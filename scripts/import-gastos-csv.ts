@@ -18,24 +18,15 @@
  *   empieza solo en una línea que arranca con fecha.
  * - El export NO trae transferencias. Por eso, después de importar, el saldo
  *   inicial de cada cuenta se ajusta para que el saldo de hoy dé el que muestra
- *   la app (SALDOS_HOY). Pasá --sin-ajuste para no tocarlos.
+ *   la app (SALDOS_HOY en gastos-saldos.ts). Pasá --sin-ajuste para no tocarlos.
+ *   Las transferencias se cargan aparte con import-gastos-transferencias.ts.
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
+import { calibrarSaldos } from "./gastos-saldos.ts";
 
 const SOURCE = "import:gastos-app";
-
-/** Saldos de hoy según la app (capturas del 2026-10-02). */
-const SALDOS_HOY: Record<string, number> = {
-  Itau: 0,
-  "Banque Heritage": 0,
-  Dolares: 0,
-  Efectivo: 0,
-  "Inversiones prex": 0,
-  "Mercado Pago": 0,
-  Santander: 0,
-};
 
 /** Cuentas conocidas: moneda, tipo, ícono y color. Las que no estén van en UYU. */
 const CUENTAS: Record<string, { currency: string; type: string; icon: string; color: string }> = {
@@ -180,28 +171,7 @@ for (let i = 0; i < data.length; i += 500) {
 }
 
 // Saldos: el export no trae transferencias, así que se calibra el saldo inicial.
-if (ajustar) {
-  for (const [name, target] of Object.entries(SALDOS_HOY)) {
-    const id = accountId.get(name);
-    if (!id) continue;
-    const txs = await prisma.transaction.findMany({
-      where: { OR: [{ accountId: id }, { toAccountId: id }] },
-      select: { kind: true, amount: true, toAmount: true, accountId: true },
-    });
-    let net = 0;
-    for (const t of txs) {
-      const amt = Math.round(Number(t.amount) * 100);
-      if (t.kind === "income") net += amt;
-      else if (t.kind === "expense") net -= amt;
-      else if (t.accountId === id) net -= amt;
-      else net += Math.round(Number(t.toAmount ?? t.amount) * 100);
-    }
-    await prisma.account.update({
-      where: { id },
-      data: { initialBalance: ((Math.round(target * 100) - net) / 100).toFixed(2) },
-    });
-  }
-}
+if (ajustar) await calibrarSaldos(prisma);
 
 const porCuenta = Object.entries(Object.groupBy(rows, (r) => r.account)).map(([k, v]) => `${k} ${v!.length}`);
 console.log(

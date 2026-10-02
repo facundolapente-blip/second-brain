@@ -43,3 +43,6 @@ next-env.d.ts
 
 # worktrees de los agentes
 /.claude/worktrees/
+
+# datos personales para importar (no van al repo)
+/data/
