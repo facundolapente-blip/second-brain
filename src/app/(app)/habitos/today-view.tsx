@@ -172,10 +172,10 @@ function DateStrip({
             onClick={() => onSelect(d)}
             className={cx(
               "relative flex w-[52px] shrink-0 snap-center flex-col items-center overflow-hidden rounded-[14px] transition-colors duration-200",
-              active ? "bg-accent text-white" : "bg-surface-2 text-muted hover:bg-surface-3",
+              active ? "bg-accent text-on-accent" : "bg-surface-2 text-muted hover:bg-surface-3",
             )}
           >
-            <span className={cx("pt-2 pb-1 text-[12px]", active ? "text-white/85" : "text-muted")}>
+            <span className={cx("pt-2 pb-1 text-[12px]", active ? "text-on-accent/85" : "text-muted")}>
               {WEEKDAY_SHORT[weekday(d)]}
             </span>
             <span
@@ -188,7 +188,7 @@ function DateStrip({
             </span>
             {isToday && (
               <span
-                className={cx("absolute bottom-1 h-[3px] w-4 rounded-full", active ? "bg-white/80" : "bg-accent")}
+                className={cx("absolute bottom-1 h-[3px] w-4 rounded-full", active ? "bg-on-accent/80" : "bg-accent")}
               />
             )}
           </button>
@@ -244,7 +244,7 @@ export function Fab({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Nuevo hábito"
-      className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-white shadow-[0_6px_20px_-6px_rgba(42,127,163,0.55)] transition-transform active:scale-95 lg:hidden"
+      className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_rgba(42,127,163,0.55)] transition-transform active:scale-95 lg:hidden"
     >
       <Plus size={26} weight="bold" />
     </button>

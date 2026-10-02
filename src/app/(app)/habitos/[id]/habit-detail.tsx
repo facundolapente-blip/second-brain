@@ -727,7 +727,7 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
               <span
                 className={cx(
                   "relative inline-flex size-12 items-center justify-center rounded-full",
-                  unlocked ? "bg-accent text-white" : "bg-surface-3 text-faint",
+                  unlocked ? "bg-accent text-on-accent" : "bg-surface-3 text-faint",
                 )}
               >
                 {unlocked ? <Medal size={26} weight="fill" /> : <Lock size={20} weight="fill" />}
