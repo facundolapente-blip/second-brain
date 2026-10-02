@@ -1,0 +1,206 @@
+// Second Brain: journal, hábitos y gastos (el plan semanal llega después).
+// App de una sola persona: los datos no llevan userId, el acceso lo cierra ALLOWED_EMAILS.
+
+generator client {
+  provider      = "prisma-client-js"
+  // El runtime de Vercel es RHEL: sin esto el motor generado no corre en producción.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Journal ────────────────────────────────────────────────────────────────
+
+/// Una entrada del diario. Puede haber más de una por día.
+model JournalEntry {
+  id        String   @id @default(cuid())
+  /// Día al que pertenece la entrada (no cuándo se escribió).
+  date      DateTime @db.Date
+  title     String?
+  body      String   @default("")
+  /// Ánimo del 1 (muy mal) al 5 (muy bien). Opcional.
+  mood      Int?
+  tags      String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
+// ─── Hábitos ────────────────────────────────────────────────────────────────
+// Modelado a partir de HabitNow, la app que Facu usaba en el celular.
+
+/// Agrupa hábitos y les da ícono y color (Deporte, Salud, Trabajo...).
+model HabitCategory {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  /// Nombre del ícono (ver src/lib/habit-icons.ts).
+  icon   String  @default("Circle")
+  /// Clave de color de la paleta (ver src/lib/palette.ts).
+  color  String  @default("stone")
+  order  Int     @default(0)
+  habits Habit[]
+}
+
+model Habit {
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  categoryId   String?
+  category     HabitCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  /// daily (todos los días) | weekdays (días específicos) | weekly (X veces por semana)
+  frequency    String         @default("daily")
+  /// Para `weekdays`: días en que toca (0 = domingo).
+  weekdays     Int[]          @default([])
+  /// Para `weekly`: cuántas veces por semana (la semana arranca el lunes).
+  timesPerWeek Int            @default(1)
+  /// Cantidad por día para darlo por hecho. 1 sin unidad = hábito de sí/no.
+  target       Int            @default(1)
+  unit         String?
+  /// Prioridad (la banderita): ordena la lista de Hoy, más alta arriba.
+  priority     Int            @default(1)
+  /// Antes de esta fecha no se cuenta nada (ni fallas ni porcentaje).
+  startDate    DateTime       @db.Date
+  order        Int            @default(0)
+  archivedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  logs         HabitLog[]
+}
+
+/// Lo marcado en un día. Sin fila = sin marcar.
+model HabitLog {
+  id      String   @id @default(cuid())
+  habitId String
+  habit   Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date    DateTime @db.Date
+  /// done | failed | skipped | none (solo nota). En hábitos de cantidad, `done` se deriva de value >= target.
+  status  String   @default("done")
+  value   Int      @default(1)
+  /// Nota del día ("hoy fumé uno después de cenar").
+  note    String?
+
+  @@unique([habitId, date])
+  @@index([date])
+}
+
+// ─── Gastos ─────────────────────────────────────────────────────────────────
+
+model Account {
+  id             String        @id @default(cuid())
+  name           String
+  /// cash | bank | card | savings | investment
+  type           String        @default("bank")
+  /// Código ISO: UYU, USD, ARS, EUR...
+  currency       String        @default("UYU")
+  initialBalance Decimal       @default(0) @db.Decimal(14, 2)
+  color          String        @default("stone")
+  order          Int           @default(0)
+  archivedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  transactions   Transaction[] @relation("TxAccount")
+  transfersIn    Transaction[] @relation("TxToAccount")
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  name         String
+  /// expense | income
+  kind         String        @default("expense")
+  icon         String        @default("Tag")
+  color        String        @default("stone")
+  archivedAt   DateTime?
+  transactions Transaction[]
+
+  @@unique([name, kind])
+}
+
+/// Un movimiento. El monto siempre es positivo: el signo lo da `kind`.
+/// En una transferencia sale `amount` de `account` y entra `toAmount` en
+/// `toAccount` (distintos si las cuentas tienen distinta moneda).
+model Transaction {
+  id          String    @id @default(cuid())
+  /// expense | income | transfer
+  kind        String
+  date        DateTime  @db.Date
+  amount      Decimal   @db.Decimal(14, 2)
+  accountId   String
+  account     Account   @relation("TxAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  toAccountId String?
+  toAccount   Account?  @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+  toAmount    Decimal?  @db.Decimal(14, 2)
+  note        String?
+  createdAt   DateTime  @default(now())
+
+  @@index([date])
+  @@index([accountId])
+}
+
+// ─── Login (Better Auth) ────────────────────────────────────────────────────
+
+model AuthUser {
+  id            String        @id
+  name          String
+  email         String        @unique
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessions      AuthSession[]
+  accounts      AuthAccount[]
+
+  @@map("auth_user")
+}
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_session")
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  /// Hash de la contraseña (nunca la contraseña en claro).
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("auth_account")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("auth_verification")
+}
