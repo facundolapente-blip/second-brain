@@ -1,0 +1,34 @@
+/*
+ * Tokens propios de Gastos. Los colores de los gráficos (ingreso azul, gasto
+ * naranja) pasaron el validador de la skill dataviz en claro y en oscuro:
+ * banda de luminosidad, croma, separación con daltonismo y contraste.
+ */
+:root {
+  --fin-in: #1f7bb3;
+  --fin-out: #c86a26;
+  --fin-grid: #ecebe7;
+  --fin-income-text: #2f6b3f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fin-in: #3d9bd4;
+    --fin-out: #d0773a;
+    --fin-grid: #2c2c29;
+    --fin-income-text: #8fcf9b;
+  }
+}
+
+/* Los montos de ingreso van en verde (texto, no marca de gráfico). */
+.fin-income {
+  color: var(--fin-income-text);
+}
+
+/* Fila horizontal deslizable sin barra visible (chips de cuentas). */
+.fin-scroll {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.fin-scroll::-webkit-scrollbar {
+  display: none;
+}
