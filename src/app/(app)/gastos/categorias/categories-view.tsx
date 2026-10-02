@@ -7,7 +7,7 @@ import { FINANCE_ICONS, FinanceIcon } from "@/lib/finance-icons";
 import { PALETTE, tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, Field, Input, Segmented, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, cx, Field, Input, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { CategoryAvatar, Fab } from "../shared";
 
@@ -169,20 +169,23 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
               {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear categoría"}
             </Button>
             {draft.id && (
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
-                  const extra = draft.txCount > 0 ? ` Sus ${draft.txCount} movimientos quedan sin clasificar.` : "";
-                  if (confirm(`¿Eliminar "${draft.name}"?${extra}`)) {
+              <>
+                <ConfirmButton
+                  confirmLabel="Tocá de nuevo para eliminar"
+                  onConfirm={() => {
                     const id = draft.id!;
                     startTransition(() => deleteCategory(id));
                     sheet.current?.close();
-                  }
-                }}
-              >
-                Eliminar categoría
-              </Button>
+                  }}
+                >
+                  Eliminar categoría
+                </ConfirmButton>
+                {draft.txCount > 0 && (
+                  <p className="text-center text-xs text-muted">
+                    Si la eliminás, sus {draft.txCount} movimientos quedan sin clasificar.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </form>

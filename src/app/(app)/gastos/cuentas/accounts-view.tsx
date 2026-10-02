@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, CaretRight, Plus } from "@phosphor-icons/react";
-import { ACCOUNT_TYPES, CURRENCIES, currencySymbol, moneySigned } from "@/lib/format";
+import { ArrowDown, ArrowUp, Bank, CaretRight, Plus } from "@phosphor-icons/react";
+import { ACCOUNT_TYPES, CURRENCIES, currencySymbol } from "@/lib/format";
 import { PALETTE, tone } from "@/lib/palette";
 import { archiveAccount, deleteAccount, reorderAccounts, saveAccount } from "@/lib/finance-actions";
 import {
@@ -13,10 +13,10 @@ import {
   type AccountDTO,
 } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
-import { AccountAvatar, EmptyBlock, Fab, TotalsInline } from "../shared";
+import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
 
 type Draft = {
   id?: string;
@@ -118,7 +118,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
 
       <main className="mx-auto max-w-3xl px-4 lg:px-8">
         {active.length === 0 ? (
-          <EmptyBlock title="Todavía no hay cuentas">
+          <EmptyBlock title="Todavía no hay cuentas" icon={<Bank size={22} aria-hidden />}>
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
               Creá una por cada lugar donde tengas plata: efectivo, cada banco, Mercado Pago, la cuenta en dólares.
             </p>
@@ -130,17 +130,24 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           <>
             <section className="grid gap-3 pt-2 pb-5 lg:pt-6">
               {Object.keys(totals).length > 0 && (
-                <dl className="flex flex-wrap gap-x-8 gap-y-3">
+                <dl className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
                   {Object.keys(totals)
                     .sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
-                    .map((c) => (
-                      <div key={c} className="grid gap-0.5">
-                        <dt className="text-[13px] text-muted">Total en {CURRENCY_NAME[c] ?? c}</dt>
-                        <dd className="text-[28px] leading-tight font-semibold tracking-tight">
-                          <TotalsInline totals={{ [c]: totals[c] }} />
-                        </dd>
-                      </div>
-                    ))}
+                    .map((c) => {
+                      const n = active.filter((a) => a.currency === c).length;
+                      return (
+                        <div key={c} className="grid gap-1 rounded-[12px] border border-line bg-surface px-3.5 py-3">
+                          <dt className="flex items-center justify-between gap-2 text-[13px] text-muted">
+                            Total en {CURRENCY_NAME[c] ?? c}
+                            <span className="rounded-[4px] bg-surface-2 px-1.5 py-px font-mono text-[11px]">{c}</span>
+                          </dt>
+                          <dd className="text-[clamp(1.25rem,5.6vw,1.625rem)] leading-tight font-semibold tracking-[-0.02em]">
+                            <Balance cents={totals[c]} currency={c} hero />
+                          </dd>
+                          <dd className="text-[12px] text-muted">{n === 1 ? "1 cuenta" : `${n} cuentas`}</dd>
+                        </div>
+                      );
+                    })}
                 </dl>
               )}
             </section>
@@ -160,8 +167,8 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                         {ACCOUNT_TYPES[a.type] ?? a.type} · {a.currency}
                       </span>
                     </span>
-                    <span className="tabular text-[15px] font-medium">{moneySigned(a.balanceCents, a.currency)}</span>
-                    {!sorting && <CaretRight size={14} className="text-faint" />}
+                    <Balance cents={a.balanceCents} currency={a.currency} className="text-[15px] font-medium" />
+                    {!sorting && <CaretRight size={14} className="text-muted" aria-hidden />}
                   </button>
                   {sorting && (
                     <span className="flex">
@@ -192,7 +199,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                       >
                         <AccountAvatar account={a} size={34} />
                         <span className="min-w-0 flex-1 truncate text-[15px]">{a.name}</span>
-                        <span className="tabular text-sm text-muted">{moneySigned(a.balanceCents, a.currency)}</span>
+                        <Balance cents={a.balanceCents} currency={a.currency} className="text-sm text-muted" />
                       </button>
                     </li>
                   ))}
@@ -308,11 +315,9 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                   {draft.archived ? "Desarchivar" : "Archivar cuenta"}
                 </Button>
                 {draft.txCount === 0 && (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => {
-                      if (!confirm(`¿Eliminar "${draft.name}"?`)) return;
+                  <ConfirmButton
+                    confirmLabel={`Tocá de nuevo para eliminar "${draft.name}"`}
+                    onConfirm={() => {
                       const id = draft.id!;
                       startTransition(async () => {
                         const r = await deleteAccount(id);
@@ -322,7 +327,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                     }}
                   >
                     Eliminar cuenta
-                  </Button>
+                  </ConfirmButton>
                 )}
               </>
             )}

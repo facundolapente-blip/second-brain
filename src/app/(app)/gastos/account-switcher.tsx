@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { CaretDown, Check, Checks, GearSix } from "@phosphor-icons/react";
-import { moneySigned } from "@/lib/format";
 import { balanceByCurrency, type AccountDTO, type Selection } from "@/lib/finance-logic";
 import { cx, Sheet, type SheetHandle } from "@/components/ui";
-import { AccountAvatar, TotalsInline } from "./shared";
+import { AccountAvatar, Balance, TotalsInline } from "./shared";
 
 /** Nombre corto de lo que se está mirando. */
 export function selectionLabel(accounts: AccountDTO[], sel: Selection): string {
@@ -31,6 +30,7 @@ export function AccountSwitcher({
   const sheet = useRef<SheetHandle>(null);
   const visible = accounts.filter((a) => !a.archived);
   const balance = balanceByCurrency(selection ? accounts : visible, selection);
+  const chosen = selection ? accounts.filter((a) => selection.includes(a.id)) : visible;
 
   function toggle(id: string) {
     const current = selection ?? visible.map((a) => a.id);
@@ -45,15 +45,26 @@ export function AccountSwitcher({
       <button
         type="button"
         onClick={() => sheet.current?.open()}
-        className="grid w-full gap-1 rounded-[12px] border border-line bg-surface px-3.5 py-2.5 text-left transition-colors hover:bg-surface-2"
+        aria-haspopup="dialog"
+        className="grid w-full gap-1.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
       >
-        <span className="flex items-center gap-1.5 text-[13px] text-muted">
-          <span>Saldo</span>
-          <span aria-hidden>·</span>
+        <span className="flex items-center gap-2 text-[13px] text-muted">
+          <span className="flex shrink-0 -space-x-1.5" aria-hidden>
+            {chosen.slice(0, 3).map((a) => (
+              <span key={a.id} className="rounded-[8px] ring-2 ring-surface">
+                <AccountAvatar account={a} size={20} />
+              </span>
+            ))}
+          </span>
           <span className="truncate font-medium text-fg">{selectionLabel(accounts, selection)}</span>
-          <CaretDown size={13} weight="bold" className="ml-auto shrink-0" />
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1">
+            Cambiar <CaretDown size={13} weight="bold" aria-hidden />
+          </span>
         </span>
-        <TotalsInline totals={balance} align="start" className="text-[17px] font-semibold" />
+        <span className="grid gap-0.5">
+          <span className="text-[12px] text-muted">Saldo actual</span>
+          <TotalsInline totals={balance} align="start" balance className="text-[18px] font-semibold tracking-tight" />
+        </span>
       </button>
 
       <Sheet ref={sheet} title="Cuentas">
@@ -72,7 +83,7 @@ export function AccountSwitcher({
                   <span
                     className={cx(
                       "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border transition-colors",
-                      on ? "border-accent bg-accent text-white" : "border-line-strong",
+                      on ? "border-accent bg-accent text-on-accent" : "border-line-strong",
                     )}
                   >
                     {on && <Check size={13} weight="bold" />}
@@ -80,8 +91,9 @@ export function AccountSwitcher({
                   <AccountAvatar account={a} size={34} />
                   <span className="grid min-w-0 flex-1">
                     <span className={cx("truncate text-[15px]", on && "font-medium")}>{a.name}</span>
-                    <span className="tabular text-[13px] text-muted">{moneySigned(a.balanceCents, a.currency)}</span>
+                    <span className="text-[12px] text-muted">{a.currency}</span>
                   </span>
+                  <Balance cents={a.balanceCents} currency={a.currency} className="text-[14px] font-medium" />
                 </button>
                 <button
                   type="button"
@@ -89,7 +101,7 @@ export function AccountSwitcher({
                     onChange(visible.length === 1 ? null : [a.id]);
                     sheet.current?.close();
                   }}
-                  className="h-8 shrink-0 rounded-md px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                  className="h-11 shrink-0 rounded-md px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
                 >
                   Solo esta
                 </button>
@@ -102,13 +114,13 @@ export function AccountSwitcher({
             type="button"
             onClick={() => onChange(null)}
             disabled={selection === null}
-            className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-sm font-medium text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
+            className="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
             <Checks size={18} weight="bold" /> Seleccionar todas
           </button>
           <Link
             href="/gastos/cuentas"
-            className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <GearSix size={18} /> Administrar
           </Link>

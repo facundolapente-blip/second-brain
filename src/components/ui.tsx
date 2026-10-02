@@ -179,7 +179,7 @@ export function ToneSquare({
 
 /**
  * Botón de borrar en dos pasos, en lugar de window.confirm: el primer toque
- * pide confirmación en el mismo lugar y a los 4 segundos vuelve solo.
+ * pide confirmación en el mismo lugar y a los 5 segundos vuelve solo.
  */
 export function ConfirmButton({
   children,
@@ -197,7 +197,7 @@ export function ConfirmButton({
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
-    const t = setTimeout(() => setArmed(false), 4000);
+    const t = setTimeout(() => setArmed(false), 5000);
     return () => clearTimeout(t);
   }, [armed]);
   return (

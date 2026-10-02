@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowUpRight } from "@phosphor-icons/react";
-import { formatMonth } from "@/lib/dates";
+import { useMemo, useRef, useState } from "react";
+import { ArrowDownRight, ArrowUpRight, ChartBar } from "@phosphor-icons/react";
+import { formatMonth, shiftMonth } from "@/lib/dates";
 import { currencySymbol, moneyCents } from "@/lib/format";
 import {
   byCategory,
@@ -19,10 +19,20 @@ import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { CategoryAvatar, MonthNav, useLookups } from "../shared";
 
+function daysInMonth(m: string) {
+  const [y, mo] = m.split("-").map(Number);
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+
+function monthName(m: string) {
+  return new Intl.DateTimeFormat("es-UY", { month: "long", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`)).toLowerCase();
+}
+
 /**
- * Semilla de la sección de análisis: gasto/ingreso por categoría del mes y
- * evolución de los últimos meses. Se mira una moneda a la vez (no se convierte
- * USD a UYU) y respeta las cuentas elegidas en el selector.
+ * Semilla de la sección de análisis: cifras del mes, ritmo de gasto contra el
+ * mes anterior, gasto/ingreso por categoría y evolución de los últimos meses.
+ * Se mira una moneda a la vez (no se convierte USD a UYU) y respeta las
+ * cuentas elegidas en el selector.
  */
 export function ReportsView({
   month,
@@ -58,23 +68,36 @@ export function ReportsView({
   const evolution = useMemo(() => byMonth(scoped, months), [scoped, months]);
   const cats = useMemo(() => byCategory(monthRows, kind), [monthRows, kind]);
 
+  const prevMonth = shiftMonth(month, -1);
+  const isCurrent = month === today.slice(0, 7);
+  // En el mes en curso se compara contra el anterior hasta el mismo día: comparar
+  // 2 días contra un mes entero siempre da "−95%" y no dice nada.
+  const cutDay = isCurrent ? Number(today.slice(8)) : 31;
+  const prevPartial = useMemo(() => {
+    const out = { expense: 0, income: 0 };
+    for (const r of scoped) if (r.date.startsWith(prevMonth) && Number(r.date.slice(8)) <= cutDay) out[r.kind] += r.cents;
+    return out;
+  }, [scoped, prevMonth, cutDay]);
+
   const cur = evolution[evolution.length - 1];
-  const prev = evolution[evolution.length - 2];
   const total = kind === "expense" ? cur.expense : cur.income;
+  const elapsed = isCurrent ? cutDay : daysInMonth(month);
+  const compareLabel = isCurrent ? `vs. ${shortMonth(prevMonth)} al día ${cutDay}` : `vs. ${monthName(prevMonth)}`;
+  const empty = cur.expense === 0 && cur.income === 0 && evolution.every((e) => e.expense === 0 && e.income === 0);
 
   return (
     <>
       <PageHeader title="Informes" tabs={<GastosTabs />} />
 
-      <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-2 pb-8 lg:px-8 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-9 px-4 pt-2 pb-8 lg:px-8 lg:pt-6">
         {/* Filtros: una sola fila arriba de todo lo que afectan. */}
-        <section className="grid gap-3 lg:grid-cols-[1fr_minmax(0,320px)] lg:items-center">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="-ml-2.5">
+        <section className="grid gap-3 lg:grid-cols-[1fr_minmax(0,320px)] lg:items-center" aria-label="Filtros">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="-ml-3">
               <MonthNav month={month} basePath="/gastos/informes" current={today.slice(0, 7)} />
             </div>
             {currencies.length > 1 && (
-              <div className="w-40">
+              <div className="w-36">
                 <Segmented
                   value={currency}
                   onChange={setCurrency}
@@ -86,48 +109,86 @@ export function ReportsView({
           <AccountSwitcher accounts={accounts} selection={selection} onChange={setSelection} />
         </section>
 
-        <section className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-          <Stat label="Gastos" cents={cur.expense} prevCents={prev?.expense} currency={currency} upIsGood={false} hero />
-          <Stat label="Ingresos" cents={cur.income} prevCents={prev?.income} currency={currency} upIsGood />
-          <Stat label="Neto" cents={cur.income - cur.expense} currency={currency} signed />
-        </section>
-
-        <section className="grid gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[15px] font-semibold">Por categoría</h2>
-            <div className="w-48">
-              <Segmented
-                value={kind}
-                onChange={setKind}
-                options={[
-                  { value: "expense", label: "Gastos" },
-                  { value: "income", label: "Ingresos" },
-                ]}
-              />
-            </div>
-          </div>
-          {cats.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted">
-              No hay {kind === "expense" ? "gastos" : "ingresos"} en {currency} este mes.
+        {empty ? (
+          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
+            <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
+              <ChartBar size={22} aria-hidden />
+            </span>
+            <h2 className="text-lg font-semibold tracking-tight">Sin movimientos en {currency}</h2>
+            <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
+              No hay gastos ni ingresos en estos meses para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
-          ) : (
-            <CategoryBars
-              items={cats.map((c) => ({
-                key: c.categoryId ?? "none",
-                category: lk.category(c.categoryId),
-                cents: c.cents,
-              }))}
-              total={total}
-              currency={currency}
-              color={kind === "expense" ? "var(--fin-out)" : "var(--fin-in)"}
-            />
-          )}
-        </section>
+          </div>
+        ) : (
+          <>
+            <section className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4" aria-label="Cifras del mes">
+              <Stat
+                label={isCurrent ? "Gastado hasta hoy" : "Gastos"}
+                cents={cur.expense}
+                prevCents={prevPartial.expense}
+                compareLabel={compareLabel}
+                currency={currency}
+                upIsGood={false}
+                hero
+              />
+              <Stat
+                label="Ingresos"
+                cents={cur.income}
+                prevCents={prevPartial.income}
+                compareLabel={compareLabel}
+                currency={currency}
+                upIsGood
+              />
+              <Stat label="Neto" cents={cur.income - cur.expense} currency={currency} signed />
+              <Stat label="Gasto por día" cents={Math.round(cur.expense / Math.max(1, elapsed) / 100) * 100} currency={currency} hint={`en ${elapsed} días`} />
+            </section>
 
-        <section className="grid gap-3">
-          <h2 className="text-[15px] font-semibold">Últimos {months.length} meses</h2>
-          <MonthlyColumns data={evolution} current={month} currency={currency} />
-        </section>
+            <section className="grid gap-3">
+              <div className="grid gap-0.5">
+                <h2 className="text-[17px] font-semibold tracking-tight">Ritmo del mes</h2>
+                <p className="text-[13px] text-muted">Gasto acumulado día a día contra {monthName(prevMonth)}.</p>
+              </div>
+              <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} />
+            </section>
+
+            <section className="grid gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[17px] font-semibold tracking-tight">Por categoría</h2>
+                <div className="w-48">
+                  <Segmented
+                    value={kind}
+                    onChange={setKind}
+                    options={[
+                      { value: "expense", label: "Gastos" },
+                      { value: "income", label: "Ingresos" },
+                    ]}
+                  />
+                </div>
+              </div>
+              {cats.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted">
+                  No hay {kind === "expense" ? "gastos" : "ingresos"} en {currency} este mes.
+                </p>
+              ) : (
+                <CategoryBars
+                  items={cats.map((c) => ({
+                    key: c.categoryId ?? "none",
+                    category: lk.category(c.categoryId),
+                    cents: c.cents,
+                  }))}
+                  total={total}
+                  currency={currency}
+                  color={kind === "expense" ? "var(--fin-out)" : "var(--fin-in)"}
+                />
+              )}
+            </section>
+
+            <section className="grid gap-3">
+              <h2 className="text-[17px] font-semibold tracking-tight">Últimos {months.length} meses</h2>
+              <MonthlyColumns data={evolution} current={month} currency={currency} />
+            </section>
+          </>
+        )}
       </main>
     </>
   );
@@ -139,35 +200,257 @@ function Stat({
   label,
   cents,
   prevCents,
+  compareLabel,
   currency,
   upIsGood,
   signed,
   hero,
+  hint,
 }: {
   label: string;
   cents: number;
   prevCents?: number;
+  compareLabel?: string;
   currency: string;
   upIsGood?: boolean;
   signed?: boolean;
   hero?: boolean;
+  hint?: string;
 }) {
   const delta = prevCents !== undefined && prevCents > 0 ? (cents - prevCents) / prevCents : null;
   const good = delta !== null && (upIsGood ? delta >= 0 : delta <= 0);
   return (
     <div className={cx("grid content-start gap-1", hero && "col-span-2 sm:col-span-1")}>
       <span className="text-[13px] text-muted">{label}</span>
-      <span className={cx("leading-none font-semibold tracking-tight", hero ? "text-[36px]" : "text-[24px]")}>
+      <span className={cx("leading-none font-semibold tracking-[-0.02em]", hero ? "text-[36px]" : "text-[22px]")}>
         {signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}
         {moneyCents(cents, currency)}
       </span>
-      {delta !== null && Math.abs(delta) >= 0.005 && (
+      {delta !== null && Math.abs(delta) >= 0.005 ? (
         <span className={cx("inline-flex items-center gap-1 text-[12.5px]", good ? "fin-income" : "text-danger")}>
-          {delta > 0 ? <ArrowUpRight size={13} weight="bold" /> : <ArrowDownRight size={13} weight="bold" />}
-          {Math.abs(Math.round(delta * 100))}% vs. mes anterior
+          {delta > 0 ? <ArrowUpRight size={13} weight="bold" aria-hidden /> : <ArrowDownRight size={13} weight="bold" aria-hidden />}
+          <span>
+            {delta > 0 ? "+" : "−"}
+            {Math.abs(Math.round(delta * 100))}% <span className="text-muted">{compareLabel}</span>
+          </span>
         </span>
+      ) : (
+        hint && <span className="text-[12.5px] text-muted">{hint}</span>
       )}
     </div>
+  );
+}
+
+// ─── Ritmo del mes ──────────────────────────────────────────────────────────
+
+/**
+ * Gasto acumulado por día: el mes elegido en el color del gasto y el anterior
+ * en gris (énfasis en uno, contexto en el otro). Un solo eje, leyenda, valor
+ * directo solo al final de cada línea, cruz que sigue al puntero (también con
+ * flechas del teclado) y tabla con todos los números.
+ */
+function PaceChart({
+  rows,
+  month,
+  prevMonth,
+  lastDay,
+  currency,
+}: {
+  rows: FlowRow[];
+  month: string;
+  prevMonth: string;
+  /** Último día con datos del mes elegido (hoy, si es el mes en curso). */
+  lastDay: number;
+  currency: string;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const span = Math.max(daysInMonth(month), daysInMonth(prevMonth));
+
+  const { curSeries, prevSeries } = useMemo(() => {
+    const a = new Array(span + 1).fill(0);
+    const b = new Array(span + 1).fill(0);
+    for (const r of rows) {
+      if (r.kind !== "expense") continue;
+      const d = Number(r.date.slice(8));
+      if (r.date.startsWith(month)) a[d] += r.cents;
+      else if (r.date.startsWith(prevMonth)) b[d] += r.cents;
+    }
+    for (let i = 1; i <= span; i++) {
+      a[i] += a[i - 1];
+      b[i] += b[i - 1];
+    }
+    return {
+      curSeries: a.slice(0, lastDay + 1),
+      prevSeries: b.slice(0, daysInMonth(prevMonth) + 1),
+    };
+  }, [rows, month, prevMonth, span, lastDay]);
+
+  const top = niceMax(Math.max(curSeries.at(-1) ?? 0, prevSeries.at(-1) ?? 0) / 100);
+  const W = 600;
+  const H = 180;
+  const x = (d: number) => (d / span) * W;
+  const y = (cents: number) => H - (cents / 100 / top) * H;
+  const path = (s: number[]) => s.map((v, d) => `${d === 0 ? "M" : "L"}${x(d).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const sym = currencySymbol(currency);
+  const ticks = [top, top / 2, 0];
+  const curEnd = curSeries.length - 1;
+  const prevEnd = prevSeries.length - 1;
+
+  function pick(clientX: number) {
+    const r = box.current?.getBoundingClientRect();
+    if (!r) return;
+    const d = Math.round(((clientX - r.left) / r.width) * span);
+    setHover(Math.min(span, Math.max(1, d)));
+  }
+
+  const h = hover;
+  const pct = (d: number) => `${(d / span) * 100}%`;
+  const topPct = (cents: number) => `${(y(cents) / H) * 100}%`;
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted">
+        <LegendLine color="var(--fin-out)" label={formatMonth(month)} />
+        <LegendLine color="var(--faint)" label={formatMonth(prevMonth)} />
+      </div>
+
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
+        <div className="relative w-14" style={{ height: H }} aria-hidden>
+          {ticks.map((t) => (
+            <span
+              key={t}
+              className="tabular absolute right-0 -translate-y-1/2 text-[11px] whitespace-nowrap text-muted"
+              style={{ top: topPct(t * 100) }}
+            >
+              {t === 0 ? "0" : `${sym} ${compact.format(t)}`}
+            </span>
+          ))}
+        </div>
+
+        <div
+          ref={box}
+          role="img"
+          tabIndex={0}
+          aria-label={`Gasto acumulado: ${formatMonth(month)} ${moneyCents(curSeries[curEnd], currency)} al día ${curEnd}; ${formatMonth(prevMonth)} ${moneyCents(prevSeries[prevEnd], currency)} en total.`}
+          onPointerMove={(e) => pick(e.clientX)}
+          onPointerDown={(e) => pick(e.clientX)}
+          onPointerLeave={() => setHover(null)}
+          onBlur={() => setHover(null)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight") setHover((v) => Math.min(span, (v ?? curEnd) + 1));
+            else if (e.key === "ArrowLeft") setHover((v) => Math.max(1, (v ?? curEnd) - 1));
+            else if (e.key === "Escape") setHover(null);
+            else return;
+            e.preventDefault();
+          }}
+          className="relative touch-pan-y rounded-[4px] outline-offset-4"
+          style={{ height: H }}
+        >
+          {ticks.map((t) => (
+            <span
+              key={t}
+              className="absolute inset-x-0 h-px"
+              style={{ top: topPct(t * 100), background: t === 0 ? "var(--border-strong)" : "var(--fin-grid)" }}
+            />
+          ))}
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden>
+            <path d={path(prevSeries)} fill="none" stroke="var(--faint)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <path
+              d={`${path(curSeries)} L${x(curEnd).toFixed(1)},${H} L0,${H} Z`}
+              fill="var(--fin-out)"
+              fillOpacity={0.1}
+              stroke="none"
+            />
+            <path d={path(curSeries)} fill="none" stroke="var(--fin-out)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          </svg>
+
+          {/* Puntos finales con anillo del color de fondo, en HTML para que no se deformen. */}
+          <Dot left={pct(prevEnd)} top={topPct(prevSeries[prevEnd])} color="var(--faint)" />
+          <Dot left={pct(curEnd)} top={topPct(curSeries[curEnd])} color="var(--fin-out)" />
+          {h === null && (
+            <span
+              className="tabular pointer-events-none absolute text-[11px] font-medium whitespace-nowrap text-fg"
+              style={{
+                left: pct(curEnd),
+                top: topPct(curSeries[curEnd]),
+                transform: `translate(${curEnd > span * 0.75 ? "calc(-100% - 8px)" : "8px"}, -130%)`,
+              }}
+            >
+              {compact.format(curSeries[curEnd] / 100)}
+            </span>
+          )}
+
+          {h !== null && (
+            <>
+              <span className="pointer-events-none absolute inset-y-0 w-px bg-line-strong" style={{ left: pct(h) }} />
+              {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
+              {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
+              <div
+                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+                style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
+              >
+                <span className="text-muted">Día {h}</span>
+                <TooltipRow color="var(--fin-out)" label={monthName(month)} value={h <= curEnd ? moneyCents(curSeries[h], currency) : "Sin datos"} />
+                <TooltipRow color="var(--faint)" label={monthName(prevMonth)} value={h <= prevEnd ? moneyCents(prevSeries[h], currency) : "Sin datos"} />
+              </div>
+            </>
+          )}
+        </div>
+
+        <span />
+        <div className="relative h-5 pt-1.5 text-[11px] text-muted" aria-hidden>
+          {[1, 10, 20, span].map((d) => (
+            <span key={d} className="tabular absolute -translate-x-1/2" style={{ left: pct(d) }}>
+              {d}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <details className="text-sm">
+        <summary className="cursor-pointer text-[13px] text-muted select-none">Ver como tabla</summary>
+        <div className="mt-2 max-h-72 overflow-y-auto">
+          <table className="w-full text-[13px]">
+            <thead className="sticky top-0 bg-bg">
+              <tr className="text-left text-muted">
+                <th className="py-1.5 font-normal">Día</th>
+                <th className="py-1.5 text-right font-normal first-letter:uppercase">{monthName(month)}</th>
+                <th className="py-1.5 text-right font-normal first-letter:uppercase">{monthName(prevMonth)}</th>
+              </tr>
+            </thead>
+            <tbody className="tabular">
+              {Array.from({ length: span }, (_, i) => i + 1).map((d) => (
+                <tr key={d} className="border-t border-line">
+                  <td className="py-1.5">{d}</td>
+                  <td className="py-1.5 text-right">{d <= curEnd ? moneyCents(curSeries[d], currency) : ""}</td>
+                  <td className="py-1.5 text-right">{d <= prevEnd ? moneyCents(prevSeries[d], currency) : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function Dot({ left, top, color }: { left: string; top: string; color: string }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg"
+      style={{ left, top, background: color }}
+    />
+  );
+}
+
+function LegendLine({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 first-letter:uppercase">
+      <span className="h-0.5 w-4 rounded-full" style={{ background: color }} aria-hidden />
+      <span className="first-letter:uppercase">{label}</span>
+    </span>
   );
 }
 
@@ -192,11 +475,15 @@ function CategoryBars({
   const max = Math.max(...items.map((i) => i.cents), 1);
   return (
     <ul className="grid gap-3.5">
-      {items.map((it) => {
+      {items.map((it, i) => {
         const pct = total > 0 ? Math.round((it.cents / total) * 100) : 0;
         const name = it.category?.name ?? "Sin clasificar";
         return (
-          <li key={it.key} className="grid grid-cols-[32px_1fr] items-center gap-x-3 gap-y-1.5" title={`${name}: ${moneyCents(it.cents, currency)} (${pct}%)`}>
+          <li
+            key={it.key}
+            className="rise grid grid-cols-[32px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5"
+            style={{ "--i": Math.min(i, 8) } as React.CSSProperties}
+          >
             <span className="row-span-2">
               <CategoryAvatar category={it.category} size={32} />
             </span>
@@ -209,7 +496,7 @@ function CategoryBars({
                 </span>
               </span>
             </span>
-            <span className="block h-2">
+            <span className="block h-2" aria-hidden>
               <span
                 className="block h-2 rounded-r-[4px]"
                 style={{ width: `${Math.max(1.5, (it.cents / max) * 100)}%`, background: color }}
@@ -237,7 +524,8 @@ function niceMax(v: number): number {
 function shortMonth(m: string): string {
   return new Intl.DateTimeFormat("es-UY", { month: "short", timeZone: "UTC" })
     .format(new Date(`${m}-01T00:00:00Z`))
-    .replace(".", "");
+    .replace(".", "")
+    .toLowerCase();
 }
 
 /**
@@ -268,9 +556,9 @@ function MonthlyColumns({
         <LegendKey color="var(--fin-out)" label="Gastos" />
       </div>
 
-      <div className="relative grid grid-cols-[auto_1fr] gap-x-2">
+      <div className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
         {/* Eje Y con valores redondos */}
-        <div className="relative w-14" style={{ height: H }}>
+        <div className="relative w-14" style={{ height: H }} aria-hidden>
           {ticks.map((t) => (
             <span
               key={t}
@@ -290,7 +578,7 @@ function MonthlyColumns({
               style={{ top: H - (t / top) * H, background: t === 0 ? "var(--border-strong)" : "var(--fin-grid)" }}
             />
           ))}
-          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${data.length}, 1fr)` }}>
+          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
             {data.map((d, i) => {
               const selected = d.month === current;
               return (
@@ -303,7 +591,7 @@ function MonthlyColumns({
                   onFocus={() => setHover(i)}
                   onBlur={() => setHover((x) => (x === i ? null : x))}
                   className={cx(
-                    "relative flex items-end justify-center gap-[2px] rounded-t-md outline-none transition-colors",
+                    "relative flex items-end justify-center gap-[2px] rounded-t-md transition-colors",
                     hover === i && "bg-surface-2/70",
                   )}
                 >
@@ -317,7 +605,7 @@ function MonthlyColumns({
 
           {hover !== null && (
             <div
-              className="pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px] shadow-[0_4px_16px_-6px_rgba(0,0,0,0.12)]"
+              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
               style={{
                 left: `${((hover + 0.5) / data.length) * 100}%`,
                 transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,
@@ -331,7 +619,7 @@ function MonthlyColumns({
         </div>
 
         <span />
-        <div className="grid pt-1.5" style={{ gridTemplateColumns: `repeat(${data.length}, 1fr)` }}>
+        <div className="grid pt-1.5" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }} aria-hidden>
           {data.map((d) => (
             <span key={d.month} className={cx("text-center text-[12px]", d.month === current ? "font-semibold text-fg" : "text-muted")}>
               {shortMonth(d.month)}
@@ -386,7 +674,7 @@ function Column({ cents, height, color, label }: { cents: number; height: number
 function LegendKey({ color, label }: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="size-2.5 rounded-[3px]" style={{ background: color }} />
+      <span className="size-2.5 rounded-[3px]" style={{ background: color }} aria-hidden />
       {label}
     </span>
   );
@@ -397,7 +685,7 @@ function TooltipRow({ color, label, value }: { color: string; label: string; val
     <span className="flex items-center gap-2">
       <span className="h-0.5 w-3 rounded-full" style={{ background: color }} />
       <span className="tabular font-semibold">{value}</span>
-      <span className="text-muted">{label}</span>
+      <span className="text-muted first-letter:uppercase">{label}</span>
     </span>
   );
 }
