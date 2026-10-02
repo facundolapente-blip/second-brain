@@ -66,12 +66,31 @@ model Habit {
   unit         String?
   /// Prioridad (la banderita): ordena la lista de Hoy, más alta arriba.
   priority     Int            @default(1)
-  /// Antes de esta fecha no se cuenta nada (ni fallas ni porcentaje).
+  /// Inicio de la pista actual: la tarjeta, la racha y el puntaje cuentan desde acá.
+  /// Las pistas anteriores están en HabitTrack.
   startDate    DateTime       @db.Date
   order        Int            @default(0)
   archivedAt   DateTime?
   createdAt    DateTime       @default(now())
   logs         HabitLog[]
+  tracks       HabitTrack[]
+}
+
+/// Una pista cerrada (como en HabitNow): un tramo anterior del hábito, con la
+/// configuración que tenía entonces. La pista actual vive en Habit.
+model HabitTrack {
+  id           String   @id @default(cuid())
+  habitId      String
+  habit        Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  frequency    String
+  weekdays     Int[]    @default([])
+  timesPerWeek Int      @default(1)
+  weekStart    Int      @default(1)
+  target       Int      @default(1)
+
+  @@index([habitId])
 }
 
 /// Lo marcado en un día. Sin fila = sin marcar.

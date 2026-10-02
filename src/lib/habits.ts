@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { fromDbDate, todayISO } from "./dates";
-import type { DayLog, Frequency, LogMap } from "./habit-logic";
+import type { DayLog, Frequency, LogMap, PastTrack } from "./habit-logic";
 
 export type CategoryDTO = { id: string; name: string; icon: string; color: string; habitCount: number };
 
@@ -22,6 +22,8 @@ export type HabitDTO = {
   priority: number;
   startDate: string;
   archived: boolean;
+  /** Pistas cerradas, de la más vieja a la más nueva. */
+  tracks: PastTrack[];
 };
 
 /** Categorías con las que arranca la app, las mismas que había en HabitNow. */
@@ -56,7 +58,7 @@ type HabitRow = Awaited<ReturnType<typeof queryHabits>>[number];
 function queryHabits(where: { archivedAt: null } | { archivedAt: { not: null } } | { id: string }) {
   return prisma.habit.findMany({
     where,
-    include: { category: true },
+    include: { category: true, tracks: { orderBy: { startDate: "asc" } } },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
   });
 }
@@ -79,6 +81,15 @@ function toDTO(h: HabitRow): HabitDTO {
     priority: h.priority,
     startDate: fromDbDate(h.startDate),
     archived: h.archivedAt !== null,
+    tracks: h.tracks.map((t) => ({
+      startDate: fromDbDate(t.startDate),
+      endDate: fromDbDate(t.endDate),
+      frequency: t.frequency as Frequency,
+      weekdays: t.weekdays,
+      timesPerWeek: t.timesPerWeek,
+      weekStart: t.weekStart,
+      target: t.target,
+    })),
   };
 }
 

@@ -40,7 +40,9 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Tocar un día en la tarjeta rota: sin marcar → hecho → fallado → salteado. Hábitos de cantidad abren `DaySheet`.
 - Cada día puede tener nota (`HabitLog.note`); un día con nota y sin marca queda con `status = "none"`.
 - Detalle `/habitos/[id]?tab=calendario|estadisticas|editar`: calendario + notas, estadísticas (puntaje, racha, veces logrado, línea del mes, barras semana/mes/año, logrado/fallido, desafío de racha) y edición.
-- Pendiente de HabitNow: "pistas" (reiniciar un hábito y ver estadísticas por tramo), reordenar a mano, recordatorios.
+- **Pistas** (como HabitNow): `Habit.startDate` es el inicio de la pista actual; las cerradas están en `HabitTrack` con la configuración que tenían. Tarjeta, Hoy y racha usan la pista actual; el detalle elige pista actual / todas / una vieja (`trackStats`).
+- Reglas calibradas con el backup real de HabitNow (`scripts/import-habitnow.ts`): los salteados no bajan la meta semanal, la primera semana se prorratea, la semana en curso entra al puntaje solo si se cumplió. El % de la tarjeta es el puntaje.
+- Pendiente: reordenar a mano, recordatorios.
 
 ## Diseño
 

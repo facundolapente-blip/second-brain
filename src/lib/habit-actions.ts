@@ -109,6 +109,11 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
   };
 
   if (id) {
+    // La pista actual no puede arrancar antes de que termine la anterior.
+    const last = await prisma.habitTrack.findFirst({ where: { habitId: id }, orderBy: { endDate: "desc" } });
+    if (last && data.startDate <= last.endDate) {
+      return { ok: false, error: "La fecha de inicio tiene que ser posterior a la pista anterior." };
+    }
     await prisma.habit.update({ where: { id }, data });
     refrescar();
     return { ok: true, id };
@@ -117,6 +122,53 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
   const created = await prisma.habit.create({ data: { ...data, order: (last._max.order ?? 0) + 1 } });
   refrescar();
   return { ok: true, id: created.id };
+}
+
+/**
+ * Empieza una pista nueva desde `date`: la actual se guarda como pista cerrada
+ * (con su configuración) y la tarjeta, la racha y el puntaje arrancan de cero.
+ * El historial no se borra: se ve en "Todas las pistas".
+ */
+export async function startNewTrack(habitId: string, date: string): Promise<ActionResult> {
+  await exigirSesion();
+  if (!isISODate(date)) return { ok: false, error: "Fecha inválida." };
+  const habit = await prisma.habit.findUnique({ where: { id: habitId } });
+  if (!habit) return { ok: false, error: "No existe ese hábito." };
+  const start = toDbDate(date);
+  if (start <= habit.startDate) {
+    return { ok: false, error: "La pista nueva tiene que empezar después del inicio de la actual." };
+  }
+  const end = new Date(start.getTime() - 86_400_000);
+  await prisma.$transaction([
+    prisma.habitTrack.create({
+      data: {
+        habitId,
+        startDate: habit.startDate,
+        endDate: end,
+        frequency: habit.frequency,
+        weekdays: habit.weekdays,
+        timesPerWeek: habit.timesPerWeek,
+        weekStart: habit.weekStart,
+        target: habit.target,
+      },
+    }),
+    prisma.habit.update({ where: { id: habitId }, data: { startDate: start } }),
+  ]);
+  refrescar();
+  return { ok: true };
+}
+
+/** Deshace la última pista nueva: la pista cerrada más reciente vuelve a ser parte de la actual. */
+export async function mergeLastTrack(habitId: string): Promise<ActionResult> {
+  await exigirSesion();
+  const last = await prisma.habitTrack.findFirst({ where: { habitId }, orderBy: { endDate: "desc" } });
+  if (!last) return { ok: false, error: "No hay pistas anteriores." };
+  await prisma.$transaction([
+    prisma.habit.update({ where: { id: habitId }, data: { startDate: last.startDate } }),
+    prisma.habitTrack.delete({ where: { id: last.id } }),
+  ]);
+  refrescar();
+  return { ok: true };
 }
 
 export async function archiveHabit(id: string, archived: boolean) {
