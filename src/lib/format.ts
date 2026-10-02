@@ -29,3 +29,19 @@ export const ACCOUNT_TYPES: Record<string, string> = {
   savings: "Ahorro",
   investment: "Inversión",
 };
+
+/** Monto en centavos con signo explícito: "+ $ 2.615", "− US$ 40,50". Cero sin signo. */
+export function moneySigned(cents: number, currency = "UYU"): string {
+  if (cents === 0) return money(0, currency);
+  return `${cents > 0 ? "+" : "−"} ${money(Math.abs(cents) / 100, currency)}`;
+}
+
+/** Monto en centavos, sin signo. */
+export function moneyCents(cents: number, currency = "UYU"): string {
+  return money(Math.abs(cents) / 100, currency);
+}
+
+/** Símbolo corto para prefijar un campo de monto. */
+export function currencySymbol(currency: string): string {
+  return currency === "UYU" ? "$" : currency === "USD" ? "US$" : currency;
+}

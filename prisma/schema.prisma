@@ -88,57 +88,145 @@ model HabitLog {
 }
 
 // ─── Gastos ─────────────────────────────────────────────────────────────────
+// Modelado a partir de la app de gastos que Facu usaba en el celular: varias
+// cuentas (cada una con su moneda), movimientos siempre atados a una cuenta y
+// transferencias entre cuentas (también entre UYU y USD).
+//
+// El saldo no se guarda: se calcula como saldo inicial + ingresos - gastos
+// +/- transferencias (src/lib/finance-logic.ts). Los montos se guardan siempre
+// positivos y el signo lo da `kind`, así los análisis no dependen de convenciones.
 
 model Account {
-  id             String        @id @default(cuid())
+  id             String                 @id @default(cuid())
   name           String
   /// cash | bank | card | savings | investment
-  type           String        @default("bank")
+  type           String                 @default("bank")
   /// Código ISO: UYU, USD, ARS, EUR...
-  currency       String        @default("UYU")
-  initialBalance Decimal       @default(0) @db.Decimal(14, 2)
-  color          String        @default("stone")
-  order          Int           @default(0)
+  currency       String                 @default("UYU")
+  initialBalance Decimal                @default(0) @db.Decimal(14, 2)
+  /// Nombre del ícono (ver src/lib/finance-icons.tsx).
+  icon           String                 @default("Wallet")
+  /// Clave de color de la paleta (ver src/lib/palette.ts).
+  color          String                 @default("stone")
+  order          Int                    @default(0)
   archivedAt     DateTime?
-  createdAt      DateTime      @default(now())
-  transactions   Transaction[] @relation("TxAccount")
-  transfersIn    Transaction[] @relation("TxToAccount")
+  createdAt      DateTime               @default(now())
+  transactions   Transaction[]          @relation("TxAccount")
+  transfersIn    Transaction[]          @relation("TxToAccount")
+  templates      TxTemplate[]           @relation("TplAccount")
+  templatesIn    TxTemplate[]           @relation("TplToAccount")
+  schedules      ScheduledTransaction[] @relation("SchAccount")
+  schedulesIn    ScheduledTransaction[] @relation("SchToAccount")
 }
 
+/// Categoría de gasto o de ingreso. Un movimiento sin categoría es "Sin clasificar".
 model Category {
-  id           String        @id @default(cuid())
+  id           String                 @id @default(cuid())
   name         String
   /// expense | income
-  kind         String        @default("expense")
-  icon         String        @default("Tag")
-  color        String        @default("stone")
+  kind         String                 @default("expense")
+  /// Nombre del ícono (ver src/lib/finance-icons.tsx).
+  icon         String                 @default("Tag")
+  color        String                 @default("stone")
+  order        Int                    @default(0)
   archivedAt   DateTime?
   transactions Transaction[]
+  templates    TxTemplate[]
+  schedules    ScheduledTransaction[]
 
   @@unique([name, kind])
 }
 
 /// Un movimiento. El monto siempre es positivo: el signo lo da `kind`.
 /// En una transferencia sale `amount` de `account` y entra `toAmount` en
-/// `toAccount` (distintos si las cuentas tienen distinta moneda).
+/// `toAccount` (distintos si las cuentas tienen distinta moneda; iguales si no).
 model Transaction {
-  id          String    @id @default(cuid())
+  id          String                @id @default(cuid())
   /// expense | income | transfer
   kind        String
-  date        DateTime  @db.Date
-  amount      Decimal   @db.Decimal(14, 2)
+  /// Día del movimiento (YYYY-MM-DD en America/Montevideo).
+  date        DateTime              @db.Date
+  /// Lo que se ve en la lista ("Dominos", "Psiquiatra"). Vacío = "Sin título".
+  title       String?
+  amount      Decimal               @db.Decimal(14, 2)
   accountId   String
-  account     Account   @relation("TxAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  account     Account               @relation("TxAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  /// Solo en gastos e ingresos. Null = sin clasificar.
+  categoryId  String?
+  category    Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  /// Solo en transferencias.
+  toAccountId String?
+  toAccount   Account?              @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+  toAmount    Decimal?              @db.Decimal(14, 2)
+  note        String?
+  /// Si lo generó una orden permanente o un movimiento programado.
+  scheduleId  String?
+  schedule    ScheduledTransaction? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  /// De dónde vino: null = cargado a mano; "import:<app>" = importado.
+  source      String?
+  /// Id en el sistema de origen, para no duplicar al reimportar.
+  externalId  String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @default(now()) @updatedAt
+
+  @@unique([source, externalId])
+  @@index([date])
+  @@index([accountId])
+  @@index([toAccountId])
+  @@index([categoryId])
+}
+
+/// Plantilla: un movimiento guardado para repetirlo rápido (el monto es opcional).
+model TxTemplate {
+  id          String    @id @default(cuid())
+  name        String
+  kind        String
+  title       String?
+  amount      Decimal?  @db.Decimal(14, 2)
+  accountId   String?
+  account     Account?  @relation("TplAccount", fields: [accountId], references: [id], onDelete: SetNull)
   categoryId  String?
   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   toAccountId String?
-  toAccount   Account?  @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+  toAccount   Account?  @relation("TplToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
   toAmount    Decimal?  @db.Decimal(14, 2)
   note        String?
+  order       Int       @default(0)
   createdAt   DateTime  @default(now())
+}
 
-  @@index([date])
-  @@index([accountId])
+/// Orden permanente (se repite: alquiler todos los meses) o movimiento
+/// programado (una sola vez, en el futuro). Todavía no hay proceso que los
+/// genere: cuando exista, crea un Transaction con `scheduleId` en `nextDate`
+/// y corre `nextDate` según la frecuencia.
+model ScheduledTransaction {
+  id           String        @id @default(cuid())
+  kind         String
+  title        String?
+  amount       Decimal       @db.Decimal(14, 2)
+  accountId    String
+  account      Account       @relation("SchAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  toAccountId  String?
+  toAccount    Account?      @relation("SchToAccount", fields: [toAccountId], references: [id], onDelete: Cascade)
+  toAmount     Decimal?      @db.Decimal(14, 2)
+  note         String?
+  /// once | daily | weekly | monthly | yearly
+  frequency    String        @default("monthly")
+  /// Cada cuántas unidades de `frequency` (2 + weekly = cada dos semanas).
+  interval     Int           @default(1)
+  startDate    DateTime      @db.Date
+  /// Próxima vez que toca generar el movimiento. Null = terminada.
+  nextDate     DateTime?     @db.Date
+  endDate      DateTime?     @db.Date
+  /// true: se carga sola; false: pide confirmación antes de cargarla.
+  autoConfirm  Boolean       @default(true)
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+
+  @@index([nextDate])
 }
 
 // ─── Login (Better Auth) ────────────────────────────────────────────────────
