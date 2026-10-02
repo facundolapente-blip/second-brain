@@ -85,7 +85,13 @@ export const TxSheet = forwardRef<
     setFormKey((k) => k + 1);
     sheet.current?.open();
     // En el celular el teclado numérico sale directo al abrir.
-    if (!next.id) setTimeout(() => amountRef.current?.focus(), 60);
+    // Si viene precargado (plantilla), queda seleccionado para pisarlo al tipear.
+    if (!next.id) {
+      setTimeout(() => {
+        amountRef.current?.focus();
+        amountRef.current?.select();
+      }, 60);
+    }
   }
 
   useImperativeHandle(ref, () => ({

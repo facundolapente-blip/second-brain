@@ -19,18 +19,16 @@ import {
   X,
   type Icon,
 } from "@phosphor-icons/react";
-import { archiveHabit, deleteHabit } from "@/lib/habit-actions";
-import { addDays, formatLong, monthBounds, shiftMonth, startOfWeek } from "@/lib/dates";
+import { archiveHabit, deleteHabit, mergeLastTrack, startNewTrack } from "@/lib/habit-actions";
+import { addDays, formatLong, formatShort, monthBounds, shiftMonth, startOfWeek } from "@/lib/dates";
 import {
-  bestStreak,
-  currentStreak,
-  dayState,
-  doneCounts,
-  habitScore,
   isDone,
-  periodSummary,
   streakMilestones,
+  trackStats,
+  type DayState,
   type LogMap,
+  type TrackStats,
+  type TrackView,
 } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
@@ -71,6 +69,8 @@ export function HabitDetail({
   const { logs: all, mark } = useHabitLogs({ [habit.id]: initialLogs });
   const logs = all[habit.id] ?? {};
   const [tab, setTab] = useState<DetailTab>(initialTab);
+  const [view, setView] = useState<TrackView>("current");
+  const stats = trackStats(habit, habit.tracks, logs, today, view);
   const daySheet = useRef<DaySheetHandle>(null);
   const openDay = (date: string) => daySheet.current?.show(habit, date);
 
@@ -126,13 +126,141 @@ export function HabitDetail({
       </header>
 
       <main className="mx-auto grid max-w-3xl gap-3 px-3 pt-4 sm:px-4 lg:px-8">
-        {tab === "calendario" && <CalendarTab habit={habit} logs={logs} today={today} openDay={openDay} />}
-        {tab === "estadisticas" && <StatsTab habit={habit} logs={logs} today={today} />}
-        {tab === "editar" && <EditTab habit={habit} categories={categories} onSaved={() => changeTab("calendario")} />}
+        {tab !== "editar" && habit.tracks.length > 0 && (
+          <TrackPicker habit={habit} view={view} onChange={setView} />
+        )}
+        {tab === "calendario" && (
+          <CalendarTab habit={habit} logs={logs} stats={stats} today={today} openDay={openDay} />
+        )}
+        {tab === "estadisticas" && <StatsTab habit={habit} stats={stats} view={view} today={today} />}
+        {tab === "editar" && (
+          <>
+            <EditTab habit={habit} categories={categories} onSaved={() => changeTab("calendario")} />
+            <TracksPanel habit={habit} today={today} />
+          </>
+        )}
       </main>
 
       <DaySheet ref={daySheet} logs={all} mark={mark} />
     </>
+  );
+}
+
+// ─── Pistas ─────────────────────────────────────────────────────────────────
+
+function trackLabel(from: string, to: string) {
+  return `${formatShort(from)} ${from.slice(0, 4)} al ${formatShort(to)} ${to.slice(0, 4)}`;
+}
+
+/** Selector de pista, como el "Pista actual / Todas las pistas" de HabitNow. */
+function TrackPicker({
+  habit,
+  view,
+  onChange,
+}: {
+  habit: HabitDTO;
+  view: TrackView;
+  onChange: (v: TrackView) => void;
+}) {
+  return (
+    <label className="rise flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5">
+      <span className="text-[13px] text-muted">Mostrando</span>
+      <select
+        value={String(view)}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange(v === "current" || v === "all" ? v : Number(v));
+        }}
+        className="min-w-0 flex-1 truncate bg-transparent text-right text-sm font-medium text-fg outline-none"
+      >
+        <option value="current">
+          Pista actual (desde {formatShort(habit.startDate)} {habit.startDate.slice(0, 4)})
+        </option>
+        <option value="all">Todas las pistas</option>
+        {habit.tracks
+          .map((t, i) => ({ t, i }))
+          .reverse()
+          .map(({ t, i }) => (
+            <option key={i} value={i}>
+              Pista {i + 1}: {trackLabel(t.startDate, t.endDate)}
+            </option>
+          ))}
+      </select>
+    </label>
+  );
+}
+
+function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
+  const [date, setDate] = useState(today);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  return (
+    <Panel icon={ArrowCounterClockwise} title="Pistas">
+      <p className="text-[13px] leading-relaxed text-muted">
+        Una pista nueva arranca la racha y el puntaje desde cero sin borrar nada. El historial anterior se sigue
+        viendo eligiendo &quot;Todas las pistas&quot;.
+      </p>
+      <ul className="mt-3 grid gap-1 text-sm">
+        <li className="flex justify-between gap-3 py-1">
+          <span className="font-medium">Actual</span>
+          <span className="tabular text-muted">
+            desde {formatShort(habit.startDate)} {habit.startDate.slice(0, 4)}
+          </span>
+        </li>
+        {habit.tracks
+          .map((t, i) => ({ t, i }))
+          .reverse()
+          .map(({ t, i }) => (
+            <li key={i} className="flex justify-between gap-3 py-1">
+              <span>Pista {i + 1}</span>
+              <span className="tabular text-muted">{trackLabel(t.startDate, t.endDate)}</span>
+            </li>
+          ))}
+      </ul>
+      <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+        <input
+          type="date"
+          value={date}
+          max={today}
+          onChange={(e) => setDate(e.target.value)}
+          aria-label="Inicio de la pista nueva"
+          className="h-10 rounded-md border border-line-strong bg-surface px-3 text-sm"
+        />
+        <Button
+          variant="outline"
+          disabled={pending}
+          onClick={() => {
+            if (!confirm("¿Empezar una pista nueva? La racha y el puntaje arrancan de cero desde esa fecha.")) return;
+            setError(null);
+            startTransition(async () => {
+              const r = await startNewTrack(habit.id, date);
+              if (!r.ok) setError(r.error);
+            });
+          }}
+        >
+          Empezar pista nueva
+        </Button>
+      </div>
+      {habit.tracks.length > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-2"
+          disabled={pending}
+          onClick={() => {
+            if (!confirm("¿Unir la pista actual con la anterior?")) return;
+            setError(null);
+            startTransition(async () => {
+              const r = await mergeLastTrack(habit.id);
+              if (!r.ok) setError(r.error);
+            });
+          }}
+        >
+          Unir con la pista anterior
+        </Button>
+      )}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+    </Panel>
   );
 }
 
@@ -181,16 +309,18 @@ function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
 function CalendarTab({
   habit,
   logs,
+  stats,
   today,
   openDay,
 }: {
   habit: HabitDTO;
   logs: LogMap;
+  stats: TrackStats;
   today: string;
   openDay: (date: string) => void;
 }) {
   const [month, setMonth] = useState(today.slice(0, 7));
-  const streak = currentStreak(habit, logs, today);
+  const streak = stats.streak;
   const notes = Object.entries(logs)
     .filter(([d, l]) => d.startsWith(month) && l.n)
     .sort(([a], [b]) => b.localeCompare(a));
@@ -198,7 +328,15 @@ function CalendarTab({
   return (
     <>
       <Panel>
-        <CalendarMonth habit={habit} logs={logs} today={today} onTap={openDay} month={month} onMonthChange={setMonth} />
+        <CalendarMonth
+          habit={habit}
+          logs={logs}
+          today={today}
+          onTap={openDay}
+          month={month}
+          onMonthChange={setMonth}
+          stateOf={stats.stateOf}
+        />
         <p className="mt-4 text-xs leading-relaxed text-muted">
           Tocá un día para marcarlo o dejarle una nota. Los días con nota tienen un puntito.
         </p>
@@ -237,12 +375,18 @@ function CalendarTab({
 
 // ─── Estadísticas ───────────────────────────────────────────────────────────
 
-function StatsTab({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today: string }) {
-  const score = habitScore(habit, logs, today);
-  const streak = currentStreak(habit, logs, today);
-  const best = bestStreak(habit, logs, today);
-  const counts = doneCounts(habit, logs, today);
-  const periods = periodSummary(habit, logs, today);
+function StatsTab({
+  habit,
+  stats,
+  view,
+  today,
+}: {
+  habit: HabitDTO;
+  stats: TrackStats;
+  view: TrackView;
+  today: string;
+}) {
+  const { score, streak, best, counts, periods, logs } = stats;
   const periodWords: [string, string] =
     habit.frequency === "weekly" ? ["Semanas logradas", "Semanas incompletas"] : ["Días logrados", "Días incompletos"];
 
@@ -252,7 +396,11 @@ function StatsTab({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today
         <div className="grid justify-items-center gap-3 py-2">
           <ScoreRing value={score} />
           <p className="max-w-[40ch] text-center text-[13px] text-muted">
-            Sube cuando cumplís y baja cuando no. Pesa más lo de las últimas semanas.
+            {view === "all"
+              ? "Promedio de todas las pistas."
+              : habit.frequency === "weekly"
+                ? "Qué parte de la meta semanal cumpliste, semana a semana."
+                : "Qué parte de los días cumpliste."}
           </p>
         </div>
       </Panel>
@@ -287,11 +435,11 @@ function StatsTab({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today
       </Panel>
 
       <Panel>
-        <MonthTimeline habit={habit} logs={logs} today={today} />
+        <MonthTimeline stateOf={stats.stateOf} today={today} />
       </Panel>
 
       <Panel>
-        <DoneBars habit={habit} logs={logs} today={today} />
+        <DoneBars habit={habit} logs={logs} from={stats.from} today={today} />
       </Panel>
 
       <Panel icon={CheckCircle} title="Logrado / Fallido">
@@ -354,7 +502,7 @@ const MARKER: Record<string, { icon: React.ReactNode; cls: string } | undefined>
 };
 
 /** Línea del mes: un punto por día con la marca arriba. */
-function MonthTimeline({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today: string }) {
+function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState; today: string }) {
   const [month, setMonth] = useState(today.slice(0, 7));
   const scroller = useRef<HTMLDivElement>(null);
   const { from, to } = monthBounds(month);
@@ -383,7 +531,7 @@ function MonthTimeline({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; 
         <div className="relative flex w-max">
           <span className="absolute inset-x-4 top-[38px] h-px bg-line-strong" />
           {days.map((d) => {
-            const m = d <= today ? MARKER[dayState(habit, logs, d, today)] : undefined;
+            const m = d <= today ? MARKER[stateOf(d)] : undefined;
             return (
               <div key={d} data-day={d} className="relative grid w-10 justify-items-center gap-2">
                 <span className="flex h-7 items-end">
@@ -408,7 +556,7 @@ function MonthTimeline({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; 
 
 type BarMode = "week" | "month" | "year";
 
-function DoneBars({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today: string }) {
+function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap; from: string; today: string }) {
   const [mode, setMode] = useState<BarMode>("month");
   const [year, setYear] = useState(Number(today.slice(0, 4)));
   const [weekOffset, setWeekOffset] = useState(0);
@@ -430,7 +578,7 @@ function DoneBars({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today
       return {
         key: m,
         label: monthName(m).slice(0, 3),
-        value: m > thisMonth || m < habit.startDate.slice(0, 7) ? null : doneDays.filter((d) => d.startsWith(m)).length,
+        value: m > thisMonth || m < from.slice(0, 7) ? null : doneDays.filter((d) => d.startsWith(m)).length,
         current: m === thisMonth,
       };
     });
@@ -438,21 +586,21 @@ function DoneBars({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today
     onNext = () => setYear(year + 1);
     nextDisabled = year >= Number(today.slice(0, 4));
   } else if (mode === "week") {
-    const lastMonday = addDays(startOfWeek(today), -7 * 12 * weekOffset);
+    const lastMonday = addDays(startOfWeek(today, habit.weekStart), -7 * 12 * weekOffset);
     const mondays = Array.from({ length: 12 }, (_, i) => addDays(lastMonday, -7 * (11 - i)));
     title = `${shortDate(mondays[0])} al ${shortDate(addDays(mondays[11], 6))}`;
     items = mondays.map((mon) => ({
       key: mon,
       label: String(Number(mon.slice(8))),
       value: doneDays.filter((d) => d >= mon && d <= addDays(mon, 6)).length,
-      current: mon === startOfWeek(today),
+      current: mon === startOfWeek(today, habit.weekStart),
     }));
     onPrev = () => setWeekOffset(weekOffset + 1);
     onNext = () => setWeekOffset(weekOffset - 1);
     nextDisabled = weekOffset === 0;
   } else {
     title = "Por año";
-    const first = Number(habit.startDate.slice(0, 4));
+    const first = Number(from.slice(0, 4));
     const last = Number(today.slice(0, 4));
     for (let y = Math.max(first, last - 7); y <= last; y++) {
       items.push({

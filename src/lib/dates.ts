@@ -41,10 +41,9 @@ export function weekday(iso: string): number {
   return toDbDate(iso).getUTCDay();
 }
 
-/** Lunes de la semana del día dado. */
-export function startOfWeek(iso: string): string {
-  const wd = weekday(iso);
-  return addDays(iso, wd === 0 ? -6 : 1 - wd);
+/** Primer día de la semana del día dado; `weekStart` 1 = lunes (por defecto), 0 = domingo. */
+export function startOfWeek(iso: string, weekStart = 1): string {
+  return addDays(iso, -((weekday(iso) - weekStart + 7) % 7));
 }
 
 export function monthKey(iso: string): string {

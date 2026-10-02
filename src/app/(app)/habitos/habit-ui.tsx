@@ -227,6 +227,7 @@ export function CalendarMonth({
   onTap,
   month: controlled,
   onMonthChange,
+  stateOf,
 }: {
   habit: HabitDTO;
   logs: LogMap;
@@ -234,6 +235,8 @@ export function CalendarMonth({
   onTap: (date: string) => void;
   month?: string;
   onMonthChange?: (m: string) => void;
+  /** Estado de cada día; por defecto, según la pista actual. */
+  stateOf?: (iso: string) => DayState;
 }) {
   const [own, setOwn] = useState(today.slice(0, 7));
   const month = controlled ?? own;
@@ -265,7 +268,7 @@ export function CalendarMonth({
               key={date}
               size="sm"
               date={date}
-              state={dayState(habit, logs, date, today)}
+              state={stateOf ? stateOf(date) : dayState(habit, logs, date, today)}
               future={date > today}
               hasNote={!!logs[date]?.n}
               onTap={() => onTap(date)}

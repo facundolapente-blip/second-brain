@@ -12,7 +12,7 @@
  *                   |grupo| (campo 1). Campos: id;grupo;;nombre;categoría;0<a|b><prioridad>;
  *                   inicio[fin];descripción;0;<tipo><frecuencia>;veces/semana;unidad;días;meta
  *                   tipo: 0 sí/no, 1 cantidad, 4 checklist. frecuencia: 0 diaria,
- *                   2 X por semana, 8 días fijos (días con 1 = domingo). a = pista activa.
+ *                   2 X por semana, 8 días fijos flexibles (días con 1 = domingo). a = pista activa.
  *   {S subtareas    hábito;id;texto;...
  *   {X marcas       pista;fecha;estado[;valor;meta]  estado: fd hecho, fc fallado, fa salteado
  *   Fechas: "B" + año-2020 + mes (desde 0) + día, cada uno un dígito en base 36.
@@ -42,6 +42,7 @@ function hnDate(code: string): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 const toDb = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+const addDaysIso = (iso: string, n: number) => new Date(toDb(iso).getTime() + n * 86_400_000).toISOString().slice(0, 10);
 
 // Categorías de fábrica de HabitNow → nombre, ícono y color de acá.
 const BUILTIN: Record<string, { name: string; icon: string; color: string }> = {
@@ -158,7 +159,6 @@ const trackToHabit = new Map<string, { habitId: string; kind: string; target: nu
 let habitOrder = 0;
 for (const ts of groupBy(tracks, (t) => t.group).values()) {
   const cur = current(ts);
-  const first = ts.reduce((a, b) => (a.start < b.start ? a : b));
   const archived = !ts.some((t) => t.active);
   const lastEnd = ts.map((t) => t.end ?? "").sort().at(-1);
 
@@ -166,21 +166,41 @@ for (const ts of groupBy(tracks, (t) => t.group).values()) {
   const description =
     [cur.description, items.length ? `Checklist: ${items.join(", ")}` : ""].filter(Boolean).join("\n") || null;
 
-  const frequency = cur.freq === "8" ? "weekdays" : cur.freq === "2" ? "weekly" : "daily";
+  // Cada pista se guarda con su configuración: la activa (o la última, si el
+  // hábito quedó archivado) es el hábito; las demás, pistas cerradas.
+  const config = (t: Track) => {
+    // "8" = días fijos flexibles ("Dom (Flexible)"): se cumple cualquier día de
+    // esa semana, así que acá es "X veces por semana" (semana de lunes a domingo).
+    const flexible = t.freq === "8";
+    return {
+      frequency: flexible || t.freq === "2" ? "weekly" : "daily",
+      weekdays: [] as number[],
+      timesPerWeek: flexible ? Math.max(1, t.days.length) : t.timesPerWeek,
+      weekStart: 1,
+      target: t.kind === "1" ? t.target : 1,
+    };
+  };
+  const sorted = [...ts].sort((a, b) => a.start.localeCompare(b.start));
+  const past = sorted.filter((t) => t !== cur);
   const habit = await prisma.habit.create({
     data: {
       name: cur.name,
       description,
       categoryId: catIdMap.get(cur.category) ?? null,
-      frequency,
-      weekdays: frequency === "weekdays" ? cur.days : [],
-      timesPerWeek: cur.timesPerWeek,
-      target: cur.kind === "1" ? cur.target : 1,
+      ...config(cur),
       unit: cur.kind === "1" ? cur.unit || null : null,
       priority: cur.priority,
-      startDate: toDb(first.start),
+      startDate: toDb(cur.start),
       order: habitOrder++,
       archivedAt: archived ? toDb(lastEnd || cur.start) : null,
+      tracks: {
+        create: past.map((t) => {
+          // Una pista sin fecha de fin termina el día antes de la siguiente.
+          const next = sorted[sorted.indexOf(t) + 1];
+          const end = t.end ?? (next ? addDaysIso(next.start, -1) : t.start);
+          return { startDate: toDb(t.start), endDate: toDb(end), ...config(t) };
+        }),
+      },
     },
   });
   for (const t of ts) trackToHabit.set(t.id, { habitId: habit.id, kind: cur.kind, target: cur.target });

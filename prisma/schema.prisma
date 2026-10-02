@@ -17,17 +17,23 @@ datasource db {
 
 /// Una entrada del diario. Puede haber más de una por día.
 model JournalEntry {
-  id        String   @id @default(cuid())
+  id         String   @id @default(cuid())
   /// Día al que pertenece la entrada (no cuándo se escribió).
-  date      DateTime @db.Date
-  title     String?
-  body      String   @default("")
+  date       DateTime @db.Date
+  title      String?
+  body       String   @default("")
   /// Ánimo del 1 (muy mal) al 5 (muy bien). Opcional.
-  mood      Int?
-  tags      String[] @default([])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  mood       Int?
+  tags       String[] @default([])
+  /// De dónde viene: null = escrita en la app; si no, el nombre del importador
+  /// (la app de diario de origen). Junto con externalId deja reimportar sin duplicar.
+  source     String?
+  /// Id de la entrada en la app de origen.
+  externalId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
+  @@unique([source, externalId])
   @@index([date])
 }
 
@@ -56,19 +62,41 @@ model Habit {
   frequency    String         @default("daily")
   /// Para `weekdays`: días en que toca (0 = domingo).
   weekdays     Int[]          @default([])
-  /// Para `weekly`: cuántas veces por semana (la semana arranca el lunes).
+  /// Para `weekly`: cuántas veces por semana.
   timesPerWeek Int            @default(1)
+  /// Para `weekly`: día en que arranca la semana (1 = lunes, 0 = domingo). Un
+  /// "domingo flexible" de HabitNow es 1 vez por semana con la semana desde el domingo.
+  weekStart    Int            @default(1)
   /// Cantidad por día para darlo por hecho. 1 sin unidad = hábito de sí/no.
   target       Int            @default(1)
   unit         String?
   /// Prioridad (la banderita): ordena la lista de Hoy, más alta arriba.
   priority     Int            @default(1)
-  /// Antes de esta fecha no se cuenta nada (ni fallas ni porcentaje).
+  /// Inicio de la pista actual: la tarjeta, la racha y el puntaje cuentan desde acá.
+  /// Las pistas anteriores están en HabitTrack.
   startDate    DateTime       @db.Date
   order        Int            @default(0)
   archivedAt   DateTime?
   createdAt    DateTime       @default(now())
   logs         HabitLog[]
+  tracks       HabitTrack[]
+}
+
+/// Una pista cerrada (como en HabitNow): un tramo anterior del hábito, con la
+/// configuración que tenía entonces. La pista actual vive en Habit.
+model HabitTrack {
+  id           String   @id @default(cuid())
+  habitId      String
+  habit        Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  frequency    String
+  weekdays     Int[]    @default([])
+  timesPerWeek Int      @default(1)
+  weekStart    Int      @default(1)
+  target       Int      @default(1)
+
+  @@index([habitId])
 }
 
 /// Lo marcado en un día. Sin fila = sin marcar.
