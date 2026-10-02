@@ -53,7 +53,8 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Editor: estado local, autoguardado con debounce de 900 ms en fila (nunca dos guardados a la vez, siempre manda lo último), guarda también al ocultar la pestaña y al salir. `saveEntry` revalida `/journal` (layout); el editor ignora las props nuevas a propósito para no pisar lo que se está escribiendo.
 - Ánimo 1 a 5 con caras Phosphor y colores de la paleta (`MOODS` en `src/lib/journal-logic.ts`). Etiquetas normalizadas en minúsculas sin `#`.
 - Serif Newsreader cargada solo en `journal/layout.tsx` (token `--font-serif`). Reglas puras en `journal-logic.ts`, consultas en `journal.ts`, acciones en `journal-actions.ts`.
-- Importador pendiente: `JournalEntry.source` + `externalId` (único juntos) para reimportar sin duplicar. Falta el formato del export de la app de diario.
+- Importador pendiente: `JournalEntry.source` + `externalId` (único juntos) para reimportar sin duplicar. La app de origen es **My Diary**; Facu va a pasar el export (sin fotos).
+- Lo que confirmó Facu (2026-10-02): casi siempre 1 entrada por día, a veces 2 (por eso el + abre la del día y el editor tiene "Otra entrada para este día"); usa título y etiquetas; no quiere candado ni recordatorios; estadísticas se definen más adelante.
 - La búsqueda es `ILIKE` (no ignora tildes).
 
 ## Diseño
