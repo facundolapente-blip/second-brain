@@ -16,6 +16,7 @@ export type HabitDTO = {
   frequency: Frequency;
   weekdays: number[];
   timesPerWeek: number;
+  weekStart: number;
   target: number;
   unit: string | null;
   priority: number;
@@ -72,6 +73,7 @@ function toDTO(h: HabitRow): HabitDTO {
     frequency: h.frequency as Frequency,
     weekdays: h.weekdays,
     timesPerWeek: h.timesPerWeek,
+    weekStart: h.weekStart,
     target: h.target,
     unit: h.unit,
     priority: h.priority,

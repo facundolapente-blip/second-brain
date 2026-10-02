@@ -438,14 +438,14 @@ function DoneBars({ habit, logs, today }: { habit: HabitDTO; logs: LogMap; today
     onNext = () => setYear(year + 1);
     nextDisabled = year >= Number(today.slice(0, 4));
   } else if (mode === "week") {
-    const lastMonday = addDays(startOfWeek(today), -7 * 12 * weekOffset);
+    const lastMonday = addDays(startOfWeek(today, habit.weekStart), -7 * 12 * weekOffset);
     const mondays = Array.from({ length: 12 }, (_, i) => addDays(lastMonday, -7 * (11 - i)));
     title = `${shortDate(mondays[0])} al ${shortDate(addDays(mondays[11], 6))}`;
     items = mondays.map((mon) => ({
       key: mon,
       label: String(Number(mon.slice(8))),
       value: doneDays.filter((d) => d >= mon && d <= addDays(mon, 6)).length,
-      current: mon === startOfWeek(today),
+      current: mon === startOfWeek(today, habit.weekStart),
     }));
     onPrev = () => setWeekOffset(weekOffset + 1);
     onNext = () => setWeekOffset(weekOffset - 1);

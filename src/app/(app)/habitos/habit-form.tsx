@@ -21,6 +21,7 @@ export type Draft = {
   frequency: Frequency;
   weekdays: number[];
   timesPerWeek: number;
+  weekStart: number;
   kind: "check" | "count";
   target: number;
   unit: string;
@@ -36,6 +37,7 @@ function emptyDraft(today: string): Draft {
     frequency: "daily",
     weekdays: [],
     timesPerWeek: 3,
+    weekStart: 1,
     kind: "check",
     target: 1,
     unit: "",
@@ -53,6 +55,7 @@ export function fromHabit(h: HabitDTO): Draft {
     frequency: h.frequency,
     weekdays: h.weekdays,
     timesPerWeek: h.timesPerWeek,
+    weekStart: h.weekStart,
     kind: h.target > 1 || h.unit ? "count" : "check",
     target: h.target,
     unit: h.unit ?? "",
@@ -207,6 +210,18 @@ export function HabitFormBody({
               onChange={(v) => set("timesPerWeek", v)}
             />
             <span className="text-sm text-muted">{draft.timesPerWeek === 1 ? "vez" : "veces"} por semana</span>
+            <label className="ml-auto flex items-center gap-2 text-sm text-muted">
+              desde el
+              <select
+                name="weekStart"
+                value={draft.weekStart}
+                onChange={(e) => set("weekStart", Number(e.target.value))}
+                className="h-10 rounded-md border border-line-strong bg-surface px-2 text-sm text-fg"
+              >
+                <option value={1}>lunes</option>
+                <option value={0}>domingo</option>
+              </select>
+            </label>
           </div>
         )}
       </div>

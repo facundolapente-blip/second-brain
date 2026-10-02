@@ -56,8 +56,11 @@ model Habit {
   frequency    String         @default("daily")
   /// Para `weekdays`: días en que toca (0 = domingo).
   weekdays     Int[]          @default([])
-  /// Para `weekly`: cuántas veces por semana (la semana arranca el lunes).
+  /// Para `weekly`: cuántas veces por semana.
   timesPerWeek Int            @default(1)
+  /// Para `weekly`: día en que arranca la semana (1 = lunes, 0 = domingo). Un
+  /// "domingo flexible" de HabitNow es 1 vez por semana con la semana desde el domingo.
+  weekStart    Int            @default(1)
   /// Cantidad por día para darlo por hecho. 1 sin unidad = hábito de sí/no.
   target       Int            @default(1)
   unit         String?

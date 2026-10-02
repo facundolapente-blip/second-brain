@@ -101,6 +101,7 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     frequency,
     weekdays: frequency === "weekdays" ? [...new Set(weekdays)].sort() : [],
     timesPerWeek: entero(fd, "timesPerWeek", 1, 7, 1),
+    weekStart: entero(fd, "weekStart", 0, 1, 1),
     target,
     unit,
     priority: entero(fd, "priority", 1, 5, 1),

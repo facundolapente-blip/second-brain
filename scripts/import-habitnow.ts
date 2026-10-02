@@ -12,7 +12,7 @@
  *                   |grupo| (campo 1). Campos: id;grupo;;nombre;categoría;0<a|b><prioridad>;
  *                   inicio[fin];descripción;0;<tipo><frecuencia>;veces/semana;unidad;días;meta
  *                   tipo: 0 sí/no, 1 cantidad, 4 checklist. frecuencia: 0 diaria,
- *                   2 X por semana, 8 días fijos (días con 1 = domingo). a = pista activa.
+ *                   2 X por semana, 8 días fijos flexibles (días con 1 = domingo). a = pista activa.
  *   {S subtareas    hábito;id;texto;...
  *   {X marcas       pista;fecha;estado[;valor;meta]  estado: fd hecho, fc fallado, fa salteado
  *   Fechas: "B" + año-2020 + mes (desde 0) + día, cada uno un dígito en base 36.
@@ -166,15 +166,21 @@ for (const ts of groupBy(tracks, (t) => t.group).values()) {
   const description =
     [cur.description, items.length ? `Checklist: ${items.join(", ")}` : ""].filter(Boolean).join("\n") || null;
 
-  const frequency = cur.freq === "8" ? "weekdays" : cur.freq === "2" ? "weekly" : "daily";
+  // "8" son días fijos flexibles ("Dom (Flexible)"): se puede cumplir cualquier
+  // día de esa semana, así que acá es "X veces por semana" con la semana
+  // arrancando en el primer día elegido. Calibrado contra el puntaje de HabitNow.
+  const flexible = cur.freq === "8";
+  const frequency = flexible || cur.freq === "2" ? "weekly" : "daily";
+  const weekStart = flexible && cur.days.length > 0 ? cur.days[0] : 1;
   const habit = await prisma.habit.create({
     data: {
       name: cur.name,
       description,
       categoryId: catIdMap.get(cur.category) ?? null,
       frequency,
-      weekdays: frequency === "weekdays" ? cur.days : [],
-      timesPerWeek: cur.timesPerWeek,
+      weekdays: [],
+      timesPerWeek: flexible ? Math.max(1, cur.days.length) : cur.timesPerWeek,
+      weekStart,
       target: cur.kind === "1" ? cur.target : 1,
       unit: cur.kind === "1" ? cur.unit || null : null,
       priority: cur.priority,
