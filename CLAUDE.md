@@ -32,7 +32,7 @@ node --env-file=.env scripts/seed-gastos-demo.ts  # cuentas y movimientos de eje
 - App: https://second-brain-ochre-phi.vercel.app (Vercel, proyecto `second-brain`, región `gru1`). Repo privado: github.com/facundolapente-blip/second-brain.
 - Base: Neon, proyecto `second-brain` (`dry-mode-32198909`, aws-sa-east-1). Conexiones y secreto en `.env.production.local` (fuera de git). Para correr algo contra producción: `set -a; . ./.env.production.local; set +a` (los importadores mejor con `DATABASE_URL="$DIRECT_URL"`).
 - Variables en Vercel: `DATABASE_URL` (pooled), `DIRECT_URL`, `BETTER_AUTH_SECRET`, `ALLOWED_EMAILS`. `BETTER_AUTH_URL` no hace falta: `urlBase()` usa `VERCEL_PROJECT_PRODUCTION_URL`.
-- Deploy: `npx vercel deploy --prod` desde esta carpeta (el build aplica migraciones solo en producción, `scripts/build.mjs`). Cuando Facu vincule GitHub en su cuenta de Vercel, `npx vercel git connect` y cada push a main despliega solo.
+- Deploy: Vercel está conectado al repo, **cada push a `main` despliega solo** (el build aplica migraciones solo en producción, `scripts/build.mjs`). A mano: `npx vercel deploy --prod`.
 
 ## Stack
 
