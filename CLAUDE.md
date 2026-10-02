@@ -27,6 +27,13 @@ node --env-file=.env scripts/seed-gastos-demo.ts  # cuentas y movimientos de eje
 - La base local es PGlite: **una sola sesión compartida**. Por eso `DATABASE_URL` lleva `connection_limit=1&pgbouncer=true` (sin eso, error "prepared statement s0 already exists"). Tampoco admite varias bases: `CREATE DATABASE` no aísla nada.
 - `LOCAL_SIN_LOGIN` en `.env` entra sin contraseña con `npm run dev` (nunca en producción).
 
+## Producción
+
+- App: https://second-brain-ochre-phi.vercel.app (Vercel, proyecto `second-brain`, región `gru1`). Repo privado: github.com/facundolapente-blip/second-brain.
+- Base: Neon, proyecto `second-brain` (`dry-mode-32198909`, aws-sa-east-1). Conexiones y secreto en `.env.production.local` (fuera de git). Para correr algo contra producción: `set -a; . ./.env.production.local; set +a` (los importadores mejor con `DATABASE_URL="$DIRECT_URL"`).
+- Variables en Vercel: `DATABASE_URL` (pooled), `DIRECT_URL`, `BETTER_AUTH_SECRET`, `ALLOWED_EMAILS`. `BETTER_AUTH_URL` no hace falta: `urlBase()` usa `VERCEL_PROJECT_PRODUCTION_URL`.
+- Deploy: `npx vercel deploy --prod` desde esta carpeta (el build aplica migraciones solo en producción, `scripts/build.mjs`). Cuando Facu vincule GitHub en su cuenta de Vercel, `npx vercel git connect` y cada push a main despliega solo.
+
 ## Stack
 
 Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `revalidatePath`), React 19, Prisma 6 sobre Postgres (Neon en prod, pendiente), Tailwind v4, Better Auth (mail + contraseña, lista blanca `ALLOWED_EMAILS`), íconos Phosphor (no lucide).
