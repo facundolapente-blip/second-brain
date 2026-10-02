@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { DotsThree } from "@phosphor-icons/react";
+import { Copy, DotsThree } from "@phosphor-icons/react";
 import { moneyCents } from "@/lib/format";
 import { deleteTemplate, renameTemplate } from "@/lib/finance-actions";
 import type { AccountDTO, CategoryDTO, TemplateDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
-import { Button, Field, IconButton, Input, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, Field, IconButton, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { CategoryAvatar, EmptyBlock, useLookups } from "../shared";
@@ -47,7 +47,7 @@ export function TemplatesView({
 
       <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-6">
         {templates.length === 0 ? (
-          <EmptyBlock title="Sin plantillas todavía">
+          <EmptyBlock title="Sin plantillas todavía" icon={<Copy size={22} aria-hidden />}>
             <p className="max-w-[48ch] text-sm leading-relaxed text-muted">
               Al cargar un movimiento que repetís seguido (el alquiler, la cuota del gimnasio, el café), marcá
               &ldquo;Guardar también como plantilla&rdquo;. Después lo cargás desde acá o desde los atajos del formulario.
@@ -105,18 +105,16 @@ export function TemplatesView({
             <Button type="submit" variant="accent" className="h-11">
               Guardar
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                if (!editing || !confirm(`¿Eliminar la plantilla "${editing.name}"?`)) return;
+            <ConfirmButton
+              onConfirm={() => {
+                if (!editing) return;
                 const id = editing.id;
                 startTransition(() => deleteTemplate(id));
                 editSheet.current?.close();
               }}
             >
               Eliminar plantilla
-            </Button>
+            </ConfirmButton>
           </div>
         </form>
       </Sheet>

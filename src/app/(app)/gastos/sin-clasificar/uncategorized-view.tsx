@@ -2,7 +2,7 @@
 
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
-import { formatShort } from "@/lib/dates";
+import { formatMonth, formatShort } from "@/lib/dates";
 import { setTransactionCategory } from "@/lib/finance-actions";
 import { dayLabel, type AccountDTO, type CategoryDTO, type TxDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
@@ -62,10 +62,17 @@ export function UncategorizedView({
               {list.length === 1 ? "1 movimiento" : `${list.length} movimientos`} sin categoría. Tocá uno para clasificarlo.
             </p>
             <ul className="grid gap-0.5 border-t border-line pt-2">
-              {list.map((t) => {
+              {list.map((t, i) => {
                 const acc = lk.account(t.accountId);
+                // Separador de mes cuando cambia (la lista viene de la más nueva a la más vieja).
+                const newMonth = i === 0 || list[i - 1].date.slice(0, 7) !== t.date.slice(0, 7);
                 return (
                   <li key={t.id}>
+                    {newMonth && (
+                      <h2 className="z-10 -mx-2 bg-bg/90 px-4 pt-3 pb-1.5 text-[13px] font-semibold backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
+                        {formatMonth(t.date.slice(0, 7))}
+                      </h2>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -76,7 +83,7 @@ export function UncategorizedView({
                     >
                       <CategoryAvatar />
                       <span className="grid min-w-0 flex-1 gap-0.5">
-                        <span className={t.title ? "truncate text-[15px] font-medium" : "truncate text-[15px] text-faint"}>
+                        <span className={t.title ? "truncate text-[15px] font-medium" : "truncate text-[15px] text-muted italic"}>
                           {t.title || "Sin título"}
                         </span>
                         <span className="truncate text-[13px] text-muted">
@@ -87,7 +94,7 @@ export function UncategorizedView({
                       <Amount
                         cents={t.kind === "income" ? t.amountCents : -t.amountCents}
                         currency={acc?.currency ?? "UYU"}
-                        className="text-[15px]"
+                        className="text-[15px] font-medium"
                       />
                     </button>
                   </li>

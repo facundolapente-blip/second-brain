@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fire, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { getAllTags, getEntries, getHome } from "@/lib/journal";
 import { getUsuario } from "@/lib/session";
@@ -66,18 +67,18 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
       <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 pt-3 lg:px-8 lg:pt-6">
         {!filtering && (
-          <section className="rise grid gap-1">
-            <p className="font-serif text-[26px] leading-tight tracking-tight lg:text-[30px]">
+          <section className="rise grid gap-1.5 pt-1 lg:pt-0">
+            <p className="font-serif text-[30px] leading-[1.1] tracking-[-0.015em] text-balance lg:text-[36px]">
               {greeting(home.hour)}
               {firstName && `, ${firstName}`}
             </p>
-            <p className="text-sm text-muted first-letter:uppercase">
-              {formatLong(home.today)}
+            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted">
+              <span className="first-letter:uppercase">{formatLong(home.today)}</span>
               {home.streak > 0 && (
-                <>
-                  {" "}
-                  · <span className="text-fg">{home.streak === 1 ? "1 día escribiendo" : `${home.streak} días seguidos`}</span>
-                </>
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 py-0.5 pr-2.5 pl-2 text-[13px] text-fg">
+                  <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden />
+                  <span className="tabular">{home.streak === 1 ? "1 día seguido" : `${home.streak} días seguidos`}</span>
+                </span>
               )}
             </p>
           </section>
@@ -91,7 +92,13 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
         {entries.length === 0 ? (
           filtering ? (
-            <p className="py-16 text-center text-sm text-muted">No hay entradas que coincidan.</p>
+            <div className="grid justify-items-center gap-2 py-16 text-center">
+              <span className="inline-flex size-11 items-center justify-center rounded-full bg-surface-2 text-muted">
+                <MagnifyingGlass size={22} aria-hidden />
+              </span>
+              <p className="text-[15px] font-medium">No hay entradas que coincidan</p>
+              <p className="max-w-[36ch] text-sm text-muted">Probá con otra palabra o sacá algún filtro. La búsqueda distingue tildes.</p>
+            </div>
           ) : (
             <EmptyJournal />
           )
@@ -99,7 +106,9 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           <div className="grid gap-6">
             {years.map((g) => (
               <section key={g.year} className="grid gap-3">
-                <h2 className="tabular text-[13px] font-semibold text-muted">{g.year}</h2>
+                <h2 className="tabular z-10 -mx-4 bg-bg/90 px-4 py-1.5 text-[15px] font-semibold tracking-tight backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
+                  {g.year}
+                </h2>
                 <div className="grid gap-3">
                   {g.items.map((e) => (
                     <EntryCard key={e.id} entry={e} index={i++} />
@@ -111,7 +120,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <Link
                 href={`/journal?${more}`}
                 scroll={false}
-                className="mx-auto inline-flex h-10 items-center rounded-md border border-line-strong px-4 text-sm font-medium hover:bg-surface-2"
+                className="mx-auto inline-flex h-11 items-center rounded-md border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.98]"
               >
                 Ver más entradas
               </Link>

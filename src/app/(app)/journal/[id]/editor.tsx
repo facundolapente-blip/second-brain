@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { CaretDown, CaretLeft, DotsThreeVertical, Plus, Trash, X } from "@phosphor-icons/react";
+import { CaretDown, CaretLeft, Check, DotsThreeVertical, Plus, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui";
 import { formatLong, formatRelative } from "@/lib/dates";
 import { deleteEntry, discardIfEmpty, saveEntry, type EntryInput } from "@/lib/journal-actions";
@@ -136,7 +136,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   return (
     <>
       <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-2xl items-center gap-1 px-2 lg:h-16 lg:px-6">
+        <div className="mx-auto flex h-14 max-w-[42rem] items-center gap-1 px-2 lg:h-16 lg:px-4">
           <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-accent">
             <CaretLeft size={22} weight="bold" />
           </IconButton>
@@ -161,28 +161,19 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             />
           </label>
 
-          <span
-            aria-live="polite"
-            className={cx(
-              "ml-auto px-2 text-[12px] transition-opacity duration-300",
-              status === "error" ? "text-danger" : "text-faint",
-              status === "idle" && "opacity-0",
-            )}
-          >
-            {status === "saving" || status === "pending" ? "Guardando…" : status === "error" ? "Sin guardar" : "Guardado"}
-          </span>
+          <SaveStatus status={status} />
           <IconButton label="Más opciones" onClick={() => moreSheet.current?.open()} className="size-10">
             <DotsThreeVertical size={22} weight="bold" />
           </IconButton>
         </div>
         {error && (
-          <p className="mx-auto max-w-2xl px-5 pb-2 text-[13px] text-danger lg:px-8" role="alert">
+          <p className="mx-auto max-w-[42rem] px-5 pb-2 text-[13px] text-danger lg:px-8" role="alert">
             {error}
           </p>
         )}
       </header>
 
-      <main className="mx-auto grid max-w-2xl gap-5 px-5 pt-2 pb-10 lg:px-8 lg:pt-6">
+      <main className="mx-auto grid max-w-[42rem] gap-6 px-5 pt-2 pb-16 lg:px-8 lg:pt-8">
         <MoodPicker
           value={mood}
           onChange={(m) => {
@@ -192,12 +183,15 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
         />
 
         <div className="grid gap-2">
-          <input
+          <textarea
+            rows={1}
             value={title}
             maxLength={TITLE_MAX}
             onChange={(e) => {
-              setTitle(e.target.value);
-              update({ title: e.target.value });
+              // Un título es una sola línea aunque se pegue texto con saltos.
+              const v = e.target.value.replace(/\n+/g, " ");
+              setTitle(v);
+              update({ title: v });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -207,7 +201,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             }}
             placeholder="Título (opcional)"
             aria-label="Título"
-            className="w-full bg-transparent font-serif text-[24px] leading-tight font-semibold tracking-tight outline-none! placeholder:font-normal placeholder:text-faint"
+            className="autogrow w-full resize-none bg-transparent font-serif text-[26px] leading-[1.2] font-semibold tracking-[-0.015em] text-balance outline-none! placeholder:font-normal placeholder:text-faint lg:text-[30px]"
           />
           <textarea
             ref={bodyRef}
@@ -218,7 +212,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             }}
             placeholder="Contá cómo estuvo tu día."
             aria-label="Texto de la entrada"
-            className="autogrow min-h-[45dvh] w-full resize-none bg-transparent font-serif text-[19px] leading-[1.7] text-fg outline-none! placeholder:text-faint"
+            className="prose-serif autogrow min-h-[50dvh] w-full resize-none bg-transparent text-[19px] leading-[1.75] text-fg outline-none! placeholder:text-faint lg:text-[20px]"
           />
         </div>
 
@@ -231,7 +225,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
           }}
         />
 
-        <p className="tabular text-[12px] text-faint">
+        <p className="tabular text-[12px] text-muted">
           {words === 1 ? "1 palabra" : `${words.toLocaleString("es-UY")} palabras`} · {formatLong(date)}
         </p>
       </main>
@@ -274,7 +268,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
               Cancelar
             </Button>
             <Button
-              className="bg-danger! text-white!"
+              className="bg-danger! text-on-accent!"
               disabled={deleting}
               onClick={() => startDelete(() => deleteEntry(entry.id))}
             >
@@ -284,6 +278,30 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
         </div>
       </Sheet>
     </>
+  );
+}
+
+/** Estado del autoguardado: discreto mientras todo va bien, claro si falla. */
+function SaveStatus({ status }: { status: Status }) {
+  const busy = status === "saving" || status === "pending";
+  return (
+    <span
+      aria-live="polite"
+      className={cx(
+        "ml-auto inline-flex items-center gap-1.5 px-2 text-[12px] transition-opacity duration-300",
+        status === "error" ? "text-danger" : "text-muted",
+        status === "idle" && "opacity-0",
+      )}
+    >
+      {status === "error" ? (
+        <WarningCircle size={14} weight="bold" aria-hidden />
+      ) : busy ? (
+        <span aria-hidden className="size-1.5 rounded-full motion-safe:animate-pulse bg-current" />
+      ) : (
+        <Check size={13} weight="bold" aria-hidden />
+      )}
+      {busy ? "Guardando" : status === "error" ? "Sin guardar" : "Guardado"}
+    </span>
   );
 }
 

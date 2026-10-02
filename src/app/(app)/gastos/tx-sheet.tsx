@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { Check } from "@phosphor-icons/react";
+import { ArrowsDownUp, Check } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
 import { deleteTransaction, saveTransaction } from "@/lib/finance-actions";
@@ -16,7 +16,7 @@ import {
   type TxDTO,
   type TxKind,
 } from "@/lib/finance-logic";
-import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { AccountAvatar, CategoryAvatar } from "./shared";
 
 type Draft = {
@@ -142,7 +142,7 @@ export const TxSheet = forwardRef<
           <p className="text-sm leading-relaxed text-muted">
             Todo movimiento sale de una cuenta. Creá la primera (Efectivo, tu banco, una tarjeta) y volvé.
           </p>
-          <Link href="/gastos/cuentas?nueva=1" className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-white">
+          <Link href="/gastos/cuentas?nueva=1" className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent">
             Crear cuenta
           </Link>
         </div>
@@ -152,7 +152,19 @@ export const TxSheet = forwardRef<
 
   return (
     <Sheet ref={sheet} title={d.id ? "Editar movimiento" : "Nuevo movimiento"}>
-      <form key={formKey} action={action} className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <form
+        key={formKey}
+        action={action}
+        aria-keyshortcuts="Control+Enter"
+        onKeyDown={(e) => {
+          // Ctrl/Cmd + Enter guarda desde cualquier campo (también desde la nota).
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            e.currentTarget.requestSubmit();
+          }
+        }}
+        className="grid grid-cols-[minmax(0,1fr)] gap-5"
+      >
         {d.id && <input type="hidden" name="id" value={d.id} />}
         <input type="hidden" name="accountId" value={d.accountId} />
         <input type="hidden" name="toAccountId" value={d.kind === "transfer" ? d.toAccountId : ""} />
@@ -184,20 +196,33 @@ export const TxSheet = forwardRef<
           <span className="text-[13px] font-medium text-muted">
             {d.kind === "transfer" && crossCurrency ? `Sale de ${from?.name}` : "Monto"}
           </span>
-          <span className="flex h-14 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
-            <span className="text-lg text-muted">{currencySymbol(from?.currency ?? "UYU")}</span>
+          <span className="flex h-16 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
+            <span className="text-xl font-medium text-muted">{currencySymbol(from?.currency ?? "UYU")}</span>
             <input
               ref={amountRef}
               name="amount"
               inputMode="decimal"
+              enterKeyHint="done"
               autoComplete="off"
               style={{ outline: "none" }}
               value={d.amount}
               onChange={(e) => set({ amount: e.target.value })}
               placeholder="0"
               required
-              className="tabular h-full w-0 min-w-0 flex-1 bg-transparent text-[26px] font-semibold tracking-tight outline-none placeholder:text-faint"
+              aria-describedby={state && !state.ok ? "tx-error" : undefined}
+              className="h-full w-0 min-w-0 flex-1 bg-transparent text-[32px] font-semibold tracking-[-0.02em] outline-none placeholder:text-faint"
             />
+            {d.kind !== "transfer" && (
+              <span
+                aria-hidden
+                className={cx(
+                  "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium",
+                  d.kind === "income" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-muted",
+                )}
+              >
+                {d.kind === "income" ? "+ ingreso" : "− gasto"}
+              </span>
+            )}
           </span>
         </label>
 
@@ -208,7 +233,7 @@ export const TxSheet = forwardRef<
               value={d.title}
               onChange={(e) => set({ title: e.target.value })}
               maxLength={120}
-              placeholder={d.kind === "income" ? "Sueldo, venta..." : "Dominos, alquiler..."}
+              placeholder={d.kind === "income" ? "Sueldo, venta…" : "Dominos, alquiler…"}
             />
           </Field>
         )}
@@ -222,6 +247,16 @@ export const TxSheet = forwardRef<
 
         {d.kind === "transfer" && (
           <>
+            <div className="-my-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => set({ accountId: d.toAccountId, toAccountId: d.accountId, amount: d.toAmount || d.amount, toAmount: d.toAmount ? d.amount : "" })}
+                disabled={!d.toAccountId}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
+              >
+                <ArrowsDownUp size={15} weight="bold" aria-hidden /> Invertir
+              </button>
+            </div>
             <AccountPicker
               label="Hacia"
               accounts={pickable(d.toAccountId).filter((a) => a.id !== d.accountId)}
@@ -334,27 +369,28 @@ export const TxSheet = forwardRef<
           </label>
         )}
 
-        {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
+        {d.id && (
+          <ConfirmButton
+            onConfirm={() => {
+              const id = d.id!;
+              startTransition(() => deleteTransaction(id));
+              sheet.current?.close();
+            }}
+          >
+            Eliminar movimiento
+          </ConfirmButton>
+        )}
 
-        <div className="grid gap-2">
-          <Button type="submit" variant="accent" disabled={pending} className="h-11">
-            {pending ? "Guardando..." : d.id ? "Guardar cambios" : SAVE_LABEL[d.kind]}
-          </Button>
-          {d.id && (
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                if (confirm("¿Eliminar este movimiento?")) {
-                  const id = d.id!;
-                  startTransition(() => deleteTransaction(id));
-                  sheet.current?.close();
-                }
-              }}
-            >
-              Eliminar movimiento
-            </Button>
+        {/* Guardar queda siempre a mano, pegado abajo de la hoja, aunque la lista de categorías sea larga. */}
+        <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-line bg-surface/95 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+          {state && !state.ok && (
+            <p id="tx-error" role="alert" className="text-sm text-danger">
+              {state.error}
+            </p>
           )}
+          <Button type="submit" variant="accent" disabled={pending} className="h-12 text-[15px]">
+            {pending ? "Guardando…" : d.id ? "Guardar cambios" : SAVE_LABEL[d.kind]}
+          </Button>
         </div>
       </form>
     </Sheet>

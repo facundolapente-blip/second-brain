@@ -19,7 +19,7 @@ function isEditor(pathname: string) {
 
 function SideLink({ href, label, icon: Ico, active }: { href: string; label: string; icon: Icon; active: boolean }) {
   return (
-    <Link href={href} className="flex flex-col items-center gap-1 pt-2 pb-2.5">
+    <Link href={href} aria-current={active ? "page" : undefined} className="flex flex-col items-center gap-1 pt-2 pb-2.5">
       <span
         className={cx(
           "flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200",
@@ -52,9 +52,9 @@ export function JournalNav() {
             onClick={() => write()}
             disabled={pending}
             aria-label="Escribir hoy"
-            className="-mt-5 inline-flex size-[60px] items-center justify-center rounded-[20px] bg-accent text-white shadow-[0_8px_22px_-8px_rgba(42,127,163,0.6)] ring-4 ring-bg transition-[transform,opacity] active:scale-95 disabled:opacity-70"
+            className="lift -mt-5 inline-flex size-[60px] items-center justify-center rounded-[20px] bg-accent text-on-accent ring-4 ring-bg transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 active:scale-95 disabled:opacity-70"
           >
-            <Plus size={28} weight="bold" className={cx(pending && "animate-pulse")} />
+            <Plus size={28} weight="bold" className={cx(pending && "motion-safe:animate-pulse")} />
           </button>
         </div>
         <SideLink
@@ -79,6 +79,7 @@ export function JournalTabs() {
           <Link
             key={t.href}
             href={t.href}
+            aria-current={active ? "page" : undefined}
             className={cx(
               "-mb-px border-b-2 px-3 pb-2.5 text-sm transition-colors",
               active ? "border-accent font-medium text-fg" : "border-transparent text-muted hover:text-fg",

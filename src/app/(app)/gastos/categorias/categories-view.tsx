@@ -7,7 +7,7 @@ import { FINANCE_ICONS, FinanceIcon } from "@/lib/finance-icons";
 import { PALETTE, tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, Field, Input, Segmented, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, cx, Field, Input, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { CategoryAvatar, Fab } from "../shared";
 
@@ -117,7 +117,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 required
                 maxLength={40}
-                placeholder={draft.kind === "income" ? "Sueldo, freelance..." : "Supermercado, nafta..."}
+                placeholder={draft.kind === "income" ? "Sueldo, freelance…" : "Supermercado, nafta…"}
               />
             </Field>
           </div>
@@ -166,23 +166,26 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
 
           <div className="grid gap-2">
             <Button type="submit" variant="accent" disabled={pending} className="h-11">
-              {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear categoría"}
+              {pending ? "Guardando…" : draft.id ? "Guardar cambios" : "Crear categoría"}
             </Button>
             {draft.id && (
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
-                  const extra = draft.txCount > 0 ? ` Sus ${draft.txCount} movimientos quedan sin clasificar.` : "";
-                  if (confirm(`¿Eliminar "${draft.name}"?${extra}`)) {
+              <>
+                <ConfirmButton
+                  confirmLabel="Tocá de nuevo para eliminar"
+                  onConfirm={() => {
                     const id = draft.id!;
                     startTransition(() => deleteCategory(id));
                     sheet.current?.close();
-                  }
-                }}
-              >
-                Eliminar categoría
-              </Button>
+                  }}
+                >
+                  Eliminar categoría
+                </ConfirmButton>
+                {draft.txCount > 0 && (
+                  <p className="text-center text-xs text-muted">
+                    Si la eliminás, sus {draft.txCount} movimientos quedan sin clasificar.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </form>

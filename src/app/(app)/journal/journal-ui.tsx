@@ -15,7 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { MenuButton } from "@/components/shell";
 import { cx } from "@/components/ui";
-import { formatShort } from "@/lib/dates";
+import { formatLong, formatShort } from "@/lib/dates";
 import { moodInfo } from "@/lib/journal-logic";
 import { writeOnDay } from "@/lib/journal-actions";
 import { tone } from "@/lib/palette";
@@ -104,63 +104,106 @@ export function useWrite() {
 
 // ─── Tarjeta de entrada ─────────────────────────────────────────────────────
 
+const WEEKDAY_SHORT = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+function wordsLabel(n: number) {
+  return n === 1 ? "1 palabra" : `${n.toLocaleString("es-UY")} palabras`;
+}
+
+/**
+ * Tarjeta de la lista: la fecha en una columna propia a la izquierda (día
+ * grande, mes y día de la semana chicos) y el texto en serif a la derecha,
+ * como una página de diario.
+ */
 export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: number }) {
   const [day, month] = formatShort(entry.date).split(" ");
+  const wd = WEEKDAY_SHORT[new Date(`${entry.date}T00:00:00Z`).getUTCDay()];
   return (
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid gap-2.5 rounded-[14px] border border-line bg-surface px-4 pt-3.5 pb-4 transition-colors hover:border-line-strong active:bg-surface-2 lg:px-5"
+      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 rounded-[14px] border border-line bg-surface py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
     >
-      <div className="flex items-center gap-3">
-        <span className="flex items-baseline gap-1.5">
-          <span className="tabular text-[28px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
-          <span className="text-[13px] text-muted">{month}</span>
+      <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
+        <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
+        <span className="text-[12px] leading-tight text-muted">{month}</span>
+        <span className="text-[11px] leading-tight text-muted">{wd}</span>
+      </span>
+
+      <span className="grid min-w-0 content-start gap-1.5">
+        <span className="sr-only">{formatLong(entry.date)}</span>
+        <span className="flex items-start gap-3">
+          <span className="grid min-w-0 flex-1 gap-1">
+            {entry.title && (
+              <span className="font-serif text-[18px] leading-snug font-semibold tracking-tight text-pretty">{entry.title}</span>
+            )}
+            {entry.excerpt ? (
+              <span className="prose-serif line-clamp-3 text-[16px] leading-[1.6] text-fg/85">{entry.excerpt}</span>
+            ) : (
+              !entry.title && <span className="text-sm text-muted">Sin texto</span>
+            )}
+          </span>
+          <MoodBadge mood={entry.mood} size={30} />
         </span>
-        <span className="ml-auto">
-          <MoodBadge mood={entry.mood} size={34} />
-        </span>
-      </div>
-      {entry.title && <h3 className="font-serif text-[18px] leading-snug font-semibold tracking-tight">{entry.title}</h3>}
-      {entry.excerpt ? (
-        <p className="line-clamp-3 font-serif text-[16px] leading-[1.55] text-fg/85">{entry.excerpt}</p>
-      ) : (
-        !entry.title && <p className="text-sm text-faint">Sin texto</p>
-      )}
-      {entry.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-0.5">
-          {entry.tags.slice(0, 4).map((t) => (
-            <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5 text-[12px] text-muted">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-[12px] text-muted">
+          {entry.tags.slice(0, 3).map((t) => (
+            <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5">
               #{t}
             </span>
           ))}
-        </div>
-      )}
+          {entry.tags.length > 3 && <span>+{entry.tags.length - 3}</span>}
+          {entry.words > 0 && <span className="tabular ml-auto">{wordsLabel(entry.words)}</span>}
+        </span>
+      </span>
     </Link>
   );
 }
 
 /** Botón para escribir en un día puntual (desde el calendario). */
-export function WriteDayButton({ date, nueva, children }: { date: string; nueva?: boolean; children: React.ReactNode }) {
+export function WriteDayButton({
+  date,
+  nueva,
+  children,
+  variant = "accent",
+}: {
+  date: string;
+  nueva?: boolean;
+  children: React.ReactNode;
+  variant?: "accent" | "outline";
+}) {
   const { pending, write } = useWrite();
   return (
     <button
       type="button"
       onClick={() => write(date, nueva)}
       disabled={pending}
-      className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-3.5 text-sm font-medium whitespace-nowrap text-white transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+      className={cx(
+        "inline-flex h-10 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-medium whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
+        variant === "accent" ? "bg-accent text-on-accent hover:opacity-90" : "border border-line-strong text-fg hover:bg-surface-2",
+      )}
     >
       {children}
     </button>
   );
 }
 
-export function Stat({ label, value, hint, className }: { label: string; value: React.ReactNode; hint?: string; className?: string }) {
+/** Cifra con su etiqueta. Sin caja: la agrupa el contenedor. */
+export function Stat({
+  label,
+  value,
+  hint,
+  className,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cx("grid content-start gap-1 rounded-[12px] border border-line bg-surface p-4", className)}>
+    <div className={cx("grid content-start gap-1", className)}>
       <span className="text-[13px] text-muted">{label}</span>
-      <span className="tabular text-[26px] leading-tight font-semibold tracking-tight">{value}</span>
-      {hint && <span className="text-xs text-muted">{hint}</span>}
+      <span className="text-[26px] leading-tight font-semibold tracking-tight">{value}</span>
+      {hint && <span className="text-[12.5px] text-muted">{hint}</span>}
     </div>
   );
 }
