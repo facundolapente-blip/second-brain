@@ -6,7 +6,7 @@
 
 App personal de Facu ("Second Brain") que junta cuatro pilares: **hábitos**, **journal**, **gastos** y **plan semanal** (reemplaza a Notion; es el más grande y va último). Se construye **un módulo a la vez**. UI en español (UY), tiene que andar bien en el celular.
 
-Estado: **Hábitos** hecho (calcado de HabitNow, la app que usaba). Journal, Gastos y Plan figuran como "Pronto" en el menú. Las tablas de Journal y Gastos ya están en el schema pero sin UI.
+Estado: **Hábitos** hecho (calcado de HabitNow, la app que usaba) y **Journal** hecho (primera versión, distribución tomada de la app de diario que usaba). Gastos y Plan figuran como "Pronto" en el menú.
 
 ## Comandos
 
@@ -19,6 +19,7 @@ npx tsc --noEmit && npx eslint src        # no hay tests
 #   npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/<...>/migration.sql
 #   npx prisma migrate deploy   (frenar npm run dev antes de prisma generate: en Windows bloquea el motor)
 node --env-file=.env scripts/seed-demo.ts # hábitos de ejemplo con historial inventado (solo local)
+node --env-file=.env scripts/seed-journal-demo.ts # entradas de journal de ejemplo (solo localhost)
 ```
 
 - **Nunca `prisma db push`**: el schema se cambia con migraciones.
@@ -41,6 +42,17 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Cada día puede tener nota (`HabitLog.note`); un día con nota y sin marca queda con `status = "none"`.
 - Detalle `/habitos/[id]?tab=calendario|estadisticas|editar`: calendario + notas, estadísticas (puntaje, racha, veces logrado, línea del mes, barras semana/mes/año, logrado/fallido, desafío de racha) y edición.
 - Pendiente de HabitNow: "pistas" (reiniciar un hábito y ver estadísticas por tramo), reordenar a mano, recordatorios.
+
+## Journal
+
+- Distribución copiada de la app de diario de Facu (no el estilo): saludo con fecha y racha, tarjeta de recuerdo ("En este día" otros años, si no el mismo día otros meses, si no ayer; se cierra por hoy con la cookie `jr_recuerdo`), entradas como tarjetas agrupadas por año (día grande, mes chico, cara del ánimo, extracto de 3 líneas en serif). Barra inferior del celular: Calendario, botón grande de escribir al medio, Estadísticas. En escritorio, pestañas.
+- Rutas: `/journal` (lista, búsqueda `?q=`, filtros `?etiqueta=` y `?animo=`, paginado `?n=`), `/journal/[id]` (editor), `/journal/calendario?mes=&dia=`, `/journal/estadisticas?mes=`.
+- Escribir = server action `writeOnDay(fecha?, nueva?)`: abre la primera entrada de ese día o crea una y redirige. Las vacías no se listan, se borran al volver con la flecha (`discardIfEmpty`) y las abandonadas se limpian al crear otra (más de una hora). No borrar en el desmontaje: el modo estricto de React lo dispara al montar.
+- Editor: estado local, autoguardado con debounce de 900 ms en fila (nunca dos guardados a la vez, siempre manda lo último), guarda también al ocultar la pestaña y al salir. `saveEntry` revalida `/journal` (layout); el editor ignora las props nuevas a propósito para no pisar lo que se está escribiendo.
+- Ánimo 1 a 5 con caras Phosphor y colores de la paleta (`MOODS` en `src/lib/journal-logic.ts`). Etiquetas normalizadas en minúsculas sin `#`.
+- Serif Newsreader cargada solo en `journal/layout.tsx` (token `--font-serif`). Reglas puras en `journal-logic.ts`, consultas en `journal.ts`, acciones en `journal-actions.ts`.
+- Importador pendiente: `JournalEntry.source` + `externalId` (único juntos) para reimportar sin duplicar. Falta el formato del export de la app de diario.
+- La búsqueda es `ILIKE` (no ignora tildes).
 
 ## Diseño
 

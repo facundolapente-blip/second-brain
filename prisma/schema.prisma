@@ -17,17 +17,23 @@ datasource db {
 
 /// Una entrada del diario. Puede haber más de una por día.
 model JournalEntry {
-  id        String   @id @default(cuid())
+  id         String   @id @default(cuid())
   /// Día al que pertenece la entrada (no cuándo se escribió).
-  date      DateTime @db.Date
-  title     String?
-  body      String   @default("")
+  date       DateTime @db.Date
+  title      String?
+  body       String   @default("")
   /// Ánimo del 1 (muy mal) al 5 (muy bien). Opcional.
-  mood      Int?
-  tags      String[] @default([])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  mood       Int?
+  tags       String[] @default([])
+  /// De dónde viene: null = escrita en la app; si no, el nombre del importador
+  /// (la app de diario de origen). Junto con externalId deja reimportar sin duplicar.
+  source     String?
+  /// Id de la entrada en la app de origen.
+  externalId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
+  @@unique([source, externalId])
   @@index([date])
 }
 

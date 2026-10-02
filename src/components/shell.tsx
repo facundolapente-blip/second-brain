@@ -10,7 +10,7 @@ type Module = { href: string; label: string; icon: Icon; soon?: boolean };
 
 const MODULES: Module[] = [
   { href: "/habitos", label: "Hábitos", icon: Medal },
-  { href: "/journal", label: "Journal", icon: Notebook, soon: true },
+  { href: "/journal", label: "Journal", icon: Notebook },
   { href: "/gastos", label: "Gastos", icon: Wallet, soon: true },
   { href: "/plan", label: "Plan semanal", icon: CalendarCheck, soon: true },
 ];
