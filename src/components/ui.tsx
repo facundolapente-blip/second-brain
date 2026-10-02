@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "@phosphor-icons/react";
 
 export function cx(...c: (string | false | null | undefined)[]) {
@@ -20,7 +20,7 @@ export function Button({ variant = "primary", size = "md", className, ...props }
         "inline-flex items-center justify-center gap-2 rounded-md font-medium whitespace-nowrap transition-[background-color,transform,opacity] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none",
         size === "md" ? "h-10 px-4 text-sm" : "h-8 px-3 text-[13px]",
         variant === "primary" && "bg-ink text-on-ink hover:opacity-90",
-        variant === "accent" && "bg-accent text-white hover:opacity-90",
+        variant === "accent" && "bg-accent text-on-accent hover:opacity-90",
         variant === "ghost" && "text-fg hover:bg-surface-2",
         variant === "outline" && "border border-line-strong text-fg hover:bg-surface-2",
         variant === "danger" && "text-danger hover:bg-[var(--st-fail-bg)]",
@@ -42,7 +42,9 @@ export function IconButton({
       title={label}
       {...props}
       className={cx(
-        "inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg active:scale-95",
+        // El área táctil se agranda 4px por lado sin cambiar el tamaño visible (44px con size-9).
+        !/\b(absolute|fixed|sticky)\b/.test(className ?? "") && "relative",
+        "inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-95",
         className,
       )}
     >
@@ -172,5 +174,47 @@ export function ToneSquare({
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * Botón de borrar en dos pasos, en lugar de window.confirm: el primer toque
+ * pide confirmación en el mismo lugar y a los 4 segundos vuelve solo.
+ */
+export function ConfirmButton({
+  children,
+  confirmLabel = "Tocá de nuevo para confirmar",
+  onConfirm,
+  className,
+  disabled,
+}: {
+  children: React.ReactNode;
+  confirmLabel?: string;
+  onConfirm: () => void;
+  className?: string;
+  disabled?: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <Button
+      type="button"
+      variant="danger"
+      disabled={disabled}
+      aria-live="polite"
+      className={cx(armed && "bg-danger! text-on-accent! hover:opacity-90", className)}
+      onClick={() => {
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else setArmed(true);
+      }}
+    >
+      {armed ? confirmLabel : children}
+    </Button>
   );
 }

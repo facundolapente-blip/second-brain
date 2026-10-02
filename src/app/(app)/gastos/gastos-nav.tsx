@@ -40,7 +40,12 @@ export function GastosNav() {
           const active = mobileActive(pathname, t.href);
           const Ico = t.icon!;
           return (
-            <Link key={t.href} href={t.href} className="flex flex-col items-center gap-1 pt-2 pb-2.5">
+            <Link
+              key={t.href}
+              href={t.href}
+              aria-current={active ? "page" : undefined}
+              className="flex flex-col items-center gap-1 pt-2 pb-2.5"
+            >
               <span
                 className={cx(
                   "flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200",
@@ -69,6 +74,7 @@ export function GastosTabs() {
           <Link
             key={t.href}
             href={t.href}
+            aria-current={active ? "page" : undefined}
             className={cx(
               "-mb-px border-b-2 px-3 pb-2.5 text-sm whitespace-nowrap transition-colors",
               active ? "border-accent font-medium text-fg" : "border-transparent text-muted hover:text-fg",

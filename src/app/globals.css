@@ -2,9 +2,10 @@
 
 /*
  * Sistema visual: monocromo cálido estilo documento, un solo "acento" que es la
- * tinta (casi negro en claro, casi blanco en oscuro). El color de verdad aparece
- * solo en pasteles apagados que identifican hábitos, cuentas y categorías.
- * Radios: 6px controles, 12px superficies.
+ * tinta (casi negro en claro, casi blanco en oscuro) más el azul petróleo de
+ * --accent para lo interactivo. El color de verdad aparece solo en pasteles
+ * apagados que identifican hábitos, cuentas y categorías.
+ * Radios: 6px controles, 12-14px superficies.
  */
 
 :root {
@@ -17,8 +18,9 @@
   --border: #e9e8e4;
   --border-strong: #d9d8d3;
   --text: #2b2a28;
-  --muted: #73726e;
-  --faint: #a3a29e;
+  --muted: #6b6a66;
+  /* Solo para placeholders, separadores y texto decorativo (3:1). */
+  --faint: #8e8d89;
   --ink: #1d1d1b;
   --on-ink: #fafaf9;
   --danger: #b5403a;
@@ -28,6 +30,10 @@
   --accent: #2a7fa3;
   --accent-soft: #e1eff5;
   --accent-fg: #1d6587;
+  /* Texto sobre un fondo --accent (blanco en claro, tinta en oscuro: AA en los dos). */
+  --on-accent: #ffffff;
+  /* Sombras teñidas con el fondo, nunca negro puro. */
+  --shadow-tint: 40, 36, 30;
 
   /* Estados de un día de hábito. */
   --st-done-bg: #dcefe3; --st-done-line: #3f8f5e; --st-done-fg: #23663d;
@@ -59,7 +65,7 @@
     --border-strong: #3a3a37;
     --text: #e9e8e4;
     --muted: #9c9b96;
-    --faint: #6c6b67;
+    --faint: #7a7974;
     --ink: #f0efeb;
     --on-ink: #1a1a19;
     --danger: #e0766f;
@@ -68,6 +74,8 @@
     --accent: #5fb0d3;
     --accent-soft: #1b2e37;
     --accent-fg: #8ccbe6;
+    --on-accent: #0f1d24;
+    --shadow-tint: 0, 0, 0;
 
     --st-done-bg: #1f3428; --st-done-line: #5daa7a; --st-done-fg: #9fd5b2;
     --st-fail-bg: #3a2124; --st-fail-line: #d8666e; --st-fail-fg: #f0a5aa;
@@ -106,6 +114,7 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
+  --color-on-accent: var(--on-accent);
   --color-tone: var(--tone-bg);
   --color-tone-fg: var(--tone-fg);
   --color-tone-solid: var(--tone-solid);
@@ -133,7 +142,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -189,4 +198,41 @@ dialog.sheet::backdrop {
 /* El textarea del journal crece con el contenido. */
 .autogrow {
   field-sizing: content;
+}
+
+/* Esqueleto de carga: bloque apagado con un brillo lento que lo cruza. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--surface-3), transparent);
+    animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  @keyframes shimmer {
+    to { transform: translateX(100%); }
+  }
+}
+
+/* Sombra de lo que flota (botón de escribir, botón flotante, tooltips), teñida con el fondo. */
+.lift {
+  box-shadow:
+    0 1px 2px rgba(var(--shadow-tint), 0.06),
+    0 10px 28px -12px rgba(var(--shadow-tint), 0.28);
+}
+
+/* Lectura larga en serif: cortes de línea prolijos y guiones en español. */
+.prose-serif {
+  /* @theme inline no publica --font-serif como variable: se usa la de next/font. */
+  font-family: var(--font-newsreader), ui-serif, Georgia, serif;
+  text-wrap: pretty;
+  hyphens: auto;
+  font-optical-sizing: auto;
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { CaretLeft, CaretRight, Fire } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, CaretLeft, CaretRight, Fire, Trophy } from "@phosphor-icons/react/dist/ssr";
 import { getStats } from "@/lib/journal";
-import { formatMonth, shiftMonth, todayISO } from "@/lib/dates";
+import { formatLong, formatMonth, shiftMonth, todayISO } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { JournalHeader, MoodBadge, Stat } from "../journal-ui";
 import { JournalTabs, WriteTodayButton } from "../journal-nav";
+import { MonthColumns, MonthHeatmap, WeekdayBars } from "./stats-charts";
 
 export const metadata = { title: "Estadísticas · Journal" };
 
@@ -16,89 +17,153 @@ function days(n: number) {
   return n === 1 ? "1 día" : `${nf.format(n)} días`;
 }
 
+function daysInMonth(m: string) {
+  const [y, mo] = m.split("-").map(Number);
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+
+const monthLink = (m: string) => `/journal/estadisticas?mes=${m}`;
+
 export default async function StatsPage({ searchParams }: PageProps<"/journal/estadisticas">) {
   const sp = await searchParams;
   const today = todayISO();
+  const current = today.slice(0, 7);
   const mesRaw = typeof sp.mes === "string" ? sp.mes : "";
-  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesRaw) && mesRaw <= today.slice(0, 7) ? mesRaw : today.slice(0, 7);
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesRaw) && mesRaw <= current ? mesRaw : current;
   const s = await getStats(month);
   const avg = s.monthMood !== null ? Math.round(s.monthMood) : null;
   const moodTotal = s.moodCounts.reduce((a, b) => a + b, 0);
-
-  // Últimos 12 meses terminando en el mes elegido.
   const last12 = Array.from({ length: 12 }, (_, i) => shiftMonth(month, i - 11));
-  const maxPerMonth = Math.max(1, ...last12.map((m) => s.perMonth[m] ?? 0));
-  const monthShort = (m: string) =>
-    new Intl.DateTimeFormat("es-UY", { month: "narrow", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
+  const monthLen = month === current ? Number(today.slice(8)) : daysInMonth(month);
+
+  if (s.totalEntries === 0) {
+    return (
+      <>
+        <JournalHeader title="Estadísticas" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
+        <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-8">
+          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
+            <h2 className="font-serif text-[22px] font-semibold tracking-tight">Todavía no hay números</h2>
+            <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
+              Cuando escribas tus primeras entradas vas a ver acá tu racha, cuánto escribís y en qué meses.
+            </p>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
       <JournalHeader title="Estadísticas" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
-      <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:px-8 lg:pt-6">
-        <section className="rise grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="col-span-2 grid content-start gap-1 rounded-[12px] border border-line bg-surface p-4 sm:col-span-1">
-            <span className="flex items-center gap-1.5 text-[13px] text-muted">
-              <Fire size={16} weight="fill" className="text-[var(--p-orange-solid)]" /> Racha actual
-            </span>
-            <span className="tabular text-[40px] leading-none font-semibold tracking-tight">{s.streak}</span>
+      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-10 px-4 pt-3 lg:px-8 lg:pt-8">
+        {/* Lo grande: todo lo escrito. Una sola cifra protagonista. */}
+        <section className="rise grid gap-6">
+          <div className="grid gap-1">
+            <span className="text-[13px] text-muted">Entradas escritas</span>
+            <span className="text-[52px] leading-none font-semibold tracking-[-0.03em]">{nf.format(s.totalEntries)}</span>
             <span className="text-sm text-muted">
-              {s.streak === 1 ? "día seguido" : "días seguidos"}
-              {s.streak === 0 && s.totalEntries > 0 ? ". Escribí hoy para arrancar otra." : ""}
+              En {days(s.totalDays)}
+              {s.firstDate && <>, desde {formatMonth(s.firstDate.slice(0, 7))}</>}. {nf.format(s.totalWords)} palabras en total.
             </span>
-            <span className="mt-auto pt-3 text-xs text-muted">Mejor racha: {days(s.best)}</span>
           </div>
-          <Stat label="Entradas" value={nf.format(s.totalEntries)} hint={`En ${days(s.totalDays)}`} />
-          <Stat label="Palabras" value={nf.format(s.totalWords)} hint={s.totalEntries ? `${nf.format(Math.round(s.totalWords / s.totalEntries))} por entrada` : undefined} />
+
+          <div className="grid grid-cols-3 divide-x divide-line rounded-[12px] border border-line bg-surface">
+            <div className="grid content-start gap-1 p-3.5 sm:p-4">
+              <span className="flex items-center gap-1 text-[12.5px] text-muted">
+                <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
+              </span>
+              <span className="text-[24px] leading-tight font-semibold tracking-tight">{s.streak}</span>
+              <span className="text-[12px] text-muted">{s.streak === 1 ? "día seguido" : "días seguidos"}</span>
+            </div>
+            <div className="grid content-start gap-1 p-3.5 sm:p-4">
+              <span className="flex items-center gap-1 text-[12.5px] text-muted">
+                <Trophy size={14} weight="fill" className="text-[var(--p-yellow-solid)]" aria-hidden /> Récord
+              </span>
+              <span className="text-[24px] leading-tight font-semibold tracking-tight">{s.best}</span>
+              <span className="text-[12px] text-muted">días</span>
+            </div>
+            <div className="grid content-start gap-1 p-3.5 sm:p-4">
+              <span className="text-[12.5px] text-muted">Por entrada</span>
+              <span className="text-[24px] leading-tight font-semibold tracking-tight">
+                {nf.format(Math.round(s.totalWords / s.totalEntries))}
+              </span>
+              <span className="text-[12px] text-muted">palabras</span>
+            </div>
+          </div>
+          {s.streak === 0 && <p className="-mt-3 text-[13px] text-muted">Escribí hoy para arrancar una racha nueva.</p>}
         </section>
 
-        <section className="grid gap-4">
+        {s.firstDate && (
+          <section className="grid gap-3">
+            <h2 className="text-[17px] font-semibold tracking-tight">Constancia</h2>
+            <MonthHeatmap
+              firstMonth={s.firstDate.slice(0, 7)}
+              currentMonth={current}
+              perMonthDays={s.perMonthDays}
+              perMonth={s.perMonth}
+              todayDay={Number(today.slice(8))}
+            />
+          </section>
+        )}
+
+        <section className="grid gap-5 border-t border-line pt-8">
           <div className="flex items-center justify-between">
             <Link
-              href={`/journal/estadisticas?mes=${shiftMonth(month, -1)}`}
+              href={monthLink(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-9 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
-            <h2 className="text-[15px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
-            {month < today.slice(0, 7) ? (
+            <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
+            {month < current ? (
               <Link
-                href={`/journal/estadisticas?mes=${shiftMonth(month, 1)}`}
+                href={monthLink(shiftMonth(month, 1))}
                 scroll={false}
                 aria-label="Mes siguiente"
-                className="inline-flex size-9 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+                className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
               >
                 <CaretRight size={18} weight="bold" />
               </Link>
             ) : (
-              <span className="size-9" />
+              <span className="size-11" />
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Entradas del mes" value={s.monthEntries} />
-            <Stat label="Días escritos" value={s.monthDays} />
-            <Stat label="Palabras" value={nf.format(s.monthWords)} />
-            <div className="grid content-start gap-1 rounded-[12px] border border-line bg-surface p-4">
-              <span className="text-[13px] text-muted">Ánimo promedio</span>
-              {s.monthMood !== null ? (
-                <span className="flex items-center gap-2">
-                  <MoodBadge mood={avg} size={30} />
-                  <span className="tabular text-[26px] leading-tight font-semibold tracking-tight">{nf1.format(s.monthMood)}</span>
-                </span>
-              ) : (
-                <span className="text-[26px] leading-tight font-semibold text-faint">Sin datos</span>
-              )}
-              {avg && <span className="text-xs text-muted">{moodInfo(avg)!.label}</span>}
-            </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+            <Stat label="Entradas" value={<span className="tabular">{s.monthEntries}</span>} />
+            <Stat
+              label="Días escritos"
+              value={<span className="tabular">{s.monthDays}</span>}
+              hint={`de ${monthLen}${month === current ? " hasta hoy" : ""}`}
+            />
+            <Stat label="Palabras" value={<span className="tabular">{nf.format(s.monthWords)}</span>} />
+            {s.monthMood !== null ? (
+              <Stat
+                label="Ánimo promedio"
+                value={
+                  <span className="flex items-center gap-2">
+                    <MoodBadge mood={avg} size={28} />
+                    <span className="tabular">{nf1.format(s.monthMood)}</span>
+                  </span>
+                }
+                hint={avg ? moodInfo(avg)!.label : undefined}
+              />
+            ) : (
+              <Stat
+                label="Por entrada"
+                value={<span className="tabular">{s.monthEntries ? nf.format(Math.round(s.monthWords / s.monthEntries)) : 0}</span>}
+                hint="palabras"
+              />
+            )}
           </div>
 
           {moodTotal > 0 && (
-            <div className="grid gap-3 rounded-[12px] border border-line bg-surface p-4">
+            <div className="grid gap-3">
               <span className="text-[13px] text-muted">Cómo estuviste</span>
-              <div className="flex h-3 gap-0.5 overflow-hidden rounded-full">
+              <div className="flex h-3 gap-[2px] overflow-hidden rounded-[4px]">
                 {MOODS.map((m, i) =>
                   s.moodCounts[i] ? (
                     <span
@@ -113,7 +178,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px]">
                 {MOODS.map((m, i) => (
                   <li key={m.value} className="inline-flex items-center gap-1.5">
-                    <span style={tone(m.color)} className="size-2.5 rounded-full bg-tone-solid" />
+                    <span style={tone(m.color)} className="size-2.5 rounded-[3px] bg-tone-solid" />
                     <span className="text-muted">{m.label}</span>
                     <span className="tabular font-medium">{s.moodCounts[i]}</span>
                   </li>
@@ -121,39 +186,42 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               </ul>
             </div>
           )}
+
+          <div className="grid gap-1">
+            <h3 className="text-[15px] font-semibold">Entradas por mes</h3>
+            <MonthColumns
+              months={last12}
+              values={last12.map((m) => s.perMonth[m] ?? 0)}
+              selected={month}
+              basePath="/journal/estadisticas"
+            />
+          </div>
         </section>
 
-        <section className="grid gap-3">
-          <h2 className="text-[15px] font-semibold">Entradas por mes</h2>
-          <div className="grid grid-cols-12 items-end gap-1.5 rounded-[12px] border border-line bg-surface px-4 pt-5 pb-3">
-            {last12.map((m) => {
-              const n = s.perMonth[m] ?? 0;
-              return (
-                <Link
-                  key={m}
-                  href={`/journal/estadisticas?mes=${m}`}
-                  scroll={false}
-                  className="group grid justify-items-center gap-1.5"
-                  title={`${formatMonth(m)}: ${n}`}
-                >
-                  <span className="tabular text-[11px] text-muted">{n || ""}</span>
-                  <span className="flex h-24 w-full items-end">
-                    <span
-                      style={{ height: `${Math.max(n ? 6 : 2, (n / maxPerMonth) * 100)}%` }}
-                      className={
-                        m === month
-                          ? "w-full rounded-[4px] bg-accent"
-                          : "w-full rounded-[4px] bg-surface-3 transition-colors group-hover:bg-line-strong"
-                      }
-                    />
-                  </span>
-                  <span className={m === month ? "text-[11px] font-semibold text-fg uppercase" : "text-[11px] text-muted uppercase"}>
-                    {monthShort(m)}
-                  </span>
-                </Link>
-              );
-            })}
+        <section className="grid gap-8 border-t border-line pt-8 sm:grid-cols-2">
+          <div className="grid content-start gap-3">
+            <h2 className="text-[17px] font-semibold tracking-tight">Qué días escribís</h2>
+            <WeekdayBars values={s.perWeekday} />
           </div>
+          {s.longest && (
+            <div className="grid content-start gap-3">
+              <h2 className="text-[17px] font-semibold tracking-tight">La entrada más larga</h2>
+              <Link
+                href={`/journal/${s.longest.id}`}
+                className="group grid gap-1 rounded-[12px] border border-line bg-surface p-4 transition-colors hover:border-line-strong"
+              >
+                <span className="text-[34px] leading-none font-semibold tracking-tight">{nf.format(s.longest.words)}</span>
+                <span className="text-[13px] text-muted">palabras</span>
+                <span className="mt-2 flex items-center gap-2 font-serif text-[16px]">
+                  <span className="min-w-0 flex-1 truncate first-letter:uppercase">
+                    {s.longest.title || formatLong(s.longest.date)}
+                    {!s.longest.title && ` de ${s.longest.date.slice(0, 4)}`}
+                  </span>
+                  <ArrowRight size={16} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </span>
+              </Link>
+            </div>
+          )}
         </section>
       </main>
     </>

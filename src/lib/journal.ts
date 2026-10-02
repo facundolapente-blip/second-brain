@@ -11,6 +11,8 @@ export type EntryCardDTO = {
   excerpt: string;
   mood: number | null;
   tags: string[];
+  /** Palabras de título + texto, para la tarjeta. */
+  words: number;
 };
 
 export type EntryDTO = {
@@ -33,7 +35,15 @@ const CARD_SELECT = { id: true, date: true, title: true, body: true, mood: true,
 type CardRow = { id: string; date: Date; title: string | null; body: string; mood: number | null; tags: string[] };
 
 function toCard(e: CardRow, max = 280): EntryCardDTO {
-  return { id: e.id, date: fromDbDate(e.date), title: e.title, excerpt: excerpt(e.body, max), mood: e.mood, tags: e.tags };
+  return {
+    id: e.id,
+    date: fromDbDate(e.date),
+    title: e.title,
+    excerpt: excerpt(e.body, max),
+    mood: e.mood,
+    tags: e.tags,
+    words: wordCount(e.body) + wordCount(e.title ?? ""),
+  };
 }
 
 const ORDER: Prisma.JournalEntryOrderByWithRelationInput[] = [{ date: "desc" }, { createdAt: "desc" }];
@@ -166,24 +176,38 @@ export async function getStats(month: string) {
   const { from, to } = monthBounds(month);
   const [days, all] = await Promise.all([
     writtenDays(),
-    prisma.journalEntry.findMany({ where: NOT_EMPTY, select: { date: true, body: true, title: true, mood: true } }),
+    prisma.journalEntry.findMany({
+      where: NOT_EMPTY,
+      select: { id: true, date: true, body: true, title: true, mood: true },
+    }),
   ]);
   let words = 0;
   const inMonth: { mood: number | null; words: number }[] = [];
   const perMonth = new Map<string, number>();
+  const perMonthWords = new Map<string, number>();
+  // Entradas por día de la semana, lunes primero.
+  const perWeekday = [0, 0, 0, 0, 0, 0, 0];
+  let longest: { id: string; date: string; title: string | null; words: number } | null = null;
   for (const e of all) {
     const w = wordCount(e.body) + wordCount(e.title ?? "");
     words += w;
     const iso = fromDbDate(e.date);
-    perMonth.set(iso.slice(0, 7), (perMonth.get(iso.slice(0, 7)) ?? 0) + 1);
+    const m = iso.slice(0, 7);
+    perMonth.set(m, (perMonth.get(m) ?? 0) + 1);
+    perMonthWords.set(m, (perMonthWords.get(m) ?? 0) + w);
+    perWeekday[(new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7]++;
+    if (!longest || w > longest.words) longest = { id: e.id, date: iso, title: e.title, words: w };
     if (iso >= from && iso <= to) inMonth.push({ mood: e.mood, words: w });
   }
+  const perMonthDays = new Map<string, number>();
+  for (const d of days) perMonthDays.set(d.slice(0, 7), (perMonthDays.get(d.slice(0, 7)) ?? 0) + 1);
   const moods = inMonth.map((e) => e.mood).filter((m): m is number => m !== null);
   const moodCounts = [1, 2, 3, 4, 5].map((v) => moods.filter((m) => m === v).length);
   return {
     today,
     streak: currentStreak(new Set(days), today),
     best: bestStreak(days),
+    firstDate: days[0] ?? null,
     totalEntries: all.length,
     totalDays: days.length,
     totalWords: words,
@@ -193,5 +217,9 @@ export async function getStats(month: string) {
     monthMood: moods.length ? moods.reduce((s, m) => s + m, 0) / moods.length : null,
     moodCounts,
     perMonth: Object.fromEntries(perMonth),
+    perMonthDays: Object.fromEntries(perMonthDays),
+    perMonthWords: Object.fromEntries(perMonthWords),
+    perWeekday,
+    longest,
   };
 }
