@@ -13,7 +13,10 @@ export function urlBase(): string {
   if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
-  return process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+  // En producción Vercel informa su dominio: no hace falta configurarlo a mano.
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  return "http://localhost:3000";
 }
 
 export const auth = betterAuth({
