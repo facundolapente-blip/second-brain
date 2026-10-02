@@ -117,7 +117,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 required
                 maxLength={40}
-                placeholder={draft.kind === "income" ? "Sueldo, freelance..." : "Supermercado, nafta..."}
+                placeholder={draft.kind === "income" ? "Sueldo, freelance…" : "Supermercado, nafta…"}
               />
             </Field>
           </div>
@@ -166,7 +166,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
 
           <div className="grid gap-2">
             <Button type="submit" variant="accent" disabled={pending} className="h-11">
-              {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear categoría"}
+              {pending ? "Guardando…" : draft.id ? "Guardar cambios" : "Crear categoría"}
             </Button>
             {draft.id && (
               <>

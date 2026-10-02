@@ -175,6 +175,19 @@ dialog.sheet {
   border: 1px solid var(--border);
   padding: 0;
 }
+/* El scroll de una hoja no arrastra la página de atrás. */
+dialog.sheet,
+dialog.sheet * {
+  overscroll-behavior: contain;
+}
+/* Sin la demora de doble toque en controles (zoom con pellizco sigue andando). */
+button,
+a,
+input,
+label,
+summary {
+  touch-action: manipulation;
+}
 dialog.sheet::backdrop {
   background: rgba(20, 20, 18, 0.32);
 }

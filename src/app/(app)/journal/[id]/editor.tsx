@@ -296,7 +296,7 @@ function SaveStatus({ status }: { status: Status }) {
       {status === "error" ? (
         <WarningCircle size={14} weight="bold" aria-hidden />
       ) : busy ? (
-        <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-current" />
+        <span aria-hidden className="size-1.5 rounded-full motion-safe:animate-pulse bg-current" />
       ) : (
         <Check size={13} weight="bold" aria-hidden />
       )}

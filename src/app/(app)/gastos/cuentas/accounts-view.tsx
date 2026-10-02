@@ -228,7 +228,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 required
                 maxLength={60}
-                placeholder="Itaú, Efectivo, Dólares..."
+                placeholder="Itaú, Efectivo, Dólares…"
               />
             </Field>
           </div>
@@ -289,7 +289,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
 
           <div className="grid gap-2">
             <Button type="submit" variant="accent" disabled={pending} className="h-11">
-              {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear cuenta"}
+              {pending ? "Guardando…" : draft.id ? "Guardar cambios" : "Crear cuenta"}
             </Button>
             {draft.id && (
               <>

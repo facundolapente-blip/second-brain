@@ -65,7 +65,7 @@ export function MonthHeatmap({
   };
 
   return (
-    <div className="grid gap-3">
+    <div className="grid max-w-xl gap-3">
       <p className="tabular min-h-5 text-[13px] text-muted first-letter:uppercase" aria-live="polite">
         {focus ? readout(focus) : "Tocá un mes para verlo en el calendario."}
       </p>

@@ -233,7 +233,7 @@ export const TxSheet = forwardRef<
               value={d.title}
               onChange={(e) => set({ title: e.target.value })}
               maxLength={120}
-              placeholder={d.kind === "income" ? "Sueldo, venta..." : "Dominos, alquiler..."}
+              placeholder={d.kind === "income" ? "Sueldo, venta…" : "Dominos, alquiler…"}
             />
           </Field>
         )}
@@ -389,7 +389,7 @@ export const TxSheet = forwardRef<
             </p>
           )}
           <Button type="submit" variant="accent" disabled={pending} className="h-12 text-[15px]">
-            {pending ? "Guardando..." : d.id ? "Guardar cambios" : SAVE_LABEL[d.kind]}
+            {pending ? "Guardando…" : d.id ? "Guardar cambios" : SAVE_LABEL[d.kind]}
           </Button>
         </div>
       </form>

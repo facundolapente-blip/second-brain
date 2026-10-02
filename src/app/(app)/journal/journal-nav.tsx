@@ -54,7 +54,7 @@ export function JournalNav() {
             aria-label="Escribir hoy"
             className="lift -mt-5 inline-flex size-[60px] items-center justify-center rounded-[20px] bg-accent text-on-accent ring-4 ring-bg transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 active:scale-95 disabled:opacity-70"
           >
-            <Plus size={28} weight="bold" className={cx(pending && "animate-pulse")} />
+            <Plus size={28} weight="bold" className={cx(pending && "motion-safe:animate-pulse")} />
           </button>
         </div>
         <SideLink
