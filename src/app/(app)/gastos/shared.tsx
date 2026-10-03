@@ -320,7 +320,7 @@ export function EmptyBlock({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mt-6 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-8">
+    <div className="mt-6 grid justify-items-start gap-3 empty-card p-8">
       {icon && (
         <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">{icon}</span>
       )}

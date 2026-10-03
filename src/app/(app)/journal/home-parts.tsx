@@ -74,7 +74,7 @@ export function HomeActions({
         <MagnifyingGlass size={20} />
       </IconButton>
       <IconButton label="Filtrar" onClick={() => sheet.current?.open()} className="relative">
-        <FunnelSimple size={20} weight={tag || mood ? "fill" : "regular"} className={cx(!!(tag || mood) && "text-accent")} />
+        <FunnelSimple size={20} weight={tag || mood ? "fill" : "regular"} className={cx(!!(tag || mood) && "text-accent-fg")} />
       </IconButton>
 
       {searching && (
@@ -279,7 +279,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
-    <div className="grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-8">
+    <div className="grid justify-items-start gap-3 empty-card p-8">
       <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
         <PenNib size={22} aria-hidden />
       </span>

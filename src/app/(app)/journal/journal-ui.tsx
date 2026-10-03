@@ -67,21 +67,21 @@ export function JournalHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
         <div className="flex h-14 items-center gap-2 lg:h-16">
           {back ? (
             <Link
               href={back}
               aria-label="Volver"
-              className="-ml-2 inline-flex size-10 items-center justify-center rounded-md text-accent lg:hidden"
+              className="-ml-2 inline-flex size-10 items-center justify-center rounded-md text-accent-fg lg:hidden"
             >
               <CaretLeft size={22} weight="bold" />
             </Link>
           ) : (
             <MenuButton />
           )}
-          {title && <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>}
+          {title && <h1 className="display truncate text-[26px] font-semibold lg:text-[30px]">{title}</h1>}
           <div className="ml-auto flex items-center gap-0.5">{actions}</div>
         </div>
         {children}
@@ -122,7 +122,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 rounded-[14px] border border-line bg-surface py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
+      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 card py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
     >
       <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
         <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>

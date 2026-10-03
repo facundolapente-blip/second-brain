@@ -106,7 +106,7 @@ export function WeekView({
             <Link
               href={`/plan?semana=${prev}`}
               aria-label="Semana anterior"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-10 items-center justify-center rounded-md text-accent-fg hover:bg-surface-2"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
@@ -116,7 +116,7 @@ export function WeekView({
             <Link
               href={`/plan?semana=${next}`}
               aria-label="Semana siguiente"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-10 items-center justify-center rounded-md text-accent-fg hover:bg-surface-2"
             >
               <CaretRight size={18} weight="bold" />
             </Link>
@@ -264,7 +264,7 @@ function DayList({
         {WEEKDAY_LONG[weekday(day)].toLowerCase()} {Number(day.slice(8))}
       </h3>
       {blocks.length === 0 ? (
-        <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-6">
+        <div className="grid justify-items-start gap-2 empty-card p-6">
           <p className="text-sm text-muted">Nada planeado para este día.</p>
           <Button variant="outline" size="sm" onClick={onNew}>
             <Plus size={15} /> Agregar bloque

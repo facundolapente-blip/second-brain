@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-/** Ícono de la app: la "F" del menú, en tinta sobre el fondo cálido. */
+/** Ícono de la app: la "F" del menú en ámbar sobre azul noche. */
 export function appIcon(size: number, radius = 0.22) {
   return new ImageResponse(
     (
@@ -11,8 +11,8 @@ export function appIcon(size: number, radius = 0.22) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#1d1d1b",
-          color: "#fafaf9",
+          background: "radial-gradient(circle at 30% 20%, #232a3d 0%, #0b0d13 70%)",
+          color: "#ffab4a",
           borderRadius: size * radius,
           fontSize: size * 0.56,
           fontWeight: 600,

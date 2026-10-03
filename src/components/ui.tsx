@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { X } from "@phosphor-icons/react";
 
 export function cx(...c: (string | false | null | undefined)[]) {
@@ -17,12 +18,12 @@ export function Button({ variant = "primary", size = "md", className, ...props }
     <button
       {...props}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-md font-medium whitespace-nowrap transition-[background-color,transform,opacity] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none",
-        size === "md" ? "h-10 px-4 text-sm" : "h-8 px-3 text-[13px]",
-        variant === "primary" && "bg-ink text-on-ink hover:opacity-90",
-        variant === "accent" && "bg-accent text-on-accent hover:opacity-90",
+        "inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,transform,opacity,box-shadow] duration-300 ease-spring active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none",
+        size === "md" ? "h-11 px-5 text-sm" : "h-9 px-4 text-[13px]",
+        variant === "primary" && "bg-ink text-on-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] hover:opacity-90",
+        variant === "accent" && "btn-glow bg-accent font-semibold text-on-accent hover:brightness-105",
         variant === "ghost" && "text-fg hover:bg-surface-2",
-        variant === "outline" && "border border-line-strong text-fg hover:bg-surface-2",
+        variant === "outline" && "border border-line-strong bg-surface/60 text-fg hover:bg-surface-2",
         variant === "danger" && "text-danger hover:bg-[var(--st-fail-bg)]",
         className,
       )}
@@ -44,7 +45,7 @@ export function IconButton({
       className={cx(
         // El área táctil se agranda 4px por lado sin cambiar el tamaño visible (44px con size-9).
         !/\b(absolute|fixed|sticky)\b/.test(className ?? "") && "relative",
-        "inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-95",
+        "inline-flex size-9 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-300 ease-spring before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-90",
         className,
       )}
     >
@@ -74,7 +75,7 @@ export function Field({
 }
 
 export const inputClass =
-  "h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-sm text-fg placeholder:text-faint outline-none transition-colors focus:border-fg/40 focus:ring-2 focus:ring-[var(--focus)]";
+  "h-11 w-full rounded-[12px] border border-line-strong bg-surface-2/60 px-3.5 text-sm text-fg shadow-[inset_0_1px_2px_rgba(var(--shadow-tint),0.06)] placeholder:text-faint outline-none transition-[border-color,box-shadow,background-color] duration-200 focus:border-accent focus:bg-surface focus:ring-4 focus:ring-[var(--focus)]";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
@@ -94,23 +95,37 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
+  const id = useId();
   return (
-    <div className="grid auto-cols-fr grid-flow-col rounded-md bg-surface-2 p-0.5" role="radiogroup">
-      {options.map((o) => (
-        <button
-          type="button"
-          key={o.value}
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cx(
-            "h-8 rounded-[5px] px-2 text-[13px] font-medium transition-colors",
-            value === o.value ? "bg-raised text-fg shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-muted hover:text-fg",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div
+      className="grid auto-cols-fr grid-flow-col rounded-full bg-surface-2 p-1 shadow-[inset_0_1px_2px_rgba(var(--shadow-tint),0.08)]"
+      role="radiogroup"
+    >
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            type="button"
+            key={o.value}
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o.value)}
+            className={cx(
+              "relative h-9 rounded-full px-2 text-[13px] font-medium transition-colors duration-200",
+              on ? "text-fg" : "text-muted hover:text-fg",
+            )}
+          >
+            {on && (
+              <motion.span
+                layoutId={`seg-${id}`}
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-raised shadow-[inset_0_1px_0_var(--edge),0_1px_2px_rgba(var(--shadow-tint),0.12),0_6px_16px_-8px_rgba(var(--shadow-tint),0.4)]"
+              />
+            )}
+            <span className="relative">{o.label}</span>
+          </button>
+        );
+      })}
       {name && <input type="hidden" name={name} value={value} />}
     </div>
   );
@@ -144,13 +159,13 @@ export const Sheet = forwardRef<
         if (e.target === dlg.current) dlg.current?.close();
       }}
     >
-      <div className="flex items-center justify-between border-b border-line px-5 py-3">
-        <h2 className="text-[15px] font-semibold">{title}</h2>
+      <div className="flex items-center justify-between px-5 pt-5 pb-2 sm:pt-4">
+        <h2 className="display text-[19px] font-semibold">{title}</h2>
         <IconButton label="Cerrar" type="button" onClick={() => dlg.current?.close()}>
           <X size={18} />
         </IconButton>
       </div>
-      <div className="max-h-[calc(92dvh-56px)] overflow-y-auto px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <div className="max-h-[calc(92dvh-64px)] overflow-y-auto px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {children}
       </div>
     </dialog>
@@ -170,7 +185,7 @@ export function ToneSquare({
   return (
     <span
       style={{ ...style, width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[10px] bg-tone-solid text-white"
+      className="inline-flex shrink-0 items-center justify-center rounded-[30%] bg-tone-solid bg-[linear-gradient(160deg,rgba(255,255,255,0.28),rgba(255,255,255,0)_55%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_6px_14px_-8px_var(--tone-solid)]"
     >
       {children}
     </span>

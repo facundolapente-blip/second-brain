@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
@@ -33,7 +34,7 @@ import {
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
-import { Button, cx, Segmented, ToneSquare } from "@/components/ui";
+import { Button, cx, inputClass, Segmented, ToneSquare } from "@/components/ui";
 import {
   CalendarMonth,
   DaySheet,
@@ -83,24 +84,24 @@ export function HabitDetail({
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto max-w-3xl px-2 lg:px-6">
-          <div className="flex h-14 items-center gap-1 lg:h-16">
+          <div className="flex h-16 items-center gap-1.5 lg:h-20">
             <Link
               href={habit.archived ? "/habitos/archivados" : "/habitos/lista"}
               aria-label="Volver a hábitos"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
             >
               <CaretLeft size={22} weight="bold" />
             </Link>
-            <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">{habit.name}</h1>
+            <h1 className="display min-w-0 truncate text-[24px] font-semibold lg:text-[28px]">{habit.name}</h1>
             <span className="ml-auto pr-2">
-              <ToneSquare size={32} style={tone(habit.color)}>
-                <HabitIcon name={habit.icon} size={18} weight="fill" />
+              <ToneSquare size={38} style={tone(habit.color)}>
+                <HabitIcon name={habit.icon} size={21} weight="fill" />
               </ToneSquare>
             </span>
           </div>
-          <div className="grid grid-cols-3 border-b border-line" role="tablist">
+          <div className="mx-2 mb-3 grid grid-cols-3 rounded-full bg-surface-2 p-1 shadow-[inset_0_1px_2px_rgba(var(--shadow-tint),0.08)] lg:mx-2" role="tablist">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -108,24 +109,25 @@ export function HabitDetail({
                 aria-selected={tab === t.id}
                 onClick={() => changeTab(t.id)}
                 className={cx(
-                  "relative h-11 text-[15px] transition-colors",
-                  tab === t.id ? "font-medium text-fg" : "text-muted hover:text-fg",
+                  "relative h-10 rounded-full text-[14.5px] transition-colors duration-200",
+                  tab === t.id ? "font-semibold text-fg" : "text-muted hover:text-fg",
                 )}
               >
-                {t.label}
-                <span
-                  className={cx(
-                    "absolute inset-x-[30%] -bottom-px h-[3px] rounded-t-full bg-accent transition-opacity duration-200",
-                    tab === t.id ? "opacity-100" : "opacity-0",
-                  )}
-                />
+                {tab === t.id && (
+                  <motion.span
+                    layoutId="detail-tab"
+                    aria-hidden
+                    className="absolute inset-0 rounded-full bg-raised shadow-[inset_0_1px_0_var(--edge),0_1px_2px_rgba(var(--shadow-tint),0.12),0_6px_16px_-8px_rgba(var(--shadow-tint),0.4)]"
+                  />
+                )}
+                <span className="relative">{t.label}</span>
               </button>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-3xl gap-3 px-3 pt-4 sm:px-4 lg:px-8">
+      <main className="mx-auto grid max-w-3xl gap-3.5 px-3 pt-3 sm:px-4 lg:px-8">
         {tab !== "editar" && habit.tracks.length > 0 && (
           <TrackPicker habit={habit} view={view} onChange={setView} />
         )}
@@ -163,7 +165,7 @@ function TrackPicker({
   onChange: (v: TrackView) => void;
 }) {
   return (
-    <label className="rise flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5">
+    <label className="rise flex items-center justify-between gap-3 card px-4 py-2.5">
       <span className="text-[13px] text-muted">Mostrando</span>
       <select
         value={String(view)}
@@ -224,7 +226,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           max={today}
           onChange={(e) => setDate(e.target.value)}
           aria-label="Inicio de la pista nueva"
-          className="h-10 rounded-md border border-line-strong bg-surface px-3 text-sm"
+          className={inputClass}
         />
         <Button
           variant="outline"
@@ -278,10 +280,14 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={cx("rise rounded-[14px] border border-line bg-surface p-4 sm:p-5", className)}>
+    <section className={cx("rise card p-4 sm:p-5", className)}>
       {title && (
-        <h2 className="mb-4 flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-          {Ico && <Ico size={19} className="text-accent" />}
+        <h2 className="display mb-4 flex items-center gap-2.5 text-[17px] font-semibold">
+          {Ico && (
+            <span className="inline-flex size-7 items-center justify-center rounded-[9px] bg-accent-soft text-accent-fg">
+              <Ico size={16} weight="fill" />
+            </span>
+          )}
           {title}
         </h2>
       )}
@@ -297,9 +303,9 @@ function streakUnit(habit: HabitDTO, n: number) {
 
 function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
   return (
-    <span className="tabular inline-flex items-baseline gap-1.5 text-accent">
-      <span className="text-3xl font-semibold tracking-tight">{value}</span>
-      {unit && <span className="text-sm font-semibold tracking-wide uppercase">{unit}</span>}
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className="num text-[44px] leading-none font-semibold">{value}</span>
+      {unit && <span className="text-sm font-medium text-muted">{unit}</span>}
     </span>
   );
 }
@@ -356,7 +362,7 @@ function CalendarTab({
                 <button
                   type="button"
                   onClick={() => openDay(d)}
-                  className="grid w-full gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-2"
+                  className="grid w-full gap-0.5 rounded-[14px] px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
                 >
                   <span className="text-[13px] font-medium text-muted first-letter:uppercase">{formatLong(d)}</span>
                   <span className="text-sm leading-relaxed whitespace-pre-wrap">{l.n}</span>
@@ -428,7 +434,7 @@ function StatsTab({
           ].map(([label, n]) => (
             <div key={label} className="flex items-center justify-between py-2.5">
               <dt className="text-sm">{label}</dt>
-              <dd className="tabular text-sm font-semibold">{n}</dd>
+              <dd className="num text-lg font-semibold">{n}</dd>
             </div>
           ))}
         </dl>
@@ -459,8 +465,14 @@ function ScoreRing({ value }: { value: number }) {
   const c = 2 * Math.PI * r;
   const arc = c * (300 / 360);
   return (
-    <div className="relative size-48">
+    <div className="relative size-52">
       <svg viewBox="0 0 180 180" className="size-full rotate-[120deg]" aria-hidden>
+        <defs>
+          <linearGradient id="score-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="var(--accent-fg)" />
+            <stop offset="100%" stopColor="var(--accent)" />
+          </linearGradient>
+        </defs>
         <circle
           cx="90"
           cy="90"
@@ -476,15 +488,16 @@ function ScoreRing({ value }: { value: number }) {
           cy="90"
           r={r}
           fill="none"
-          stroke="var(--accent)"
+          stroke="url(#score-grad)"
           strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={`${(arc * value) / 100} ${c}`}
           className="transition-[stroke-dasharray] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
         />
       </svg>
-      <span className="tabular absolute inset-0 flex items-center justify-center text-5xl font-semibold tracking-tight">
-        {value}
+      <span className="absolute inset-0 grid place-content-center text-center">
+        <span className="num text-[64px] leading-none font-semibold">{value}</span>
+        <span className="mt-1 text-[13px] text-muted">de 100</span>
       </span>
     </div>
   );
@@ -623,15 +636,15 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
         onNext={onNext}
         nextDisabled={nextDisabled}
       />
-      <div className="grid h-44 grid-flow-col items-end gap-1.5 border-b border-line-strong">
+      <div className="grid h-44 grid-flow-col items-end gap-1.5 border-b border-line">
         {items.map((it) => (
           <div key={it.key} className="grid h-full grid-rows-[auto_1fr] justify-items-center gap-1">
             <span className="tabular text-[11px] font-medium text-muted">{it.value === null ? "-" : it.value}</span>
             <div className="flex w-full items-end justify-center">
               <div
                 className={cx(
-                  "w-full max-w-6 rounded-t-[5px] bg-accent transition-[height] duration-500",
-                  !it.current && "opacity-80",
+                  "w-full max-w-6 rounded-t-[4px] transition-[height] duration-700 ease-spring",
+                  it.current ? "bg-accent-fg" : "bg-accent",
                 )}
                 style={{ height: `${it.value ? Math.max(4, (it.value / max) * 100) : 0}%` }}
               />
@@ -675,7 +688,7 @@ function Donut({ achieved, missed, labels }: { achieved: number; missed: number;
     <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
       <div className="relative mx-auto size-44">
         <svg viewBox="0 0 160 160" className="size-full -rotate-90" aria-hidden>
-          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--p-orange-solid)" strokeWidth="24" />
+          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--surface-3)" strokeWidth="24" />
           <circle
             cx="80"
             cy="80"
@@ -699,7 +712,7 @@ function Donut({ achieved, missed, labels }: { achieved: number; missed: number;
           <span className="tabular ml-auto font-semibold">{achieved}</span>
         </li>
         <li className="flex items-center gap-2">
-          <span className="size-2.5 rounded-full bg-[var(--p-orange-solid)]" />
+          <span className="size-2.5 rounded-full bg-surface-3 ring-1 ring-line-strong" />
           {labels[1]}
           <span className="tabular ml-auto font-semibold">{missed}</span>
         </li>
@@ -720,14 +733,14 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
             <div
               key={g}
               className={cx(
-                "grid w-24 shrink-0 justify-items-center gap-2 rounded-[12px] px-2 py-3",
+                "grid w-24 shrink-0 justify-items-center gap-2 rounded-[18px] px-2 py-3.5",
                 unlocked ? "bg-accent-soft" : "bg-surface-2",
               )}
             >
               <span
                 className={cx(
                   "relative inline-flex size-12 items-center justify-center rounded-full",
-                  unlocked ? "bg-accent text-on-accent" : "bg-surface-3 text-faint",
+                  unlocked ? "btn-glow bg-accent text-on-accent" : "bg-surface-3 text-faint",
                 )}
               >
                 {unlocked ? <Medal size={26} weight="fill" /> : <Lock size={20} weight="fill" />}

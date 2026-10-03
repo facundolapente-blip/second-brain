@@ -10,16 +10,14 @@ export function Bone({ className = "", style }: { className?: string; style?: Re
 /** Cabecera de pantalla con título y, en escritorio, la línea de pestañas. */
 export function HeaderSkeleton({ title, tabs = 3 }: { title: string; tabs?: number }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-2 lg:h-16">
-          <span className="size-8 lg:hidden" />
-          <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>
+        <div className="flex h-16 items-center gap-2 lg:h-20">
+          <span className="size-10 lg:hidden" />
+          <h1 className="display truncate text-[26px] font-semibold lg:text-[30px]">{title}</h1>
         </div>
-        <div className="hidden gap-5 border-b border-line pb-3 lg:flex">
-          {Array.from({ length: tabs }, (_, i) => (
-            <Bone key={i} className="h-4 w-20" />
-          ))}
+        <div className="hidden pb-3 lg:flex">
+          <Bone className="h-10 rounded-full" style={{ width: tabs * 104 }} />
         </div>
       </div>
     </header>

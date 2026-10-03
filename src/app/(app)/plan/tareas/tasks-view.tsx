@@ -87,7 +87,7 @@ export function TasksView({
         </div>
 
         {visible.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
+          <div className="mt-2 grid justify-items-start gap-3 empty-card p-6">
             <p className="text-sm text-muted">
               {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
             </p>
@@ -151,7 +151,7 @@ function TaskRow({
   const urgent = left !== null && left <= 2 && t.status !== "done";
   return (
     <li
-      className="rise rounded-[14px] border border-line bg-surface transition-colors hover:border-line-strong"
+      className="rise card transition-colors hover:border-line-strong"
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
     >
       <button type="button" onClick={onOpen} className="grid w-full gap-2 p-3.5 text-left">

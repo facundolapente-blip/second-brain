@@ -51,14 +51,14 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                 type="button"
                 onClick={() => open({ id: c.id, name: c.name, icon: c.icon, color: c.color })}
                 style={tone(c.color)}
-                className="group flex w-full flex-col items-start gap-6 rounded-[14px] border border-line bg-surface p-4 text-left transition-colors hover:bg-surface-2"
+                className="group relative flex w-full flex-col items-start gap-7 overflow-hidden card p-4 text-left transition-[transform,background-color] duration-300 ease-spring hover:bg-surface-2 active:scale-[0.98]"
               >
                 <ToneSquare size={42} style={tone(c.color)}>
                   <HabitIcon name={c.icon} size={23} weight="fill" />
                 </ToneSquare>
                 <span className="flex w-full items-end justify-between gap-2">
                   <span className="grid gap-0.5">
-                    <span className="text-[15px] font-semibold tracking-tight">{c.name}</span>
+                    <span className="display text-[17px] font-semibold">{c.name}</span>
                     <span className="text-[13px] text-muted">
                       {c.habitCount === 0 ? "Sin hábitos" : c.habitCount === 1 ? "1 hábito" : `${c.habitCount} hábitos`}
                     </span>
@@ -106,7 +106,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={p}
                   style={tone(p)}
                   className={cx(
-                    "size-8 rounded-full bg-tone-solid transition-transform active:scale-90",
+                    "size-10 rounded-full bg-tone-solid shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition-transform duration-300 ease-spring active:scale-90",
                     draft.color === p && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 />
@@ -125,7 +125,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={name}
                   style={tone(draft.color)}
                   className={cx(
-                    "inline-flex aspect-square items-center justify-center rounded-[9px] transition-colors",
+                    "inline-flex aspect-square items-center justify-center rounded-[12px] transition-colors",
                     draft.icon === name ? "bg-tone-solid text-white" : "text-muted hover:bg-surface-2",
                   )}
                 >

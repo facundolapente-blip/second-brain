@@ -50,7 +50,7 @@ export function UncategorizedView({
       <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-6">
         {list.length === 0 ? (
           <div className="mt-6 flex items-center gap-3 rounded-[12px] border border-line p-6">
-            <CheckCircle size={28} weight="fill" className="text-accent" />
+            <CheckCircle size={28} weight="fill" className="text-accent-fg" />
             <div className="grid gap-0.5">
               <h2 className="text-[15px] font-semibold">Todo clasificado</h2>
               <p className="text-sm text-muted">Los movimientos que cargues sin categoría van a aparecer acá.</p>

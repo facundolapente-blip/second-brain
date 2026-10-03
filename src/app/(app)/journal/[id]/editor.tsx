@@ -137,7 +137,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
     <>
       <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[42rem] items-center gap-1 px-2 lg:h-16 lg:px-4">
-          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-accent">
+          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-accent-fg">
             <CaretLeft size={22} weight="bold" />
           </IconButton>
 

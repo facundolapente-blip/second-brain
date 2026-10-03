@@ -146,7 +146,7 @@ export function HabitFormBody({
                 onClick={() => set("categoryId", active ? "" : c.id)}
                 style={tone(c.color)}
                 className={cx(
-                  "inline-flex h-9 items-center gap-2 rounded-md border pr-3 pl-1 text-[13px] transition-colors",
+                  "inline-flex h-10 items-center gap-2 rounded-full border pr-3.5 pl-1.5 text-[13px] transition-colors",
                   active ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
@@ -180,7 +180,7 @@ export function HabitFormBody({
                 <label
                   key={d}
                   className={cx(
-                    "flex h-10 cursor-pointer items-center justify-center rounded-[10px] border text-[13px] font-medium transition-colors select-none",
+                    "flex h-11 cursor-pointer items-center justify-center rounded-full border text-[13px] font-medium transition-colors select-none",
                     on ? "border-accent bg-accent-soft text-accent-fg" : "border-line text-muted hover:bg-surface-2",
                   )}
                 >
@@ -253,8 +253,8 @@ export function HabitFormBody({
                 onClick={() => set("priority", p)}
                 aria-label={`Prioridad ${p}`}
                 className={cx(
-                  "inline-flex size-8 items-center justify-center rounded-md transition-colors",
-                  p <= draft.priority ? "text-accent" : "text-faint hover:text-muted",
+                  "inline-flex size-10 items-center justify-center rounded-full transition-colors",
+                  p <= draft.priority ? "text-accent-fg" : "text-faint hover:text-muted",
                 )}
               >
                 <Flag size={17} weight={p <= draft.priority ? "fill" : "regular"} />
@@ -308,11 +308,11 @@ function Stepper({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex h-10 items-center rounded-md border border-line-strong">
+    <div className="flex h-11 items-center rounded-full border border-line-strong bg-surface-2/60">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="h-full w-9 text-lg text-muted hover:text-fg"
+        className="h-full w-11 text-lg text-muted hover:text-fg"
         aria-label="Menos"
       >
         −
@@ -330,7 +330,7 @@ function Stepper({
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="h-full w-9 text-lg text-muted hover:text-fg"
+        className="h-full w-11 text-lg text-muted hover:text-fg"
         aria-label="Más"
       >
         +

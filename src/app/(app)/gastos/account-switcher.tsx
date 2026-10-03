@@ -46,7 +46,7 @@ export function AccountSwitcher({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-haspopup="dialog"
-        className="grid w-full gap-1.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
+        className="grid w-full gap-1.5 card card-sm px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
       >
         <span className="flex items-center gap-2 text-[13px] text-muted">
           <span className="flex shrink-0 -space-x-1.5" aria-hidden>

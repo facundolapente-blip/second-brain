@@ -1,96 +1,105 @@
 @import "tailwindcss";
 
 /*
- * Sistema visual: monocromo cálido estilo documento, un solo "acento" que es la
- * tinta (casi negro en claro, casi blanco en oscuro) más el azul petróleo de
- * --accent para lo interactivo. El color de verdad aparece solo en pasteles
- * apagados que identifican hábitos, cuentas y categorías.
- * Radios: 6px controles, 12-14px superficies.
+ * Sistema visual "Nocturno": pensado primero para la noche. Base azul tinta muy
+ * profunda con grises fríos, un solo acento cálido (ámbar de farol) que contrasta
+ * con el frío del fondo, superficies en capas con un filo de luz arriba y sombras
+ * teñidas de azul, nunca negro puro. El claro es porcelana fría con la misma lógica.
+ * El color de verdad aparece solo en los pasteles de categoría y en los estados de día.
+ * Radios: 12px controles chicos, 999px botones, 22px superficies, 28px hojas.
  */
 
 :root {
-  --bg: #fbfbfa;
+  --bg: #f2f3f7;
+  --bg-glow-a: rgba(242, 154, 46, 0.1);
+  --bg-glow-b: rgba(96, 128, 214, 0.1);
   --surface: #ffffff;
-  --surface-2: #f4f3f0;
-  --surface-3: #ecebe7;
+  --surface-2: #eceef3;
+  --surface-3: #e2e5ec;
   /* Lo que se apoya sobre una superficie (segmento elegido, chips). */
   --raised: #ffffff;
-  --border: #e9e8e4;
-  --border-strong: #d9d8d3;
-  --text: #2b2a28;
-  --muted: #6b6a66;
+  --border: #e1e4eb;
+  --border-strong: #cfd3dc;
+  /* Filo de luz arriba de cada superficie (se ve como vidrio pulido). */
+  --edge: rgba(255, 255, 255, 0.9);
+  --glass: rgba(255, 255, 255, 0.72);
+  --text: #141821;
+  --muted: #5a6070;
   /* Solo para placeholders, separadores y texto decorativo (3:1). */
-  --faint: #8e8d89;
-  --ink: #1d1d1b;
-  --on-ink: #fafaf9;
-  --danger: #b5403a;
-  --success: #3d6b41;
-  --focus: rgba(29, 29, 27, 0.18);
-  /* Único acento de la app: el azul petróleo de HabitNow, más apagado. */
-  --accent: #2a7fa3;
-  --accent-soft: #e1eff5;
-  --accent-fg: #1d6587;
-  /* Texto sobre un fondo --accent (blanco en claro, tinta en oscuro: AA en los dos). */
-  --on-accent: #ffffff;
-  /* Sombras teñidas con el fondo, nunca negro puro. */
-  --shadow-tint: 40, 36, 30;
+  --faint: #868c99;
+  --ink: #12151d;
+  --on-ink: #f6f7fa;
+  --danger: #c2372f;
+  --success: #2f7a4a;
+  --focus: rgba(236, 140, 26, 0.28);
+  /* Único acento: ámbar de farol. --accent para fondos e íconos, --accent-fg para texto. */
+  --accent: #ec8c1a;
+  --accent-soft: #fdf0de;
+  --accent-fg: #a35400;
+  --on-accent: #1c1205;
+  /* Sombras teñidas de azul noche. */
+  --shadow-tint: 30, 40, 72;
 
   /* Estados de un día de hábito. */
-  --st-done-bg: #dcefe3; --st-done-line: #3f8f5e; --st-done-fg: #23663d;
-  --st-fail-bg: #fbe3e4; --st-fail-line: #d0505a; --st-fail-fg: #9b2c33;
-  --st-skip-bg: #fbf0d2; --st-skip-line: #d4a52c; --st-skip-fg: #85620a;
-  --st-idle-bg: #efeeeb; --st-idle-fg: #6f6e6a;
+  --st-done-bg: #dbf1e3; --st-done-line: #2f9a5c; --st-done-fg: #1d6a3d;
+  --st-fail-bg: #fde3e4; --st-fail-line: #db4b55; --st-fail-fg: #9e2731;
+  --st-skip-bg: #fbf3cc; --st-skip-line: #c9a714; --st-skip-fg: #7c6400;
+  --st-idle-bg: #eceef3; --st-idle-fg: #646a78;
 
-  --p-stone-bg: #efeeeb; --p-stone-fg: #5f5e5a; --p-stone-solid: #8a8984;
-  --p-red-bg: #fbe9e8; --p-red-fg: #9f2f2d; --p-red-solid: #d9675f;
-  --p-orange-bg: #fcefe3; --p-orange-fg: #95511d; --p-orange-solid: #dc8a4a;
-  --p-yellow-bg: #fbf3db; --p-yellow-fg: #896000; --p-yellow-solid: #d4a72c;
-  --p-green-bg: #eaf2e9; --p-green-fg: #346538; --p-green-solid: #6a9c6c;
-  --p-teal-bg: #e4f2f0; --p-teal-fg: #276660; --p-teal-solid: #4f9b92;
-  --p-blue-bg: #e3f0fa; --p-blue-fg: #1f6c9f; --p-blue-solid: #5a98c6;
-  --p-purple-bg: #efeaf7; --p-purple-fg: #5e4a8b; --p-purple-solid: #8f7cbf;
-  --p-pink-bg: #f9e9f1; --p-pink-fg: #8c3b63; --p-pink-solid: #c97199;
+  --p-stone-bg: #eceef2; --p-stone-fg: #545a66; --p-stone-solid: #858b98;
+  --p-red-bg: #fde8e7; --p-red-fg: #a12c2a; --p-red-solid: #e0645c;
+  --p-orange-bg: #fdeee0; --p-orange-fg: #974d16; --p-orange-solid: #e88a45;
+  --p-yellow-bg: #fcf3d6; --p-yellow-fg: #855e00; --p-yellow-solid: #d9ab27;
+  --p-green-bg: #e5f3e7; --p-green-fg: #2e6936; --p-green-solid: #5fa56a;
+  --p-teal-bg: #e0f3f1; --p-teal-fg: #226760; --p-teal-solid: #3fa397;
+  --p-blue-bg: #e2eefc; --p-blue-fg: #1c62a8; --p-blue-solid: #4f8fd6;
+  --p-purple-bg: #eeeafb; --p-purple-fg: #5a45a0; --p-purple-solid: #8a76cf;
+  --p-pink-bg: #fbe8f1; --p-pink-fg: #94335f; --p-pink-solid: #d46b9b;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151514;
-    --surface: #1c1c1b;
-    --surface-2: #242422;
-    --surface-3: #2d2d2a;
-    --raised: #3a3a36;
-    --border: #2c2c29;
-    --border-strong: #3a3a37;
-    --text: #e9e8e4;
-    --muted: #9c9b96;
-    --faint: #7a7974;
-    --ink: #f0efeb;
-    --on-ink: #1a1a19;
-    --danger: #e0766f;
-    --success: #8fbf91;
-    --focus: rgba(240, 239, 235, 0.22);
-    --accent: #5fb0d3;
-    --accent-soft: #1b2e37;
-    --accent-fg: #8ccbe6;
-    --on-accent: #0f1d24;
-    --shadow-tint: 0, 0, 0;
+    --bg: #090a0e;
+    --bg-glow-a: rgba(255, 166, 64, 0.075);
+    --bg-glow-b: rgba(84, 116, 210, 0.14);
+    --surface: #111319;
+    --surface-2: #171a22;
+    --surface-3: #1f232d;
+    --raised: #2a2f3b;
+    --border: #1f232c;
+    --border-strong: #2d323d;
+    --edge: rgba(255, 255, 255, 0.06);
+    --glass: rgba(17, 19, 25, 0.66);
+    --text: #eceef4;
+    --muted: #9ba1af;
+    --faint: #6e7483;
+    --ink: #f2f3f7;
+    --on-ink: #0d0f14;
+    --danger: #ff7d76;
+    --success: #7fd69b;
+    --focus: rgba(255, 171, 74, 0.3);
+    --accent: #ffab4a;
+    --accent-soft: #2a1e10;
+    --accent-fg: #ffc27c;
+    --on-accent: #1c1205;
+    --shadow-tint: 0, 2, 10;
 
-    --st-done-bg: #1f3428; --st-done-line: #5daa7a; --st-done-fg: #9fd5b2;
-    --st-fail-bg: #3a2124; --st-fail-line: #d8666e; --st-fail-fg: #f0a5aa;
-    --st-skip-bg: #372f17; --st-skip-line: #c9a23a; --st-skip-fg: #e8cb76;
-    --st-idle-bg: #262624; --st-idle-fg: #8f8e89;
+    --st-done-bg: #15301f; --st-done-line: #4fc77d; --st-done-fg: #9fe3b6;
+    --st-fail-bg: #351a1e; --st-fail-line: #f0626c; --st-fail-fg: #f8aab0;
+    --st-skip-bg: #312c12; --st-skip-line: #e3c63c; --st-skip-fg: #f0dc85;
+    --st-idle-bg: #1a1d25; --st-idle-fg: #8d93a1;
 
-    --p-stone-bg: #2a2a28; --p-stone-fg: #b9b8b3; --p-stone-solid: #8d8c87;
-    --p-red-bg: #3a2322; --p-red-fg: #eea19b; --p-red-solid: #d4706a;
-    --p-orange-bg: #3a2a1d; --p-orange-fg: #eeb383; --p-orange-solid: #d48e55;
-    --p-yellow-bg: #362f1a; --p-yellow-fg: #e8c869; --p-yellow-solid: #c9a23a;
-    --p-green-bg: #22301f; --p-green-fg: #a5cfa6; --p-green-solid: #6f9f70;
-    --p-teal-bg: #1d302d; --p-teal-fg: #8fcfc6; --p-teal-solid: #55a095;
-    --p-blue-bg: #1c2b38; --p-blue-fg: #9cc8ea; --p-blue-solid: #5e9bc9;
-    --p-purple-bg: #2b2538; --p-purple-fg: #c3b4e6; --p-purple-solid: #9381c4;
-    --p-pink-bg: #36222c; --p-pink-fg: #e8a7c6; --p-pink-solid: #c9779e;
+    --p-stone-bg: #1d2028; --p-stone-fg: #b6bbc6; --p-stone-solid: #7f8594;
+    --p-red-bg: #33191b; --p-red-fg: #f4a19b; --p-red-solid: #e06a62;
+    --p-orange-bg: #33231a; --p-orange-fg: #f3b585; --p-orange-solid: #e08d4f;
+    --p-yellow-bg: #302a14; --p-yellow-fg: #ecd06e; --p-yellow-solid: #d1a830;
+    --p-green-bg: #172a1d; --p-green-fg: #a2d6aa; --p-green-solid: #5fa86b;
+    --p-teal-bg: #132a29; --p-teal-fg: #8ad5cb; --p-teal-solid: #3fa497;
+    --p-blue-bg: #15233a; --p-blue-fg: #9fc6f2; --p-blue-solid: #5592d9;
+    --p-purple-bg: #221d3a; --p-purple-fg: #c5b8f0; --p-purple-solid: #8e7bd3;
+    --p-pink-bg: #32192a; --p-pink-fg: #f0a8ca; --p-pink-solid: #d5709f;
 
     color-scheme: dark;
   }
@@ -122,6 +131,16 @@
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-display: var(--font-bricolage), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Controles un poco más blandos que antes (rounded-md = 10px). */
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
@@ -130,19 +149,46 @@ html {
 }
 
 body {
-  background: var(--bg);
+  /* Transparente para que se vea el resplandor fijo de atrás (html pone el color). */
+  background: transparent;
   color: var(--text);
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "cv11";
+  isolation: isolate;
+}
+
+/*
+ * Ambiente: dos resplandores fijos (ámbar arriba a la izquierda, azul noche a la
+ * derecha) y un grano finísimo encima. Fijos y sin eventos: no repintan al hacer scroll.
+ */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+body::before {
+  background:
+    radial-gradient(60rem 36rem at 8% -8%, var(--bg-glow-a), transparent 60%),
+    radial-gradient(56rem 40rem at 100% 0%, var(--bg-glow-b), transparent 62%);
+}
+body::after {
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+@media (prefers-color-scheme: dark) {
+  body::after { opacity: 0.05; }
 }
 
 ::selection {
-  background: var(--p-yellow-bg);
+  background: var(--accent-soft);
   color: var(--text);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
 }
 
@@ -151,14 +197,79 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Tipografía display: títulos y números protagonistas. */
+.display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.025em;
+}
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  font-optical-sizing: auto;
+}
+
+@layer components {
+  /*
+   * Superficie con profundidad: degradé apenas perceptible, filo de luz arriba,
+   * hilo de borde y sombra teñida, difusa y larga. Las utilidades la pisan.
+   */
+  .card {
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    background-color: var(--surface);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 48px);
+    box-shadow:
+      inset 0 1px 0 var(--edge),
+      0 1px 2px rgba(var(--shadow-tint), 0.05),
+      0 18px 40px -24px rgba(var(--shadow-tint), 0.28);
+  }
+  .card-sm {
+    border-radius: 16px;
+  }
+  /* Estado vacío: contorno punteado sobre vidrio apagado. */
+  .empty-card {
+    border-radius: 22px;
+    border: 1px dashed var(--border-strong);
+    background: color-mix(in oklab, var(--surface) 55%, transparent);
+  }
+
+  /* Vidrio: solo en lo que flota fijo (barras, cabeceras, menú, hojas). */
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    backdrop-filter: blur(22px) saturate(170%);
+    box-shadow:
+      inset 0 1px 0 var(--edge),
+      0 0 0 1px color-mix(in oklab, var(--border) 80%, transparent),
+      0 20px 50px -20px rgba(var(--shadow-tint), 0.35);
+  }
+
+  /* Botón principal con un brillo arriba (el ámbar parece iluminado desde adentro). */
+  .btn-glow {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 8px 24px -10px color-mix(in oklab, var(--accent) 75%, transparent);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* Entrada suave de bloques. Solo transform + opacity. */
 @media (prefers-reduced-motion: no-preference) {
   .rise {
-    animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--i, 0) * 60ms);
+    animation: rise 640ms var(--ease-out-soft) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 45ms);
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(10px) scale(0.99); }
     to { opacity: 1; transform: none; }
   }
 }
@@ -169,11 +280,27 @@ dialog.sheet {
   width: 100%;
   max-width: 100%;
   max-height: 92dvh;
-  border-radius: 14px 14px 0 0;
-  background: var(--surface);
+  border-radius: 28px 28px 0 0;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface) 120px);
   color: var(--text);
   border: 1px solid var(--border);
+  border-bottom: 0;
   padding: 0;
+  box-shadow:
+    inset 0 1px 0 var(--edge),
+    0 -24px 60px -20px rgba(var(--shadow-tint), 0.45);
+}
+/* Manija de arrastre (solo indicativa) arriba de la hoja en el celular. */
+dialog.sheet::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 38px;
+  height: 4px;
+  margin-left: -19px;
+  border-radius: 999px;
+  background: var(--border-strong);
 }
 /* El scroll de una hoja no arrastra la página de atrás. */
 dialog.sheet,
@@ -189,22 +316,43 @@ summary {
   touch-action: manipulation;
 }
 dialog.sheet::backdrop {
-  background: rgba(20, 20, 18, 0.32);
+  background: rgba(6, 8, 14, 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 @media (min-width: 640px) {
   dialog.sheet {
     margin: auto;
     max-width: 30rem;
-    border-radius: 12px;
+    border-radius: 24px;
+    border-bottom: 1px solid var(--border);
+    box-shadow:
+      inset 0 1px 0 var(--edge),
+      0 40px 80px -30px rgba(var(--shadow-tint), 0.55);
+  }
+  dialog.sheet::before {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
   dialog.sheet[open] {
-    animation: sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation: sheet-in 520ms var(--ease-spring);
+  }
+  dialog.sheet[open]::backdrop {
+    animation: fade-in 320ms ease-out;
   }
   @keyframes sheet-in {
-    from { transform: translateY(24px); opacity: 0; }
+    from { transform: translateY(48px); opacity: 0; }
     to { transform: none; opacity: 1; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+  }
+  @media (min-width: 640px) {
+    @keyframes sheet-in {
+      from { transform: translateY(16px) scale(0.97); opacity: 0; }
+      to { transform: none; opacity: 1; }
+    }
   }
 }
 
@@ -217,7 +365,7 @@ dialog.sheet::backdrop {
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--surface-2);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -237,8 +385,9 @@ dialog.sheet::backdrop {
 /* Sombra de lo que flota (botón de escribir, botón flotante, tooltips), teñida con el fondo. */
 .lift {
   box-shadow:
-    0 1px 2px rgba(var(--shadow-tint), 0.06),
-    0 10px 28px -12px rgba(var(--shadow-tint), 0.28);
+    inset 0 1px 0 var(--edge),
+    0 1px 2px rgba(var(--shadow-tint), 0.08),
+    0 16px 36px -14px rgba(var(--shadow-tint), 0.42);
 }
 
 /* Lectura larga en serif: cortes de línea prolijos y guiones en español. */

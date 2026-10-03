@@ -14,11 +14,11 @@ export function PageHeader({
   wide?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
       <div className={`mx-auto px-4 lg:px-8 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
-        <div className="flex h-14 items-center gap-2 lg:h-16">
+        <div className="flex h-16 items-center gap-2 lg:h-20">
           <MenuButton />
-          <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>
+          <h1 className="display truncate text-[26px] font-semibold lg:text-[30px]">{title}</h1>
           <div className="ml-auto flex items-center gap-0.5">{actions}</div>
         </div>
         {tabs}

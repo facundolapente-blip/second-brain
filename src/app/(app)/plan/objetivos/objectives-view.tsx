@@ -85,7 +85,7 @@ export function ObjectivesView({
         </div>
 
         {groups.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
+          <div className="mt-2 grid justify-items-start gap-3 empty-card p-6">
             <p className="text-sm text-muted">No hay resultados clave para este filtro.</p>
             <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
               <Plus size={15} /> Nuevo resultado
@@ -142,7 +142,7 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
       <button
         type="button"
         onClick={onOpen}
-        className="grid w-full gap-2 rounded-[14px] border border-line bg-surface p-3.5 text-left transition-colors hover:border-line-strong"
+        className="grid w-full gap-2 card p-3.5 text-left transition-colors hover:border-line-strong"
       >
         <span className="flex items-start gap-3">
           <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", finished && "text-muted")}>

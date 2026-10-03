@@ -110,7 +110,7 @@ export function ReportsView({
         </section>
 
         {empty ? (
-          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
+          <div className="grid justify-items-start gap-2 empty-card p-8">
             <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
               <ChartBar size={22} aria-hidden />
             </span>

@@ -136,7 +136,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                     .map((c) => {
                       const n = active.filter((a) => a.currency === c).length;
                       return (
-                        <div key={c} className="grid gap-1 rounded-[12px] border border-line bg-surface px-3.5 py-3">
+                        <div key={c} className="grid gap-1 card card-sm px-3.5 py-3">
                           <dt className="flex items-center justify-between gap-2 text-[13px] text-muted">
                             Total en {CURRENCY_NAME[c] ?? c}
                             <span className="rounded-[4px] bg-surface-2 px-1.5 py-px font-mono text-[11px]">{c}</span>
@@ -276,7 +276,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                   aria-label={p}
                   style={tone(p)}
                   className={cx(
-                    "size-8 rounded-full bg-tone-solid transition-transform active:scale-90",
+                    "size-10 rounded-full bg-tone-solid shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition-transform duration-300 ease-spring active:scale-90",
                     draft.color === p && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 />

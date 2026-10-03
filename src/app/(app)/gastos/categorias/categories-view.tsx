@@ -133,7 +133,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={p}
                   style={tone(p)}
                   className={cx(
-                    "size-8 rounded-full bg-tone-solid transition-transform active:scale-90",
+                    "size-10 rounded-full bg-tone-solid shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition-transform duration-300 ease-spring active:scale-90",
                     draft.color === p && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 />

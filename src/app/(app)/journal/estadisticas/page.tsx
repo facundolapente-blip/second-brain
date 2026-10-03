@@ -41,7 +41,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
       <>
         <JournalHeader title="Estadísticas" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
         <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-8">
-          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
+          <div className="grid justify-items-start gap-2 empty-card p-8">
             <h2 className="font-serif text-[22px] font-semibold tracking-tight">Todavía no hay números</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               Cuando escribas tus primeras entradas vas a ver acá tu racha, cuánto escribís y en qué meses.
@@ -68,7 +68,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             </span>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-line rounded-[12px] border border-line bg-surface">
+          <div className="grid grid-cols-3 divide-x divide-line card card-sm">
             <div className="grid content-start gap-1 p-3.5 sm:p-4">
               <span className="flex items-center gap-1 text-[12.5px] text-muted">
                 <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
@@ -113,7 +113,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               href={monthLink(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-md text-accent-fg transition-colors hover:bg-surface-2"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
@@ -123,7 +123,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
                 href={monthLink(shiftMonth(month, 1))}
                 scroll={false}
                 aria-label="Mes siguiente"
-                className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+                className="inline-flex size-11 items-center justify-center rounded-md text-accent-fg transition-colors hover:bg-surface-2"
               >
                 <CaretRight size={18} weight="bold" />
               </Link>
@@ -208,7 +208,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               <h2 className="text-[17px] font-semibold tracking-tight">La entrada más larga</h2>
               <Link
                 href={`/journal/${s.longest.id}`}
-                className="group grid gap-1 rounded-[12px] border border-line bg-surface p-4 transition-colors hover:border-line-strong"
+                className="group grid gap-1 card card-sm p-4 transition-colors hover:border-line-strong"
               >
                 <span className="text-[34px] leading-none font-semibold tracking-tight">{nf.format(s.longest.words)}</span>
                 <span className="text-[13px] text-muted">palabras</span>

@@ -26,14 +26,14 @@ export function ErrorState({
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4 lg:h-16 lg:px-8">
+      <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
+        <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-20 lg:px-8">
           <MenuButton />
-          <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>
+          <h1 className="display truncate text-[26px] font-semibold lg:text-[30px]">{title}</h1>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-8">
-        <div role="alert" className="grid justify-items-start gap-3 rounded-[14px] border border-line bg-surface p-6 lg:p-8">
+        <div role="alert" className="grid justify-items-start gap-3 card p-6 lg:p-8">
           <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]">
             <WarningCircle size={22} weight="bold" aria-hidden />
           </span>
