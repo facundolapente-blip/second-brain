@@ -103,7 +103,7 @@ function BlockForm({
       <p className="-mt-3 text-xs text-muted">Sin hora, el bloque queda para todo el día.</p>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Categoría</span>
+        <span className="label-mono text-muted">Categoría</span>
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => {
             const on = categoryId === c.id;
@@ -127,12 +127,12 @@ function BlockForm({
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Prioridad</span>
+        <span className="label-mono text-muted">Prioridad</span>
         <FirePicker value={priority} onChange={setPriority} name="priority" />
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Hábito vinculado</span>
+        <span className="label-mono text-muted">Hábito vinculado</span>
         <select
           value={habitId}
           onChange={(e) => setHabitId(e.target.value)}

@@ -134,7 +134,7 @@ export function HabitFormBody({
       </Field>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Categoría</span>
+        <span className="label-mono text-muted">Categoría</span>
         <input type="hidden" name="categoryId" value={draft.categoryId} />
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => {
@@ -146,8 +146,10 @@ export function HabitFormBody({
                 onClick={() => set("categoryId", active ? "" : c.id)}
                 style={tone(c.color)}
                 className={cx(
-                  "inline-flex h-9 items-center gap-2 rounded-md border pr-3 pl-1 text-[13px] transition-colors",
-                  active ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
+                  "inline-flex h-11 items-center gap-2 rounded-md border pr-3 pl-1.5 text-[13px] transition-colors",
+                  active
+                    ? "border-rule bg-tone font-semibold text-tone-fg shadow-[inset_0_0_0_1px_var(--rule)]"
+                    : "border-line-strong text-fg hover:bg-surface-2",
                 )}
               >
                 <ToneSquare size={26} style={tone(c.color)}>
@@ -161,7 +163,7 @@ export function HabitFormBody({
       </div>
 
       <div className="grid gap-2">
-        <span className="text-[13px] font-medium text-muted">Frecuencia</span>
+        <span className="label-mono text-muted">Frecuencia</span>
         <Segmented
           name="frequency"
           value={draft.frequency}
@@ -180,8 +182,8 @@ export function HabitFormBody({
                 <label
                   key={d}
                   className={cx(
-                    "flex h-10 cursor-pointer items-center justify-center rounded-[10px] border text-[13px] font-medium transition-colors select-none",
-                    on ? "border-accent bg-accent-soft text-accent-fg" : "border-line text-muted hover:bg-surface-2",
+                    "label-mono flex h-11 cursor-pointer items-center justify-center rounded-[2px] border text-[10.5px] transition-colors select-none has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent",
+                    on ? "border-rule bg-ink font-bold text-on-ink" : "border-line-strong text-muted hover:bg-surface-2",
                   )}
                 >
                   <input
@@ -216,7 +218,7 @@ export function HabitFormBody({
       </div>
 
       <div className="grid gap-2">
-        <span className="text-[13px] font-medium text-muted">Cómo se mide</span>
+        <span className="label-mono text-muted">Cómo se mide</span>
         <Segmented
           name="kind"
           value={draft.kind}
@@ -243,21 +245,23 @@ export function HabitFormBody({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-1.5">
-          <span className="text-[13px] font-medium text-muted">Prioridad</span>
+          <span className="label-mono text-muted">Prioridad</span>
           <input type="hidden" name="priority" value={draft.priority} />
-          <div className="flex h-10 items-center gap-1">
+          <div className="grid h-11 grid-cols-5 gap-px border border-line-strong bg-line-strong">
             {[1, 2, 3, 4, 5].map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => set("priority", p)}
                 aria-label={`Prioridad ${p}`}
+                aria-pressed={p === draft.priority}
                 className={cx(
-                  "inline-flex size-8 items-center justify-center rounded-md transition-colors",
-                  p <= draft.priority ? "text-accent" : "text-faint hover:text-muted",
+                  "inline-flex items-center justify-center transition-colors",
+                  p <= draft.priority ? "bg-surface text-accent-fg" : "bg-surface text-faint hover:text-muted",
+                  p === draft.priority && "bg-surface-2",
                 )}
               >
-                <Flag size={17} weight={p <= draft.priority ? "fill" : "regular"} />
+                <Flag size={16} weight={p <= draft.priority ? "fill" : "regular"} />
               </button>
             ))}
           </div>
@@ -308,11 +312,11 @@ function Stepper({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex h-10 items-center rounded-md border border-line-strong">
+    <div className="flex h-11 items-center divide-x divide-line-strong rounded-md border border-line-strong">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="h-full w-9 text-lg text-muted hover:text-fg"
+        className="h-full w-11 text-lg text-muted hover:bg-surface-2 hover:text-fg"
         aria-label="Menos"
       >
         −
@@ -325,12 +329,12 @@ function Stepper({
         min={min}
         max={max}
         onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
-        className="tabular h-full w-12 bg-transparent text-center text-sm font-medium outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className="tabular h-full w-14 bg-transparent text-center text-[15px] font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="h-full w-9 text-lg text-muted hover:text-fg"
+        className="h-full w-11 text-lg text-muted hover:bg-surface-2 hover:text-fg"
         aria-label="Más"
       >
         +

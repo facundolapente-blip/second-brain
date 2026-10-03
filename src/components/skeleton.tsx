@@ -10,15 +10,15 @@ export function Bone({ className = "", style }: { className?: string; style?: Re
 /** Cabecera de pantalla con título y, en escritorio, la línea de pestañas. */
 export function HeaderSkeleton({ title, tabs = 3 }: { title: string; tabs?: number }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-20 border-b border-rule bg-bg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-2 lg:h-16">
-          <span className="size-8 lg:hidden" />
-          <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>
+        <div className="flex h-14 items-center gap-2 lg:h-[72px]">
+          <span className="size-9 lg:hidden" />
+          <h1 className="display text-[24px] uppercase lg:text-[34px]">{title}</h1>
         </div>
-        <div className="hidden gap-5 border-b border-line pb-3 lg:flex">
+        <div className="hidden h-11 items-center gap-6 lg:flex">
           {Array.from({ length: tabs }, (_, i) => (
-            <Bone key={i} className="h-4 w-20" />
+            <Bone key={i} className="h-3 w-20" />
           ))}
         </div>
       </div>

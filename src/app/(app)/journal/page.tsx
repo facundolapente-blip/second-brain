@@ -75,7 +75,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
             <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted">
               <span className="first-letter:uppercase">{formatLong(home.today)}</span>
               {home.streak > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 py-0.5 pr-2.5 pl-2 text-[13px] text-fg">
+                <span className="inline-flex items-center gap-1 rounded-[2px] bg-surface-2 py-0.5 pr-2.5 pl-2 text-[13px] text-fg">
                   <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden />
                   <span className="tabular">{home.streak === 1 ? "1 día seguido" : `${home.streak} días seguidos`}</span>
                 </span>
@@ -150,7 +150,7 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="flex items-center gap-3 rounded-[12px] bg-surface-2 px-4 py-3 text-sm">
+    <div className="flex items-center gap-3 rounded-none bg-surface-2 px-4 py-3 text-sm">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
           {count}

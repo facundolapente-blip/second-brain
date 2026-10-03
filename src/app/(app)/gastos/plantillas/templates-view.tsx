@@ -60,7 +60,7 @@ export function TemplatesView({
                 <button
                   type="button"
                   onClick={() => form.current?.fromTemplate(t)}
-                  className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                  className="flex min-w-0 flex-1 items-center gap-3.5 rounded-none px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
                 >
                   <CategoryAvatar category={lk.category(t.categoryId)} transfer={t.kind === "transfer"} />
                   <span className="grid min-w-0 flex-1 gap-0.5">

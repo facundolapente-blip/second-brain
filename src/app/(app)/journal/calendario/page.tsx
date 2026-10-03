@@ -140,7 +140,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                 )}
               </div>
               {selectedEntries.length === 0 ? (
-                <div className="grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
+                <div className="grid justify-items-start gap-3 border border-dashed border-line-strong p-6">
                   <p className="font-serif text-[17px] text-muted italic">
                     {selected > today ? "Este día todavía no llegó." : "Este día no escribiste."}
                   </p>
@@ -155,7 +155,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               )}
             </>
           ) : (
-            <p className="rounded-[14px] border border-dashed border-line-strong p-6 font-serif text-[17px] text-muted italic">
+            <p className="border border-dashed border-line-strong p-6 font-serif text-[17px] text-muted italic">
               Tocá un día para ver lo que escribiste.
             </p>
           )}

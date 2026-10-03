@@ -67,7 +67,7 @@ export function JournalHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-20 border-b border-rule bg-bg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
         <div className="flex h-14 items-center gap-2 lg:h-16">
           {back ? (
@@ -122,7 +122,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 rounded-[14px] border border-line bg-surface py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
+      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 border border-line-strong bg-surface py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
     >
       <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
         <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
@@ -147,7 +147,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
         </span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-[12px] text-muted">
           {entry.tags.slice(0, 3).map((t) => (
-            <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5">
+            <span key={t} className="rounded-[2px] bg-surface-2 px-2 py-0.5">
               #{t}
             </span>
           ))}

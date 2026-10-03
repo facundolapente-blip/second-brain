@@ -11,7 +11,7 @@ export default function Loading() {
           <Bone className="h-8 w-60" />
           <Bone className="h-4 w-44" />
         </div>
-        <Bone className="h-44 rounded-[14px]" />
+        <Bone className="h-44 rounded-none" />
         <Bone className="h-5 w-12" />
         {Array.from({ length: 4 }, (_, i) => (
           <EntryCardSkeleton key={i} />

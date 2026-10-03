@@ -70,7 +70,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                     <button
                       type="button"
                       onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount })}
-                      className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex w-full items-center gap-3.5 rounded-none px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
                     >
                       <CategoryAvatar category={c} />
                       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -123,7 +123,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Color</span>
+            <span className="label-mono text-muted">Color</span>
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((p) => (
                 <button
@@ -133,7 +133,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={p}
                   style={tone(p)}
                   className={cx(
-                    "size-8 rounded-full bg-tone-solid transition-transform active:scale-90",
+                    "size-11 rounded-[2px] bg-tone-solid transition-transform active:scale-90",
                     draft.color === p && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 />
@@ -142,7 +142,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Ícono</span>
+            <span className="label-mono text-muted">Ícono</span>
             <div className="grid grid-cols-8 gap-1.5">
               {Object.keys(FINANCE_ICONS).map((name) => (
                 <button

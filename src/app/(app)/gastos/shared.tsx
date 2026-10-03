@@ -87,7 +87,7 @@ export function AccountAvatar({ account, size = 36 }: { account: Pick<AccountDTO
     <span
       aria-hidden
       style={{ ...tone(account.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[10px] bg-tone-solid text-white"
+      className="inline-flex shrink-0 items-center justify-center rounded-[2px] bg-tone-solid text-white"
     >
       <FinanceIcon name={account.icon} size={Math.round(size * 0.52)} weight="fill" />
     </span>
@@ -240,7 +240,7 @@ export function TxRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-none px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -303,7 +303,7 @@ export function Fab({ onClick, label = "Nuevo movimiento" }: { onClick: () => vo
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="lift fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
+      className="lift fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
     >
       <Plus size={26} weight="bold" />
     </button>
@@ -320,9 +320,9 @@ export function EmptyBlock({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mt-6 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-8">
+    <div className="mt-6 grid justify-items-start gap-3 border border-dashed border-line-strong p-8">
       {icon && (
-        <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">{icon}</span>
+        <span className="inline-flex size-10 items-center justify-center rounded-[2px] bg-accent-soft text-accent-fg">{icon}</span>
       )}
       <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
       {children}

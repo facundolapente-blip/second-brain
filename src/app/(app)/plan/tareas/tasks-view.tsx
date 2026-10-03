@@ -75,7 +75,7 @@ export function TasksView({
                 aria-selected={on}
                 onClick={() => setView(v.id)}
                 className={cx(
-                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
+                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[2px] border px-3.5 text-[13px] transition-colors",
                   on ? "border-ink bg-ink font-medium text-on-ink" : "border-line text-muted hover:bg-surface-2 hover:text-fg",
                 )}
               >
@@ -87,7 +87,7 @@ export function TasksView({
         </div>
 
         {visible.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
+          <div className="mt-2 grid justify-items-start gap-3 border border-dashed border-line-strong p-6">
             <p className="text-sm text-muted">
               {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
             </p>
@@ -115,7 +115,7 @@ export function TasksView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nueva tarea"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -151,7 +151,7 @@ function TaskRow({
   const urgent = left !== null && left <= 2 && t.status !== "done";
   return (
     <li
-      className="rise rounded-[14px] border border-line bg-surface transition-colors hover:border-line-strong"
+      className="rise border border-line-strong bg-surface transition-colors hover:border-line-strong"
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
     >
       <button type="button" onClick={onOpen} className="grid w-full gap-2 p-3.5 text-left">

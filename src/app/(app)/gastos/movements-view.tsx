@@ -228,7 +228,7 @@ function NetHero({ cents, currency }: { cents: number; currency: string }) {
 function FlowTile({ label, totals, kind }: { label: string; totals: Record<string, number>; kind: "in" | "out" }) {
   const cur = sortedCurrencies(totals);
   return (
-    <div className="grid content-start gap-1 rounded-[12px] border border-line bg-surface px-3 py-2.5">
+    <div className="grid content-start gap-1 border border-line-strong bg-surface px-3 py-2.5">
       <dt className="flex items-center gap-1.5 text-[13px] text-muted">
         <span
           aria-hidden

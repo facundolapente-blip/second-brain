@@ -1,96 +1,108 @@
 @import "tailwindcss";
 
 /*
- * Sistema visual: monocromo cálido estilo documento, un solo "acento" que es la
- * tinta (casi negro en claro, casi blanco en oscuro) más el azul petróleo de
- * --accent para lo interactivo. El color de verdad aparece solo en pasteles
- * apagados que identifican hábitos, cuentas y categorías.
- * Radios: 6px controles, 12-14px superficies.
+ * Sistema visual (opción C, "Tablero"): un panel de control personal.
+ * - Papel técnico cálido en claro, pantalla apagada en oscuro.
+ * - Grotesca (Archivo) para títulos y texto; monoespaciada (JetBrains Mono)
+ *   para todo número, fecha, monto y etiqueta técnica.
+ * - Líneas de 1px que organizan el contenido en compartimentos; casi sin sombras.
+ * - Un solo acento fuerte tipo señalética (naranja), más los estados
+ *   verde / rojo / amarillo. Los pasteles de categoría solo marcan identidad.
+ * - Esquinas rectas: 2px en controles, 0 en superficies. Círculos solo en puntos.
  */
 
 :root {
-  --bg: #fbfbfa;
-  --surface: #ffffff;
-  --surface-2: #f4f3f0;
-  --surface-3: #ecebe7;
+  --bg: #efeee9;
+  --surface: #f8f7f3;
+  --surface-2: #e6e4dd;
+  --surface-3: #dcdad2;
   /* Lo que se apoya sobre una superficie (segmento elegido, chips). */
-  --raised: #ffffff;
-  --border: #e9e8e4;
-  --border-strong: #d9d8d3;
-  --text: #2b2a28;
-  --muted: #6b6a66;
+  --raised: #fdfdfb;
+  --border: #d3d0c7;
+  --border-strong: #a19e94;
+  /* Regla estructural: la línea que separa zonas (cabecera, menú, tablas). */
+  --rule: #1b1b19;
+  --text: #161614;
+  --muted: #55534d;
   /* Solo para placeholders, separadores y texto decorativo (3:1). */
-  --faint: #8e8d89;
-  --ink: #1d1d1b;
-  --on-ink: #fafaf9;
-  --danger: #b5403a;
-  --success: #3d6b41;
-  --focus: rgba(29, 29, 27, 0.18);
-  /* Único acento de la app: el azul petróleo de HabitNow, más apagado. */
-  --accent: #2a7fa3;
-  --accent-soft: #e1eff5;
-  --accent-fg: #1d6587;
-  /* Texto sobre un fondo --accent (blanco en claro, tinta en oscuro: AA en los dos). */
-  --on-accent: #ffffff;
-  /* Sombras teñidas con el fondo, nunca negro puro. */
+  --faint: #7c7970;
+  --ink: #161614;
+  --on-ink: #f8f7f3;
+  --danger: #b3261e;
+  --success: #1e7a43;
+  --focus: rgba(22, 22, 20, 0.2);
+  /* Acento de señalética. Relleno con texto tinta encima; --accent-fg para texto. */
+  --accent: #ff5a1a;
+  --accent-soft: #fde3d4;
+  --accent-fg: #b23a00;
+  --on-accent: #161614;
   --shadow-tint: 40, 36, 30;
 
-  /* Estados de un día de hábito. */
-  --st-done-bg: #dcefe3; --st-done-line: #3f8f5e; --st-done-fg: #23663d;
-  --st-fail-bg: #fbe3e4; --st-fail-line: #d0505a; --st-fail-fg: #9b2c33;
-  --st-skip-bg: #fbf0d2; --st-skip-line: #d4a52c; --st-skip-fg: #85620a;
-  --st-idle-bg: #efeeeb; --st-idle-fg: #6f6e6a;
+  /* Estados de un día de hábito: bg = tinte, line = señal (relleno), fg = texto sobre tinte. */
+  --st-done-bg: #d5ebdb; --st-done-line: #1e7a43; --st-done-fg: #13562e;
+  --st-fail-bg: #f8dcd8; --st-fail-line: #d1342b; --st-fail-fg: #8f1f18;
+  --st-skip-bg: #f6e8b8; --st-skip-line: #c99700; --st-skip-fg: #6e5200;
+  --st-idle-bg: #e4e2db; --st-idle-fg: #66645d;
+  /* Texto sobre el relleno de un estado (hecho). */
+  --on-st: #ffffff;
 
-  --p-stone-bg: #efeeeb; --p-stone-fg: #5f5e5a; --p-stone-solid: #8a8984;
-  --p-red-bg: #fbe9e8; --p-red-fg: #9f2f2d; --p-red-solid: #d9675f;
-  --p-orange-bg: #fcefe3; --p-orange-fg: #95511d; --p-orange-solid: #dc8a4a;
-  --p-yellow-bg: #fbf3db; --p-yellow-fg: #896000; --p-yellow-solid: #d4a72c;
-  --p-green-bg: #eaf2e9; --p-green-fg: #346538; --p-green-solid: #6a9c6c;
-  --p-teal-bg: #e4f2f0; --p-teal-fg: #276660; --p-teal-solid: #4f9b92;
-  --p-blue-bg: #e3f0fa; --p-blue-fg: #1f6c9f; --p-blue-solid: #5a98c6;
-  --p-purple-bg: #efeaf7; --p-purple-fg: #5e4a8b; --p-purple-solid: #8f7cbf;
-  --p-pink-bg: #f9e9f1; --p-pink-fg: #8c3b63; --p-pink-solid: #c97199;
+  --p-stone-bg: #e6e4de; --p-stone-fg: #55544f; --p-stone-solid: #7f7d77;
+  --p-red-bg: #f7dfdc; --p-red-fg: #9a2a24; --p-red-solid: #cf5148;
+  --p-orange-bg: #f9e4d3; --p-orange-fg: #8f4a12; --p-orange-solid: #d97a35;
+  --p-yellow-bg: #f6ecc8; --p-yellow-fg: #7d5900; --p-yellow-solid: #c99a1c;
+  --p-green-bg: #dfeddf; --p-green-fg: #2e5f33; --p-green-solid: #579158;
+  --p-teal-bg: #d9ece9; --p-teal-fg: #225f59; --p-teal-solid: #3f8f86;
+  --p-blue-bg: #dae8f4; --p-blue-fg: #1c6194; --p-blue-solid: #4a88bb;
+  --p-purple-bg: #e7e1f2; --p-purple-fg: #574484; --p-purple-solid: #806db3;
+  --p-pink-bg: #f4e0ea; --p-pink-fg: #85355b; --p-pink-solid: #bc628c;
+
+  /* Puntitos de plano técnico en el fondo. */
+  --grid-dot: rgba(22, 22, 20, 0.07);
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151514;
-    --surface: #1c1c1b;
-    --surface-2: #242422;
-    --surface-3: #2d2d2a;
-    --raised: #3a3a36;
-    --border: #2c2c29;
-    --border-strong: #3a3a37;
-    --text: #e9e8e4;
-    --muted: #9c9b96;
-    --faint: #7a7974;
-    --ink: #f0efeb;
-    --on-ink: #1a1a19;
-    --danger: #e0766f;
-    --success: #8fbf91;
-    --focus: rgba(240, 239, 235, 0.22);
-    --accent: #5fb0d3;
-    --accent-soft: #1b2e37;
-    --accent-fg: #8ccbe6;
-    --on-accent: #0f1d24;
+    --bg: #121211;
+    --surface: #191917;
+    --surface-2: #222220;
+    --surface-3: #2c2c29;
+    --raised: #34342f;
+    --border: #2f2f2b;
+    --border-strong: #4c4b45;
+    --rule: #d8d6ce;
+    --text: #ecebe5;
+    --muted: #a5a39b;
+    --faint: #7a7871;
+    --ink: #ecebe5;
+    --on-ink: #121211;
+    --danger: #ff7b6e;
+    --success: #5dd28a;
+    --focus: rgba(236, 235, 229, 0.24);
+    --accent: #ff6a2b;
+    --accent-soft: #3a2116;
+    --accent-fg: #ff9a66;
+    --on-accent: #121211;
     --shadow-tint: 0, 0, 0;
 
-    --st-done-bg: #1f3428; --st-done-line: #5daa7a; --st-done-fg: #9fd5b2;
-    --st-fail-bg: #3a2124; --st-fail-line: #d8666e; --st-fail-fg: #f0a5aa;
-    --st-skip-bg: #372f17; --st-skip-line: #c9a23a; --st-skip-fg: #e8cb76;
-    --st-idle-bg: #262624; --st-idle-fg: #8f8e89;
+    --st-done-bg: #17301f; --st-done-line: #4cc47c; --st-done-fg: #93e0b0;
+    --st-fail-bg: #3a1c19; --st-fail-line: #ff6b5e; --st-fail-fg: #ffaca3;
+    --st-skip-bg: #352b10; --st-skip-line: #f0c232; --st-skip-fg: #f3d77c;
+    --st-idle-bg: #242422; --st-idle-fg: #8f8d86;
+    --on-st: #0d1a12;
 
-    --p-stone-bg: #2a2a28; --p-stone-fg: #b9b8b3; --p-stone-solid: #8d8c87;
-    --p-red-bg: #3a2322; --p-red-fg: #eea19b; --p-red-solid: #d4706a;
-    --p-orange-bg: #3a2a1d; --p-orange-fg: #eeb383; --p-orange-solid: #d48e55;
-    --p-yellow-bg: #362f1a; --p-yellow-fg: #e8c869; --p-yellow-solid: #c9a23a;
-    --p-green-bg: #22301f; --p-green-fg: #a5cfa6; --p-green-solid: #6f9f70;
-    --p-teal-bg: #1d302d; --p-teal-fg: #8fcfc6; --p-teal-solid: #55a095;
-    --p-blue-bg: #1c2b38; --p-blue-fg: #9cc8ea; --p-blue-solid: #5e9bc9;
-    --p-purple-bg: #2b2538; --p-purple-fg: #c3b4e6; --p-purple-solid: #9381c4;
-    --p-pink-bg: #36222c; --p-pink-fg: #e8a7c6; --p-pink-solid: #c9779e;
+    --p-stone-bg: #2a2a27; --p-stone-fg: #bdbbb4; --p-stone-solid: #85837d;
+    --p-red-bg: #3a2220; --p-red-fg: #f1a39c; --p-red-solid: #d46a62;
+    --p-orange-bg: #3a291b; --p-orange-fg: #f0b484; --p-orange-solid: #d48a50;
+    --p-yellow-bg: #35301a; --p-yellow-fg: #ead06e; --p-yellow-solid: #c4a03a;
+    --p-green-bg: #20301f; --p-green-fg: #a8d3a8; --p-green-solid: #6b9f6c;
+    --p-teal-bg: #1b302d; --p-teal-fg: #8fd0c7; --p-teal-solid: #519f94;
+    --p-blue-bg: #1b2a37; --p-blue-fg: #9ec9eb; --p-blue-solid: #5a99c9;
+    --p-purple-bg: #2a2437; --p-purple-fg: #c5b6e8; --p-purple-solid: #8f7dc3;
+    --p-pink-bg: #36212b; --p-pink-fg: #eaa9c8; --p-pink-solid: #c6749b;
+
+    --grid-dot: rgba(236, 235, 229, 0.05);
 
     color-scheme: dark;
   }
@@ -104,6 +116,7 @@
   --color-raised: var(--raised);
   --color-line: var(--border);
   --color-line-strong: var(--border-strong);
+  --color-rule: var(--rule);
   --color-fg: var(--text);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
@@ -119,9 +132,17 @@
   --color-tone-fg: var(--tone-fg);
   --color-tone-solid: var(--tone-solid);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+
+  /* Esquinas rectas: todo control queda en 2px. */
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
 }
 
 html {
@@ -130,15 +151,17 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--text);
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
+  font-variation-settings: "wdth" 100;
 }
 
 ::selection {
-  background: var(--p-yellow-bg);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 :focus-visible {
@@ -146,33 +169,65 @@ body {
   outline-offset: 2px;
 }
 
-/* Números alineados en montos y contadores. */
+/* Números como instrumento: monoespaciada con cifras tabulares. */
 .tabular {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 0;
+  letter-spacing: -0.01em;
 }
 
-/* Entrada suave de bloques. Solo transform + opacity. */
+/* Etiqueta técnica: mono, chica, en mayúsculas y espaciada. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Titular grotesco ancho y apretado. */
+@utility display {
+  font-family: var(--font-sans);
+  font-variation-settings: "wdth" 118;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+
+/* Rayado diagonal (día salteado, zonas sin datos). */
+@utility hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    currentColor 0 1px,
+    transparent 1px 5px
+  );
+}
+
+/* Entrada de bloques. Solo transform + opacity, corta y seca. */
 @media (prefers-reduced-motion: no-preference) {
   .rise {
-    animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--i, 0) * 60ms);
+    animation: rise 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--i, 0) * 40ms);
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
   }
 }
 
-/* <dialog> como hoja inferior en el celular y modal centrado en pantalla grande. */
+/* <dialog> como hoja inferior en el celular y panel centrado en pantalla grande. */
 dialog.sheet {
   margin: auto auto 0;
   width: 100%;
   max-width: 100%;
   max-height: 92dvh;
-  border-radius: 14px 14px 0 0;
+  border-radius: 0;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
+  border-top-width: 3px;
   padding: 0;
 }
 /* El scroll de una hoja no arrastra la página de atrás. */
@@ -189,21 +244,21 @@ summary {
   touch-action: manipulation;
 }
 dialog.sheet::backdrop {
-  background: rgba(20, 20, 18, 0.32);
+  background: rgba(18, 18, 17, 0.45);
 }
 @media (min-width: 640px) {
   dialog.sheet {
     margin: auto;
     max-width: 30rem;
-    border-radius: 12px;
+    box-shadow: 8px 8px 0 rgba(var(--shadow-tint), 0.18);
   }
 }
 @media (prefers-reduced-motion: no-preference) {
   dialog.sheet[open] {
-    animation: sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation: sheet-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   @keyframes sheet-in {
-    from { transform: translateY(24px); opacity: 0; }
+    from { transform: translateY(16px); opacity: 0; }
     to { transform: none; opacity: 1; }
   }
 }
@@ -213,32 +268,26 @@ dialog.sheet::backdrop {
   field-sizing: content;
 }
 
-/* Esqueleto de carga: bloque apagado con un brillo lento que lo cruza. */
+/* Esqueleto de carga: bloque rayado que late lento. */
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--surface-2);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .skeleton::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, var(--surface-3), transparent);
-    animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  .skeleton {
+    animation: skel 1.4s steps(2, jump-none) infinite alternate;
   }
-  @keyframes shimmer {
-    to { transform: translateX(100%); }
+  @keyframes skel {
+    from { opacity: 1; }
+    to { opacity: 0.55; }
   }
 }
 
-/* Sombra de lo que flota (botón de escribir, botón flotante, tooltips), teñida con el fondo. */
+/* Lo que flota (botón de escribir, botón flotante): sombra dura desplazada, como un sello. */
 .lift {
-  box-shadow:
-    0 1px 2px rgba(var(--shadow-tint), 0.06),
-    0 10px 28px -12px rgba(var(--shadow-tint), 0.28);
+  box-shadow: 3px 3px 0 var(--rule);
 }
 
 /* Lectura larga en serif: cortes de línea prolijos y guiones en español. */

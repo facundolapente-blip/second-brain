@@ -85,7 +85,7 @@ export function ObjectivesView({
         </div>
 
         {groups.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
+          <div className="mt-2 grid justify-items-start gap-3 border border-dashed border-line-strong p-6">
             <p className="text-sm text-muted">No hay resultados clave para este filtro.</p>
             <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
               <Plus size={15} /> Nuevo resultado
@@ -122,7 +122,7 @@ export function ObjectivesView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nuevo resultado clave"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -142,7 +142,7 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
       <button
         type="button"
         onClick={onOpen}
-        className="grid w-full gap-2 rounded-[14px] border border-line bg-surface p-3.5 text-left transition-colors hover:border-line-strong"
+        className="grid w-full gap-2 border border-line-strong bg-surface p-3.5 text-left transition-colors hover:border-line-strong"
       >
         <span className="flex items-start gap-3">
           <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", finished && "text-muted")}>
@@ -235,7 +235,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       )}
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Tipo</span>
+        <span className="label-mono text-muted">Tipo</span>
         <Segmented
           name="kind"
           value={kind}
@@ -248,7 +248,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Estado</span>
+        <span className="label-mono text-muted">Estado</span>
         <Segmented
           name="status"
           value={status}
@@ -258,12 +258,12 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Trimestres</span>
+        <span className="label-mono text-muted">Trimestres</span>
         <div className="grid grid-cols-4 gap-1.5">
           {QUARTERS.map((q) => (
             <label
               key={q}
-              className="flex h-10 cursor-pointer items-center justify-center rounded-[10px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
+              className="flex h-10 cursor-pointer items-center justify-center rounded-[2px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
             >
               <input type="checkbox" name="quarters" value={q} defaultChecked={kr?.quarters.includes(q)} className="sr-only" />
               {q}

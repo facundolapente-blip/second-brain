@@ -7,7 +7,7 @@ import {
   ArrowCounterClockwise,
   CalendarBlank,
   ChartBar,
-  CheckCircle,
+
   DotsThreeVertical,
   Funnel,
   LinkSimple,
@@ -90,7 +90,7 @@ export function HabitsList({
             {archived ? (
               <Link
                 href="/habitos/lista"
-                className="inline-flex h-9 items-center rounded-md px-2 text-sm text-accent hover:bg-surface-2"
+                className="label-mono inline-flex h-11 items-center rounded-md px-2 text-accent-fg hover:bg-surface-2"
               >
                 Volver
               </Link>
@@ -99,7 +99,7 @@ export function HabitsList({
                 href="/habitos/archivados"
                 aria-label="Archivados"
                 title="Archivados"
-                className="inline-flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Archive size={21} />
               </Link>
@@ -118,7 +118,7 @@ export function HabitsList({
         }
       />
 
-      <main className="mx-auto grid max-w-3xl gap-3 px-3 pt-2 sm:px-4 lg:px-8 lg:pt-5">
+      <main className="mx-auto grid max-w-3xl gap-3 px-3 pt-3 sm:px-4 lg:px-8 lg:pt-6">
         {(searching || activeCategory) && (
           <div className="flex flex-wrap items-center gap-2">
             {searching && (
@@ -128,7 +128,7 @@ export function HabitsList({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar hábito"
                 aria-label="Buscar hábito"
-                className="h-10 min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--focus)]"
+                className="h-11 min-w-0 flex-1 rounded-md border border-rule bg-surface px-3 text-[15px] outline-none focus:ring-2 focus:ring-[var(--focus)]"
               />
             )}
             {activeCategory && (
@@ -136,7 +136,7 @@ export function HabitsList({
                 type="button"
                 onClick={() => setCategory(null)}
                 style={tone(activeCategory.color)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-tone px-2.5 text-[13px] font-medium text-tone-fg"
+                className="inline-flex h-10 items-center gap-1.5 rounded-md border border-tone-solid bg-tone px-3 text-[13px] font-medium text-tone-fg"
               >
                 {activeCategory.name}
                 <X size={13} weight="bold" />
@@ -146,7 +146,7 @@ export function HabitsList({
         )}
 
         {habits.length === 0 ? (
-          <div className="mt-4 rounded-[12px] border border-dashed border-line-strong p-8 text-sm text-muted">
+          <div className="mt-4 border border-dashed border-line-strong p-8 text-sm text-muted">
             {archived ? (
               "No hay hábitos archivados."
             ) : (
@@ -161,7 +161,13 @@ export function HabitsList({
         ) : visible.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted">Ningún hábito coincide.</p>
         ) : (
-          visible.map((h, i) => (
+          <>
+          <p className="label-mono flex items-center gap-2 text-muted">
+            <span className="tabular text-fg">{String(visible.length).padStart(2, "0")}</span>
+            {visible.length === 1 ? "hábito" : "hábitos"}
+            <span aria-hidden className="h-px flex-1 bg-line-strong" />
+          </p>
+          {visible.map((h, i) => (
             <HabitCard
               key={h.id}
               index={i}
@@ -172,7 +178,8 @@ export function HabitsList({
               onDetail={(habit, date) => daySheet.current?.show(habit, date)}
               onEdit={() => form.current?.edit(h)}
             />
-          ))
+          ))}
+          </>
         )}
       </main>
 
@@ -209,24 +216,24 @@ function HabitCard({
   return (
     <article
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise rounded-[14px] border border-line bg-surface px-4 pt-3.5 pb-2"
+      className="rise border border-line-strong bg-surface"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="grid min-w-0 gap-1">
-          <h2 className="truncate text-[16px] font-semibold tracking-tight">{habit.name}</h2>
+      <div className="flex items-center gap-3 px-3.5 pt-3 pb-2.5">
+        <ToneSquare size={36} style={tone(habit.color)}>
+          <HabitIcon name={habit.icon} size={20} weight="fill" />
+        </ToneSquare>
+        <div className="grid min-w-0 flex-1 gap-1">
+          <h2 className="truncate text-[17px] leading-tight font-bold tracking-tight">{habit.name}</h2>
           <span>
             <HabitBadge habit={habit} />
           </span>
         </div>
-        <ToneSquare size={36} style={tone(habit.color)}>
-          <HabitIcon name={habit.icon} size={20} weight="fill" />
-        </ToneSquare>
       </div>
 
-      <div className="mt-3 grid grid-cols-7 justify-items-center gap-1">
+      <div className="grid grid-cols-7 justify-items-center gap-1 px-2.5 pb-3">
         {days.map((d) => (
-          <div key={d} className="grid justify-items-center gap-1.5">
-            <span className={cx("text-[12px]", d === today ? "font-semibold text-fg" : "text-muted")}>
+          <div key={d} className="grid justify-items-center gap-1">
+            <span className={cx("label-mono text-[10px]", d === today ? "font-bold text-fg" : "text-muted")}>
               {WEEKDAY_SHORT[weekday(d)]}
             </span>
             <DayCircle date={d} state={dayState(habit, logs, d, today)} onTap={() => tap(d)} />
@@ -234,21 +241,23 @@ function HabitCard({
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-[13px] font-medium" style={tone(habit.color)}>
-        <span className="tabular inline-flex items-center gap-1 text-fg" title="Racha actual">
-          <LinkSimple size={16} weight="bold" className="text-tone-fg" />
+      <div className="flex items-stretch border-t border-line" style={tone(habit.color)}>
+        <Readout label="Racha" title="Racha actual">
+          <LinkSimple size={14} weight="bold" className="text-tone-solid" aria-hidden />
           {streak}
-        </span>
-        <span className="tabular inline-flex items-center gap-1 text-fg" title="Puntaje del hábito">
-          <CheckCircle size={16} weight="bold" className="text-tone-fg" />
+        </Readout>
+        <Readout label="Puntaje" title="Puntaje del hábito">
+          <span className="relative inline-block h-2 w-10 border border-line-strong" aria-hidden>
+            <span className="absolute inset-y-0 left-0 bg-tone-solid" style={{ width: `${score}%` }} />
+          </span>
           {score}%
-        </span>
-        <div className="ml-auto flex items-center">
+        </Readout>
+        <div className="ml-auto flex items-center pr-1">
           <Link
             href={`/habitos/${habit.id}?tab=calendario`}
             aria-label="Calendario"
             title="Calendario"
-            className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <CalendarBlank size={20} />
           </Link>
@@ -256,7 +265,7 @@ function HabitCard({
             href={`/habitos/${habit.id}?tab=estadisticas`}
             aria-label="Estadísticas"
             title="Estadísticas"
-            className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <ChartBar size={20} />
           </Link>
@@ -294,5 +303,17 @@ function HabitCard({
         </div>
       </div>
     </article>
+  );
+}
+
+/** Lectura de un instrumento: etiqueta mono chica arriba, valor grande abajo. */
+function Readout({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
+  return (
+    <div title={title} className="grid content-center gap-0.5 border-r border-line px-3.5 py-1.5">
+      <span className="label-mono text-[10px] text-muted">{label}</span>
+      <span className="tabular inline-flex items-center gap-1.5 text-[17px] leading-none font-semibold text-fg">
+        {children}
+      </span>
+    </div>
   );
 }

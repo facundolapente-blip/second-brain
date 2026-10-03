@@ -46,12 +46,12 @@ export function AccountSwitcher({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-haspopup="dialog"
-        className="grid w-full gap-1.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
+        className="grid w-full gap-1.5 border border-line-strong bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
       >
         <span className="flex items-center gap-2 text-[13px] text-muted">
           <span className="flex shrink-0 -space-x-1.5" aria-hidden>
             {chosen.slice(0, 3).map((a) => (
-              <span key={a.id} className="rounded-[8px] ring-2 ring-surface">
+              <span key={a.id} className="rounded-[2px] ring-2 ring-surface">
                 <AccountAvatar account={a} size={20} />
               </span>
             ))}
@@ -78,11 +78,11 @@ export function AccountSwitcher({
                   role="checkbox"
                   aria-checked={on}
                   onClick={() => toggle(a.id)}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-surface-2"
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-[2px] px-2 py-2 text-left transition-colors hover:bg-surface-2"
                 >
                   <span
                     className={cx(
-                      "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+                      "inline-flex size-5 shrink-0 items-center justify-center rounded-[2px] border transition-colors",
                       on ? "border-accent bg-accent text-on-accent" : "border-line-strong",
                     )}
                   >

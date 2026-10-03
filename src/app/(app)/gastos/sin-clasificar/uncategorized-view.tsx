@@ -49,7 +49,7 @@ export function UncategorizedView({
 
       <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-6">
         {list.length === 0 ? (
-          <div className="mt-6 flex items-center gap-3 rounded-[12px] border border-line p-6">
+          <div className="mt-6 flex items-center gap-3 rounded-none border border-line p-6">
             <CheckCircle size={28} weight="fill" className="text-accent" />
             <div className="grid gap-0.5">
               <h2 className="text-[15px] font-semibold">Todo clasificado</h2>
@@ -79,7 +79,7 @@ export function UncategorizedView({
                         setCurrent(t);
                         sheet.current?.open();
                       }}
-                      className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex w-full items-center gap-3.5 rounded-none px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
                     >
                       <CategoryAvatar />
                       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -112,7 +112,7 @@ export function UncategorizedView({
               key={c.id}
               type="button"
               onClick={() => assign(c.id)}
-              className="flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-3 text-center transition-colors hover:bg-surface-2 active:bg-surface-2"
+              className="flex flex-col items-center gap-1.5 rounded-[2px] px-1 py-3 text-center transition-colors hover:bg-surface-2 active:bg-surface-2"
             >
               <CategoryAvatar category={c} size={40} />
               <span className="line-clamp-2 text-[12.5px] leading-tight">{c.name}</span>

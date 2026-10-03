@@ -12,7 +12,7 @@ export function CategoryTag({ category, className }: { category?: CategoryDTO | 
     <span
       style={tone(category.color)}
       className={cx(
-        "inline-flex h-[22px] items-center rounded-[5px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
+        "inline-flex h-[22px] items-center rounded-[2px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
         className,
       )}
     >
@@ -26,7 +26,7 @@ export function StatusPill({ label, toneKey }: { label: string; toneKey: string 
   return (
     <span
       style={tone(toneKey)}
-      className="inline-flex h-[22px] items-center rounded-full bg-tone px-2 text-[12px] leading-none font-medium whitespace-nowrap text-tone-fg"
+      className="inline-flex h-[22px] items-center rounded-[2px] bg-tone px-2 text-[12px] leading-none font-medium whitespace-nowrap text-tone-fg"
     >
       {label}
     </span>

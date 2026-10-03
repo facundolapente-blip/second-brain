@@ -43,23 +43,28 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-5">
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <main className="mx-auto max-w-3xl px-4 pt-4 lg:px-8 lg:pt-6">
+        <ul className="grid grid-cols-2 gap-px border border-line-strong bg-line-strong sm:grid-cols-3">
           {categories.map((c, i) => (
-            <li key={c.id} className="rise" style={{ "--i": i } as React.CSSProperties}>
+            <li key={c.id} className="rise bg-surface" style={{ "--i": i } as React.CSSProperties}>
               <button
                 type="button"
                 onClick={() => open({ id: c.id, name: c.name, icon: c.icon, color: c.color })}
                 style={tone(c.color)}
-                className="group flex w-full flex-col items-start gap-6 rounded-[14px] border border-line bg-surface p-4 text-left transition-colors hover:bg-surface-2"
+                className="group flex h-full w-full flex-col items-start gap-6 p-4 text-left transition-colors hover:bg-surface-2"
               >
-                <ToneSquare size={42} style={tone(c.color)}>
-                  <HabitIcon name={c.icon} size={23} weight="fill" />
-                </ToneSquare>
+                <span className="flex w-full items-start justify-between">
+                  <ToneSquare size={42} style={tone(c.color)}>
+                    <HabitIcon name={c.icon} size={23} weight="fill" />
+                  </ToneSquare>
+                  <span className="tabular text-[28px] leading-none font-semibold text-fg" aria-hidden>
+                    {String(c.habitCount).padStart(2, "0")}
+                  </span>
+                </span>
                 <span className="flex w-full items-end justify-between gap-2">
                   <span className="grid gap-0.5">
-                    <span className="text-[15px] font-semibold tracking-tight">{c.name}</span>
-                    <span className="text-[13px] text-muted">
+                    <span className="text-[15px] font-bold tracking-tight">{c.name}</span>
+                    <span className="label-mono text-[10px] text-muted">
                       {c.habitCount === 0 ? "Sin hábitos" : c.habitCount === 1 ? "1 hábito" : `${c.habitCount} hábitos`}
                     </span>
                   </span>
@@ -96,7 +101,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Color</span>
+            <span className="label-mono text-muted">Color</span>
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((p) => (
                 <button
@@ -106,7 +111,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={p}
                   style={tone(p)}
                   className={cx(
-                    "size-8 rounded-full bg-tone-solid transition-transform active:scale-90",
+                    "size-11 rounded-[2px] bg-tone-solid transition-transform active:scale-90",
                     draft.color === p && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 />
@@ -115,7 +120,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Ícono</span>
+            <span className="label-mono text-muted">Ícono</span>
             <div className="grid grid-cols-8 gap-1.5">
               {Object.keys(HABIT_ICONS).map((name) => (
                 <button
@@ -125,7 +130,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={name}
                   style={tone(draft.color)}
                   className={cx(
-                    "inline-flex aspect-square items-center justify-center rounded-[9px] transition-colors",
+                    "inline-flex aspect-square items-center justify-center rounded-[2px] transition-colors",
                     draft.icon === name ? "bg-tone-solid text-white" : "text-muted hover:bg-surface-2",
                   )}
                 >

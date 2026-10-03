@@ -83,39 +83,38 @@ export function HabitDetail({
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-rule bg-bg pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-3xl px-2 lg:px-6">
-          <div className="flex h-14 items-center gap-1 lg:h-16">
+          <div className="flex h-14 items-center gap-1.5 lg:h-16">
             <Link
               href={habit.archived ? "/habitos/archivados" : "/habitos/lista"}
               aria-label="Volver a hábitos"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-fg hover:bg-surface-2"
             >
               <CaretLeft size={22} weight="bold" />
             </Link>
-            <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">{habit.name}</h1>
-            <span className="ml-auto pr-2">
-              <ToneSquare size={32} style={tone(habit.color)}>
-                <HabitIcon name={habit.icon} size={18} weight="fill" />
-              </ToneSquare>
-            </span>
+            <ToneSquare size={30} style={tone(habit.color)}>
+              <HabitIcon name={habit.icon} size={17} weight="fill" />
+            </ToneSquare>
+            <h1 className="display min-w-0 truncate pl-1 text-[22px] uppercase lg:text-[28px]">{habit.name}</h1>
           </div>
-          <div className="grid grid-cols-3 border-b border-line" role="tablist">
-            {TABS.map((t) => (
+          <div className="grid grid-cols-3 border-t border-line" role="tablist">
+            {TABS.map((t, i) => (
               <button
                 key={t.id}
                 role="tab"
                 aria-selected={tab === t.id}
                 onClick={() => changeTab(t.id)}
                 className={cx(
-                  "relative h-11 text-[15px] transition-colors",
-                  tab === t.id ? "font-medium text-fg" : "text-muted hover:text-fg",
+                  "label-mono relative h-11 transition-colors",
+                  i > 0 && "border-l border-line",
+                  tab === t.id ? "font-bold text-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
                 )}
               >
                 {t.label}
                 <span
                   className={cx(
-                    "absolute inset-x-[30%] -bottom-px h-[3px] rounded-t-full bg-accent transition-opacity duration-200",
+                    "absolute inset-x-0 -bottom-px h-[3px] bg-accent transition-opacity duration-200",
                     tab === t.id ? "opacity-100" : "opacity-0",
                   )}
                 />
@@ -163,8 +162,8 @@ function TrackPicker({
   onChange: (v: TrackView) => void;
 }) {
   return (
-    <label className="rise flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5">
-      <span className="text-[13px] text-muted">Mostrando</span>
+    <label className="rise flex min-h-11 items-center justify-between gap-3 border border-line-strong bg-surface px-4 py-2">
+      <span className="label-mono text-muted">Mostrando</span>
       <select
         value={String(view)}
         onChange={(e) => {
@@ -224,7 +223,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           max={today}
           onChange={(e) => setDate(e.target.value)}
           aria-label="Inicio de la pista nueva"
-          className="h-10 rounded-md border border-line-strong bg-surface px-3 text-sm"
+          className="tabular h-11 rounded-md border border-line-strong bg-surface px-3 text-sm"
         />
         <Button
           variant="outline"
@@ -278,14 +277,14 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={cx("rise rounded-[14px] border border-line bg-surface p-4 sm:p-5", className)}>
+    <section className={cx("rise border border-line-strong bg-surface", className)}>
       {title && (
-        <h2 className="mb-4 flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-          {Ico && <Ico size={19} className="text-accent" />}
+        <h2 className="label-mono flex h-10 items-center gap-2 border-b border-line px-4 text-fg sm:px-5">
+          {Ico && <Ico size={15} weight="bold" className="text-accent-fg" aria-hidden />}
           {title}
         </h2>
       )}
-      {children}
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   );
 }
@@ -297,9 +296,9 @@ function streakUnit(habit: HabitDTO, n: number) {
 
 function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
   return (
-    <span className="tabular inline-flex items-baseline gap-1.5 text-accent">
-      <span className="text-3xl font-semibold tracking-tight">{value}</span>
-      {unit && <span className="text-sm font-semibold tracking-wide uppercase">{unit}</span>}
+    <span className="inline-flex items-baseline gap-2 text-fg">
+      <span className="tabular text-[44px] leading-none font-semibold tracking-tight">{value}</span>
+      {unit && <span className="label-mono text-muted">{unit}</span>}
     </span>
   );
 }
@@ -358,7 +357,7 @@ function CalendarTab({
                   onClick={() => openDay(d)}
                   className="grid w-full gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-2"
                 >
-                  <span className="text-[13px] font-medium text-muted first-letter:uppercase">{formatLong(d)}</span>
+                  <span className="label-mono text-muted">{formatLong(d)}</span>
                   <span className="text-sm leading-relaxed whitespace-pre-wrap">{l.n}</span>
                 </button>
               </li>
@@ -406,29 +405,29 @@ function StatsTab({
       </Panel>
 
       <Panel icon={LinkSimple} title="Racha">
-        <div className="grid grid-cols-2 divide-x divide-line text-center">
-          <div className="grid gap-1">
-            <span className="text-[13px] text-muted">Actual</span>
+        <div className="grid grid-cols-2 divide-x divide-line">
+          <div className="grid gap-2 pr-4">
+            <span className="label-mono text-muted">Actual</span>
             <BigNumber value={streak} unit={streakUnit(habit, streak)} />
           </div>
-          <div className="grid gap-1">
-            <span className="text-[13px] text-muted">Mejor</span>
+          <div className="grid gap-2 pl-4">
+            <span className="label-mono text-muted">Mejor</span>
             <BigNumber value={best} unit={streakUnit(habit, best)} />
           </div>
         </div>
       </Panel>
 
       <Panel icon={CheckCircle} title="Veces logrado">
-        <dl className="divide-y divide-line">
+        <dl className="-m-4 grid grid-cols-2 gap-px bg-line sm:-m-5 sm:grid-cols-4">
           {[
             ["Esta semana", counts.week],
             ["Este mes", counts.month],
             ["Este año", counts.year],
             ["Total", counts.total],
           ].map(([label, n]) => (
-            <div key={label} className="flex items-center justify-between py-2.5">
-              <dt className="text-sm">{label}</dt>
-              <dd className="tabular text-sm font-semibold">{n}</dd>
+            <div key={label} className="grid gap-1.5 bg-surface px-4 py-3 sm:px-5">
+              <dt className="label-mono text-[10px] text-muted">{label}</dt>
+              <dd className="tabular text-[26px] leading-none font-semibold">{n}</dd>
             </div>
           ))}
         </dl>
@@ -453,38 +452,59 @@ function StatsTab({
   );
 }
 
+/** Redondeo para coordenadas SVG: servidor y cliente calculan igual el mismo texto. */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 function ScoreRing({ value }: { value: number }) {
-  // Arco de 300°, abierto abajo, como en HabitNow.
-  const r = 70;
+  // Arco de 300°, abierto abajo, como en HabitNow, con marcas cada 10% como un dial.
+  const r = 66;
   const c = 2 * Math.PI * r;
   const arc = c * (300 / 360);
+  const ticks = Array.from({ length: 11 }, (_, i) => i * 10);
   return (
-    <div className="relative size-48">
-      <svg viewBox="0 0 180 180" className="size-full rotate-[120deg]" aria-hidden>
-        <circle
-          cx="90"
-          cy="90"
-          r={r}
-          fill="none"
-          stroke="var(--surface-3)"
-          strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${arc} ${c}`}
-        />
-        <circle
-          cx="90"
-          cy="90"
-          r={r}
-          fill="none"
-          stroke="var(--accent)"
-          strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${(arc * value) / 100} ${c}`}
-          className="transition-[stroke-dasharray] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-        />
+    <div className="relative size-52" role="img" aria-label={`Puntaje ${value} de 100`}>
+      <svg viewBox="0 0 180 180" className="size-full" aria-hidden>
+        <g transform="rotate(120 90 90)">
+          <circle
+            cx="90"
+            cy="90"
+            r={r}
+            fill="none"
+            stroke="var(--surface-3)"
+            strokeWidth="14"
+            strokeDasharray={`${arc} ${c}`}
+          />
+          <circle
+            cx="90"
+            cy="90"
+            r={r}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="14"
+            strokeDasharray={`${(arc * value) / 100} ${c}`}
+            className="transition-[stroke-dasharray] duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
+          />
+        </g>
+        {ticks.map((t) => {
+          const a = ((120 + t * 3) * Math.PI) / 180;
+          const r1 = 79;
+          const r2 = t % 50 === 0 ? 87 : 84;
+          return (
+            <line
+              key={t}
+              x1={round2(90 + r1 * Math.cos(a))}
+              y1={round2(90 + r1 * Math.sin(a))}
+              x2={round2(90 + r2 * Math.cos(a))}
+              y2={round2(90 + r2 * Math.sin(a))}
+              stroke="var(--muted)"
+              strokeWidth={t % 50 === 0 ? 1.5 : 1}
+            />
+          );
+        })}
       </svg>
-      <span className="tabular absolute inset-0 flex items-center justify-center text-5xl font-semibold tracking-tight">
-        {value}
+      <span className="absolute inset-0 grid place-content-center justify-items-center gap-1">
+        <span className="tabular text-[52px] leading-none font-semibold tracking-tight">{value}</span>
+        <span className="label-mono text-[10px] text-muted">de 100</span>
       </span>
     </div>
   );
@@ -536,7 +556,7 @@ function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState;
               <div key={d} data-day={d} className="relative grid w-10 justify-items-center gap-2">
                 <span className="flex h-7 items-end">
                   {m && (
-                    <span className={cx("inline-flex size-6 items-center justify-center rounded-[7px]", m.cls)}>
+                    <span className={cx("inline-flex size-6 items-center justify-center rounded-[2px]", m.cls)}>
                       {m.icon}
                     </span>
                   )}
@@ -623,17 +643,27 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
         onNext={onNext}
         nextDisabled={nextDisabled}
       />
-      <div className="grid h-44 grid-flow-col items-end gap-1.5 border-b border-line-strong">
+      <div
+        className="relative grid h-44 grid-flow-col items-end gap-1.5 border-b border-rule bg-[linear-gradient(var(--border)_1px,transparent_1px)] bg-[length:100%_25%]"
+        role="img"
+        aria-label={`Veces logrado: ${items.map((it) => `${it.label} ${it.value ?? "sin datos"}`).join(", ")}`}
+      >
         {items.map((it) => (
-          <div key={it.key} className="grid h-full grid-rows-[auto_1fr] justify-items-center gap-1">
-            <span className="tabular text-[11px] font-medium text-muted">{it.value === null ? "-" : it.value}</span>
+          <div
+            key={it.key}
+            title={`${it.label}: ${it.value === null ? "sin datos" : it.value}`}
+            className="group grid h-full grid-rows-[auto_1fr] justify-items-center gap-1"
+          >
+            <span className={cx("tabular text-[11px] font-medium", it.current ? "text-fg" : "text-muted")}>
+              {it.value === null ? "-" : it.value}
+            </span>
             <div className="flex w-full items-end justify-center">
               <div
                 className={cx(
-                  "w-full max-w-6 rounded-t-[5px] bg-accent transition-[height] duration-500",
-                  !it.current && "opacity-80",
+                  "w-full max-w-5 transition-[height,opacity] duration-500 group-hover:opacity-80 motion-reduce:transition-none",
+                  it.current ? "bg-accent" : "bg-fg",
                 )}
-                style={{ height: `${it.value ? Math.max(4, (it.value / max) * 100) : 0}%` }}
+                style={{ height: `${it.value ? Math.max(3, (it.value / max) * 100) : 0}%` }}
               />
             </div>
           </div>
@@ -643,7 +673,7 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
         {items.map((it) => (
           <span
             key={it.key}
-            className={cx("text-center text-[11px]", it.current ? "font-semibold text-fg" : "text-muted")}
+            className={cx("label-mono text-center text-[9.5px] tracking-normal", it.current ? "font-bold text-fg" : "text-muted")}
           >
             {it.label}
           </span>
@@ -671,37 +701,40 @@ function Donut({ achieved, missed, labels }: { achieved: number; missed: number;
   const r = 60;
   const c = 2 * Math.PI * r;
   const part = total === 0 ? 0 : (achieved / total) * c;
+  // Separación de 2px entre los dos tramos (en unidades del viewBox).
+  const gap = total === 0 || achieved === 0 || missed === 0 ? 0 : 2;
+  const pct = total === 0 ? null : Math.round((achieved / total) * 100);
   return (
     <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
-      <div className="relative mx-auto size-44">
+      <div className="relative mx-auto size-44" role="img" aria-label={`${labels[0]} ${achieved}, ${labels[1]} ${missed}`}>
         <svg viewBox="0 0 160 160" className="size-full -rotate-90" aria-hidden>
-          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--p-orange-solid)" strokeWidth="24" />
+          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--surface-3)" strokeWidth="22" />
           <circle
             cx="80"
             cy="80"
             r={r}
             fill="none"
             stroke="var(--st-done-line)"
-            strokeWidth="24"
-            strokeDasharray={`${part} ${c}`}
+            strokeWidth="22"
+            strokeDasharray={`${Math.max(0, part - gap)} ${c}`}
+            strokeDashoffset={-gap / 2}
           />
         </svg>
-        <span className="absolute inset-0 grid place-content-center text-center">
-          <span className="tabular text-2xl font-semibold tracking-tight">
-            {total === 0 ? "-" : `${Math.round((achieved / total) * 100)}%`}
-          </span>
+        <span className="absolute inset-0 grid place-content-center justify-items-center gap-0.5">
+          <span className="tabular text-[30px] leading-none font-semibold tracking-tight">{pct === null ? "-" : `${pct}%`}</span>
+          <span className="label-mono text-[10px] text-muted">logrado</span>
         </span>
       </div>
-      <ul className="grid gap-2 text-sm">
-        <li className="flex items-center gap-2">
-          <span className="size-2.5 rounded-full bg-[var(--st-done-line)]" />
+      <ul className="grid divide-y divide-line border-y border-line text-sm">
+        <li className="flex min-h-11 items-center gap-2.5">
+          <span className="size-3 bg-[var(--st-done-line)]" aria-hidden />
           {labels[0]}
-          <span className="tabular ml-auto font-semibold">{achieved}</span>
+          <span className="tabular ml-auto text-[17px] font-semibold">{achieved}</span>
         </li>
-        <li className="flex items-center gap-2">
-          <span className="size-2.5 rounded-full bg-[var(--p-orange-solid)]" />
+        <li className="flex min-h-11 items-center gap-2.5">
+          <span className="size-3 border border-line-strong bg-surface-3" aria-hidden />
           {labels[1]}
-          <span className="tabular ml-auto font-semibold">{missed}</span>
+          <span className="tabular ml-auto text-[17px] font-semibold">{missed}</span>
         </li>
       </ul>
     </div>
@@ -720,20 +753,21 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
             <div
               key={g}
               className={cx(
-                "grid w-24 shrink-0 justify-items-center gap-2 rounded-[12px] px-2 py-3",
-                unlocked ? "bg-accent-soft" : "bg-surface-2",
+                "grid w-24 shrink-0 justify-items-center gap-2 border px-2 py-3",
+                unlocked ? "border-rule bg-surface" : "border-dashed border-line-strong",
               )}
             >
               <span
                 className={cx(
-                  "relative inline-flex size-12 items-center justify-center rounded-full",
-                  unlocked ? "bg-accent text-on-accent" : "bg-surface-3 text-faint",
+                  "relative inline-flex size-11 items-center justify-center",
+                  unlocked ? "border border-rule bg-accent text-on-accent" : "bg-surface-2 text-faint",
                 )}
               >
-                {unlocked ? <Medal size={26} weight="fill" /> : <Lock size={20} weight="fill" />}
+                {unlocked ? <Medal size={24} weight="fill" /> : <Lock size={18} weight="fill" />}
               </span>
-              <span className={cx("text-center text-[12px]", unlocked ? "font-medium text-accent-fg" : "text-muted")}>
-                {g} {streakUnit(habit, g)}
+              <span className="grid justify-items-center leading-tight">
+                <span className={cx("tabular text-[18px] font-semibold", unlocked ? "text-fg" : "text-muted")}>{g}</span>
+                <span className="label-mono text-[9.5px] text-muted">{streakUnit(habit, g)}</span>
               </span>
             </div>
           );

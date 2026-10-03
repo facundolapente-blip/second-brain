@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Grotesca variable con eje de ancho: texto normal en 100, titulares anchos en 118.
+const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"], axes: ["wdth"] });
+// Monoespaciada para números, fechas, montos y etiquetas técnicas.
+const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Second Brain",
@@ -13,15 +15,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbfbfa" },
-    { media: "(prefers-color-scheme: dark)", color: "#151514" },
+    { media: "(prefers-color-scheme: light)", color: "#efeee9" },
+    { media: "(prefers-color-scheme: dark)", color: "#121211" },
   ],
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="es" className={`${archivo.variable} ${jetbrains.variable} antialiased`}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

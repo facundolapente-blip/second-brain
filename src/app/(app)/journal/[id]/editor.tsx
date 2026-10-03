@@ -361,7 +361,7 @@ function TagEditor({
     <div className="grid gap-2.5 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-2 pr-1 pl-3 text-[13px]">
+          <span key={t} className="inline-flex h-8 items-center gap-1 rounded-[2px] bg-surface-2 pr-1 pl-3 text-[13px]">
             #{t}
             <button
               type="button"
@@ -409,7 +409,7 @@ function TagEditor({
               // mousedown para que no se pierda el foco antes del click
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => add(t)}
-              className="h-7 rounded-full border border-dashed border-line-strong px-2.5 text-[12px] text-muted hover:border-solid hover:text-fg"
+              className="h-7 rounded-[2px] border border-dashed border-line-strong px-2.5 text-[12px] text-muted hover:border-solid hover:text-fg"
             >
               #{t}
             </button>

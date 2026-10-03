@@ -94,7 +94,7 @@ export function MonthHeatmap({
                   onBlur={() => setFocus((f) => (f === m ? null : f))}
                   style={{ background: RAMP[b] }}
                   className={cx(
-                    "aspect-square rounded-[4px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)]",
+                    "aspect-square rounded-[2px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)]",
                     m === currentMonth && "shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--accent)]",
                   )}
                 />
@@ -106,7 +106,7 @@ export function MonthHeatmap({
       <div className="flex items-center justify-end gap-1.5 text-[12px] text-muted" aria-hidden>
         Menos
         {RAMP.map((c, i) => (
-          <span key={i} className="size-3 rounded-[3px]" style={{ background: c }} />
+          <span key={i} className="size-3 rounded-[2px]" style={{ background: c }} />
         ))}
         Más
       </div>

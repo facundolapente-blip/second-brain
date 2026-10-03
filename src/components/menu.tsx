@@ -31,7 +31,7 @@ export function Menu({ trigger, items, align = "right" }: { trigger: (toggle: ()
         <div
           role="menu"
           className={cx(
-            "absolute top-full z-30 mt-1 min-w-44 overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-[0_8px_30px_-12px_rgba(20,20,18,0.25)]",
+            "absolute top-full z-30 mt-1 min-w-48 overflow-hidden rounded-[2px] border border-rule bg-surface shadow-[3px_3px_0_rgba(var(--shadow-tint),0.22)]",
             align === "right" ? "right-0" : "left-0",
           )}
         >
@@ -45,7 +45,7 @@ export function Menu({ trigger, items, align = "right" }: { trigger: (toggle: ()
                 it.onSelect();
               }}
               className={cx(
-                "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2",
+                "flex min-h-11 w-full items-center gap-2.5 border-b border-line px-3 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:bg-surface-2",
                 it.danger ? "text-danger" : "text-fg",
               )}
             >

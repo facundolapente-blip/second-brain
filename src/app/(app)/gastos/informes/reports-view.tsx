@@ -110,8 +110,8 @@ export function ReportsView({
         </section>
 
         {empty ? (
-          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
-            <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
+          <div className="grid justify-items-start gap-2 border border-dashed border-line-strong p-8">
+            <span className="inline-flex size-10 items-center justify-center rounded-[2px] bg-accent-soft text-accent-fg">
               <ChartBar size={22} aria-hidden />
             </span>
             <h2 className="text-lg font-semibold tracking-tight">Sin movimientos en {currency}</h2>
@@ -344,7 +344,7 @@ function PaceChart({
             else return;
             e.preventDefault();
           }}
-          className="relative touch-pan-y rounded-[4px] outline-offset-4"
+          className="relative touch-pan-y rounded-[2px] outline-offset-4"
           style={{ height: H }}
         >
           {ticks.map((t) => (
@@ -387,7 +387,7 @@ function PaceChart({
               {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
               {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
               <div
-                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[2px] border border-line bg-surface p-2.5 text-[12.5px]"
                 style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
               >
                 <span className="text-muted">Día {h}</span>
@@ -605,7 +605,7 @@ function MonthlyColumns({
 
           {hover !== null && (
             <div
-              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[2px] border border-line bg-surface p-2.5 text-[12.5px]"
               style={{
                 left: `${((hover + 0.5) / data.length) * 100}%`,
                 transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,
@@ -674,7 +674,7 @@ function Column({ cents, height, color, label }: { cents: number; height: number
 function LegendKey({ color, label }: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="size-2.5 rounded-[3px]" style={{ background: color }} aria-hidden />
+      <span className="size-2.5 rounded-[2px]" style={{ background: color }} aria-hidden />
       {label}
     </span>
   );

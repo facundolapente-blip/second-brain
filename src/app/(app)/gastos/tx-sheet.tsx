@@ -177,7 +177,7 @@ export const TxSheet = forwardRef<
                 key={t.id}
                 type="button"
                 onClick={() => setD((prev) => applyTemplate(prev, t))}
-                className="h-8 shrink-0 rounded-full border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                className="h-8 shrink-0 rounded-[2px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 {t.name}
               </button>
@@ -193,10 +193,10 @@ export const TxSheet = forwardRef<
         />
 
         <label className="grid gap-1.5">
-          <span className="text-[13px] font-medium text-muted">
+          <span className="label-mono text-muted">
             {d.kind === "transfer" && crossCurrency ? `Sale de ${from?.name}` : "Monto"}
           </span>
-          <span className="flex h-16 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
+          <span className="flex h-16 items-center gap-2.5 rounded-[2px] border border-line-strong bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
             <span className="text-xl font-medium text-muted">{currencySymbol(from?.currency ?? "UYU")}</span>
             <input
               ref={amountRef}
@@ -216,7 +216,7 @@ export const TxSheet = forwardRef<
               <span
                 aria-hidden
                 className={cx(
-                  "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium",
+                  "shrink-0 rounded-[2px] px-2 py-0.5 text-[12px] font-medium",
                   d.kind === "income" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-muted",
                 )}
               >
@@ -252,7 +252,7 @@ export const TxSheet = forwardRef<
                 type="button"
                 onClick={() => set({ accountId: d.toAccountId, toAccountId: d.accountId, amount: d.toAmount || d.amount, toAmount: d.toAmount ? d.amount : "" })}
                 disabled={!d.toAccountId}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
+                className="inline-flex h-9 items-center gap-1.5 rounded-[2px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
               >
                 <ArrowsDownUp size={15} weight="bold" aria-hidden /> Invertir
               </button>
@@ -265,7 +265,7 @@ export const TxSheet = forwardRef<
             />
             {crossCurrency && (
               <label className="grid gap-1.5">
-                <span className="text-[13px] font-medium text-muted">Llega a {to?.name}</span>
+                <span className="label-mono text-muted">Llega a {to?.name}</span>
                 <span className="flex h-12 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
                   <span className="text-muted">{currencySymbol(to?.currency ?? "")}</span>
                   <input
@@ -298,7 +298,7 @@ export const TxSheet = forwardRef<
         {d.kind !== "transfer" && (
           <div className="grid gap-2">
             <div className="flex items-baseline justify-between">
-              <span className="text-[13px] font-medium text-muted">Categoría</span>
+              <span className="label-mono text-muted">Categoría</span>
               <Link href="/gastos/categorias" className="text-[13px] text-accent-fg hover:underline">
                 Editar categorías
               </Link>
@@ -321,7 +321,7 @@ export const TxSheet = forwardRef<
         )}
 
         <div className="grid gap-2">
-          <span className="text-[13px] font-medium text-muted">Fecha</span>
+          <span className="label-mono text-muted">Fecha</span>
           <div className="flex gap-2">
             {[
               { label: "Hoy", value: todayISO() },
@@ -424,7 +424,7 @@ function AccountPicker({
 }) {
   return (
     <div className="grid gap-2">
-      <span className="text-[13px] font-medium text-muted">{label}</span>
+      <span className="label-mono text-muted">{label}</span>
       <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-0.5 fin-scroll" role="radiogroup" aria-label={label}>
         {accounts.map((a) => {
           const on = a.id === value;
@@ -436,7 +436,7 @@ function AccountPicker({
               aria-checked={on}
               onClick={() => onChange(a.id)}
               className={cx(
-                "flex h-11 shrink-0 items-center gap-2 rounded-[10px] border pr-3 pl-1.5 text-sm transition-colors",
+                "flex h-11 shrink-0 items-center gap-2 rounded-[2px] border pr-3 pl-1.5 text-sm transition-colors",
                 on ? "border-fg bg-surface-2 font-medium" : "border-line-strong hover:bg-surface-2",
               )}
             >
@@ -468,7 +468,7 @@ function CategoryChip({
       onClick={onClick}
       aria-pressed={selected}
       className={cx(
-        "relative flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2 text-center transition-colors",
+        "relative flex flex-col items-center gap-1.5 rounded-[2px] px-1 py-2 text-center transition-colors",
         selected ? "bg-surface-2 ring-1 ring-fg" : "hover:bg-surface-2",
       )}
     >
