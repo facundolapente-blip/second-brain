@@ -12,7 +12,7 @@ const MODULES: Module[] = [
   { href: "/habitos", label: "Hábitos", icon: Medal },
   { href: "/journal", label: "Journal", icon: Notebook },
   { href: "/gastos", label: "Gastos", icon: Wallet },
-  { href: "/plan", label: "Plan semanal", icon: CalendarCheck, soon: true },
+  { href: "/plan", label: "Plan semanal", icon: CalendarCheck },
 ];
 
 const DrawerCtx = createContext<() => void>(() => {});

@@ -80,6 +80,7 @@ model Habit {
   createdAt    DateTime       @default(now())
   logs         HabitLog[]
   tracks       HabitTrack[]
+  planBlocks   PlanBlock[]
 }
 
 /// Una pista cerrada (como en HabitNow): un tramo anterior del hábito, con la
@@ -319,4 +320,106 @@ model AuthVerification {
 
   @@index([identifier])
   @@map("auth_verification")
+}
+
+// ─── Plan semanal ───────────────────────────────────────────────────────────
+// Reemplaza el "Plan Semanal" de Notion de Facu: bloques de la semana (Daily
+// Planning), tareas (Para hacer) y objetivos con resultados clave.
+
+model PlanCategory {
+  id     String      @id @default(cuid())
+  name   String      @unique
+  /// Clave de color de la paleta (ver src/lib/palette.ts).
+  color  String      @default("stone")
+  order  Int         @default(0)
+  tasks  PlanTask[]
+  blocks PlanBlock[]
+}
+
+/// Una tarea con o sin deadline ("Para hacer").
+model PlanTask {
+  id          String        @id @default(cuid())
+  title       String
+  categoryId  String?
+  category    PlanCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  /// backlog (Programadas, para algún día) | todo (Sin empezar) | doing (En curso) | done (Terminado)
+  status      String        @default("todo")
+  /// 0 a 4 fueguitos.
+  priority    Int           @default(1)
+  deadline    DateTime?     @db.Date
+  /// Progreso y meta numéricos opcionales (por ejemplo 2 de 3 entregas).
+  progress    Int?
+  goal        Int?
+  /// "Agendada": ya tiene lugar en la semana.
+  scheduled   Boolean       @default(false)
+  notes       String?
+  completedAt DateTime?
+  source      String?
+  externalId  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  blocks      PlanBlock[]
+
+  @@unique([source, externalId])
+  @@index([status])
+}
+
+/// Un bloque de la semana ("Daily Planning"): algo para hacer un día, con horario opcional.
+model PlanBlock {
+  id         String        @id @default(cuid())
+  title      String
+  categoryId String?
+  category   PlanCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  date       DateTime      @db.Date
+  /// "HH:MM" en hora de Montevideo; sin hora = todo el día.
+  startTime  String?
+  endTime    String?
+  priority   Int           @default(0)
+  done       Boolean       @default(false)
+  place      String?
+  notes      String?
+  /// Tarea de la que sale este bloque.
+  taskId     String?
+  task       PlanTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  /// Hábito vinculado: marcar el bloque como hecho marca el hábito ese día.
+  habitId    String?
+  habit      Habit?        @relation(fields: [habitId], references: [id], onDelete: SetNull)
+  source     String?
+  externalId String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([source, externalId])
+  @@index([date])
+}
+
+/// Un objetivo grande ("Mejorar mi salud", "Cursar 7 materias").
+model PlanObjective {
+  id         String          @id @default(cuid())
+  title      String          @unique
+  order      Int             @default(0)
+  keyResults PlanKeyResult[]
+}
+
+/// Resultado clave de un objetivo, con progreso hacia una meta.
+model PlanKeyResult {
+  id          String         @id @default(cuid())
+  objectiveId String?
+  objective   PlanObjective? @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  title       String
+  /// activity (Actividad) | habit (Hábito)
+  kind        String         @default("activity")
+  /// todo (Sin empezar) | doing (Haciendo) | done (Completado) | closed (Finalizado sin completar)
+  status      String         @default("todo")
+  /// Trimestres en los que corre: Q1, Q2, Q3, Q4.
+  quarters    String[]       @default([])
+  deadline    DateTime?      @db.Date
+  progress    Float?
+  goal        Float?
+  source      String?
+  externalId  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([source, externalId])
 }

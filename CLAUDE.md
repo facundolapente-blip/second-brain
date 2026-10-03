@@ -80,6 +80,15 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Interfaz (rediseño 2026-10): montos de movimientos con signo explícito ("+"/"−"; el verde es refuerzo). Saldos con `Balance` (tinta, sin "+", negativo en rojo), nunca con `Amount`. Ingresos/gastos con flecha. Día pegado arriba en el celular. Transferencia sin nota se titula "Desde X a Y". Hoja de carga: monto con foco directo, Guardar pegado abajo, Ctrl/Cmd+Enter guarda, "Invertir" en transferencias; atajo N abre la hoja en Movimientos. Informes: en el mes en curso compara contra el anterior hasta el mismo día.
 - `node --env-file=.env scripts/seed-gastos-demo.ts`: cuentas reales de Facu con movimientos inventados (solo localhost); ajusta saldos iniciales para que el saldo de hoy dé el de sus capturas.
 
+## Plan semanal
+
+- Reemplaza el "Plan Semanal" de Notion. Tres pantallas: **Semana** (`/plan?semana=YYYY-MM-DD`, bloques de lunes a domingo; en el celular tira de días + lista del día, en escritorio tablero de 7 columnas), **Tareas** (`/plan/tareas`, vistas guardadas como en Notion: Para hacer, Con deadline, Prioridades, Más chill, Programadas, Terminadas) y **Objetivos** (`/plan/objetivos`, objetivos con resultados clave, filtro por trimestre).
+- Modelos: `PlanBlock` (día, `startTime`/`endTime` "HH:MM" opcionales, prioridad 0 a 4 fueguitos, `done`, `taskId`, `habitId`), `PlanTask` (status `backlog|todo|doing|done` = Programada / Sin empezar / En curso / Terminado, deadline, progreso/meta, `scheduled` = Agendada), `PlanObjective` + `PlanKeyResult` (kind activity/habit, status todo/doing/done/closed, `quarters`), `PlanCategory`.
+- **Vínculo con Hábitos**: un bloque con `habitId` marca el hábito como hecho ese día al tildarlo (`syncHabit` en `plan-actions.ts`); al destildarlo solo borra la marca si era "hecho" (no pisa fallados ni salteados). El formulario sugiere vincular si el nombre coincide con un hábito.
+- "Copiar a la semana que viene" duplica los bloques (sin el hecho). "Agendar en la semana" desde una tarea abre un bloque con la tarea vinculada.
+- Un bloque llamado "Libre" se ve tenue y no cuenta en "N de M hechos".
+- Importador: `node --env-file=.env scripts/import-notion-plan.ts <export.zip>` (export Markdown & CSV de Notion; usa los CSV `_all` de Daily Planning, Para hacer y Resultados Clave; fechas "28 de septiembre de 2026 9:00 (GMT-3) → 12:00"; vincula bloques con hábitos y tareas del mismo nombre; ids estables, no duplica).
+
 ## Diseño
 
 Monocromo cálido estilo documento, tokens en `globals.css` (claro/oscuro por `prefers-color-scheme`). Un solo acento: azul petróleo (`--accent`). Color solo en pasteles de categoría (`src/lib/palette.ts`) y en los estados de día (`--st-*`). Radios 6px controles / 12-14px superficies. Sin em-dashes en textos visibles. Hojas inferiores con `<dialog>` (`Sheet` en `components/ui.tsx`).
