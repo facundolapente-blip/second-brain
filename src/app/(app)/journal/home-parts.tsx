@@ -79,7 +79,7 @@ export function HomeActions({
 
       {searching && (
         <div className="absolute inset-x-0 top-[env(safe-area-inset-top)] z-10 bg-bg">
-          <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4 lg:h-16 lg:px-8">
+          <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-20 lg:px-8">
             <MagnifyingGlass size={18} className="shrink-0 text-muted" />
             <input
               autoFocus
@@ -92,7 +92,7 @@ export function HomeActions({
               enterKeyHint="search"
               className="h-10 min-w-0 flex-1 bg-transparent text-[16px] outline-none! placeholder:text-faint"
             />
-            <button type="button" onClick={closeSearch} className="h-9 shrink-0 px-2 text-sm font-medium text-accent-fg">
+            <button type="button" onClick={closeSearch} className="h-11 shrink-0 rounded-full px-3 text-sm font-medium text-accent-fg hover:bg-surface-2">
               Cancelar
             </button>
           </div>
@@ -113,7 +113,7 @@ export function HomeActions({
                     aria-pressed={on}
                     onClick={() => nav({ animo: on ? null : String(m.value) })}
                     className={cx(
-                      "grid justify-items-center gap-1 rounded-md py-2.5 text-[12px] transition-colors",
+                      "grid justify-items-center gap-1 rounded-[16px] py-3 text-[12px] transition-[background-color,transform] duration-300 ease-spring active:scale-95",
                       on ? "bg-accent-soft font-medium text-accent-fg" : "text-muted hover:bg-surface-2",
                     )}
                   >
@@ -139,7 +139,7 @@ export function HomeActions({
                       aria-pressed={on}
                       onClick={() => nav({ etiqueta: on ? null : t })}
                       className={cx(
-                        "h-8 rounded-full border px-3 text-[13px] transition-colors",
+                        "h-10 rounded-full border px-3.5 text-[13px] transition-colors",
                         on ? "border-accent bg-accent-soft font-medium text-accent-fg" : "border-line-strong text-fg hover:bg-surface-2",
                       )}
                     >
@@ -216,15 +216,20 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
   return (
     <section
       aria-label={title}
-      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 rounded-[14px] border border-line bg-surface-2/60 p-4 lg:p-5"
+      className="rise card relative grid grid-cols-[minmax(0,1fr)] gap-3 overflow-hidden p-4 lg:p-6"
       style={{ "--i": 1 } as React.CSSProperties}
     >
-      <div className="flex items-start gap-2.5 pr-10">
-        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-accent-fg">
+      {/* Luz cálida de recuerdo, como una lámpara sobre la página. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -left-16 size-64 rounded-full bg-accent opacity-[0.12] blur-3xl"
+      />
+      <div className="relative flex items-start gap-3 pr-10">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-accent text-on-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
           <ClockCounterClockwise size={18} weight="bold" aria-hidden />
         </span>
         <div className="grid min-w-0">
-          <h2 className="text-[15px] leading-tight font-semibold">{title}</h2>
+          <h2 className="display text-[18px] leading-tight font-semibold">{title}</h2>
           <p className="text-[13px] text-muted">{line}</p>
         </div>
       </div>
@@ -234,7 +239,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
       <Link
         href={`/journal/${first.id}`}
-        className="group grid gap-1.5 rounded-[10px] border-l-2 border-accent/40 py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
+        className="group relative grid gap-1.5 border-l-2 border-accent/50 py-1 pr-2 pl-4 transition-colors hover:border-accent"
       >
         <span className="text-[12.5px] text-muted">
           {memory.kind === "years" ? `${yearsAgo(first.date, today)}, ` : ""}
@@ -242,18 +247,18 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
           {showYear(first.date) && ` ${first.date.slice(0, 4)}`}
         </span>
         {first.title && <span className="font-serif text-[17px] leading-snug font-semibold">{first.title}</span>}
-        <span className="prose-serif line-clamp-3 text-[16px] leading-[1.6] text-fg/85">
+        <span className="prose-serif line-clamp-3 text-[17px] leading-[1.6] text-fg/90 italic">
           {first.excerpt || (!first.title && "Sin texto")}
         </span>
       </Link>
 
       {rest.length > 0 && (
-        <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5 border-t border-line pt-2">
+        <ul className="relative grid grid-cols-[minmax(0,1fr)] gap-0.5 border-t border-line pt-2">
           {rest.slice(0, 3).map((e) => (
             <li key={e.id}>
               <Link
                 href={`/journal/${e.id}`}
-                className="flex min-h-11 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-3 active:bg-surface-3"
+                className="flex min-h-11 items-center gap-3 rounded-[12px] px-2 py-2 transition-colors hover:bg-surface-2 active:bg-surface-2"
               >
                 <span className="tabular min-w-[78px] shrink-0 text-[13px] text-muted">
                   {formatShort(e.date)}
@@ -280,8 +285,8 @@ export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
     <div className="grid justify-items-start gap-3 empty-card p-8">
-      <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
-        <PenNib size={22} aria-hidden />
+      <span className="inline-flex size-11 items-center justify-center rounded-[14px] bg-accent text-on-accent btn-glow">
+        <PenNib size={22} weight="fill" aria-hidden />
       </span>
       <h2 className="font-serif text-[22px] leading-tight font-semibold tracking-tight">Todavía no escribiste nada</h2>
       <p className="max-w-[46ch] text-sm leading-relaxed text-muted">

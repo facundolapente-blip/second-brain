@@ -42,18 +42,18 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
       <JournalHeader title="Calendario" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
       <main className="mx-auto grid max-w-3xl gap-6 px-4 pt-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10 lg:px-8 lg:pt-6">
-        <section className="grid content-start gap-4">
+        <section className="card grid content-start gap-4 p-3 sm:p-5">
           <div className="flex items-center justify-between">
             <Link
               href={href(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent-fg transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
             <div className="grid justify-items-center gap-0.5 text-center leading-tight">
-              <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
+              <h2 className="display text-[20px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
               <span className="tabular text-[13px] text-muted">
                 {byDay.size === 0
                   ? "Sin entradas"
@@ -69,7 +69,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               href={href(shiftMonth(month, 1))}
               scroll={false}
               aria-label="Mes siguiente"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent-fg transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
             >
               <CaretRight size={18} weight="bold" />
             </Link>
@@ -96,7 +96,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   aria-current={isSel ? "date" : undefined}
                   style={info ? tone(info.color) : undefined}
                   className={cx(
-                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200",
+                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow,transform] duration-300 ease-spring active:scale-90",
                     list
                       ? info
                         ? "bg-tone font-semibold text-tone-fg"
@@ -104,7 +104,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                       : d > today
                         ? "text-faint"
                         : "text-fg hover:bg-surface-2",
-                    isSel && "ring-2 ring-accent ring-offset-2 ring-offset-bg",
+                    isSel && "ring-2 ring-accent ring-offset-2 ring-offset-surface",
                   )}
                 >
                   {Number(d.slice(8))}
@@ -132,7 +132,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
           {selected ? (
             <>
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatLong(selected)}</h2>
+                <h2 className="display text-[20px] font-semibold first-letter:uppercase">{formatLong(selected)}</h2>
                 {selectedEntries.length > 0 && (
                   <WriteDayButton date={selected} nueva variant="outline">
                     <Plus size={16} weight="bold" /> Otra

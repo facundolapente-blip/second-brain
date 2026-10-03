@@ -61,7 +61,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
         <section className="rise grid gap-6">
           <div className="grid gap-1">
             <span className="text-[13px] text-muted">Entradas escritas</span>
-            <span className="text-[52px] leading-none font-semibold tracking-[-0.03em]">{nf.format(s.totalEntries)}</span>
+            <span className="num text-[72px] leading-[0.95] font-semibold lg:text-[88px]">{nf.format(s.totalEntries)}</span>
             <span className="text-sm text-muted">
               En {days(s.totalDays)}
               {s.firstDate && <>, desde {formatMonth(s.firstDate.slice(0, 7))}</>}. {nf.format(s.totalWords)} palabras en total.
@@ -71,21 +71,21 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
           <div className="grid grid-cols-3 divide-x divide-line card card-sm">
             <div className="grid content-start gap-1 p-3.5 sm:p-4">
               <span className="flex items-center gap-1 text-[12.5px] text-muted">
-                <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
+                <Fire size={14} weight="fill" className="text-accent-fg" aria-hidden /> Racha
               </span>
-              <span className="text-[24px] leading-tight font-semibold tracking-tight">{s.streak}</span>
+              <span className="num text-[30px] leading-tight font-semibold">{s.streak}</span>
               <span className="text-[12px] text-muted">{s.streak === 1 ? "día seguido" : "días seguidos"}</span>
             </div>
             <div className="grid content-start gap-1 p-3.5 sm:p-4">
               <span className="flex items-center gap-1 text-[12.5px] text-muted">
                 <Trophy size={14} weight="fill" className="text-[var(--p-yellow-solid)]" aria-hidden /> Récord
               </span>
-              <span className="text-[24px] leading-tight font-semibold tracking-tight">{s.best}</span>
+              <span className="num text-[30px] leading-tight font-semibold">{s.best}</span>
               <span className="text-[12px] text-muted">días</span>
             </div>
             <div className="grid content-start gap-1 p-3.5 sm:p-4">
               <span className="text-[12.5px] text-muted">Por entrada</span>
-              <span className="text-[24px] leading-tight font-semibold tracking-tight">
+              <span className="num text-[30px] leading-tight font-semibold">
                 {nf.format(Math.round(s.totalWords / s.totalEntries))}
               </span>
               <span className="text-[12px] text-muted">palabras</span>
@@ -96,7 +96,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
 
         {s.firstDate && (
           <section className="grid gap-3">
-            <h2 className="text-[17px] font-semibold tracking-tight">Constancia</h2>
+            <h2 className="display text-[20px] font-semibold">Constancia</h2>
             <MonthHeatmap
               firstMonth={s.firstDate.slice(0, 7)}
               currentMonth={current}
@@ -113,17 +113,17 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               href={monthLink(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent-fg transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
-            <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
+            <h2 className="display text-[20px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
             {month < current ? (
               <Link
                 href={monthLink(shiftMonth(month, 1))}
                 scroll={false}
                 aria-label="Mes siguiente"
-                className="inline-flex size-11 items-center justify-center rounded-md text-accent-fg transition-colors hover:bg-surface-2"
+                className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
               >
                 <CaretRight size={18} weight="bold" />
               </Link>
@@ -188,7 +188,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
           )}
 
           <div className="grid gap-1">
-            <h3 className="text-[15px] font-semibold">Entradas por mes</h3>
+            <h3 className="display text-[16px] font-semibold">Entradas por mes</h3>
             <MonthColumns
               months={last12}
               values={last12.map((m) => s.perMonth[m] ?? 0)}
@@ -200,15 +200,15 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
 
         <section className="grid gap-8 border-t border-line pt-8 sm:grid-cols-2">
           <div className="grid content-start gap-3">
-            <h2 className="text-[17px] font-semibold tracking-tight">Qué días escribís</h2>
+            <h2 className="display text-[20px] font-semibold">Qué días escribís</h2>
             <WeekdayBars values={s.perWeekday} />
           </div>
           {s.longest && (
             <div className="grid content-start gap-3">
-              <h2 className="text-[17px] font-semibold tracking-tight">La entrada más larga</h2>
+              <h2 className="display text-[20px] font-semibold">La entrada más larga</h2>
               <Link
                 href={`/journal/${s.longest.id}`}
-                className="group grid gap-1 card card-sm p-4 transition-colors hover:border-line-strong"
+                className="group grid gap-1 card card-sm p-4 transition-[border-color,transform] duration-300 ease-spring hover:border-line-strong active:scale-[0.98]"
               >
                 <span className="text-[34px] leading-none font-semibold tracking-tight">{nf.format(s.longest.words)}</span>
                 <span className="text-[13px] text-muted">palabras</span>

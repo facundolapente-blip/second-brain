@@ -69,12 +69,12 @@ export function JournalHeader({
   return (
     <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-2 lg:h-16">
+        <div className="flex h-16 items-center gap-2 lg:h-20">
           {back ? (
             <Link
               href={back}
               aria-label="Volver"
-              className="-ml-2 inline-flex size-10 items-center justify-center rounded-md text-accent-fg lg:hidden"
+              className="-ml-1.5 inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90 lg:hidden"
             >
               <CaretLeft size={22} weight="bold" />
             </Link>
@@ -122,11 +122,11 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 card py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
+      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 card py-4 pr-4 pl-3 transition-[border-color,background-color,transform] duration-300 ease-spring hover:border-line-strong active:scale-[0.99] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
     >
       <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
-        <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
-        <span className="text-[12px] leading-tight text-muted">{month}</span>
+        <span className="num text-[30px] leading-none font-semibold">{day.padStart(2, "0")}</span>
+        <span className="text-[12px] leading-tight font-medium text-accent-fg">{month}</span>
         <span className="text-[11px] leading-tight text-muted">{wd}</span>
       </span>
 
@@ -147,7 +147,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
         </span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-[12px] text-muted">
           {entry.tags.slice(0, 3).map((t) => (
-            <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5">
+            <span key={t} className="rounded-full bg-surface-2 px-2.5 py-1">
               #{t}
             </span>
           ))}
@@ -178,8 +178,10 @@ export function WriteDayButton({
       onClick={() => write(date, nueva)}
       disabled={pending}
       className={cx(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-medium whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
-        variant === "accent" ? "bg-accent text-on-accent hover:opacity-90" : "border border-line-strong text-fg hover:bg-surface-2",
+        "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium whitespace-nowrap transition-[opacity,transform,background-color] duration-300 ease-spring active:scale-[0.97] disabled:opacity-60",
+        variant === "accent"
+          ? "btn-glow bg-accent font-semibold text-on-accent hover:brightness-105"
+          : "border border-line-strong bg-surface/60 text-fg hover:bg-surface-2",
       )}
     >
       {children}
@@ -202,7 +204,7 @@ export function Stat({
   return (
     <div className={cx("grid content-start gap-1", className)}>
       <span className="text-[13px] text-muted">{label}</span>
-      <span className="text-[26px] leading-tight font-semibold tracking-tight">{value}</span>
+      <span className="num text-[32px] leading-tight font-semibold">{value}</span>
       {hint && <span className="text-[12.5px] text-muted">{hint}</span>}
     </div>
   );

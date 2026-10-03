@@ -4,8 +4,8 @@ import { Bone, LoadingRegion } from "@/components/skeleton";
 export default function Loading() {
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex h-14 max-w-[42rem] items-center gap-3 px-4 lg:h-16">
+      <header className="sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-16 max-w-[42rem] items-center gap-3 px-4 lg:h-20">
           <Bone className="size-6 rounded-md" />
           <Bone className="h-4 w-40" />
         </div>

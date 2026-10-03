@@ -135,15 +135,15 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[42rem] items-center gap-1 px-2 lg:h-16 lg:px-4">
-          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-accent-fg">
+      <header className="sticky top-0 z-20 bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
+        <div className="mx-auto flex h-16 max-w-[42rem] items-center gap-1 px-2 lg:h-20 lg:px-4">
+          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-11 text-fg">
             <CaretLeft size={22} weight="bold" />
           </IconButton>
 
           {/* La fecha se cambia con el selector nativo del sistema. */}
-          <label className="relative inline-flex h-9 min-w-0 cursor-pointer items-center gap-1 rounded-md px-2 hover:bg-surface-2">
-            <span className="truncate text-[15px] font-semibold first-letter:uppercase">{formatRelative(date, today)}</span>
+          <label className="relative inline-flex h-10 min-w-0 cursor-pointer items-center gap-1.5 rounded-full px-3 transition-colors hover:bg-surface-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[var(--accent-fg)]">
+            <span className="display truncate text-[17px] font-semibold first-letter:uppercase">{formatRelative(date, today)}</span>
             <CaretDown size={14} weight="bold" className="shrink-0 text-muted" />
             <input
               ref={dateRef}
@@ -162,7 +162,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
           </label>
 
           <SaveStatus status={status} />
-          <IconButton label="Más opciones" onClick={() => moreSheet.current?.open()} className="size-10">
+          <IconButton label="Más opciones" onClick={() => moreSheet.current?.open()} className="size-11">
             <DotsThreeVertical size={22} weight="bold" />
           </IconButton>
         </div>
@@ -241,7 +241,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
                 write(date, true);
               });
             }}
-            className="flex h-11 items-center gap-3 rounded-md px-2 text-left text-[15px] hover:bg-surface-2"
+            className="flex h-12 items-center gap-3 rounded-[14px] px-3 text-left text-[15px] hover:bg-surface-2"
           >
             <Plus size={20} className="text-muted" /> Otra entrada para este día
           </button>
@@ -251,7 +251,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
               moreSheet.current?.close();
               confirmSheet.current?.open();
             }}
-            className="flex h-11 items-center gap-3 rounded-md px-2 text-left text-[15px] text-danger hover:bg-[var(--st-fail-bg)]"
+            className="flex h-12 items-center gap-3 rounded-[14px] px-3 text-left text-[15px] text-danger hover:bg-[var(--st-fail-bg)]"
           >
             <Trash size={20} /> Borrar entrada
           </button>
@@ -288,7 +288,7 @@ function SaveStatus({ status }: { status: Status }) {
     <span
       aria-live="polite"
       className={cx(
-        "ml-auto inline-flex items-center gap-1.5 px-2 text-[12px] transition-opacity duration-300",
+        "ml-auto inline-flex h-7 items-center gap-1.5 rounded-full bg-surface-2/80 px-2.5 text-[12px] transition-opacity duration-300",
         status === "error" ? "text-danger" : "text-muted",
         status === "idle" && "opacity-0",
       )}
@@ -321,8 +321,10 @@ function MoodPicker({ value, onChange }: { value: number | null; onChange: (m: n
             onClick={() => onChange(on ? null : m.value)}
             style={tone(m.color)}
             className={cx(
-              "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-90",
-              on ? "bg-tone text-tone-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
+              "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,color,transform,box-shadow] duration-300 ease-spring active:scale-[0.85]",
+              on
+                ? "scale-110 bg-tone text-tone-fg shadow-[inset_0_0_0_2px_var(--tone-solid),0_6px_16px_-8px_var(--tone-solid)]"
+                : "text-muted hover:bg-surface-2 hover:text-fg",
             )}
           >
             <MoodIcon mood={m.value} size={on ? 28 : 26} weight={on ? "duotone" : "regular"} />
@@ -361,13 +363,13 @@ function TagEditor({
     <div className="grid gap-2.5 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-2 pr-1 pl-3 text-[13px]">
+          <span key={t} className="inline-flex h-9 items-center gap-1 rounded-full bg-surface-2 pr-1 pl-3.5 text-[13px] shadow-[inset_0_1px_0_var(--edge)]">
             #{t}
             <button
               type="button"
               aria-label={`Quitar ${t}`}
               onClick={() => onChange(tags.filter((x) => x !== t))}
-              className="inline-flex size-6 items-center justify-center rounded-full text-muted hover:bg-surface-3 hover:text-fg"
+              className="relative inline-flex size-7 items-center justify-center rounded-full text-muted before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-3 hover:text-fg"
             >
               <X size={12} weight="bold" />
             </button>
@@ -409,7 +411,7 @@ function TagEditor({
               // mousedown para que no se pierda el foco antes del click
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => add(t)}
-              className="h-7 rounded-full border border-dashed border-line-strong px-2.5 text-[12px] text-muted hover:border-solid hover:text-fg"
+              className="h-9 rounded-full border border-dashed border-line-strong px-3 text-[12.5px] text-muted hover:border-solid hover:text-fg"
             >
               #{t}
             </button>
