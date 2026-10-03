@@ -87,7 +87,7 @@ export function AccountAvatar({ account, size = 36 }: { account: Pick<AccountDTO
     <span
       aria-hidden
       style={{ ...tone(account.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[10px] bg-tone-solid text-white"
+      className="inline-flex shrink-0 items-center justify-center rounded-[30%] bg-tone-solid bg-[linear-gradient(160deg,rgba(255,255,255,0.28),rgba(255,255,255,0)_55%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"
     >
       <FinanceIcon name={account.icon} size={Math.round(size * 0.52)} weight="fill" />
     </span>
@@ -240,7 +240,7 @@ export function TxRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[16px] px-2.5 py-2.5 text-left transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-[0.99] active:bg-surface-2"
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -271,22 +271,22 @@ export function MonthNav({ month, basePath, current }: { month: string; basePath
       <Link
         href={href(shiftMonth(month, -1))}
         aria-label="Mes anterior"
-        className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
       >
         <CaretLeft size={18} weight="bold" />
       </Link>
-      <h2 className="min-w-[9.5rem] text-center text-[15px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
+      <h2 className="display min-w-[9.5rem] text-center text-[18px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
       <Link
         href={href(shiftMonth(month, 1))}
         aria-label="Mes siguiente"
-        className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
       >
         <CaretRight size={18} weight="bold" />
       </Link>
       {month !== current && (
         <Link
           href={basePath}
-          className="ml-1 inline-flex h-8 items-center rounded-md border border-line-strong px-2.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
+          className="ml-1 inline-flex h-9 items-center rounded-full border border-line-strong bg-surface/60 px-3.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
         >
           Hoy
         </Link>
@@ -303,7 +303,7 @@ export function Fab({ onClick, label = "Nuevo movimiento" }: { onClick: () => vo
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="lift fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
+      className="btn-glow fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[20px] bg-accent text-on-accent transition-transform duration-300 ease-spring active:scale-90 lg:hidden"
     >
       <Plus size={26} weight="bold" />
     </button>
@@ -322,9 +322,9 @@ export function EmptyBlock({
   return (
     <div className="mt-6 grid justify-items-start gap-3 empty-card p-8">
       {icon && (
-        <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">{icon}</span>
+        <span className="inline-flex size-11 items-center justify-center rounded-[14px] bg-accent-soft text-accent-fg">{icon}</span>
       )}
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 className="display text-xl font-semibold">{title}</h2>
       {children}
     </div>
   );

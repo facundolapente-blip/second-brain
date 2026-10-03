@@ -142,7 +142,7 @@ export const TxSheet = forwardRef<
           <p className="text-sm leading-relaxed text-muted">
             Todo movimiento sale de una cuenta. Creá la primera (Efectivo, tu banco, una tarjeta) y volvé.
           </p>
-          <Link href="/gastos/cuentas?nueva=1" className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent">
+          <Link href="/gastos/cuentas?nueva=1" className="btn-glow inline-flex h-11 items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-on-accent">
             Crear cuenta
           </Link>
         </div>
@@ -177,7 +177,7 @@ export const TxSheet = forwardRef<
                 key={t.id}
                 type="button"
                 onClick={() => setD((prev) => applyTemplate(prev, t))}
-                className="h-8 shrink-0 rounded-full border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                className="h-10 shrink-0 rounded-full border border-line-strong px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 {t.name}
               </button>
@@ -196,7 +196,7 @@ export const TxSheet = forwardRef<
           <span className="text-[13px] font-medium text-muted">
             {d.kind === "transfer" && crossCurrency ? `Sale de ${from?.name}` : "Monto"}
           </span>
-          <span className="flex h-16 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
+          <span className="flex h-[76px] items-center gap-2.5 rounded-[20px] border border-line-strong bg-surface-2/60 px-4 shadow-[inset_0_1px_2px_rgba(var(--shadow-tint),0.08)] transition-[border-color,box-shadow,background-color] focus-within:border-accent focus-within:bg-surface focus-within:ring-4 focus-within:ring-[var(--focus)]">
             <span className="text-xl font-medium text-muted">{currencySymbol(from?.currency ?? "UYU")}</span>
             <input
               ref={amountRef}
@@ -210,7 +210,7 @@ export const TxSheet = forwardRef<
               placeholder="0"
               required
               aria-describedby={state && !state.ok ? "tx-error" : undefined}
-              className="h-full w-0 min-w-0 flex-1 bg-transparent text-[32px] font-semibold tracking-[-0.02em] outline-none placeholder:text-faint"
+              className="num h-full w-0 min-w-0 flex-1 bg-transparent text-[40px] font-semibold outline-none placeholder:text-faint"
             />
             {d.kind !== "transfer" && (
               <span
@@ -252,7 +252,7 @@ export const TxSheet = forwardRef<
                 type="button"
                 onClick={() => set({ accountId: d.toAccountId, toAccountId: d.accountId, amount: d.toAmount || d.amount, toAmount: d.toAmount ? d.amount : "" })}
                 disabled={!d.toAccountId}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
               >
                 <ArrowsDownUp size={15} weight="bold" aria-hidden /> Invertir
               </button>
@@ -266,7 +266,7 @@ export const TxSheet = forwardRef<
             {crossCurrency && (
               <label className="grid gap-1.5">
                 <span className="text-[13px] font-medium text-muted">Llega a {to?.name}</span>
-                <span className="flex h-12 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+                <span className="flex h-14 items-center gap-2 rounded-[16px] border border-line-strong bg-surface-2/60 px-4 focus-within:border-accent focus-within:bg-surface focus-within:ring-4 focus-within:ring-[var(--focus)]">
                   <span className="text-muted">{currencySymbol(to?.currency ?? "")}</span>
                   <input
                     name="toAmount"
@@ -299,7 +299,7 @@ export const TxSheet = forwardRef<
           <div className="grid gap-2">
             <div className="flex items-baseline justify-between">
               <span className="text-[13px] font-medium text-muted">Categoría</span>
-              <Link href="/gastos/categorias" className="text-[13px] text-accent-fg hover:underline">
+              <Link href="/gastos/categorias" className="inline-flex min-h-10 items-center rounded-full px-3 text-[13px] font-medium text-accent-fg hover:bg-surface-2">
                 Editar categorías
               </Link>
             </div>
@@ -332,8 +332,8 @@ export const TxSheet = forwardRef<
                 type="button"
                 onClick={() => set({ date: o.value })}
                 className={cx(
-                  "h-10 rounded-md border px-3.5 text-sm transition-colors",
-                  d.date === o.value ? "border-fg bg-ink text-on-ink" : "border-line-strong text-fg hover:bg-surface-2",
+                  "h-10 rounded-full border px-4 text-sm transition-colors",
+                  d.date === o.value ? "border-accent bg-accent-soft font-medium text-accent-fg" : "border-line-strong text-fg hover:bg-surface-2",
                 )}
               >
                 {o.label}
@@ -382,7 +382,7 @@ export const TxSheet = forwardRef<
         )}
 
         {/* Guardar queda siempre a mano, pegado abajo de la hoja, aunque la lista de categorías sea larga. */}
-        <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-line bg-surface/95 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+        <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-line bg-[color-mix(in_oklab,var(--surface)_80%,transparent)] px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
           {state && !state.ok && (
             <p id="tx-error" role="alert" className="text-sm text-danger">
               {state.error}
@@ -436,8 +436,8 @@ function AccountPicker({
               aria-checked={on}
               onClick={() => onChange(a.id)}
               className={cx(
-                "flex h-11 shrink-0 items-center gap-2 rounded-[10px] border pr-3 pl-1.5 text-sm transition-colors",
-                on ? "border-fg bg-surface-2 font-medium" : "border-line-strong hover:bg-surface-2",
+                "flex h-12 shrink-0 items-center gap-2 rounded-full border pr-4 pl-1.5 text-sm transition-colors",
+                on ? "border-accent bg-accent-soft font-medium" : "border-line-strong hover:bg-surface-2",
               )}
             >
               <AccountAvatar account={a} size={30} />
@@ -468,14 +468,14 @@ function CategoryChip({
       onClick={onClick}
       aria-pressed={selected}
       className={cx(
-        "relative flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2 text-center transition-colors",
-        selected ? "bg-surface-2 ring-1 ring-fg" : "hover:bg-surface-2",
+        "relative flex flex-col items-center gap-1.5 rounded-[16px] px-1 py-2.5 text-center transition-[background-color,transform] duration-300 ease-spring active:scale-95",
+        selected ? "bg-accent-soft ring-2 ring-accent" : "hover:bg-surface-2",
       )}
     >
       {children}
       <span className="line-clamp-2 text-[11.5px] leading-tight">{label}</span>
       {selected && (
-        <span className="absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-ink text-on-ink">
+        <span className="absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-accent text-on-accent">
           <Check size={10} weight="bold" />
         </span>
       )}

@@ -49,10 +49,10 @@ export function UncategorizedView({
 
       <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-6">
         {list.length === 0 ? (
-          <div className="mt-6 flex items-center gap-3 rounded-[12px] border border-line p-6">
+          <div className="mt-6 flex items-center gap-3 card p-6">
             <CheckCircle size={28} weight="fill" className="text-accent-fg" />
             <div className="grid gap-0.5">
-              <h2 className="text-[15px] font-semibold">Todo clasificado</h2>
+              <h2 className="display text-[18px] font-semibold">Todo clasificado</h2>
               <p className="text-sm text-muted">Los movimientos que cargues sin categoría van a aparecer acá.</p>
             </div>
           </div>
@@ -69,7 +69,7 @@ export function UncategorizedView({
                 return (
                   <li key={t.id}>
                     {newMonth && (
-                      <h2 className="z-10 -mx-2 bg-bg/90 px-4 pt-3 pb-1.5 text-[13px] font-semibold backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
+                      <h2 className="z-10 -mx-2 bg-[color-mix(in_oklab,var(--bg)_75%,transparent)] px-4 pt-3 pb-1.5 text-[13.5px] font-semibold backdrop-blur-xl first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
                         {formatMonth(t.date.slice(0, 7))}
                       </h2>
                     )}
@@ -79,7 +79,7 @@ export function UncategorizedView({
                         setCurrent(t);
                         sheet.current?.open();
                       }}
-                      className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex w-full items-center gap-3.5 rounded-[16px] px-2.5 py-2.5 text-left transition-colors hover:bg-surface-2"
                     >
                       <CategoryAvatar />
                       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -112,7 +112,7 @@ export function UncategorizedView({
               key={c.id}
               type="button"
               onClick={() => assign(c.id)}
-              className="flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-3 text-center transition-colors hover:bg-surface-2 active:bg-surface-2"
+              className="flex flex-col items-center gap-1.5 rounded-[16px] px-1 py-3 text-center transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-95 active:bg-surface-2"
             >
               <CategoryAvatar category={c} size={40} />
               <span className="line-clamp-2 text-[12.5px] leading-tight">{c.name}</span>

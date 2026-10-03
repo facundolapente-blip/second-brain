@@ -54,20 +54,20 @@ export function TemplatesView({
             </p>
           </EmptyBlock>
         ) : (
-          <ul className="grid gap-0.5">
+          <ul className="card grid gap-0.5 p-1.5">
             {templates.map((t, i) => (
               <li key={t.id} className="rise flex items-center gap-1" style={{ "--i": i } as React.CSSProperties}>
                 <button
                   type="button"
                   onClick={() => form.current?.fromTemplate(t)}
-                  className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                  className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[16px] px-2.5 py-2.5 text-left transition-colors hover:bg-surface-2"
                 >
                   <CategoryAvatar category={lk.category(t.categoryId)} transfer={t.kind === "transfer"} />
                   <span className="grid min-w-0 flex-1 gap-0.5">
                     <span className="truncate text-[15px] font-medium">{t.name}</span>
                     <span className="truncate text-[13px] text-muted">{describe(t)}</span>
                   </span>
-                  <span className="text-[13px] font-medium text-accent-fg">Usar</span>
+                  <span className="rounded-full bg-accent-soft px-3 py-1 text-[13px] font-medium text-accent-fg">Usar</span>
                 </button>
                 <IconButton
                   label="Opciones"

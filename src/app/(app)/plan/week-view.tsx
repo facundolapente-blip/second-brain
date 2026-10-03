@@ -106,7 +106,7 @@ export function WeekView({
             <Link
               href={`/plan?semana=${prev}`}
               aria-label="Semana anterior"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent-fg hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
@@ -116,7 +116,7 @@ export function WeekView({
             <Link
               href={`/plan?semana=${next}`}
               aria-label="Semana siguiente"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent-fg hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg transition-[background-color,transform] duration-300 ease-spring hover:bg-surface-2 active:scale-90"
             >
               <CaretRight size={18} weight="bold" />
             </Link>
@@ -133,7 +133,7 @@ export function WeekView({
           )}
         </div>
         {copyMsg && (
-          <p role="status" className="mb-3 rounded-md bg-accent-soft px-3 py-2 text-[13px] text-accent-fg">
+          <p role="status" className="mb-3 rounded-[14px] bg-accent-soft px-3.5 py-2.5 text-[13px] text-accent-fg">
             {copyMsg}
           </p>
         )}

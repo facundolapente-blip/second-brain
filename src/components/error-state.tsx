@@ -34,10 +34,10 @@ export function ErrorState({
       </header>
       <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-8">
         <div role="alert" className="grid justify-items-start gap-3 card p-6 lg:p-8">
-          <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]">
+          <span className="inline-flex size-11 items-center justify-center rounded-[14px] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]">
             <WarningCircle size={22} weight="bold" aria-hidden />
           </span>
-          <h2 className="text-lg font-semibold tracking-tight">No se pudo cargar esta pantalla</h2>
+          <h2 className="display text-xl font-semibold">No se pudo cargar esta pantalla</h2>
           <p className="max-w-[48ch] text-sm leading-relaxed text-muted">
             Puede ser la conexión o la base de datos. Lo que ya guardaste no se pierde. Probá de nuevo en un momento.
           </p>
@@ -46,13 +46,13 @@ export function ErrorState({
             <button
               type="button"
               onClick={() => retry()}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 active:scale-[0.98]"
+              className="btn-glow inline-flex h-11 items-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-on-accent transition-[filter,transform] duration-300 ease-spring hover:brightness-105 active:scale-[0.97]"
             >
               <ArrowClockwise size={16} weight="bold" aria-hidden /> Reintentar
             </button>
             <Link
               href={back.href}
-              className="inline-flex h-10 items-center rounded-md border border-line-strong px-4 text-sm font-medium transition-colors hover:bg-surface-2"
+              className="inline-flex h-11 items-center rounded-full border border-line-strong bg-surface/60 px-5 text-sm font-medium transition-colors hover:bg-surface-2"
             >
               {back.label}
             </Link>

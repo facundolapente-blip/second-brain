@@ -111,17 +111,17 @@ export function ReportsView({
 
         {empty ? (
           <div className="grid justify-items-start gap-2 empty-card p-8">
-            <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
+            <span className="inline-flex size-11 items-center justify-center rounded-[14px] bg-accent-soft text-accent-fg">
               <ChartBar size={22} aria-hidden />
             </span>
-            <h2 className="text-lg font-semibold tracking-tight">Sin movimientos en {currency}</h2>
+            <h2 className="display text-xl font-semibold">Sin movimientos en {currency}</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               No hay gastos ni ingresos en estos meses para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
           </div>
         ) : (
           <>
-            <section className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4" aria-label="Cifras del mes">
+            <section className="card grid grid-cols-2 gap-x-6 gap-y-5 p-5 sm:grid-cols-4" aria-label="Cifras del mes">
               <Stat
                 label={isCurrent ? "Gastado hasta hoy" : "Gastos"}
                 cents={cur.expense}
@@ -143,18 +143,18 @@ export function ReportsView({
               <Stat label="Gasto por día" cents={Math.round(cur.expense / Math.max(1, elapsed) / 100) * 100} currency={currency} hint={`en ${elapsed} días`} />
             </section>
 
-            <section className="grid gap-3">
+            <section className="card grid gap-3 p-4 sm:p-5">
               <div className="grid gap-0.5">
-                <h2 className="text-[17px] font-semibold tracking-tight">Ritmo del mes</h2>
+                <h2 className="display text-[20px] font-semibold">Ritmo del mes</h2>
                 <p className="text-[13px] text-muted">Gasto acumulado día a día contra {monthName(prevMonth)}.</p>
               </div>
               <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} />
             </section>
 
-            <section className="grid gap-4">
+            <section className="card grid gap-4 p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[17px] font-semibold tracking-tight">Por categoría</h2>
-                <div className="w-48">
+                <h2 className="display text-[18px] font-semibold whitespace-nowrap sm:text-[20px]">Por categoría</h2>
+                <div className="w-44 sm:w-48">
                   <Segmented
                     value={kind}
                     onChange={setKind}
@@ -183,8 +183,8 @@ export function ReportsView({
               )}
             </section>
 
-            <section className="grid gap-3">
-              <h2 className="text-[17px] font-semibold tracking-tight">Últimos {months.length} meses</h2>
+            <section className="card grid gap-3 p-4 sm:p-5">
+              <h2 className="display text-[20px] font-semibold">Últimos {months.length} meses</h2>
               <MonthlyColumns data={evolution} current={month} currency={currency} />
             </section>
           </>
@@ -222,7 +222,7 @@ function Stat({
   return (
     <div className={cx("grid content-start gap-1", hero && "col-span-2 sm:col-span-1")}>
       <span className="text-[13px] text-muted">{label}</span>
-      <span className={cx("leading-none font-semibold tracking-[-0.02em]", hero ? "text-[36px]" : "text-[22px]")}>
+      <span className={cx("num leading-none font-semibold", hero ? "text-[44px]" : "text-[26px]")}>
         {signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}
         {moneyCents(cents, currency)}
       </span>
@@ -387,7 +387,7 @@ function PaceChart({
               {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
               {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
               <div
-                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[14px] border border-line bg-surface p-3 text-[12.5px]"
                 style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
               >
                 <span className="text-muted">Día {h}</span>
@@ -412,7 +412,7 @@ function PaceChart({
         <summary className="cursor-pointer text-[13px] text-muted select-none">Ver como tabla</summary>
         <div className="mt-2 max-h-72 overflow-y-auto">
           <table className="w-full text-[13px]">
-            <thead className="sticky top-0 bg-bg">
+            <thead className="sticky top-0 bg-surface">
               <tr className="text-left text-muted">
                 <th className="py-1.5 font-normal">Día</th>
                 <th className="py-1.5 text-right font-normal first-letter:uppercase">{monthName(month)}</th>
@@ -439,7 +439,7 @@ function Dot({ left, top, color }: { left: string; top: string; color: string })
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg"
+      className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface"
       style={{ left, top, background: color }}
     />
   );
@@ -605,7 +605,7 @@ function MonthlyColumns({
 
           {hover !== null && (
             <div
-              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[14px] border border-line bg-surface p-3 text-[12.5px]"
               style={{
                 left: `${((hover + 0.5) / data.length) * 100}%`,
                 transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,

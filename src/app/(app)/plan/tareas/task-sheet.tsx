@@ -94,7 +94,7 @@ function TaskForm({
                 style={tone(c.color)}
                 aria-pressed={on}
                 className={cx(
-                  "h-9 rounded-md border px-3 text-[13px] transition-colors",
+                  "h-10 rounded-full border px-3.5 text-[13px] transition-colors",
                   on ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >

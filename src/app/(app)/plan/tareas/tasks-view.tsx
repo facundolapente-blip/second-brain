@@ -195,7 +195,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, -1))}
                 aria-label="Restar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 <Minus size={16} weight="bold" />
               </button>
@@ -203,7 +203,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, 1))}
                 aria-label="Sumar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 <Plus size={16} weight="bold" />
               </button>

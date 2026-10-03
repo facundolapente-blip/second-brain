@@ -115,7 +115,7 @@ function BlockForm({
                 style={tone(c.color)}
                 aria-pressed={on}
                 className={cx(
-                  "h-9 rounded-md border px-3 text-[13px] transition-colors",
+                  "h-10 rounded-full border px-3.5 text-[13px] transition-colors",
                   on ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
@@ -150,7 +150,7 @@ function BlockForm({
           <button
             type="button"
             onClick={() => setHabitId(suggested.id)}
-            className="inline-flex items-center gap-1.5 justify-self-start rounded-md text-[13px] font-medium text-accent-fg hover:underline"
+            className="inline-flex min-h-10 items-center gap-1.5 justify-self-start rounded-full text-[13px] font-medium text-accent-fg hover:underline"
           >
             <Medal size={15} weight="fill" /> Vincular con el hábito {suggested.name}
           </button>

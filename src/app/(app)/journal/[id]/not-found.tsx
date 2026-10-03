@@ -13,7 +13,7 @@ export default function EntryNotFound() {
       </p>
       <Link
         href="/journal"
-        className="mt-1 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+        className="btn-glow mt-1 inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-semibold text-on-accent transition-[filter,transform] duration-300 ease-spring hover:brightness-105 active:scale-[0.97]"
       >
         Volver a las entradas
       </Link>

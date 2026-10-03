@@ -58,7 +58,7 @@ export function FirePicker({ value, onChange, name }: { value: number; onChange:
           aria-label={`${p} ${p === 1 ? "fueguito" : "fueguitos"}`}
           onClick={() => onChange(value === p ? 0 : p)}
           className={cx(
-            "inline-flex size-10 items-center justify-center rounded-md transition-colors",
+            "inline-flex size-10 items-center justify-center rounded-full transition-colors",
             p <= value ? "text-[var(--p-orange-solid)]" : "text-faint hover:text-muted",
           )}
         >

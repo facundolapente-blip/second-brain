@@ -55,22 +55,22 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           return (
             <section key={s.kind} className="grid gap-2">
               <div className="flex items-baseline justify-between px-2">
-                <h2 className="text-[15px] font-semibold">{s.title}</h2>
+                <h2 className="display text-[18px] font-semibold">{s.title}</h2>
                 <button
                   type="button"
                   onClick={() => create(s.kind)}
-                  className="text-[13px] text-accent-fg hover:underline"
+                  className="inline-flex min-h-10 items-center rounded-full px-3 text-[13px] font-medium text-accent-fg hover:bg-surface-2"
                 >
                   Agregar
                 </button>
               </div>
-              <ul className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
+              <ul className="card grid grid-cols-1 gap-0.5 p-1.5 sm:grid-cols-2">
                 {list.map((c, i) => (
                   <li key={c.id} className="rise" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
                       onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount })}
-                      className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex w-full items-center gap-3.5 rounded-[16px] px-2.5 py-2.5 text-left transition-colors hover:bg-surface-2"
                     >
                       <CategoryAvatar category={c} />
                       <span className="grid min-w-0 flex-1 gap-0.5">
