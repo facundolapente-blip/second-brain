@@ -48,19 +48,19 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               href={href(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-md border border-line-strong text-fg transition-colors hover:border-rule hover:bg-surface-2"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
             <div className="grid justify-items-center gap-0.5 text-center leading-tight">
-              <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
-              <span className="tabular text-[13px] text-muted">
+              <h2 className="text-[19px] font-bold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
+              <span className="tabular text-[11.5px] text-muted">
                 {byDay.size === 0
                   ? "Sin entradas"
                   : `${byDay.size === 1 ? "1 día escrito" : `${byDay.size} días escritos`}, ${nf.format(monthWords)} palabras`}
               </span>
               {month !== today.slice(0, 7) && (
-                <Link href={href(today.slice(0, 7), today)} scroll={false} className="mt-0.5 text-[13px] font-medium text-accent-fg hover:underline">
+                <Link href={href(today.slice(0, 7), today)} scroll={false} className="label-mono mt-1 inline-flex min-h-8 items-center text-accent-fg hover:underline">
                   Volver a hoy
                 </Link>
               )}
@@ -69,15 +69,15 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               href={href(shiftMonth(month, 1))}
               scroll={false}
               aria-label="Mes siguiente"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-md border border-line-strong text-fg transition-colors hover:border-rule hover:bg-surface-2"
             >
               <CaretRight size={18} weight="bold" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-7 justify-items-center gap-y-1">
-            {WEEK_HEAD.map((w) => (
-              <span key={w} aria-hidden className="pb-1 text-[12px] font-medium text-muted">
+          <div className="grid grid-cols-7 justify-items-center gap-y-1.5">
+            {WEEK_HEAD.map((w, i) => (
+              <span key={w} aria-hidden className={cx("label-mono pb-1 text-[10.5px]", i >= 5 ? "text-accent-fg" : "text-muted")}>
                 {w}
               </span>
             ))}
@@ -96,32 +96,32 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   aria-current={isSel ? "date" : undefined}
                   style={info ? tone(info.color) : undefined}
                   className={cx(
-                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200",
+                    "tabular relative inline-flex size-11 items-center justify-center overflow-hidden rounded-[2px] border text-[15px] transition-[background-color,box-shadow] duration-150",
                     list
                       ? info
-                        ? "bg-tone font-semibold text-tone-fg"
-                        : "bg-accent-soft font-semibold text-accent-fg"
+                        ? "border-tone-solid bg-tone font-semibold text-tone-fg"
+                        : "border-line-strong bg-surface-3 font-semibold text-fg"
                       : d > today
-                        ? "text-faint"
-                        : "text-fg hover:bg-surface-2",
-                    isSel && "ring-2 ring-accent ring-offset-2 ring-offset-bg",
+                        ? "border-transparent text-faint"
+                        : "border-transparent text-fg hover:bg-surface-2",
+                    isSel && "outline-2 outline-offset-2 outline-rule outline-solid",
                   )}
                 >
                   {Number(d.slice(8))}
-                  {d === today && <span className="absolute bottom-1 h-[3px] w-3.5 rounded-full bg-accent" />}
+                  {d === today && <span className="absolute inset-x-0 top-0 h-[3px] bg-accent" />}
                 </Link>
               );
             })}
           </div>
 
-          <ul className="flex flex-wrap gap-x-3.5 gap-y-1.5 pt-1 text-[12px] text-muted" aria-label="Referencias de color">
+          <ul className="flex flex-wrap gap-x-3.5 gap-y-1.5 border-t border-line pt-3 font-mono text-[11px] text-muted" aria-label="Referencias de color">
             <li className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-full bg-accent-soft ring-1 ring-accent/30" />
+              <span className="size-3 border border-line-strong bg-surface-3" />
               Escrito
             </li>
             {MOODS.map((m) => (
               <li key={m.value} className="inline-flex items-center gap-1.5">
-                <span style={tone(m.color)} className="size-3 rounded-full bg-tone ring-1 ring-[var(--tone-solid)]/40" />
+                <span style={tone(m.color)} className="size-3 border border-tone-solid bg-tone" />
                 {m.label}
               </li>
             ))}
@@ -132,7 +132,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
           {selected ? (
             <>
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatLong(selected)}</h2>
+                <h2 className="text-[19px] font-bold tracking-tight first-letter:uppercase">{formatLong(selected)}</h2>
                 {selectedEntries.length > 0 && (
                   <WriteDayButton date={selected} nueva variant="outline">
                     <Plus size={16} weight="bold" /> Otra
@@ -151,7 +151,11 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   )}
                 </div>
               ) : (
-                selectedEntries.map((e, i) => <EntryCard key={e.id} entry={e} index={i} />)
+                <div className="grid divide-y divide-line border border-line-strong">
+                  {selectedEntries.map((e, i) => (
+                    <EntryCard key={e.id} entry={e} index={i} />
+                  ))}
+                </div>
               )}
             </>
           ) : (

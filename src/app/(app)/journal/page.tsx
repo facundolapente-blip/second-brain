@@ -67,20 +67,24 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
       <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 pt-3 lg:px-8 lg:pt-6">
         {!filtering && (
-          <section className="rise grid gap-1.5 pt-1 lg:pt-0">
-            <p className="font-serif text-[30px] leading-[1.1] tracking-[-0.015em] text-balance lg:text-[36px]">
+          <section className="rise grid gap-3 pt-1 lg:pt-0">
+            <p className="label-mono text-muted">{formatLong(home.today)}</p>
+            <p className="font-serif text-[32px] leading-[1.05] tracking-[-0.02em] text-balance lg:text-[42px]">
               {greeting(home.hour)}
               {firstName && `, ${firstName}`}
             </p>
-            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted">
-              <span className="first-letter:uppercase">{formatLong(home.today)}</span>
-              {home.streak > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-[2px] bg-surface-2 py-0.5 pr-2.5 pl-2 text-[13px] text-fg">
-                  <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden />
-                  <span className="tabular">{home.streak === 1 ? "1 día seguido" : `${home.streak} días seguidos`}</span>
+            {home.streak > 0 && (
+              <p className="flex items-stretch self-start border border-line-strong bg-surface">
+                <span className="flex items-center gap-1.5 border-r border-line-strong px-2.5">
+                  <Fire size={15} weight="fill" className="text-accent" aria-hidden />
+                  <span className="label-mono text-[10px] text-muted">Racha</span>
                 </span>
-              )}
-            </p>
+                <span className="flex items-baseline gap-1.5 px-2.5 py-1.5">
+                  <span className="tabular text-[17px] leading-none font-semibold">{home.streak}</span>
+                  <span className="text-[13px] text-muted">{home.streak === 1 ? "día seguido" : "días seguidos"}</span>
+                </span>
+              </p>
+            )}
           </section>
         )}
 
@@ -105,11 +109,12 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         ) : (
           <div className="grid gap-6">
             {years.map((g) => (
-              <section key={g.year} className="grid gap-3">
-                <h2 className="tabular z-10 -mx-4 bg-bg/90 px-4 py-1.5 text-[15px] font-semibold tracking-tight backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
-                  {g.year}
+              <section key={g.year} className="grid gap-2">
+                <h2 className="z-10 -mx-4 flex items-baseline gap-3 bg-bg px-4 py-1.5 max-lg:sticky max-lg:top-[calc(3.5rem+1px+env(safe-area-inset-top))]">
+                  <span className="tabular text-[22px] leading-none font-semibold tracking-tight">{g.year}</span>
+                  <span aria-hidden className="h-px flex-1 self-center bg-line-strong" />
                 </h2>
-                <div className="grid gap-3">
+                <div className="grid divide-y divide-line border border-line-strong">
                   {g.items.map((e) => (
                     <EntryCard key={e.id} entry={e} index={i++} />
                   ))}
@@ -120,7 +125,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <Link
                 href={`/journal?${more}`}
                 scroll={false}
-                className="mx-auto inline-flex h-11 items-center rounded-md border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.98]"
+                className="label-mono mx-auto inline-flex h-11 items-center rounded-md border border-rule px-5 transition-colors hover:bg-surface-2 active:translate-y-px"
               >
                 Ver más entradas
               </Link>
@@ -150,7 +155,7 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="flex items-center gap-3 rounded-none bg-surface-2 px-4 py-3 text-sm">
+    <div className="flex items-center gap-3 border border-rule border-l-4 border-l-accent bg-surface px-4 py-3 text-sm">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
           {count}
@@ -158,7 +163,8 @@ function FilterSummary({
         </span>{" "}
         <span className="text-muted">{parts.join(", ")}</span>
       </span>
-      <Link href="/journal" className="shrink-0 font-medium text-accent-fg">
+      <Link href="/journal" className="label-mono inline-flex h-11 shrink-0 items-center px-1 text-accent-fg">
+
         Limpiar
       </Link>
     </div>

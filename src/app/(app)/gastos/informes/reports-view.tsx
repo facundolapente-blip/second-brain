@@ -145,7 +145,7 @@ export function ReportsView({
 
             <section className="grid gap-3">
               <div className="grid gap-0.5">
-                <h2 className="text-[17px] font-semibold tracking-tight">Ritmo del mes</h2>
+                <h2 className="label-mono flex items-center gap-2 text-fg after:h-px after:flex-1 after:bg-line-strong">Ritmo del mes</h2>
                 <p className="text-[13px] text-muted">Gasto acumulado día a día contra {monthName(prevMonth)}.</p>
               </div>
               <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} />
@@ -153,7 +153,7 @@ export function ReportsView({
 
             <section className="grid gap-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[17px] font-semibold tracking-tight">Por categoría</h2>
+                <h2 className="label-mono flex items-center gap-2 text-fg after:h-px after:flex-1 after:bg-line-strong">Por categoría</h2>
                 <div className="w-48">
                   <Segmented
                     value={kind}
@@ -184,7 +184,7 @@ export function ReportsView({
             </section>
 
             <section className="grid gap-3">
-              <h2 className="text-[17px] font-semibold tracking-tight">Últimos {months.length} meses</h2>
+              <h2 className="label-mono flex items-center gap-2 text-fg after:h-px after:flex-1 after:bg-line-strong">Últimos {months.length} meses</h2>
               <MonthlyColumns data={evolution} current={month} currency={currency} />
             </section>
           </>
@@ -409,7 +409,7 @@ function PaceChart({
       </div>
 
       <details className="text-sm">
-        <summary className="cursor-pointer text-[13px] text-muted select-none">Ver como tabla</summary>
+        <summary className="label-mono inline-flex min-h-11 cursor-pointer items-center text-muted select-none hover:text-fg">Ver como tabla</summary>
         <div className="mt-2 max-h-72 overflow-y-auto">
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 bg-bg">
@@ -629,7 +629,7 @@ function MonthlyColumns({
       </div>
 
       <details className="text-sm">
-        <summary className="cursor-pointer text-[13px] text-muted select-none">Ver como tabla</summary>
+        <summary className="label-mono inline-flex min-h-11 cursor-pointer items-center text-muted select-none hover:text-fg">Ver como tabla</summary>
         <table className="mt-2 w-full text-[13px]">
           <thead>
             <tr className="text-left text-muted">

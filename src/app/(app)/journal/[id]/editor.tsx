@@ -135,15 +135,15 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-rule bg-bg pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-[42rem] items-center gap-1 px-2 lg:h-16 lg:px-4">
-          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-accent">
+          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-fg">
             <CaretLeft size={22} weight="bold" />
           </IconButton>
 
           {/* La fecha se cambia con el selector nativo del sistema. */}
-          <label className="relative inline-flex h-9 min-w-0 cursor-pointer items-center gap-1 rounded-md px-2 hover:bg-surface-2">
-            <span className="truncate text-[15px] font-semibold first-letter:uppercase">{formatRelative(date, today)}</span>
+          <label className="relative inline-flex h-11 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border border-line-strong px-2.5 hover:border-rule hover:bg-surface-2">
+            <span className="label-mono truncate text-[11.5px] text-fg">{formatRelative(date, today)}</span>
             <CaretDown size={14} weight="bold" className="shrink-0 text-muted" />
             <input
               ref={dateRef}
@@ -225,7 +225,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
           }}
         />
 
-        <p className="tabular text-[12px] text-muted">
+        <p className="label-mono text-[10.5px] text-muted">
           {words === 1 ? "1 palabra" : `${words.toLocaleString("es-UY")} palabras`} · {formatLong(date)}
         </p>
       </main>
@@ -288,7 +288,7 @@ function SaveStatus({ status }: { status: Status }) {
     <span
       aria-live="polite"
       className={cx(
-        "ml-auto inline-flex items-center gap-1.5 px-2 text-[12px] transition-opacity duration-300",
+        "label-mono ml-auto inline-flex items-center gap-1.5 px-2 text-[10.5px] transition-opacity duration-300",
         status === "error" ? "text-danger" : "text-muted",
         status === "idle" && "opacity-0",
       )}
@@ -296,7 +296,7 @@ function SaveStatus({ status }: { status: Status }) {
       {status === "error" ? (
         <WarningCircle size={14} weight="bold" aria-hidden />
       ) : busy ? (
-        <span aria-hidden className="size-1.5 rounded-full motion-safe:animate-pulse bg-current" />
+        <span aria-hidden className="size-2 motion-safe:animate-pulse bg-accent" />
       ) : (
         <Check size={13} weight="bold" aria-hidden />
       )}
@@ -321,15 +321,15 @@ function MoodPicker({ value, onChange }: { value: number | null; onChange: (m: n
             onClick={() => onChange(on ? null : m.value)}
             style={tone(m.color)}
             className={cx(
-              "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-90",
-              on ? "bg-tone text-tone-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
+              "inline-flex size-11 items-center justify-center rounded-[2px] border transition-[background-color,color,transform] duration-150 active:scale-90 motion-reduce:active:scale-100",
+              on ? "border-tone-solid bg-tone text-tone-fg" : "border-transparent text-muted hover:bg-surface-2 hover:text-fg",
             )}
           >
             <MoodIcon mood={m.value} size={on ? 28 : 26} weight={on ? "duotone" : "regular"} />
           </button>
         );
       })}
-      <span className="ml-2 text-[13px] text-muted">
+      <span className="label-mono ml-2 text-muted">
         {value ? MOODS.find((m) => m.value === value)!.label : "Ánimo"}
       </span>
     </div>
@@ -361,13 +361,13 @@ function TagEditor({
     <div className="grid gap-2.5 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-8 items-center gap-1 rounded-[2px] bg-surface-2 pr-1 pl-3 text-[13px]">
+          <span key={t} className="inline-flex h-9 items-center gap-1 rounded-[2px] border border-line-strong bg-surface pr-0.5 pl-2.5 font-mono text-[13px]">
             #{t}
             <button
               type="button"
               aria-label={`Quitar ${t}`}
               onClick={() => onChange(tags.filter((x) => x !== t))}
-              className="inline-flex size-6 items-center justify-center rounded-full text-muted hover:bg-surface-3 hover:text-fg"
+              className="inline-flex size-8 items-center justify-center text-muted hover:bg-surface-2 hover:text-fg"
             >
               <X size={12} weight="bold" />
             </button>
@@ -409,7 +409,7 @@ function TagEditor({
               // mousedown para que no se pierda el foco antes del click
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => add(t)}
-              className="h-7 rounded-[2px] border border-dashed border-line-strong px-2.5 text-[12px] text-muted hover:border-solid hover:text-fg"
+              className="h-9 rounded-[2px] border border-dashed border-line-strong px-2.5 font-mono text-[12px] text-muted hover:border-solid hover:text-fg"
             >
               #{t}
             </button>

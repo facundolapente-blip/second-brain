@@ -113,8 +113,8 @@ export function HomeActions({
                     aria-pressed={on}
                     onClick={() => nav({ animo: on ? null : String(m.value) })}
                     className={cx(
-                      "grid justify-items-center gap-1 rounded-md py-2.5 text-[12px] transition-colors",
-                      on ? "bg-accent-soft font-medium text-accent-fg" : "text-muted hover:bg-surface-2",
+                      "grid justify-items-center gap-1 rounded-md border py-2.5 text-[12px] transition-colors",
+                      on ? "border-rule bg-ink font-semibold text-on-ink" : "border-line-strong text-muted hover:bg-surface-2",
                     )}
                   >
                     <MoodIcon mood={m.value} size={26} weight={on ? "fill" : "regular"} />
@@ -139,8 +139,8 @@ export function HomeActions({
                       aria-pressed={on}
                       onClick={() => nav({ etiqueta: on ? null : t })}
                       className={cx(
-                        "h-8 rounded-[2px] border px-3 text-[13px] transition-colors",
-                        on ? "border-accent bg-accent-soft font-medium text-accent-fg" : "border-line-strong text-fg hover:bg-surface-2",
+                        "h-10 rounded-[2px] border px-3 font-mono text-[13px] transition-colors",
+                        on ? "border-rule bg-ink font-semibold text-on-ink" : "border-line-strong text-fg hover:bg-surface-2",
                       )}
                     >
                       #{t}
@@ -216,15 +216,15 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
   return (
     <section
       aria-label={title}
-      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 border border-line-strong bg-surface-2/60 p-4 lg:p-5"
+      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 border border-rule bg-surface p-4 lg:p-5"
       style={{ "--i": 1 } as React.CSSProperties}
     >
       <div className="flex items-start gap-2.5 pr-10">
-        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[2px] bg-accent-soft text-accent-fg">
+        <span className="inline-flex size-8 shrink-0 items-center justify-center border border-rule bg-accent text-on-accent">
           <ClockCounterClockwise size={18} weight="bold" aria-hidden />
         </span>
-        <div className="grid min-w-0">
-          <h2 className="text-[15px] leading-tight font-semibold">{title}</h2>
+        <div className="grid min-w-0 gap-0.5">
+          <h2 className="label-mono text-fg">{title}</h2>
           <p className="text-[13px] text-muted">{line}</p>
         </div>
       </div>
@@ -234,9 +234,9 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
       <Link
         href={`/journal/${first.id}`}
-        className="group grid gap-1.5 rounded-[2px] border-l-2 border-accent/40 py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
+        className="group grid gap-1.5 border-l-[3px] border-line-strong py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
       >
-        <span className="text-[12.5px] text-muted">
+        <span className="label-mono text-[10.5px] text-muted">
           {memory.kind === "years" ? `${yearsAgo(first.date, today)}, ` : ""}
           {formatShort(first.date)}
           {showYear(first.date) && ` ${first.date.slice(0, 4)}`}
@@ -253,7 +253,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
             <li key={e.id}>
               <Link
                 href={`/journal/${e.id}`}
-                className="flex min-h-11 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-3 active:bg-surface-3"
+                className="flex min-h-11 items-center gap-3 px-2 py-2 transition-colors hover:bg-surface-2 active:bg-surface-2"
               >
                 <span className="tabular min-w-[78px] shrink-0 text-[13px] text-muted">
                   {formatShort(e.date)}
@@ -280,7 +280,7 @@ export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
     <div className="grid justify-items-start gap-3 border border-dashed border-line-strong p-8">
-      <span className="inline-flex size-10 items-center justify-center rounded-[2px] bg-accent-soft text-accent-fg">
+      <span className="inline-flex size-10 items-center justify-center border border-rule bg-accent text-on-accent">
         <PenNib size={22} aria-hidden />
       </span>
       <h2 className="font-serif text-[22px] leading-tight font-semibold tracking-tight">Todavía no escribiste nada</h2>

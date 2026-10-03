@@ -8,15 +8,16 @@ import { formatMonth } from "@/lib/dates";
 const nf = new Intl.NumberFormat("es-UY");
 
 /**
- * Rampa secuencial de un solo tono (el acento) mezclado con la superficie:
- * clara a oscura, y en modo oscuro se invierte sola porque cambia la superficie.
+ * Rampa secuencial de tinta mezclada con la superficie, como una trama de
+ * plano: de casi vacío a tinta llena. En modo oscuro se invierte sola porque
+ * cambian la tinta y la superficie. El acento queda para marcar el mes en curso.
  */
 const RAMP = [
   "var(--surface-2)",
-  "color-mix(in oklab, var(--accent) 22%, var(--surface))",
-  "color-mix(in oklab, var(--accent) 45%, var(--surface))",
-  "color-mix(in oklab, var(--accent) 70%, var(--surface))",
-  "var(--accent)",
+  "color-mix(in oklab, var(--text) 20%, var(--surface))",
+  "color-mix(in oklab, var(--text) 42%, var(--surface))",
+  "color-mix(in oklab, var(--text) 66%, var(--surface))",
+  "var(--text)",
 ];
 
 function daysInMonth(m: string) {
@@ -103,7 +104,7 @@ export function MonthHeatmap({
           </Row>
         ))}
       </div>
-      <div className="flex items-center justify-end gap-1.5 text-[12px] text-muted" aria-hidden>
+      <div className="label-mono flex items-center justify-end gap-1.5 text-[10px] text-muted" aria-hidden>
         Menos
         {RAMP.map((c, i) => (
           <span key={i} className="size-3 rounded-[2px]" style={{ background: c }} />
@@ -111,7 +112,7 @@ export function MonthHeatmap({
         Más
       </div>
       <details className="text-sm">
-        <summary className="cursor-pointer text-[13px] text-muted select-none">Ver como tabla</summary>
+        <summary className="label-mono inline-flex min-h-11 cursor-pointer items-center text-muted select-none hover:text-fg">Ver como tabla</summary>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[22rem] text-[13px]">
             <thead>
@@ -184,7 +185,7 @@ export function MonthColumns({
           `${formatMonth(months[shown])}: ${values[shown] === 1 ? "1 entrada" : `${nf.format(values[shown])} entradas`}`}
       </p>
       <div className="relative" style={{ height: H }}>
-        <span className="absolute inset-x-0 bottom-0 h-px bg-line-strong" />
+        <span className="absolute inset-x-0 bottom-0 h-px bg-rule" />
         <div className="absolute inset-0 grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
           {months.map((m, i) => {
             const v = values[i];
@@ -200,12 +201,12 @@ export function MonthColumns({
                 onPointerLeave={() => setHover((x) => (x === i ? null : x))}
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover((x) => (x === i ? null : x))}
-                className={cx("group relative flex items-end justify-center rounded-t-md transition-colors", hover === i && "bg-surface-2/70")}
+                className={cx("group relative flex items-end justify-center transition-colors", hover === i && "bg-surface-2")}
               >
                 <span
                   className={cx(
-                    "relative block w-full max-w-6 rounded-t-[4px] transition-colors",
-                    isSel ? "bg-accent" : "bg-surface-3 group-hover:bg-line-strong",
+                    "relative block w-full max-w-5 transition-colors",
+                    isSel ? "bg-accent" : "bg-line-strong group-hover:bg-muted",
                   )}
                   style={{ height: v ? Math.max(3, (v / max) * (H - 18)) : 0 }}
                 >
@@ -222,7 +223,7 @@ export function MonthColumns({
       </div>
       <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }} aria-hidden>
         {months.map((m) => (
-          <span key={m} className={cx("text-center text-[11px]", m === selected ? "font-semibold text-fg" : "text-muted")}>
+          <span key={m} className={cx("label-mono text-center text-[9.5px] tracking-normal", m === selected ? "font-bold text-fg" : "text-muted")}>
             {short(m).slice(0, 3)}
           </span>
         ))}
@@ -244,7 +245,7 @@ export function WeekdayBars({ values }: { values: number[] }) {
           <span className={cx(i === top ? "font-medium text-fg" : "text-muted")}>{labels[i]}</span>
           <span className="block h-2.5">
             <span
-              className={cx("block h-2.5 rounded-r-[4px]", i === top ? "bg-accent" : "bg-[color-mix(in_oklab,var(--accent)_40%,var(--surface))]")}
+              className={cx("block h-2.5", i === top ? "bg-accent" : "bg-line-strong")}
               style={{ width: `${Math.max(2, (v / max) * 100)}%` }}
             />
           </span>

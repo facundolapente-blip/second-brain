@@ -38,7 +38,7 @@ export function MoodBadge({ mood, size = 36 }: { mood: number | null; size?: num
   return (
     <span
       style={{ ...tone(info.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-tone text-tone-fg"
+      className="inline-flex shrink-0 items-center justify-center rounded-[2px] bg-tone text-tone-fg"
       title={info.label}
       aria-label={`Ánimo: ${info.label}`}
     >
@@ -69,19 +69,19 @@ export function JournalHeader({
   return (
     <header className="sticky top-0 z-20 border-b border-rule bg-bg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-2 lg:h-16">
+        <div className="flex h-14 items-center gap-2 lg:h-[72px]">
           {back ? (
             <Link
               href={back}
               aria-label="Volver"
-              className="-ml-2 inline-flex size-10 items-center justify-center rounded-md text-accent lg:hidden"
+              className="-ml-1.5 inline-flex size-11 items-center justify-center rounded-md text-fg hover:bg-surface-2 lg:hidden"
             >
               <CaretLeft size={22} weight="bold" />
             </Link>
           ) : (
             <MenuButton />
           )}
-          {title && <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>}
+          {title && <h1 className="display min-w-0 truncate text-[24px] uppercase lg:text-[34px]">{title}</h1>}
           <div className="ml-auto flex items-center gap-0.5">{actions}</div>
         </div>
         {children}
@@ -122,12 +122,12 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 border border-line-strong bg-surface py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
+      className="rise group grid grid-cols-[3rem_minmax(0,1fr)] gap-x-3.5 bg-surface py-4 pr-4 pl-2 transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 lg:grid-cols-[3.5rem_minmax(0,1fr)] lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-3"
     >
-      <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
-        <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
-        <span className="text-[12px] leading-tight text-muted">{month}</span>
-        <span className="text-[11px] leading-tight text-muted">{wd}</span>
+      <span className="grid content-start justify-items-center gap-1 border-r border-line pt-0.5 pr-2 text-center lg:pr-3" aria-hidden>
+        <span className="tabular text-[28px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
+        <span className="label-mono text-[10px] leading-none text-fg">{month}</span>
+        <span className="label-mono text-[10px] leading-none text-muted">{wd}</span>
       </span>
 
       <span className="grid min-w-0 content-start gap-1.5">
@@ -145,9 +145,9 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
           </span>
           <MoodBadge mood={entry.mood} size={30} />
         </span>
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-[12px] text-muted">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 font-mono text-[11.5px] text-muted">
           {entry.tags.slice(0, 3).map((t) => (
-            <span key={t} className="rounded-[2px] bg-surface-2 px-2 py-0.5">
+            <span key={t} className="border border-line-strong px-1.5 py-px">
               #{t}
             </span>
           ))}
@@ -178,8 +178,10 @@ export function WriteDayButton({
       onClick={() => write(date, nueva)}
       disabled={pending}
       className={cx(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-medium whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
-        variant === "accent" ? "bg-accent text-on-accent hover:opacity-90" : "border border-line-strong text-fg hover:bg-surface-2",
+        "label-mono inline-flex h-11 items-center justify-center gap-2 rounded-md px-3.5 whitespace-nowrap transition-[box-shadow,transform,background-color] active:translate-y-px disabled:opacity-60",
+        variant === "accent"
+          ? "border border-rule bg-accent text-on-accent shadow-[2px_2px_0_var(--rule)] hover:shadow-[1px_1px_0_var(--rule)] active:shadow-none"
+          : "border border-rule text-fg hover:bg-surface-2",
       )}
     >
       {children}
@@ -201,8 +203,8 @@ export function Stat({
 }) {
   return (
     <div className={cx("grid content-start gap-1", className)}>
-      <span className="text-[13px] text-muted">{label}</span>
-      <span className="text-[26px] leading-tight font-semibold tracking-tight">{value}</span>
+      <span className="label-mono text-[10.5px] text-muted">{label}</span>
+      <span className="tabular text-[28px] leading-tight font-semibold tracking-tight">{value}</span>
       {hint && <span className="text-[12.5px] text-muted">{hint}</span>}
     </div>
   );
