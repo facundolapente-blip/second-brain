@@ -116,7 +116,7 @@ export function MovementsView({
             </p>
             <Link
               href="/gastos/cuentas?nueva=1"
-              className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+              className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
             >
               Crear cuenta
             </Link>
@@ -160,7 +160,7 @@ export function MovementsView({
                 <span className="inline-flex size-11 items-center justify-center rounded-full bg-surface-2 text-muted">
                   <Receipt size={22} aria-hidden />
                 </span>
-                <p className="text-[15px] font-medium">No hay movimientos este mes</p>
+                <p className="text-[15px] font-semibold">No hay movimientos este mes</p>
                 <p className="max-w-[34ch] text-sm text-muted">
                   {selection ? "En las cuentas elegidas. Probá con todas o con otro mes." : "Cargá el primero con el botón de más."}
                 </p>
@@ -182,7 +182,7 @@ export function MovementsView({
                           {label}
                           {relative && <span className="ml-2 font-normal text-muted">{formatShort(g.date)}</span>}
                         </h3>
-                        <TotalsInline totals={g.net} className="text-[13px] font-medium" />
+                        <TotalsInline totals={g.net} className="text-[13px] font-semibold" />
                       </header>
                       <ul>
                         {g.txs.map((t) => (
@@ -228,7 +228,7 @@ function NetHero({ cents, currency }: { cents: number; currency: string }) {
 function FlowTile({ label, totals, kind }: { label: string; totals: Record<string, number>; kind: "in" | "out" }) {
   const cur = sortedCurrencies(totals);
   return (
-    <div className="grid content-start gap-1 rounded-[12px] border border-line bg-surface px-3 py-2.5">
+    <div className="grid content-start gap-1 rounded-card card px-3 py-2.5">
       <dt className="flex items-center gap-1.5 text-[13px] text-muted">
         <span
           aria-hidden
@@ -252,7 +252,7 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon?: 
   return (
     <Link
       href={href}
-      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
     >
       {icon}
       {label}

@@ -134,7 +134,7 @@ export function HabitFormBody({
       </Field>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Categoría</span>
+        <span className="text-[13px] font-semibold text-muted">Categoría</span>
         <input type="hidden" name="categoryId" value={draft.categoryId} />
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => {
@@ -147,7 +147,7 @@ export function HabitFormBody({
                 style={tone(c.color)}
                 className={cx(
                   "inline-flex h-9 items-center gap-2 rounded-md border pr-3 pl-1 text-[13px] transition-colors",
-                  active ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
+                  active ? "border-tone-solid bg-tone font-semibold text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
                 <ToneSquare size={26} style={tone(c.color)}>
@@ -161,7 +161,7 @@ export function HabitFormBody({
       </div>
 
       <div className="grid gap-2">
-        <span className="text-[13px] font-medium text-muted">Frecuencia</span>
+        <span className="text-[13px] font-semibold text-muted">Frecuencia</span>
         <Segmented
           name="frequency"
           value={draft.frequency}
@@ -180,7 +180,7 @@ export function HabitFormBody({
                 <label
                   key={d}
                   className={cx(
-                    "flex h-10 cursor-pointer items-center justify-center rounded-[10px] border text-[13px] font-medium transition-colors select-none",
+                    "flex h-10 cursor-pointer items-center justify-center rounded-[12px] border text-[13px] font-semibold transition-colors select-none",
                     on ? "border-accent bg-accent-soft text-accent-fg" : "border-line text-muted hover:bg-surface-2",
                   )}
                 >
@@ -216,7 +216,7 @@ export function HabitFormBody({
       </div>
 
       <div className="grid gap-2">
-        <span className="text-[13px] font-medium text-muted">Cómo se mide</span>
+        <span className="text-[13px] font-semibold text-muted">Cómo se mide</span>
         <Segmented
           name="kind"
           value={draft.kind}
@@ -243,7 +243,7 @@ export function HabitFormBody({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-1.5">
-          <span className="text-[13px] font-medium text-muted">Prioridad</span>
+          <span className="text-[13px] font-semibold text-muted">Prioridad</span>
           <input type="hidden" name="priority" value={draft.priority} />
           <div className="flex h-10 items-center gap-1">
             {[1, 2, 3, 4, 5].map((p) => (
@@ -325,7 +325,7 @@ function Stepper({
         min={min}
         max={max}
         onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
-        className="tabular h-full w-12 bg-transparent text-center text-sm font-medium outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className="tabular h-full w-12 bg-transparent text-center text-sm font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
         type="button"

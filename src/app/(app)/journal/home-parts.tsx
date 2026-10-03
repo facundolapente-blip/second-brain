@@ -92,7 +92,7 @@ export function HomeActions({
               enterKeyHint="search"
               className="h-10 min-w-0 flex-1 bg-transparent text-[16px] outline-none! placeholder:text-faint"
             />
-            <button type="button" onClick={closeSearch} className="h-9 shrink-0 px-2 text-sm font-medium text-accent-fg">
+            <button type="button" onClick={closeSearch} className="h-9 shrink-0 px-2 text-sm font-semibold text-accent-fg">
               Cancelar
             </button>
           </div>
@@ -102,7 +102,7 @@ export function HomeActions({
       <Sheet ref={sheet} title="Filtrar">
         <div className="grid gap-6">
           <section className="grid gap-2.5">
-            <h3 className="text-[13px] font-medium text-muted">Ánimo</h3>
+            <h3 className="text-[13px] font-semibold text-muted">Ánimo</h3>
             <div className="grid grid-cols-5 gap-1.5">
               {MOODS.map((m) => {
                 const on = mood === m.value;
@@ -114,7 +114,7 @@ export function HomeActions({
                     onClick={() => nav({ animo: on ? null : String(m.value) })}
                     className={cx(
                       "grid justify-items-center gap-1 rounded-md py-2.5 text-[12px] transition-colors",
-                      on ? "bg-accent-soft font-medium text-accent-fg" : "text-muted hover:bg-surface-2",
+                      on ? "bg-accent-soft font-semibold text-accent-fg" : "text-muted hover:bg-surface-2",
                     )}
                   >
                     <MoodIcon mood={m.value} size={26} weight={on ? "fill" : "regular"} />
@@ -125,7 +125,7 @@ export function HomeActions({
             </div>
           </section>
           <section className="grid gap-2.5">
-            <h3 className="text-[13px] font-medium text-muted">Etiqueta</h3>
+            <h3 className="text-[13px] font-semibold text-muted">Etiqueta</h3>
             {tags.length === 0 ? (
               <p className="text-sm text-muted">Todavía no usaste etiquetas. Se agregan al final de cada entrada.</p>
             ) : (
@@ -140,7 +140,7 @@ export function HomeActions({
                       onClick={() => nav({ etiqueta: on ? null : t })}
                       className={cx(
                         "h-8 rounded-full border px-3 text-[13px] transition-colors",
-                        on ? "border-accent bg-accent-soft font-medium text-accent-fg" : "border-line-strong text-fg hover:bg-surface-2",
+                        on ? "border-accent bg-accent-soft font-semibold text-accent-fg" : "border-line-strong text-fg hover:bg-surface-2",
                       )}
                     >
                       #{t}
@@ -216,7 +216,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
   return (
     <section
       aria-label={title}
-      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 rounded-[14px] border border-line bg-surface-2/60 p-4 lg:p-5"
+      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 rounded-card card-2/60 p-4 lg:p-5"
       style={{ "--i": 1 } as React.CSSProperties}
     >
       <div className="flex items-start gap-2.5 pr-10">
@@ -234,7 +234,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
       <Link
         href={`/journal/${first.id}`}
-        className="group grid gap-1.5 rounded-[10px] border-l-2 border-accent/40 py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
+        className="group grid gap-1.5 rounded-[12px] border-l-2 border-accent/40 py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
       >
         <span className="text-[12.5px] text-muted">
           {memory.kind === "years" ? `${yearsAgo(first.date, today)}, ` : ""}
@@ -279,8 +279,8 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
-    <div className="grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-8">
-      <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
+    <div className="grid justify-items-start gap-3 rounded-card card p-8">
+      <span className="inline-flex size-10 items-center justify-center rounded-[12px] bg-accent-soft text-accent-fg">
         <PenNib size={22} aria-hidden />
       </span>
       <h2 className="font-serif text-[22px] leading-tight font-semibold tracking-tight">Todavía no escribiste nada</h2>

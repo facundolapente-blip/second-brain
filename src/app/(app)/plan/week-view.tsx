@@ -122,7 +122,7 @@ export function WeekView({
             </Link>
           </div>
           {!isThisWeek && (
-            <Link href="/plan" className="text-sm font-medium text-accent-fg hover:underline">
+            <Link href="/plan" className="text-sm font-semibold text-accent-fg hover:underline">
               Esta semana
             </Link>
           )}
@@ -153,7 +153,7 @@ export function WeekView({
                   aria-selected={active}
                   onClick={() => setSelected(d)}
                   className={cx(
-                    "relative flex flex-col items-center rounded-[12px] pt-1.5 pb-2 transition-colors",
+                    "relative flex flex-col items-center rounded-[16px] pt-1.5 pb-2 transition-colors",
                     active ? "bg-accent text-on-accent" : "bg-surface-2 text-fg hover:bg-surface-3",
                   )}
                 >
@@ -214,7 +214,7 @@ export function WeekView({
                 <button
                   type="button"
                   onClick={() => openNew(d)}
-                  className="flex h-9 items-center gap-1.5 rounded-[10px] px-2 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+                  className="flex h-9 items-center gap-1.5 rounded-[12px] px-2 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
                 >
                   <Plus size={14} /> Nuevo
                 </button>
@@ -228,7 +228,7 @@ export function WeekView({
         type="button"
         onClick={() => openNew(selected)}
         aria-label="Nuevo bloque"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift-accent fixed right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-20 inline-flex size-15 items-center justify-center rounded-full bg-accent text-on-accent hover:scale-105 transition-transform active:scale-95 lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -259,12 +259,12 @@ function DayList({
 }) {
   return (
     <section aria-label={WEEKDAY_LONG[weekday(day)]}>
-      <h3 className="pb-2 text-[13px] font-medium text-muted">
+      <h3 className="pb-2 text-[13px] font-semibold text-muted">
         {day === today ? "Hoy, " : ""}
         {WEEKDAY_LONG[weekday(day)].toLowerCase()} {Number(day.slice(8))}
       </h3>
       {blocks.length === 0 ? (
-        <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-6">
+        <div className="grid justify-items-start gap-2 rounded-card card p-6">
           <p className="text-sm text-muted">Nada planeado para este día.</p>
           <Button variant="outline" size="sm" onClick={onNew}>
             <Plus size={15} /> Agregar bloque
@@ -313,7 +313,7 @@ function BlockCard({
   return (
     <article
       className={cx(
-        "group relative flex items-start gap-2 rounded-[12px] border p-2.5 transition-colors",
+        "group relative flex items-start gap-2 rounded-[16px] border p-2.5 transition-colors",
         free ? "border-dashed border-line-strong bg-transparent" : "border-line bg-surface hover:border-line-strong",
         b.done && !free && "bg-surface-2/60",
       )}
@@ -321,7 +321,7 @@ function BlockCard({
       <button type="button" onClick={onEdit} className="grid min-w-0 flex-1 gap-1.5 text-left">
         <span
           className={cx(
-            "text-[14px] leading-snug font-medium",
+            "text-[14px] leading-snug font-semibold",
             free && "text-muted",
             b.done && !free && "text-muted line-through decoration-faint",
           )}

@@ -94,7 +94,7 @@ export function MonthHeatmap({
                   onBlur={() => setFocus((f) => (f === m ? null : f))}
                   style={{ background: RAMP[b] }}
                   className={cx(
-                    "aspect-square rounded-[4px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)]",
+                    "aspect-square rounded-[6px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)]",
                     m === currentMonth && "shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--accent)]",
                   )}
                 />
@@ -210,7 +210,7 @@ export function MonthColumns({
                   style={{ height: v ? Math.max(3, (v / max) * (H - 18)) : 0 }}
                 >
                   {isSel && v > 0 && (
-                    <span className="tabular absolute bottom-full left-1/2 mb-1 -translate-x-1/2 text-[11px] font-medium text-fg">
+                    <span className="tabular absolute bottom-full left-1/2 mb-1 -translate-x-1/2 text-[11px] font-semibold text-fg">
                       {v}
                     </span>
                   )}
@@ -241,7 +241,7 @@ export function WeekdayBars({ values }: { values: number[] }) {
     <ul className="grid gap-2">
       {values.map((v, i) => (
         <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)_3rem] items-center gap-3 text-[13px]">
-          <span className={cx(i === top ? "font-medium text-fg" : "text-muted")}>{labels[i]}</span>
+          <span className={cx(i === top ? "font-semibold text-fg" : "text-muted")}>{labels[i]}</span>
           <span className="block h-2.5">
             <span
               className={cx("block h-2.5 rounded-r-[4px]", i === top ? "bg-accent" : "bg-[color-mix(in_oklab,var(--accent)_40%,var(--surface))]")}

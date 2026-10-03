@@ -7,7 +7,7 @@ export default function Loading() {
       <LoadingRegion label="Cargando informes" className="mx-auto grid max-w-3xl gap-9 px-4 pt-3 lg:px-8 lg:pt-6">
         <div className="grid gap-3 lg:grid-cols-[1fr_minmax(0,320px)] lg:items-center">
           <Bone className="h-6 w-40" />
-          <Bone className="h-[92px] rounded-[12px]" />
+          <Bone className="h-[92px] rounded-[16px]" />
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
           {["h-10", "h-7", "h-7", "h-7"].map((h, i) => (

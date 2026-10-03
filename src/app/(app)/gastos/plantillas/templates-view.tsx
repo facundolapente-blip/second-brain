@@ -60,14 +60,14 @@ export function TemplatesView({
                 <button
                   type="button"
                   onClick={() => form.current?.fromTemplate(t)}
-                  className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                  className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[16px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
                 >
                   <CategoryAvatar category={lk.category(t.categoryId)} transfer={t.kind === "transfer"} />
                   <span className="grid min-w-0 flex-1 gap-0.5">
-                    <span className="truncate text-[15px] font-medium">{t.name}</span>
+                    <span className="truncate text-[15px] font-semibold">{t.name}</span>
                     <span className="truncate text-[13px] text-muted">{describe(t)}</span>
                   </span>
-                  <span className="text-[13px] font-medium text-accent-fg">Usar</span>
+                  <span className="text-[13px] font-semibold text-accent-fg">Usar</span>
                 </button>
                 <IconButton
                   label="Opciones"

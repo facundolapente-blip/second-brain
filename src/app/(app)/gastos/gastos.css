@@ -4,18 +4,18 @@
  * banda de luminosidad, croma, separación con daltonismo y contraste.
  */
 :root {
-  --fin-in: #1f7bb3;
-  --fin-out: #c86a26;
-  --fin-grid: #ecebe7;
-  --fin-income-text: #2f6b3f;
+  --fin-in: #2f73d9;
+  --fin-out: #dd6416;
+  --fin-grid: #ececf1;
+  --fin-income-text: #12703a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fin-in: #3d9bd4;
-    --fin-out: #d0773a;
-    --fin-grid: #2c2c29;
-    --fin-income-text: #8fcf9b;
+    --fin-in: #4a8ff5;
+    --fin-out: #e0702a;
+    --fin-grid: #2b2b32;
+    --fin-income-text: #6fdc96;
   }
 }
 

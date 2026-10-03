@@ -1,5 +1,5 @@
 /**
- * Colores para hábitos, cuentas y categorías: pasteles apagados que solo marcan
+ * Colores para hábitos, cuentas y categorías: colores vivos que marcan
  * identidad. Cada uno resuelve a variables CSS definidas en globals.css, así el
  * modo oscuro tiene su propia versión sin lógica en los componentes.
  */
@@ -17,5 +17,6 @@ export function tone(key: string): React.CSSProperties {
     "--tone-bg": `var(--p-${k}-bg)`,
     "--tone-fg": `var(--p-${k}-fg)`,
     "--tone-solid": `var(--p-${k}-solid)`,
+    "--tone-on": `var(--p-${k}-on)`,
   } as React.CSSProperties;
 }

@@ -31,7 +31,7 @@ export function Menu({ trigger, items, align = "right" }: { trigger: (toggle: ()
         <div
           role="menu"
           className={cx(
-            "absolute top-full z-30 mt-1 min-w-44 overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-[0_8px_30px_-12px_rgba(20,20,18,0.25)]",
+            "absolute top-full z-30 mt-1 min-w-44 overflow-hidden rounded-tile card py-1 shadow-[0_8px_30px_-12px_rgba(20,20,18,0.25)]",
             align === "right" ? "right-0" : "left-0",
           )}
         >

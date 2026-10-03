@@ -11,7 +11,7 @@ const newsreader = Newsreader({
 
 export default function JournalLayout({ children }: LayoutProps<"/journal">) {
   return (
-    <div className={`${newsreader.variable} min-h-dvh pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-12`}>
+    <div className={`${newsreader.variable} mod-journal min-h-dvh pb-[calc(100px+env(safe-area-inset-bottom))] lg:pb-12`}>
       {children}
       <JournalNav />
     </div>

@@ -96,7 +96,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <span className="inline-flex size-11 items-center justify-center rounded-full bg-surface-2 text-muted">
                 <MagnifyingGlass size={22} aria-hidden />
               </span>
-              <p className="text-[15px] font-medium">No hay entradas que coincidan</p>
+              <p className="text-[15px] font-semibold">No hay entradas que coincidan</p>
               <p className="max-w-[36ch] text-sm text-muted">Probá con otra palabra o sacá algún filtro. La búsqueda distingue tildes.</p>
             </div>
           ) : (
@@ -120,7 +120,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <Link
                 href={`/journal?${more}`}
                 scroll={false}
-                className="mx-auto inline-flex h-11 items-center rounded-md border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.98]"
+                className="mx-auto inline-flex h-11 items-center rounded-full bg-accent-soft text-accent-fg px-5 text-sm font-semibold transition-colors hover:bg-surface-2 active:scale-[0.98]"
               >
                 Ver más entradas
               </Link>
@@ -150,15 +150,15 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="flex items-center gap-3 rounded-[12px] bg-surface-2 px-4 py-3 text-sm">
+    <div className="flex items-center gap-3 rounded-[16px] bg-surface-2 px-4 py-3 text-sm">
       <span className="min-w-0 flex-1">
-        <span className="font-medium">
+        <span className="font-semibold">
           {count}
           {hasMore ? "+" : ""} {count === 1 ? "entrada" : "entradas"}
         </span>{" "}
         <span className="text-muted">{parts.join(", ")}</span>
       </span>
-      <Link href="/journal" className="shrink-0 font-medium text-accent-fg">
+      <Link href="/journal" className="shrink-0 font-semibold text-accent-fg">
         Limpiar
       </Link>
     </div>

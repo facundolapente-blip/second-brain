@@ -1,6 +1,9 @@
 import { MenuButton } from "./shell";
 
-/** Barra superior de cada pantalla: menú (celular), título, acciones y pestañas opcionales. */
+/**
+ * Barra superior de cada pantalla, estilo título grande de iOS: menú (celular),
+ * título, acciones y pestañas opcionales. Esmerilada al quedar pegada arriba.
+ */
 export function PageHeader({
   title,
   actions,
@@ -14,12 +17,12 @@ export function PageHeader({
   wide?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="frost-bg sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
       <div className={`mx-auto px-4 lg:px-8 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
-        <div className="flex h-14 items-center gap-2 lg:h-16">
+        <div className="flex h-16 items-center gap-3 lg:h-20">
           <MenuButton />
-          <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>
-          <div className="ml-auto flex items-center gap-0.5">{actions}</div>
+          <h1 className="truncate text-[28px] leading-none font-black tracking-[-0.02em] lg:text-[32px]">{title}</h1>
+          <div className="ml-auto flex items-center gap-1">{actions}</div>
         </div>
         {tabs}
       </div>

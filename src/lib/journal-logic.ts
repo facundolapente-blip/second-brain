@@ -12,7 +12,7 @@ export const MOODS: { value: Mood; label: string; icon: string; color: string }[
   { value: 2, label: "Mal", icon: "SmileyNervous", color: "orange" },
   { value: 3, label: "Normal", icon: "SmileyMeh", color: "yellow" },
   { value: 4, label: "Bien", icon: "Smiley", color: "green" },
-  { value: 5, label: "Muy bien", icon: "SmileyWink", color: "teal" },
+  { value: 5, label: "Muy bien", icon: "SmileyWink", color: "blue" },
 ];
 
 export function isMood(v: unknown): v is Mood {

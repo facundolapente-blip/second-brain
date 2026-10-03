@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
@@ -83,24 +84,24 @@ export function HabitDetail({
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto max-w-3xl px-2 lg:px-6">
-          <div className="flex h-14 items-center gap-1 lg:h-16">
+      <header className="frost-bg sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto max-w-3xl px-4 lg:px-8">
+          <div className="flex h-16 items-center gap-3 lg:h-20">
             <Link
               href={habit.archived ? "/habitos/archivados" : "/habitos/lista"}
               aria-label="Volver a hábitos"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="-ml-1.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-accent-fg shadow-[0_1px_3px_rgba(var(--shadow-tint),0.1)] transition-transform active:scale-90"
             >
               <CaretLeft size={22} weight="bold" />
             </Link>
-            <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">{habit.name}</h1>
-            <span className="ml-auto pr-2">
-              <ToneSquare size={32} style={tone(habit.color)}>
-                <HabitIcon name={habit.icon} size={18} weight="fill" />
+            <h1 className="min-w-0 truncate text-[24px] leading-none font-black tracking-[-0.02em] lg:text-[28px]">{habit.name}</h1>
+            <span className="ml-auto">
+              <ToneSquare size={40} style={tone(habit.color)}>
+                <HabitIcon name={habit.icon} size={22} weight="fill" />
               </ToneSquare>
             </span>
           </div>
-          <div className="grid grid-cols-3 border-b border-line" role="tablist">
+          <div className="mb-3 grid grid-cols-3 rounded-full bg-surface-3/70 p-1" role="tablist">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -108,17 +109,18 @@ export function HabitDetail({
                 aria-selected={tab === t.id}
                 onClick={() => changeTab(t.id)}
                 className={cx(
-                  "relative h-11 text-[15px] transition-colors",
-                  tab === t.id ? "font-medium text-fg" : "text-muted hover:text-fg",
+                  "relative h-10 rounded-full text-[14px] transition-colors",
+                  tab === t.id ? "font-extrabold text-fg" : "font-semibold text-muted hover:text-fg",
                 )}
               >
-                {t.label}
-                <span
-                  className={cx(
-                    "absolute inset-x-[30%] -bottom-px h-[3px] rounded-t-full bg-accent transition-opacity duration-200",
-                    tab === t.id ? "opacity-100" : "opacity-0",
-                  )}
-                />
+                {tab === t.id && (
+                  <motion.span
+                    layoutId="habit-detail-tab"
+                    transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                    className="absolute inset-0 rounded-full bg-raised shadow-[0_1px_3px_rgba(var(--shadow-tint),0.14)]"
+                  />
+                )}
+                <span className="relative">{t.label}</span>
               </button>
             ))}
           </div>
@@ -163,7 +165,7 @@ function TrackPicker({
   onChange: (v: TrackView) => void;
 }) {
   return (
-    <label className="rise flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-4 py-2.5">
+    <label className="rise flex items-center justify-between gap-3 rounded-card card px-4 py-2.5">
       <span className="text-[13px] text-muted">Mostrando</span>
       <select
         value={String(view)}
@@ -171,7 +173,7 @@ function TrackPicker({
           const v = e.target.value;
           onChange(v === "current" || v === "all" ? v : Number(v));
         }}
-        className="min-w-0 flex-1 truncate bg-transparent text-right text-sm font-medium text-fg outline-none"
+        className="min-w-0 flex-1 truncate bg-transparent text-right text-sm font-semibold text-fg outline-none"
       >
         <option value="current">
           Pista actual (desde {formatShort(habit.startDate)} {habit.startDate.slice(0, 4)})
@@ -202,7 +204,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
       </p>
       <ul className="mt-3 grid gap-1 text-sm">
         <li className="flex justify-between gap-3 py-1">
-          <span className="font-medium">Actual</span>
+          <span className="font-semibold">Actual</span>
           <span className="tabular text-muted">
             desde {formatShort(habit.startDate)} {habit.startDate.slice(0, 4)}
           </span>
@@ -278,9 +280,9 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={cx("rise rounded-[14px] border border-line bg-surface p-4 sm:p-5", className)}>
+    <section className={cx("rise rounded-card card p-4 sm:p-5", className)}>
       {title && (
-        <h2 className="mb-4 flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+        <h2 className="mb-4 flex items-center gap-2 text-[17px] font-extrabold tracking-tight">
           {Ico && <Ico size={19} className="text-accent" />}
           {title}
         </h2>
@@ -298,8 +300,8 @@ function streakUnit(habit: HabitDTO, n: number) {
 function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
   return (
     <span className="tabular inline-flex items-baseline gap-1.5 text-accent">
-      <span className="text-3xl font-semibold tracking-tight">{value}</span>
-      {unit && <span className="text-sm font-semibold tracking-wide uppercase">{unit}</span>}
+      <span className="text-4xl font-black tracking-tight">{value}</span>
+      {unit && <span className="text-sm font-extrabold">{unit}</span>}
     </span>
   );
 }
@@ -358,7 +360,7 @@ function CalendarTab({
                   onClick={() => openDay(d)}
                   className="grid w-full gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-2"
                 >
-                  <span className="text-[13px] font-medium text-muted first-letter:uppercase">{formatLong(d)}</span>
+                  <span className="text-[13px] font-semibold text-muted first-letter:uppercase">{formatLong(d)}</span>
                   <span className="text-sm leading-relaxed whitespace-pre-wrap">{l.n}</span>
                 </button>
               </li>
@@ -428,7 +430,7 @@ function StatsTab({
           ].map(([label, n]) => (
             <div key={label} className="flex items-center justify-between py-2.5">
               <dt className="text-sm">{label}</dt>
-              <dd className="tabular text-sm font-semibold">{n}</dd>
+              <dd className="tabular text-[17px] font-black">{n}</dd>
             </div>
           ))}
         </dl>
@@ -483,7 +485,7 @@ function ScoreRing({ value }: { value: number }) {
           className="transition-[stroke-dasharray] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
         />
       </svg>
-      <span className="tabular absolute inset-0 flex items-center justify-center text-5xl font-semibold tracking-tight">
+      <span className="tabular absolute inset-0 flex items-center justify-center text-6xl font-black tracking-tight">
         {value}
       </span>
     </div>
@@ -626,7 +628,7 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
       <div className="grid h-44 grid-flow-col items-end gap-1.5 border-b border-line-strong">
         {items.map((it) => (
           <div key={it.key} className="grid h-full grid-rows-[auto_1fr] justify-items-center gap-1">
-            <span className="tabular text-[11px] font-medium text-muted">{it.value === null ? "-" : it.value}</span>
+            <span className="tabular text-[11px] font-semibold text-muted">{it.value === null ? "-" : it.value}</span>
             <div className="flex w-full items-end justify-center">
               <div
                 className={cx(
@@ -675,33 +677,33 @@ function Donut({ achieved, missed, labels }: { achieved: number; missed: number;
     <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
       <div className="relative mx-auto size-44">
         <svg viewBox="0 0 160 160" className="size-full -rotate-90" aria-hidden>
-          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--p-orange-solid)" strokeWidth="24" />
+          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--chart-muted)" strokeWidth="24" />
           <circle
             cx="80"
             cy="80"
             r={r}
             fill="none"
-            stroke="var(--st-done-line)"
+            stroke="var(--st-done-solid)"
             strokeWidth="24"
             strokeDasharray={`${part} ${c}`}
           />
         </svg>
         <span className="absolute inset-0 grid place-content-center text-center">
-          <span className="tabular text-2xl font-semibold tracking-tight">
+          <span className="tabular text-3xl font-black tracking-tight">
             {total === 0 ? "-" : `${Math.round((achieved / total) * 100)}%`}
           </span>
         </span>
       </div>
       <ul className="grid gap-2 text-sm">
         <li className="flex items-center gap-2">
-          <span className="size-2.5 rounded-full bg-[var(--st-done-line)]" />
+          <span className="size-2.5 rounded-full bg-[var(--st-done-solid)]" />
           {labels[0]}
-          <span className="tabular ml-auto font-semibold">{achieved}</span>
+          <span className="tabular ml-auto font-extrabold">{achieved}</span>
         </li>
         <li className="flex items-center gap-2">
-          <span className="size-2.5 rounded-full bg-[var(--p-orange-solid)]" />
+          <span className="size-2.5 rounded-full bg-[var(--chart-muted)]" />
           {labels[1]}
-          <span className="tabular ml-auto font-semibold">{missed}</span>
+          <span className="tabular ml-auto font-extrabold">{missed}</span>
         </li>
       </ul>
     </div>
@@ -720,7 +722,7 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
             <div
               key={g}
               className={cx(
-                "grid w-24 shrink-0 justify-items-center gap-2 rounded-[12px] px-2 py-3",
+                "grid w-24 shrink-0 justify-items-center gap-2 rounded-[16px] px-2 py-3",
                 unlocked ? "bg-accent-soft" : "bg-surface-2",
               )}
             >
@@ -732,7 +734,7 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
               >
                 {unlocked ? <Medal size={26} weight="fill" /> : <Lock size={20} weight="fill" />}
               </span>
-              <span className={cx("text-center text-[12px]", unlocked ? "font-medium text-accent-fg" : "text-muted")}>
+              <span className={cx("text-center text-[12px]", unlocked ? "font-semibold text-accent-fg" : "text-muted")}>
                 {g} {streakUnit(habit, g)}
               </span>
             </div>

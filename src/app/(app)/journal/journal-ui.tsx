@@ -81,7 +81,7 @@ export function JournalHeader({
           ) : (
             <MenuButton />
           )}
-          {title && <h1 className="text-[22px] font-semibold tracking-tight lg:text-2xl">{title}</h1>}
+          {title && <h1 className="text-[22px] font-extrabold tracking-tight lg:text-2xl">{title}</h1>}
           <div className="ml-auto flex items-center gap-0.5">{actions}</div>
         </div>
         {children}
@@ -122,7 +122,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 rounded-[14px] border border-line bg-surface py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
+      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 rounded-card card py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
     >
       <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
         <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
@@ -178,7 +178,7 @@ export function WriteDayButton({
       onClick={() => write(date, nueva)}
       disabled={pending}
       className={cx(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-medium whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
+        "inline-flex h-10 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-semibold whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
         variant === "accent" ? "bg-accent text-on-accent hover:opacity-90" : "border border-line-strong text-fg hover:bg-surface-2",
       )}
     >

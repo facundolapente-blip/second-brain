@@ -46,7 +46,7 @@ export function AccountSwitcher({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-haspopup="dialog"
-        className="grid w-full gap-1.5 rounded-[12px] border border-line bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
+        className="grid w-full gap-1.5 rounded-card card px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
       >
         <span className="flex items-center gap-2 text-[13px] text-muted">
           <span className="flex shrink-0 -space-x-1.5" aria-hidden>
@@ -56,7 +56,7 @@ export function AccountSwitcher({
               </span>
             ))}
           </span>
-          <span className="truncate font-medium text-fg">{selectionLabel(accounts, selection)}</span>
+          <span className="truncate font-semibold text-fg">{selectionLabel(accounts, selection)}</span>
           <span className="ml-auto inline-flex shrink-0 items-center gap-1">
             Cambiar <CaretDown size={13} weight="bold" aria-hidden />
           </span>
@@ -78,11 +78,11 @@ export function AccountSwitcher({
                   role="checkbox"
                   aria-checked={on}
                   onClick={() => toggle(a.id)}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-surface-2"
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] px-2 py-2 text-left transition-colors hover:bg-surface-2"
                 >
                   <span
                     className={cx(
-                      "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+                      "inline-flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
                       on ? "border-accent bg-accent text-on-accent" : "border-line-strong",
                     )}
                   >
@@ -90,10 +90,10 @@ export function AccountSwitcher({
                   </span>
                   <AccountAvatar account={a} size={34} />
                   <span className="grid min-w-0 flex-1">
-                    <span className={cx("truncate text-[15px]", on && "font-medium")}>{a.name}</span>
+                    <span className={cx("truncate text-[15px]", on && "font-semibold")}>{a.name}</span>
                     <span className="text-[12px] text-muted">{a.currency}</span>
                   </span>
-                  <Balance cents={a.balanceCents} currency={a.currency} className="text-[14px] font-medium" />
+                  <Balance cents={a.balanceCents} currency={a.currency} className="text-[14px] font-semibold" />
                 </button>
                 <button
                   type="button"
@@ -114,7 +114,7 @@ export function AccountSwitcher({
             type="button"
             onClick={() => onChange(null)}
             disabled={selection === null}
-            className="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
+            className="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-semibold text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
             <Checks size={18} weight="bold" /> Seleccionar todas
           </button>

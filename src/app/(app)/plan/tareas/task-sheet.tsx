@@ -72,7 +72,7 @@ function TaskForm({
       </Field>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Estado</span>
+        <span className="text-[13px] font-semibold text-muted">Estado</span>
         <Segmented
           name="status"
           value={status}
@@ -82,7 +82,7 @@ function TaskForm({
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Categoría</span>
+        <span className="text-[13px] font-semibold text-muted">Categoría</span>
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => {
             const on = categoryId === c.id;
@@ -95,7 +95,7 @@ function TaskForm({
                 aria-pressed={on}
                 className={cx(
                   "h-9 rounded-md border px-3 text-[13px] transition-colors",
-                  on ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
+                  on ? "border-tone-solid bg-tone font-semibold text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
                 {c.name}
@@ -107,7 +107,7 @@ function TaskForm({
 
       <div className="grid grid-cols-[auto_1fr] items-end gap-4">
         <div className="grid gap-1.5">
-          <span className="text-[13px] font-medium text-muted">Prioridad</span>
+          <span className="text-[13px] font-semibold text-muted">Prioridad</span>
           <FirePicker value={priority} onChange={setPriority} name="priority" />
         </div>
         <Field label="Deadline">

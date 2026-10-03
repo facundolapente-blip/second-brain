@@ -110,11 +110,11 @@ export function ReportsView({
         </section>
 
         {empty ? (
-          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
-            <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
+          <div className="grid justify-items-start gap-2 rounded-card card p-8">
+            <span className="inline-flex size-10 items-center justify-center rounded-[12px] bg-accent-soft text-accent-fg">
               <ChartBar size={22} aria-hidden />
             </span>
-            <h2 className="text-lg font-semibold tracking-tight">Sin movimientos en {currency}</h2>
+            <h2 className="text-lg font-extrabold tracking-tight">Sin movimientos en {currency}</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               No hay gastos ni ingresos en estos meses para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
@@ -344,7 +344,7 @@ function PaceChart({
             else return;
             e.preventDefault();
           }}
-          className="relative touch-pan-y rounded-[4px] outline-offset-4"
+          className="relative touch-pan-y rounded-[6px] outline-offset-4"
           style={{ height: H }}
         >
           {ticks.map((t) => (
@@ -370,7 +370,7 @@ function PaceChart({
           <Dot left={pct(curEnd)} top={topPct(curSeries[curEnd])} color="var(--fin-out)" />
           {h === null && (
             <span
-              className="tabular pointer-events-none absolute text-[11px] font-medium whitespace-nowrap text-fg"
+              className="tabular pointer-events-none absolute text-[11px] font-semibold whitespace-nowrap text-fg"
               style={{
                 left: pct(curEnd),
                 top: topPct(curSeries[curEnd]),
@@ -387,7 +387,7 @@ function PaceChart({
               {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
               {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
               <div
-                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-tile card p-2.5 text-[12.5px]"
                 style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
               >
                 <span className="text-muted">Día {h}</span>
@@ -490,7 +490,7 @@ function CategoryBars({
             <span className="flex items-baseline justify-between gap-3 text-[14px]">
               <span className={cx("truncate", !it.category && "text-muted")}>{name}</span>
               <span className="shrink-0">
-                <span className="tabular font-medium">{moneyCents(it.cents, currency)}</span>
+                <span className="tabular font-semibold">{moneyCents(it.cents, currency)}</span>
                 <span className="tabular ml-2 inline-block w-9 text-right text-[12.5px] text-muted">
                   {pct === 0 && it.cents > 0 ? "<1" : pct}%
                 </span>
@@ -605,7 +605,7 @@ function MonthlyColumns({
 
           {hover !== null && (
             <div
-              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[10px] border border-line bg-surface p-2.5 text-[12.5px]"
+              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-tile card p-2.5 text-[12.5px]"
               style={{
                 left: `${((hover + 0.5) / data.length) * 100}%`,
                 transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,
@@ -663,7 +663,7 @@ function Column({ cents, height, color, label }: { cents: number; height: number
   return (
     <span className="relative block w-[clamp(8px,28%,24px)] rounded-t-[4px]" style={{ height, background: color }}>
       {label && cents > 0 && (
-        <span className="tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap text-fg">
+        <span className="tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 text-[10.5px] font-semibold whitespace-nowrap text-fg">
           {compact.format(cents / 100)}
         </span>
       )}

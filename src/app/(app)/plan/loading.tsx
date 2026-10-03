@@ -12,12 +12,12 @@ export default function Loading() {
         </div>
         <div className="grid grid-cols-7 gap-1.5 pb-4 lg:hidden">
           {Array.from({ length: 7 }, (_, i) => (
-            <Bone key={i} className="h-14 rounded-[12px]" />
+            <Bone key={i} className="h-14 rounded-[16px]" />
           ))}
         </div>
         <div className="grid gap-2.5 lg:grid-cols-7">
           {Array.from({ length: 7 }, (_, i) => (
-            <Bone key={i} className="h-20 rounded-[12px]" />
+            <Bone key={i} className="h-20 rounded-[16px]" />
           ))}
         </div>
       </LoadingRegion>

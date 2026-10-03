@@ -41,7 +41,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
       <>
         <JournalHeader title="Estadísticas" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
         <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-8">
-          <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-8">
+          <div className="grid justify-items-start gap-2 rounded-card card p-8">
             <h2 className="font-serif text-[22px] font-semibold tracking-tight">Todavía no hay números</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               Cuando escribas tus primeras entradas vas a ver acá tu racha, cuánto escribís y en qué meses.
@@ -68,7 +68,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             </span>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-line rounded-[12px] border border-line bg-surface">
+          <div className="grid grid-cols-3 divide-x divide-line rounded-card card">
             <div className="grid content-start gap-1 p-3.5 sm:p-4">
               <span className="flex items-center gap-1 text-[12.5px] text-muted">
                 <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
@@ -163,7 +163,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
           {moodTotal > 0 && (
             <div className="grid gap-3">
               <span className="text-[13px] text-muted">Cómo estuviste</span>
-              <div className="flex h-3 gap-[2px] overflow-hidden rounded-[4px]">
+              <div className="flex h-3 gap-[2px] overflow-hidden rounded-[6px]">
                 {MOODS.map((m, i) =>
                   s.moodCounts[i] ? (
                     <span
@@ -180,7 +180,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
                   <li key={m.value} className="inline-flex items-center gap-1.5">
                     <span style={tone(m.color)} className="size-2.5 rounded-[3px] bg-tone-solid" />
                     <span className="text-muted">{m.label}</span>
-                    <span className="tabular font-medium">{s.moodCounts[i]}</span>
+                    <span className="tabular font-semibold">{s.moodCounts[i]}</span>
                   </li>
                 ))}
               </ul>
@@ -208,7 +208,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               <h2 className="text-[17px] font-semibold tracking-tight">La entrada más larga</h2>
               <Link
                 href={`/journal/${s.longest.id}`}
-                className="group grid gap-1 rounded-[12px] border border-line bg-surface p-4 transition-colors hover:border-line-strong"
+                className="group grid gap-1 rounded-card card p-4 transition-colors hover:border-line-strong"
               >
                 <span className="text-[34px] leading-none font-semibold tracking-tight">{nf.format(s.longest.words)}</span>
                 <span className="text-[13px] text-muted">palabras</span>

@@ -90,7 +90,7 @@ export function HabitsList({
             {archived ? (
               <Link
                 href="/habitos/lista"
-                className="inline-flex h-9 items-center rounded-md px-2 text-sm text-accent hover:bg-surface-2"
+                className="inline-flex h-9 items-center rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-fg"
               >
                 Volver
               </Link>
@@ -99,7 +99,7 @@ export function HabitsList({
                 href="/habitos/archivados"
                 aria-label="Archivados"
                 title="Archivados"
-                className="inline-flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg"
               >
                 <Archive size={21} />
               </Link>
@@ -128,7 +128,7 @@ export function HabitsList({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar hábito"
                 aria-label="Buscar hábito"
-                className="h-10 min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--focus)]"
+                className="field h-11 min-w-0 flex-1 rounded-full border px-4 text-[15px] outline-none focus:ring-4 focus:ring-[var(--focus)]"
               />
             )}
             {activeCategory && (
@@ -136,7 +136,7 @@ export function HabitsList({
                 type="button"
                 onClick={() => setCategory(null)}
                 style={tone(activeCategory.color)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-tone px-2.5 text-[13px] font-medium text-tone-fg"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-tone px-3.5 text-[13px] font-bold text-tone-fg"
               >
                 {activeCategory.name}
                 <X size={13} weight="bold" />
@@ -146,7 +146,7 @@ export function HabitsList({
         )}
 
         {habits.length === 0 ? (
-          <div className="mt-4 rounded-[12px] border border-dashed border-line-strong p-8 text-sm text-muted">
+          <div className="mt-4 rounded-card card p-8 text-sm text-muted">
             {archived ? (
               "No hay hábitos archivados."
             ) : (
@@ -159,7 +159,7 @@ export function HabitsList({
             )}
           </div>
         ) : visible.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted">Ningún hábito coincide.</p>
+          <p className="py-12 text-center text-[15px] font-semibold text-muted">Ningún hábito coincide.</p>
         ) : (
           visible.map((h, i) => (
             <HabitCard
@@ -209,24 +209,24 @@ function HabitCard({
   return (
     <article
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise rounded-[14px] border border-line bg-surface px-4 pt-3.5 pb-2"
+      className="rise rounded-card card px-4 pt-4 pb-2.5"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="grid min-w-0 gap-1">
-          <h2 className="truncate text-[16px] font-semibold tracking-tight">{habit.name}</h2>
+        <div className="grid min-w-0 gap-1.5">
+          <h2 className="truncate text-[17px] font-extrabold tracking-[-0.01em]">{habit.name}</h2>
           <span>
             <HabitBadge habit={habit} />
           </span>
         </div>
-        <ToneSquare size={36} style={tone(habit.color)}>
-          <HabitIcon name={habit.icon} size={20} weight="fill" />
+        <ToneSquare size={42} style={tone(habit.color)}>
+          <HabitIcon name={habit.icon} size={23} weight="fill" />
         </ToneSquare>
       </div>
 
       <div className="mt-3 grid grid-cols-7 justify-items-center gap-1">
         {days.map((d) => (
           <div key={d} className="grid justify-items-center gap-1.5">
-            <span className={cx("text-[12px]", d === today ? "font-semibold text-fg" : "text-muted")}>
+            <span className={cx("text-[12px] font-bold", d === today ? "text-accent-fg" : "text-muted")}>
               {WEEKDAY_SHORT[weekday(d)]}
             </span>
             <DayCircle date={d} state={dayState(habit, logs, d, today)} onTap={() => tap(d)} />
@@ -234,13 +234,13 @@ function HabitCard({
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-[13px] font-medium" style={tone(habit.color)}>
-        <span className="tabular inline-flex items-center gap-1 text-fg" title="Racha actual">
-          <LinkSimple size={16} weight="bold" className="text-tone-fg" />
+      <div className="mt-3 flex items-center gap-1.5 text-[13px] font-extrabold" style={tone(habit.color)}>
+        <span className="tabular inline-flex h-7 items-center gap-1 rounded-full bg-tone px-2.5 text-tone-fg" title="Racha actual">
+          <LinkSimple size={15} weight="bold" />
           {streak}
         </span>
-        <span className="tabular inline-flex items-center gap-1 text-fg" title="Puntaje del hábito">
-          <CheckCircle size={16} weight="bold" className="text-tone-fg" />
+        <span className="tabular inline-flex h-7 items-center gap-1 rounded-full bg-tone px-2.5 text-tone-fg" title="Puntaje del hábito">
+          <CheckCircle size={15} weight="bold" />
           {score}%
         </span>
         <div className="ml-auto flex items-center">
@@ -248,7 +248,7 @@ function HabitCard({
             href={`/habitos/${habit.id}?tab=calendario`}
             aria-label="Calendario"
             title="Calendario"
-            className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg"
           >
             <CalendarBlank size={20} />
           </Link>
@@ -256,7 +256,7 @@ function HabitCard({
             href={`/habitos/${habit.id}?tab=estadisticas`}
             aria-label="Estadísticas"
             title="Estadísticas"
-            className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg"
           >
             <ChartBar size={20} />
           </Link>

@@ -87,7 +87,7 @@ export function AccountAvatar({ account, size = 36 }: { account: Pick<AccountDTO
     <span
       aria-hidden
       style={{ ...tone(account.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[10px] bg-tone-solid text-white"
+      className="inline-flex shrink-0 items-center justify-center rounded-[12px] bg-tone-solid text-white"
     >
       <FinanceIcon name={account.icon} size={Math.round(size * 0.52)} weight="fill" />
     </span>
@@ -240,14 +240,14 @@ export function TxRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[16px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted italic")}>{title || "Sin título"}</span>
+        <span className={cx("truncate text-[15px]", title ? "font-semibold" : "text-muted italic")}>{title || "Sin título"}</span>
         <span className="truncate text-[13px] text-muted">{subtitle}</span>
       </span>
-      <span className="grid shrink-0 justify-items-end gap-0.5 text-[15px] font-medium">
+      <span className="grid shrink-0 justify-items-end gap-0.5 text-[15px] font-semibold">
         {internal ? (
           <span className="tabular font-normal text-muted" title="Entre cuentas elegidas: no cambia el total">
             {moneyCents(tx.amountCents, fx[0].currency)}
@@ -286,7 +286,7 @@ export function MonthNav({ month, basePath, current }: { month: string; basePath
       {month !== current && (
         <Link
           href={basePath}
-          className="ml-1 inline-flex h-8 items-center rounded-md border border-line-strong px-2.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
+          className="ml-1 inline-flex h-8 items-center rounded-full bg-accent-soft text-accent-fg px-2.5 text-[13px] font-semibold transition-colors hover:bg-surface-2"
         >
           Hoy
         </Link>
@@ -303,7 +303,7 @@ export function Fab({ onClick, label = "Nuevo movimiento" }: { onClick: () => vo
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="lift fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
+      className="lift-accent fixed right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-20 inline-flex size-15 items-center justify-center rounded-full bg-accent text-on-accent hover:scale-105 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
     >
       <Plus size={26} weight="bold" />
     </button>
@@ -320,11 +320,11 @@ export function EmptyBlock({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mt-6 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-8">
+    <div className="mt-6 grid justify-items-start gap-3 rounded-card card p-8">
       {icon && (
-        <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">{icon}</span>
+        <span className="inline-flex size-10 items-center justify-center rounded-[12px] bg-accent-soft text-accent-fg">{icon}</span>
       )}
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
       {children}
     </div>
   );

@@ -16,7 +16,9 @@ import {
 import { addDays, formatLong, monthBounds, shiftMonth, weekday } from "@/lib/dates";
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
+import { motion } from "motion/react";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
+import { Burst, useHasChanged, useJustDone } from "@/components/celebrate";
 
 // ─── Estado optimista de las marcas ─────────────────────────────────────────
 
@@ -91,14 +93,14 @@ export function useDayTap(
 // ─── Círculo de un día ──────────────────────────────────────────────────────
 
 const STATE_CLASS: Record<DayState, string> = {
-  done: "bg-[var(--st-done-bg)] border-[var(--st-done-line)] text-[var(--st-done-fg)]",
-  partial: "bg-[var(--st-done-bg)] border-[var(--st-done-line)] border-dashed text-[var(--st-done-fg)]",
-  failed: "bg-[var(--st-fail-bg)] border-[var(--st-fail-line)] text-[var(--st-fail-fg)]",
-  skipped: "bg-[var(--st-skip-bg)] border-[var(--st-skip-line)] text-[var(--st-skip-fg)]",
-  missed: "bg-[var(--st-fail-bg)] border-transparent text-[var(--st-fail-fg)]",
-  pending: "bg-surface border-fg/70 text-fg",
-  idle: "bg-[var(--st-idle-bg)] border-transparent text-[var(--st-idle-fg)]",
-  before: "bg-transparent border-transparent text-faint",
+  done: "bg-[var(--st-done-solid)] text-[var(--st-done-on)]",
+  partial: "bg-[var(--st-done-bg)] text-[var(--st-done-fg)] outline-2 outline-dashed -outline-offset-2 outline-[var(--st-done-line)]",
+  failed: "bg-[var(--st-fail-solid)] text-[var(--st-fail-on)]",
+  skipped: "bg-[var(--st-skip-solid)] text-[var(--st-skip-on)]",
+  missed: "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
+  pending: "bg-surface text-fg ring-2 ring-inset ring-accent",
+  idle: "bg-[var(--st-idle-bg)] text-[var(--st-idle-fg)]",
+  before: "bg-transparent text-faint",
 };
 
 const STATE_LABEL: Record<DayState, string> = {
@@ -128,23 +130,36 @@ export function DayCircle({
   hasNote?: boolean;
 }) {
   const day = Number(date.slice(8));
+  const shot = useJustDone(state === "done");
+  const changed = useHasChanged(state);
+  const settled = (state === "done" || state === "failed" || state === "skipped") && changed;
+  const off = future || state === "before";
   return (
-    <button
-      type="button"
-      onClick={onTap}
-      disabled={future || state === "before"}
-      aria-label={`${formatLong(date)}${STATE_LABEL[state] ? `, ${STATE_LABEL[state]}` : ""}${hasNote ? ", con nota" : ""}`}
-      className={cx(
-        "tabular relative inline-flex items-center justify-center border-2 font-medium transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:active:scale-100",
-        size === "md"
-          ? "size-10 rounded-[13px] text-[15px] sm:size-11"
-          : "size-9 rounded-[11px] text-sm sm:size-10 sm:rounded-[12px]",
-        future ? "border-line bg-transparent text-fg/80" : STATE_CLASS[state],
-      )}
-    >
-      {day}
-      {hasNote && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-accent" />}
-    </button>
+    <span className="relative inline-flex">
+      <Burst shot={shot} />
+      <motion.button
+        type="button"
+        onClick={onTap}
+        disabled={off}
+        whileTap={off ? undefined : { scale: 0.84 }}
+        aria-label={`${formatLong(date)}${STATE_LABEL[state] ? `, ${STATE_LABEL[state]}` : ""}${hasNote ? ", con nota" : ""}`}
+        className={cx(
+          "tabular relative inline-flex items-center justify-center rounded-full font-extrabold transition-[background-color,color,box-shadow] duration-200",
+          size === "md" ? "size-10 text-[15px] sm:size-11" : "size-9 text-sm sm:size-10",
+          future ? "bg-transparent text-fg/70 ring-1 ring-inset ring-line-strong" : STATE_CLASS[state],
+        )}
+      >
+        <motion.span
+          key={settled ? state : "plain"}
+          initial={settled ? { scale: 0.5 } : false}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 600, damping: 15 }}
+        >
+          {day}
+        </motion.span>
+        {hasNote && <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-accent ring-2 ring-surface" />}
+      </motion.button>
+    </span>
   );
 }
 
@@ -154,7 +169,7 @@ export function HabitBadge({ habit, text }: { habit: HabitDTO; text?: string }) 
   return (
     <span
       style={tone(habit.color)}
-      className="inline-flex items-center gap-1 rounded-[5px] bg-tone px-1.5 py-0.5 text-[12px] leading-none font-medium text-tone-fg"
+      className="inline-flex items-center gap-1 rounded-full bg-tone px-2 py-1 text-[12px] leading-none font-bold text-tone-fg"
     >
       {text ?? frequencyLabel(habit)}
       {habit.priority > 1 && (
@@ -188,20 +203,20 @@ export function PeriodNav({
       <button
         type="button"
         onClick={onPrev}
-        className="inline-flex size-9 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+        className="inline-flex size-10 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
         aria-label="Anterior"
       >
         <CaretLeft size={18} weight="bold" />
       </button>
       <div className="grid text-center leading-tight" aria-live="polite">
-        <span className="text-[15px] font-semibold first-letter:uppercase">{title}</span>
+        <span className="text-[17px] font-extrabold first-letter:uppercase">{title}</span>
         {subtitle && <span className="tabular text-[13px] text-muted">{subtitle}</span>}
       </div>
       <button
         type="button"
         onClick={onNext}
         disabled={nextDisabled}
-        className="inline-flex size-9 items-center justify-center rounded-md text-accent hover:bg-surface-2 disabled:opacity-30"
+        className="inline-flex size-10 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90 disabled:opacity-30"
         aria-label="Siguiente"
       >
         <CaretRight size={18} weight="bold" />
@@ -258,7 +273,7 @@ export function CalendarMonth({
       />
       <div className="grid grid-cols-7 justify-items-center gap-y-2">
         {WEEK_HEAD.map((w, i) => (
-          <span key={w} className={cx("pb-1 text-[12px] font-medium", i >= 5 ? "text-accent" : "text-muted")}>
+          <span key={w} className={cx("pb-1 text-[12px] font-bold", i >= 5 ? "text-accent-fg" : "text-muted")}>
             {w}
           </span>
         ))}
@@ -337,7 +352,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   <button
                     type="button"
                     onClick={() => setValue((v) => Math.max(0, v - 1))}
-                    className="inline-flex size-12 items-center justify-center rounded-[13px] bg-surface-2 text-fg active:scale-95"
+                    className="inline-flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
                     aria-label="Restar uno"
                   >
                     <Minus size={20} weight="bold" />
@@ -349,7 +364,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                       value={value}
                       min={0}
                       onChange={(e) => setValue(Math.max(0, Number(e.target.value) || 0))}
-                      className="tabular w-24 bg-transparent text-center text-4xl font-semibold tracking-tight outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                      className="tabular w-24 bg-transparent text-center text-5xl font-black tracking-tight outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       aria-label="Cantidad"
                     />
                     <p className="text-xs text-muted">
@@ -359,7 +374,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   <button
                     type="button"
                     onClick={() => setValue((v) => v + 1)}
-                    className="inline-flex size-12 items-center justify-center rounded-[13px] bg-surface-2 text-fg active:scale-95"
+                    className="inline-flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
                     aria-label="Sumar uno"
                   >
                     <Plus size={20} weight="bold" />
@@ -378,7 +393,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   onClick={() => apply("done", habit.target)}
                   icon={<Check size={18} weight="bold" />}
                   label="Hecho"
-                  cls="text-[var(--st-done-fg)] bg-[var(--st-done-bg)]"
+                  cls="text-[var(--st-done-on)] bg-[var(--st-done-solid)]"
                 />
               )}
               <StatusOption
@@ -386,19 +401,19 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                 onClick={() => apply("failed")}
                 icon={<X size={18} weight="bold" />}
                 label="Fallado"
-                cls="text-[var(--st-fail-fg)] bg-[var(--st-fail-bg)]"
+                cls="text-[var(--st-fail-on)] bg-[var(--st-fail-solid)]"
               />
               <StatusOption
                 active={marked === "skipped"}
                 onClick={() => apply("skipped")}
                 icon={<ArrowBendUpRight size={18} weight="bold" />}
                 label="Saltear"
-                cls="text-[var(--st-skip-fg)] bg-[var(--st-skip-bg)]"
+                cls="text-[var(--st-skip-on)] bg-[var(--st-skip-solid)]"
               />
             </div>
 
             <label className="grid gap-1.5">
-              <span className="text-[13px] font-medium text-muted">Nota del día</span>
+              <span className="pl-1 text-[13px] font-semibold text-muted">Nota del día</span>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -454,9 +469,9 @@ function StatusOption({
       type="button"
       onClick={onClick}
       className={cx(
-        "flex h-16 flex-col items-center justify-center gap-1 rounded-[10px] text-[13px] font-medium transition-transform active:scale-95",
+        "flex h-[72px] flex-col items-center justify-center gap-1 rounded-[18px] text-sm font-extrabold transition-[transform,opacity] duration-200 active:scale-95",
         cls,
-        active && "ring-2 ring-current ring-inset",
+        active ? "ring-[3px] ring-fg/80 ring-offset-2 ring-offset-surface" : "opacity-90 hover:opacity-100",
       )}
     >
       {icon}

@@ -60,7 +60,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   : `${byDay.size === 1 ? "1 día escrito" : `${byDay.size} días escritos`}, ${nf.format(monthWords)} palabras`}
               </span>
               {month !== today.slice(0, 7) && (
-                <Link href={href(today.slice(0, 7), today)} scroll={false} className="mt-0.5 text-[13px] font-medium text-accent-fg hover:underline">
+                <Link href={href(today.slice(0, 7), today)} scroll={false} className="mt-0.5 text-[13px] font-semibold text-accent-fg hover:underline">
                   Volver a hoy
                 </Link>
               )}
@@ -77,7 +77,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
 
           <div className="grid grid-cols-7 justify-items-center gap-y-1">
             {WEEK_HEAD.map((w) => (
-              <span key={w} aria-hidden className="pb-1 text-[12px] font-medium text-muted">
+              <span key={w} aria-hidden className="pb-1 text-[12px] font-semibold text-muted">
                 {w}
               </span>
             ))}
@@ -140,7 +140,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                 )}
               </div>
               {selectedEntries.length === 0 ? (
-                <div className="grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
+                <div className="grid justify-items-start gap-3 rounded-card card p-6">
                   <p className="font-serif text-[17px] text-muted italic">
                     {selected > today ? "Este día todavía no llegó." : "Este día no escribiste."}
                   </p>
@@ -155,7 +155,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               )}
             </>
           ) : (
-            <p className="rounded-[14px] border border-dashed border-line-strong p-6 font-serif text-[17px] text-muted italic">
+            <p className="rounded-card card p-6 font-serif text-[17px] text-muted italic">
               Tocá un día para ver lo que escribiste.
             </p>
           )}

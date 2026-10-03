@@ -1,99 +1,139 @@
 @import "tailwindcss";
 
 /*
- * Sistema visual: monocromo cálido estilo documento, un solo "acento" que es la
- * tinta (casi negro en claro, casi blanco en oscuro) más el azul petróleo de
- * --accent para lo interactivo. El color de verdad aparece solo en pasteles
- * apagados que identifican hábitos, cuentas y categorías.
- * Radios: 6px controles, 12-14px superficies.
+ * Sistema visual "Vivo": app nativa amable y colorida.
+ * Base tomada del sistema de Apple (fondo agrupado gris frío, superficies
+ * blancas sin borde, botones píldora, títulos grandes con tracking negativo) y
+ * la suavidad de Airbnb (todo redondeado, una sola sombra teñida).
+ *
+ * Regla de color: cada módulo tiene su acento (Hábitos coral, Journal violeta,
+ * Gastos verde, Plan azul) que se aplica con la clase .mod-* en su layout. En una
+ * pantalla hay un solo acento. Las categorías usan la paleta viva (--p-*), los
+ * estados de día usan rellenos sólidos (--st-*).
+ *
+ * Radios (regla fija): botones, chips y pestañas en píldora; controles de
+ * formulario 12px (rounded-md); cuadrados de ícono 30% (rounded-[12px] a 40px);
+ * tarjetas 20px (rounded-card); hojas 28px.
  */
 
 :root {
-  --bg: #fbfbfa;
+  --bg: #f2f2f7;
   --surface: #ffffff;
-  --surface-2: #f4f3f0;
-  --surface-3: #ecebe7;
-  /* Lo que se apoya sobre una superficie (segmento elegido, chips). */
+  --surface-2: #f2f2f6;
+  --surface-3: #e7e7ed;
   --raised: #ffffff;
-  --border: #e9e8e4;
-  --border-strong: #d9d8d3;
-  --text: #2b2a28;
-  --muted: #6b6a66;
+  --border: #e3e3ea;
+  --border-strong: #d1d1da;
+  --text: #1c1c1e;
+  --muted: #65656c;
   /* Solo para placeholders, separadores y texto decorativo (3:1). */
-  --faint: #8e8d89;
-  --ink: #1d1d1b;
-  --on-ink: #fafaf9;
-  --danger: #b5403a;
-  --success: #3d6b41;
-  --focus: rgba(29, 29, 27, 0.18);
-  /* Único acento de la app: el azul petróleo de HabitNow, más apagado. */
-  --accent: #2a7fa3;
-  --accent-soft: #e1eff5;
-  --accent-fg: #1d6587;
-  /* Texto sobre un fondo --accent (blanco en claro, tinta en oscuro: AA en los dos). */
+  --faint: #8a8a91;
+  --ink: #1c1c1e;
+  --on-ink: #ffffff;
+  --danger: #c7322f;
+  --success: #15803d;
+  --focus: rgba(31, 111, 224, 0.28);
+  /* Acento por defecto (shell, login): azul. Los módulos lo pisan. */
+  --accent: #1f6fe0;
+  --accent-soft: #e2ecfc;
+  --accent-fg: #1a5fc4;
   --on-accent: #ffffff;
-  /* Sombras teñidas con el fondo, nunca negro puro. */
-  --shadow-tint: 40, 36, 30;
+  --shadow-tint: 30, 30, 60;
+  --backdrop: rgba(14, 14, 24, 0.36);
+  --chart-muted: #c4c4cc;
 
-  /* Estados de un día de hábito. */
-  --st-done-bg: #dcefe3; --st-done-line: #3f8f5e; --st-done-fg: #23663d;
-  --st-fail-bg: #fbe3e4; --st-fail-line: #d0505a; --st-fail-fg: #9b2c33;
-  --st-skip-bg: #fbf0d2; --st-skip-line: #d4a52c; --st-skip-fg: #85620a;
-  --st-idle-bg: #efeeeb; --st-idle-fg: #6f6e6a;
+  /* Estados de un día de hábito: rellenos sólidos con número blanco (AA). */
+  --st-done-solid: #15803d; --st-done-on: #ffffff;
+  --st-fail-solid: #cf3434; --st-fail-on: #ffffff;
+  --st-skip-solid: #f5b800; --st-skip-on: #3a2a00;
+  --st-done-bg: #dcf5e4; --st-done-line: #15803d; --st-done-fg: #12703a;
+  --st-fail-bg: #fde4e3; --st-fail-line: #cf3434; --st-fail-fg: #a8231f;
+  --st-skip-bg: #fff2c7; --st-skip-line: #d9a300; --st-skip-fg: #7a5800;
+  --st-idle-bg: #ececf1; --st-idle-fg: #6b6b72;
 
-  --p-stone-bg: #efeeeb; --p-stone-fg: #5f5e5a; --p-stone-solid: #8a8984;
-  --p-red-bg: #fbe9e8; --p-red-fg: #9f2f2d; --p-red-solid: #d9675f;
-  --p-orange-bg: #fcefe3; --p-orange-fg: #95511d; --p-orange-solid: #dc8a4a;
-  --p-yellow-bg: #fbf3db; --p-yellow-fg: #896000; --p-yellow-solid: #d4a72c;
-  --p-green-bg: #eaf2e9; --p-green-fg: #346538; --p-green-solid: #6a9c6c;
-  --p-teal-bg: #e4f2f0; --p-teal-fg: #276660; --p-teal-solid: #4f9b92;
-  --p-blue-bg: #e3f0fa; --p-blue-fg: #1f6c9f; --p-blue-solid: #5a98c6;
-  --p-purple-bg: #efeaf7; --p-purple-fg: #5e4a8b; --p-purple-solid: #8f7cbf;
-  --p-pink-bg: #f9e9f1; --p-pink-fg: #8c3b63; --p-pink-solid: #c97199;
+  /* Paleta viva: fondo tintado, texto AA sobre el tinte, sólido y lo que va encima del sólido. */
+  --p-stone-bg: #ececf1; --p-stone-fg: #54545b; --p-stone-solid: #8e8e96; --p-stone-on: #ffffff;
+  --p-red-bg: #ffe6e4; --p-red-fg: #b02320; --p-red-solid: #ee4b44; --p-red-on: #ffffff;
+  --p-orange-bg: #ffecdc; --p-orange-fg: #a3450b; --p-orange-solid: #f7801f; --p-orange-on: #ffffff;
+  --p-yellow-bg: #fff3c9; --p-yellow-fg: #7a5800; --p-yellow-solid: #f6bb0f; --p-yellow-on: #3a2a00;
+  --p-green-bg: #dcf5e4; --p-green-fg: #14703a; --p-green-solid: #25a553; --p-green-on: #ffffff;
+  --p-teal-bg: #d6f3f0; --p-teal-fg: #0b6c66; --p-teal-solid: #0ea296; --p-teal-on: #ffffff;
+  --p-blue-bg: #dfecfd; --p-blue-fg: #1a5cbc; --p-blue-solid: #3584f0; --p-blue-on: #ffffff;
+  --p-purple-bg: #ede6fe; --p-purple-fg: #6233c4; --p-purple-solid: #8b5cf0; --p-purple-on: #ffffff;
+  --p-pink-bg: #fde4ef; --p-pink-fg: #ab2160; --p-pink-solid: #ec4e93; --p-pink-on: #ffffff;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151514;
-    --surface: #1c1c1b;
-    --surface-2: #242422;
-    --surface-3: #2d2d2a;
-    --raised: #3a3a36;
-    --border: #2c2c29;
-    --border-strong: #3a3a37;
-    --text: #e9e8e4;
-    --muted: #9c9b96;
-    --faint: #7a7974;
-    --ink: #f0efeb;
-    --on-ink: #1a1a19;
-    --danger: #e0766f;
-    --success: #8fbf91;
-    --focus: rgba(240, 239, 235, 0.22);
-    --accent: #5fb0d3;
-    --accent-soft: #1b2e37;
-    --accent-fg: #8ccbe6;
-    --on-accent: #0f1d24;
+    --bg: #0e0e11;
+    --surface: #1c1c21;
+    --surface-2: #26262c;
+    --surface-3: #313138;
+    --raised: #3b3b43;
+    --border: #2b2b32;
+    --border-strong: #3c3c45;
+    --text: #f3f3f6;
+    --muted: #a3a3ab;
+    --faint: #7a7a82;
+    --ink: #f3f3f6;
+    --on-ink: #141418;
+    --danger: #ff7b72;
+    --success: #4fd17e;
+    --focus: rgba(110, 168, 255, 0.35);
+    --accent: #6ea8ff;
+    --accent-soft: #18263d;
+    --accent-fg: #93bfff;
+    --on-accent: #0b1424;
     --shadow-tint: 0, 0, 0;
+    --backdrop: rgba(0, 0, 0, 0.55);
+    --chart-muted: #4b4b54;
 
-    --st-done-bg: #1f3428; --st-done-line: #5daa7a; --st-done-fg: #9fd5b2;
-    --st-fail-bg: #3a2124; --st-fail-line: #d8666e; --st-fail-fg: #f0a5aa;
-    --st-skip-bg: #372f17; --st-skip-line: #c9a23a; --st-skip-fg: #e8cb76;
-    --st-idle-bg: #262624; --st-idle-fg: #8f8e89;
+    --st-done-solid: #16843f; --st-done-on: #ffffff;
+    --st-fail-solid: #c9363b; --st-fail-on: #ffffff;
+    --st-skip-solid: #f5c02a; --st-skip-on: #2e2200;
+    --st-done-bg: #15301f; --st-done-line: #3dcb72; --st-done-fg: #8be3ab;
+    --st-fail-bg: #3a1a1c; --st-fail-line: #ff6b6b; --st-fail-fg: #ffaaa6;
+    --st-skip-bg: #352a0c; --st-skip-line: #f5c02a; --st-skip-fg: #f6d57a;
+    --st-idle-bg: #26262c; --st-idle-fg: #9a9aa2;
 
-    --p-stone-bg: #2a2a28; --p-stone-fg: #b9b8b3; --p-stone-solid: #8d8c87;
-    --p-red-bg: #3a2322; --p-red-fg: #eea19b; --p-red-solid: #d4706a;
-    --p-orange-bg: #3a2a1d; --p-orange-fg: #eeb383; --p-orange-solid: #d48e55;
-    --p-yellow-bg: #362f1a; --p-yellow-fg: #e8c869; --p-yellow-solid: #c9a23a;
-    --p-green-bg: #22301f; --p-green-fg: #a5cfa6; --p-green-solid: #6f9f70;
-    --p-teal-bg: #1d302d; --p-teal-fg: #8fcfc6; --p-teal-solid: #55a095;
-    --p-blue-bg: #1c2b38; --p-blue-fg: #9cc8ea; --p-blue-solid: #5e9bc9;
-    --p-purple-bg: #2b2538; --p-purple-fg: #c3b4e6; --p-purple-solid: #9381c4;
-    --p-pink-bg: #36222c; --p-pink-fg: #e8a7c6; --p-pink-solid: #c9779e;
+    --p-stone-bg: #2a2a30; --p-stone-fg: #c2c2ca; --p-stone-solid: #75757e; --p-stone-on: #ffffff;
+    --p-red-bg: #3b1d1e; --p-red-fg: #ffa39d; --p-red-solid: #e5484d; --p-red-on: #ffffff;
+    --p-orange-bg: #3a2414; --p-orange-fg: #ffb57a; --p-orange-solid: #f07d22; --p-orange-on: #ffffff;
+    --p-yellow-bg: #362b0d; --p-yellow-fg: #f6d266; --p-yellow-solid: #f2b919; --p-yellow-on: #2e2200;
+    --p-green-bg: #15301f; --p-green-fg: #8be3ab; --p-green-solid: #28a957; --p-green-on: #ffffff;
+    --p-teal-bg: #0f2f2d; --p-teal-fg: #7fe0d6; --p-teal-solid: #0fa197; --p-teal-on: #ffffff;
+    --p-blue-bg: #15253d; --p-blue-fg: #9cc4ff; --p-blue-solid: #3b82f0; --p-blue-on: #ffffff;
+    --p-purple-bg: #261d40; --p-purple-fg: #c6b1ff; --p-purple-solid: #8a5cf0; --p-purple-on: #ffffff;
+    --p-pink-bg: #3b1a2b; --p-pink-fg: #ffa3cb; --p-pink-solid: #e54b8f; --p-pink-on: #ffffff;
 
     color-scheme: dark;
   }
+}
+
+/* Acento por módulo. Se aplica en el layout de cada módulo y en el menú lateral. */
+.mod-habitos {
+  --accent: #cc4517; --accent-soft: #fde9df; --accent-fg: #b23c12; --on-accent: #ffffff;
+  --focus: rgba(204, 69, 23, 0.28);
+}
+.mod-journal {
+  --accent: #7c4ddb; --accent-soft: #efe8fd; --accent-fg: #6a3fc8; --on-accent: #ffffff;
+  --focus: rgba(124, 77, 219, 0.28);
+}
+.mod-gastos {
+  --accent: #0b7f62; --accent-soft: #daf3eb; --accent-fg: #0a6e55; --on-accent: #ffffff;
+  --focus: rgba(11, 127, 98, 0.28);
+}
+.mod-plan {
+  --accent: #1f6fe0; --accent-soft: #e2ecfc; --accent-fg: #1a5fc4; --on-accent: #ffffff;
+  --focus: rgba(31, 111, 224, 0.28);
+}
+@media (prefers-color-scheme: dark) {
+  .mod-habitos { --accent: #ff8a5c; --accent-soft: #3a2219; --accent-fg: #ffa47f; --on-accent: #1f0d05; --focus: rgba(255, 138, 92, 0.35); }
+  .mod-journal { --accent: #b39bff; --accent-soft: #2a2240; --accent-fg: #c5b3ff; --on-accent: #170f2e; --focus: rgba(179, 155, 255, 0.35); }
+  .mod-gastos { --accent: #3fd1a5; --accent-soft: #133129; --accent-fg: #6fe0bd; --on-accent: #04241a; --focus: rgba(63, 209, 165, 0.35); }
+  .mod-plan { --accent: #6ea8ff; --accent-soft: #18263d; --accent-fg: #93bfff; --on-accent: #0b1424; --focus: rgba(110, 168, 255, 0.35); }
 }
 
 @theme inline {
@@ -118,10 +158,18 @@
   --color-tone: var(--tone-bg);
   --color-tone-fg: var(--tone-fg);
   --color-tone-solid: var(--tone-solid);
+  --color-tone-on: var(--tone-on);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", monospace;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-card: 20px;
+  --radius-tile: 16px;
 }
 
 html {
@@ -133,16 +181,22 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
+  /* Nunito es un poco más chica de ojo: un pelo más de peso en el texto corrido. */
+  font-weight: 450;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
 }
 
 ::selection {
-  background: var(--p-yellow-bg);
+  background: var(--accent-soft);
   color: var(--text);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2.5px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -151,14 +205,46 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Superficie agrupada estilo iOS: blanca sin borde con una sombra teñida en
+   claro, hairline sutil en oscuro (las sombras no se ven sobre negro). */
+@utility card {
+  background-color: var(--surface);
+  border: 1px solid transparent;
+  box-shadow:
+    0 1px 2px rgba(var(--shadow-tint), 0.04),
+    0 6px 20px -10px rgba(var(--shadow-tint), 0.14);
+  @media (prefers-color-scheme: dark) {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+
+/* Campos de formulario: blancos con hairline sobre el fondo gris; dentro de una
+   hoja o tarjeta (superficie blanca) pasan a relleno gris sin borde, como iOS. */
+@layer components {
+.field {
+  background-color: var(--surface);
+  border-color: var(--border-strong);
+}
+dialog .field,
+.card .field {
+  background-color: var(--surface-2);
+  border-color: transparent;
+}
+.field:focus {
+  background-color: var(--surface);
+  border-color: var(--accent);
+}
+}
+
 /* Entrada suave de bloques. Solo transform + opacity. */
 @media (prefers-reduced-motion: no-preference) {
   .rise {
-    animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--i, 0) * 60ms);
+    animation: rise 560ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 40ms);
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(10px) scale(0.985); }
     to { opacity: 1; transform: none; }
   }
 }
@@ -169,11 +255,12 @@ dialog.sheet {
   width: 100%;
   max-width: 100%;
   max-height: 92dvh;
-  border-radius: 14px 14px 0 0;
+  border-radius: 28px 28px 0 0;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 0;
   padding: 0;
+  box-shadow: 0 -10px 40px -12px rgba(var(--shadow-tint), 0.25);
 }
 /* El scroll de una hoja no arrastra la página de atrás. */
 dialog.sheet,
@@ -189,22 +276,34 @@ summary {
   touch-action: manipulation;
 }
 dialog.sheet::backdrop {
-  background: rgba(20, 20, 18, 0.32);
+  background: var(--backdrop);
 }
 @media (min-width: 640px) {
   dialog.sheet {
     margin: auto;
     max-width: 30rem;
-    border-radius: 12px;
+    border-radius: 24px;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
   dialog.sheet[open] {
-    animation: sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation: sheet-in 460ms cubic-bezier(0.2, 1.15, 0.35, 1);
+  }
+  dialog.sheet[open]::backdrop {
+    animation: fade-in 260ms ease-out;
   }
   @keyframes sheet-in {
-    from { transform: translateY(24px); opacity: 0; }
-    to { transform: none; opacity: 1; }
+    from { transform: translateY(100%); }
+    to { transform: none; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+  }
+  @media (min-width: 640px) {
+    @keyframes sheet-in {
+      from { transform: translateY(24px) scale(0.96); opacity: 0; }
+      to { transform: none; opacity: 1; }
+    }
   }
 }
 
@@ -217,8 +316,8 @@ dialog.sheet::backdrop {
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 6px;
-  background: var(--surface-2);
+  border-radius: 10px;
+  background: var(--surface-3);
 }
 @media (prefers-reduced-motion: no-preference) {
   .skeleton::after {
@@ -226,7 +325,7 @@ dialog.sheet::backdrop {
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, var(--surface-3), transparent);
+    background: linear-gradient(90deg, transparent, var(--surface-2), transparent);
     animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
   @keyframes shimmer {
@@ -234,17 +333,41 @@ dialog.sheet::backdrop {
   }
 }
 
-/* Sombra de lo que flota (botón de escribir, botón flotante, tooltips), teñida con el fondo. */
+/* Sombra de lo que flota (botón de escribir, botón flotante, tooltips), teñida. */
 .lift {
   box-shadow:
-    0 1px 2px rgba(var(--shadow-tint), 0.06),
-    0 10px 28px -12px rgba(var(--shadow-tint), 0.28);
+    0 2px 4px rgba(var(--shadow-tint), 0.08),
+    0 12px 28px -10px rgba(var(--shadow-tint), 0.35);
+}
+/* Botón flotante: la sombra toma el color del acento del módulo. */
+.lift-accent {
+  box-shadow:
+    0 2px 4px rgba(var(--shadow-tint), 0.1),
+    0 12px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* Barra flotante esmerilada (barra inferior, cabecera). Sin blur si el sistema
+   pide menos transparencia. */
+.frost {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+.frost-bg {
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .frost { background: var(--surface); backdrop-filter: none; }
+  .frost-bg { background: var(--bg); backdrop-filter: none; }
 }
 
 /* Lectura larga en serif: cortes de línea prolijos y guiones en español. */
 .prose-serif {
   /* @theme inline no publica --font-serif como variable: se usa la de next/font. */
   font-family: var(--font-newsreader), ui-serif, Georgia, serif;
+  font-weight: 400;
   text-wrap: pretty;
   hyphens: auto;
   font-optical-sizing: auto;

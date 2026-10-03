@@ -136,10 +136,10 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                     .map((c) => {
                       const n = active.filter((a) => a.currency === c).length;
                       return (
-                        <div key={c} className="grid gap-1 rounded-[12px] border border-line bg-surface px-3.5 py-3">
+                        <div key={c} className="grid gap-1 rounded-card card px-3.5 py-3">
                           <dt className="flex items-center justify-between gap-2 text-[13px] text-muted">
                             Total en {CURRENCY_NAME[c] ?? c}
-                            <span className="rounded-[4px] bg-surface-2 px-1.5 py-px font-mono text-[11px]">{c}</span>
+                            <span className="rounded-[6px] bg-surface-2 px-1.5 py-px font-mono text-[11px]">{c}</span>
                           </dt>
                           <dd className="text-[clamp(1.25rem,5.6vw,1.625rem)] leading-tight font-semibold tracking-[-0.02em]">
                             <Balance cents={totals[c]} currency={c} hero />
@@ -158,16 +158,16 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                   <button
                     type="button"
                     onClick={() => (sorting ? undefined : edit(a))}
-                    className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[12px] px-2 py-3 text-left transition-colors hover:bg-surface-2"
+                    className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[16px] px-2 py-3 text-left transition-colors hover:bg-surface-2"
                   >
                     <AccountAvatar account={a} size={40} />
                     <span className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="truncate text-[15px] font-medium">{a.name}</span>
+                      <span className="truncate text-[15px] font-semibold">{a.name}</span>
                       <span className="text-[13px] text-muted">
                         {ACCOUNT_TYPES[a.type] ?? a.type} · {a.currency}
                       </span>
                     </span>
-                    <Balance cents={a.balanceCents} currency={a.currency} className="text-[15px] font-medium" />
+                    <Balance cents={a.balanceCents} currency={a.currency} className="text-[15px] font-semibold" />
                     {!sorting && <CaretRight size={14} className="text-muted" aria-hidden />}
                   </button>
                   {sorting && (
@@ -195,7 +195,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                       <button
                         type="button"
                         onClick={() => edit(a)}
-                        className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left opacity-70 transition-colors hover:bg-surface-2"
+                        className="flex w-full items-center gap-3.5 rounded-[16px] px-2 py-2.5 text-left opacity-70 transition-colors hover:bg-surface-2"
                       >
                         <AccountAvatar account={a} size={34} />
                         <span className="min-w-0 flex-1 truncate text-[15px]">{a.name}</span>
@@ -266,7 +266,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           </Field>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Color</span>
+            <span className="text-[13px] font-semibold text-muted">Color</span>
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((p) => (
                 <button
@@ -359,7 +359,7 @@ function ChipGroup({
 }) {
   return (
     <div className="grid gap-2">
-      <span className="text-[13px] font-medium text-muted">{label}</span>
+      <span className="text-[13px] font-semibold text-muted">{label}</span>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={label}>
         {options.map((o) => (
           <button
@@ -371,7 +371,7 @@ function ChipGroup({
             onClick={() => onChange(o.value)}
             className={cx(
               "h-9 rounded-md border px-3 text-[13px] transition-colors disabled:opacity-40",
-              value === o.value ? "border-fg bg-ink font-medium text-on-ink" : "border-line-strong hover:bg-surface-2",
+              value === o.value ? "border-fg bg-ink font-semibold text-on-ink" : "border-line-strong hover:bg-surface-2",
             )}
           >
             {o.label}

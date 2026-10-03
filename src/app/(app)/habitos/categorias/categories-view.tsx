@@ -51,7 +51,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                 type="button"
                 onClick={() => open({ id: c.id, name: c.name, icon: c.icon, color: c.color })}
                 style={tone(c.color)}
-                className="group flex w-full flex-col items-start gap-6 rounded-[14px] border border-line bg-surface p-4 text-left transition-colors hover:bg-surface-2"
+                className="group flex w-full flex-col items-start gap-6 rounded-card card p-4 text-left transition-colors hover:bg-surface-2"
               >
                 <ToneSquare size={42} style={tone(c.color)}>
                   <HabitIcon name={c.icon} size={23} weight="fill" />
@@ -96,7 +96,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Color</span>
+            <span className="text-[13px] font-semibold text-muted">Color</span>
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((p) => (
                 <button
@@ -115,7 +115,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Ícono</span>
+            <span className="text-[13px] font-semibold text-muted">Ícono</span>
             <div className="grid grid-cols-8 gap-1.5">
               {Object.keys(HABIT_ICONS).map((name) => (
                 <button
