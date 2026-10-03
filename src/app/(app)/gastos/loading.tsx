@@ -15,11 +15,11 @@ export default function Loading() {
               <Bone className="h-10 w-44" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Bone className="h-[68px] rounded-[12px]" />
-              <Bone className="h-[68px] rounded-[12px]" />
+              <Bone className="h-[68px] rounded-[8px]" />
+              <Bone className="h-[68px] rounded-[8px]" />
             </div>
           </div>
-          <Bone className="h-[92px] rounded-[12px]" />
+          <Bone className="h-[92px] rounded-[8px]" />
         </div>
         <TxListSkeleton />
       </LoadingRegion>

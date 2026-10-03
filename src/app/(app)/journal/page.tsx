@@ -65,22 +65,22 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         }
       />
 
-      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 pt-3 lg:px-8 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-8 px-4 pt-3 lg:px-10 lg:pt-8">
         {!filtering && (
-          <section className="rise grid gap-1.5 pt-1 lg:pt-0">
-            <p className="font-serif text-[30px] leading-[1.1] tracking-[-0.015em] text-balance lg:text-[36px]">
+          <section className="rise grid gap-3 pt-1 lg:pt-0">
+            <p className="kicker">{formatLong(home.today)}</p>
+            <p className="display text-[38px] leading-[1.02] text-balance italic lg:text-[52px]">
               {greeting(home.hour)}
               {firstName && `, ${firstName}`}
             </p>
-            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted">
-              <span className="first-letter:uppercase">{formatLong(home.today)}</span>
-              {home.streak > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 py-0.5 pr-2.5 pl-2 text-[13px] text-fg">
-                  <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden />
-                  <span className="tabular">{home.streak === 1 ? "1 día seguido" : `${home.streak} días seguidos`}</span>
+            {home.streak > 0 && (
+              <p className="inline-flex items-center gap-1.5 text-[14px] text-muted">
+                <Fire size={15} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden />
+                <span className="tabular">
+                  {home.streak === 1 ? "1 día seguido escribiendo" : `${home.streak} días seguidos escribiendo`}
                 </span>
-              )}
-            </p>
+              </p>
+            )}
           </section>
         )}
 
@@ -93,23 +93,23 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         {entries.length === 0 ? (
           filtering ? (
             <div className="grid justify-items-center gap-2 py-16 text-center">
-              <span className="inline-flex size-11 items-center justify-center rounded-full bg-surface-2 text-muted">
-                <MagnifyingGlass size={22} aria-hidden />
+              <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
+                <MagnifyingGlass size={20} aria-hidden />
               </span>
-              <p className="text-[15px] font-medium">No hay entradas que coincidan</p>
+              <p className="display text-[24px]">No hay entradas que coincidan</p>
               <p className="max-w-[36ch] text-sm text-muted">Probá con otra palabra o sacá algún filtro. La búsqueda distingue tildes.</p>
             </div>
           ) : (
             <EmptyJournal />
           )
         ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-10">
             {years.map((g) => (
-              <section key={g.year} className="grid gap-3">
-                <h2 className="tabular z-10 -mx-4 bg-bg/90 px-4 py-1.5 text-[15px] font-semibold tracking-tight backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
+              <section key={g.year} className="grid">
+                <h2 className="figure z-10 -mx-4 flex items-baseline gap-3 border-b border-fg/80 bg-bg/92 px-4 pt-2 pb-2 text-[30px] backdrop-blur-md max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0 lg:text-[36px]">
                   {g.year}
                 </h2>
-                <div className="grid gap-3">
+                <div className="grid">
                   {g.items.map((e) => (
                     <EntryCard key={e.id} entry={e} index={i++} />
                   ))}
@@ -120,7 +120,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <Link
                 href={`/journal?${more}`}
                 scroll={false}
-                className="mx-auto inline-flex h-11 items-center rounded-md border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.98]"
+                className="mx-auto inline-flex h-11 items-center rounded-[4px] border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.98]"
               >
                 Ver más entradas
               </Link>
@@ -150,7 +150,7 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="flex items-center gap-3 rounded-[12px] bg-surface-2 px-4 py-3 text-sm">
+    <div className="flex items-center gap-3 border-y border-line py-3 text-[15px]">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
           {count}

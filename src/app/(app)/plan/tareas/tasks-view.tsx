@@ -59,7 +59,7 @@ export function TasksView({
           </Button>
         }
       />
-      <main className="mx-auto max-w-3xl px-4 lg:px-8">
+      <main className="mx-auto max-w-3xl px-4 lg:px-10">
         <div
           role="tablist"
           aria-label="Vistas"
@@ -75,20 +75,20 @@ export function TasksView({
                 aria-selected={on}
                 onClick={() => setView(v.id)}
                 className={cx(
-                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
-                  on ? "border-ink bg-ink font-medium text-on-ink" : "border-line text-muted hover:bg-surface-2 hover:text-fg",
+                  "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
+                  on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
                 )}
               >
                 {v.label}
-                <span className={cx("tabular text-[12px]", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
+                <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
               </button>
             );
           })}
         </div>
 
         {visible.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
-            <p className="text-sm text-muted">
+          <div className="mt-2 grid justify-items-start gap-3 border-y border-line py-8">
+            <p className="display text-[20px] text-muted italic">
               {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
             </p>
             <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
@@ -96,7 +96,7 @@ export function TasksView({
             </Button>
           </div>
         ) : (
-          <ul className="grid gap-2">
+          <ul className="grid border-t border-line">
             {visible.map((t, i) => (
               <TaskRow
                 key={t.id}
@@ -115,9 +115,9 @@ export function TasksView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nueva tarea"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
       >
-        <Plus size={26} weight="bold" />
+        <Plus size={24} />
       </button>
 
       <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} />
@@ -151,18 +151,18 @@ function TaskRow({
   const urgent = left !== null && left <= 2 && t.status !== "done";
   return (
     <li
-      className="rise rounded-[14px] border border-line bg-surface transition-colors hover:border-line-strong"
+      className="rise border-b border-line transition-colors hover:bg-surface-2/50"
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
     >
-      <button type="button" onClick={onOpen} className="grid w-full gap-2 p-3.5 text-left">
+      <button type="button" onClick={onOpen} className="grid w-full gap-2 px-1 py-4 text-left">
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", t.status === "done" && "text-muted line-through decoration-faint")}>
+          <span className={cx("min-w-0 flex-1 text-[16px] leading-snug font-medium", t.status === "done" && "text-muted line-through decoration-faint")}>
             {t.title}
           </span>
           {left !== null && t.status !== "done" && (
             <span
               className={cx(
-                "tabular shrink-0 text-[12px] font-medium",
+                "shrink-0 font-mono text-[11px] font-medium tabular",
                 left < 0 ? "text-danger" : urgent ? "text-[var(--p-orange-fg)]" : "text-muted",
               )}
             >
@@ -187,7 +187,7 @@ function TaskRow({
         </span>
       </button>
       {pct !== null && (
-        <div className="flex items-center gap-2 border-t border-line px-3.5 py-2">
+        <div className="flex items-center gap-2 border-t border-dashed border-line px-1 py-1.5">
           <ProgressSquares pct={pct} label={`${t.progress ?? 0} de ${t.goal}`} />
           {t.status !== "done" && (
             <span className="ml-auto flex">
@@ -195,7 +195,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, -1))}
                 aria-label="Restar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Minus size={16} weight="bold" />
               </button>
@@ -203,7 +203,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, 1))}
                 aria-label="Sumar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Plus size={16} weight="bold" />
               </button>

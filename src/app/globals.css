@@ -1,96 +1,100 @@
 @import "tailwindcss";
 
 /*
- * Sistema visual: monocromo cálido estilo documento, un solo "acento" que es la
- * tinta (casi negro en claro, casi blanco en oscuro) más el azul petróleo de
- * --accent para lo interactivo. El color de verdad aparece solo en pasteles
- * apagados que identifican hábitos, cuentas y categorías.
- * Radios: 6px controles, 12-14px superficies.
+ * Papel: un cuaderno de papel bueno. Fondo crema con un grano casi invisible,
+ * tinta casi negra (casi blanca en oscuro), líneas finas en lugar de cajas y
+ * casi nada de sombra. El único acento es la tinta azul petróleo de --accent
+ * (lo interactivo). El color de verdad aparece solo en pasteles apagados que
+ * identifican hábitos, cuentas y categorías, y en los estados de un día.
+ * Tipografía: Newsreader (serif) para títulos, cifras grandes y lectura;
+ * Instrument Sans para la interfaz; Geist Mono chica para metadatos.
+ * Radios: 4px controles, 8px superficies, círculos solo para los días.
  */
 
 :root {
-  --bg: #fbfbfa;
-  --surface: #ffffff;
-  --surface-2: #f4f3f0;
-  --surface-3: #ecebe7;
+  --bg: #f6f4ee;
+  --surface: #fbfaf6;
+  --surface-2: #eeebe3;
+  --surface-3: #e5e1d6;
   /* Lo que se apoya sobre una superficie (segmento elegido, chips). */
-  --raised: #ffffff;
-  --border: #e9e8e4;
-  --border-strong: #d9d8d3;
-  --text: #2b2a28;
-  --muted: #6b6a66;
+  --raised: #fffefa;
+  --border: #e2ded3;
+  --border-strong: #cdc8bb;
+  --text: #24221e;
+  --muted: #64605a;
   /* Solo para placeholders, separadores y texto decorativo (3:1). */
-  --faint: #8e8d89;
-  --ink: #1d1d1b;
-  --on-ink: #fafaf9;
-  --danger: #b5403a;
-  --success: #3d6b41;
-  --focus: rgba(29, 29, 27, 0.18);
-  /* Único acento de la app: el azul petróleo de HabitNow, más apagado. */
-  --accent: #2a7fa3;
-  --accent-soft: #e1eff5;
-  --accent-fg: #1d6587;
-  /* Texto sobre un fondo --accent (blanco en claro, tinta en oscuro: AA en los dos). */
+  --faint: #8a857b;
+  --ink: #1c1b18;
+  --on-ink: #f8f6f0;
+  --danger: #a93a33;
+  --success: #3a663d;
+  --focus: rgba(28, 27, 24, 0.16);
+  /* Único acento: tinta azul petróleo, como la de una lapicera de pluma. */
+  --accent: #22698a;
+  --accent-soft: #dfeaee;
+  --accent-fg: #1b5873;
   --on-accent: #ffffff;
-  /* Sombras teñidas con el fondo, nunca negro puro. */
-  --shadow-tint: 40, 36, 30;
+  /* Sombras teñidas con el papel, nunca negro puro. */
+  --shadow-tint: 52, 44, 30;
+  --grain-opacity: 0.045;
 
   /* Estados de un día de hábito. */
-  --st-done-bg: #dcefe3; --st-done-line: #3f8f5e; --st-done-fg: #23663d;
-  --st-fail-bg: #fbe3e4; --st-fail-line: #d0505a; --st-fail-fg: #9b2c33;
-  --st-skip-bg: #fbf0d2; --st-skip-line: #d4a52c; --st-skip-fg: #85620a;
-  --st-idle-bg: #efeeeb; --st-idle-fg: #6f6e6a;
+  --st-done-bg: #dcecdf; --st-done-line: #3c855a; --st-done-fg: #22603b;
+  --st-fail-bg: #f8e2e0; --st-fail-line: #c4504f; --st-fail-fg: #932c2f;
+  --st-skip-bg: #f7eccd; --st-skip-line: #c99b28; --st-skip-fg: #7d5c08;
+  --st-idle-bg: #ebe8e0; --st-idle-fg: #6a665e;
 
-  --p-stone-bg: #efeeeb; --p-stone-fg: #5f5e5a; --p-stone-solid: #8a8984;
-  --p-red-bg: #fbe9e8; --p-red-fg: #9f2f2d; --p-red-solid: #d9675f;
-  --p-orange-bg: #fcefe3; --p-orange-fg: #95511d; --p-orange-solid: #dc8a4a;
-  --p-yellow-bg: #fbf3db; --p-yellow-fg: #896000; --p-yellow-solid: #d4a72c;
-  --p-green-bg: #eaf2e9; --p-green-fg: #346538; --p-green-solid: #6a9c6c;
-  --p-teal-bg: #e4f2f0; --p-teal-fg: #276660; --p-teal-solid: #4f9b92;
-  --p-blue-bg: #e3f0fa; --p-blue-fg: #1f6c9f; --p-blue-solid: #5a98c6;
-  --p-purple-bg: #efeaf7; --p-purple-fg: #5e4a8b; --p-purple-solid: #8f7cbf;
-  --p-pink-bg: #f9e9f1; --p-pink-fg: #8c3b63; --p-pink-solid: #c97199;
+  --p-stone-bg: #ebe8e0; --p-stone-fg: #5c5952; --p-stone-solid: #8a867d;
+  --p-red-bg: #f7e5e2; --p-red-fg: #9a302c; --p-red-solid: #cf6a60;
+  --p-orange-bg: #f8ebdd; --p-orange-fg: #8f4f1d; --p-orange-solid: #d38a4e;
+  --p-yellow-bg: #f6eed4; --p-yellow-fg: #835d02; --p-yellow-solid: #cba232;
+  --p-green-bg: #e5eee2; --p-green-fg: #33623a; --p-green-solid: #6a9a6b;
+  --p-teal-bg: #e0eeeb; --p-teal-fg: #26625c; --p-teal-solid: #4f978e;
+  --p-blue-bg: #e0ebf3; --p-blue-fg: #22648f; --p-blue-solid: #5b93bd;
+  --p-purple-bg: #ebe6f2; --p-purple-fg: #5b4985; --p-purple-solid: #8d7bb9;
+  --p-pink-bg: #f5e5ec; --p-pink-fg: #873b5f; --p-pink-solid: #c27295;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151514;
-    --surface: #1c1c1b;
-    --surface-2: #242422;
-    --surface-3: #2d2d2a;
-    --raised: #3a3a36;
-    --border: #2c2c29;
-    --border-strong: #3a3a37;
-    --text: #e9e8e4;
-    --muted: #9c9b96;
-    --faint: #7a7974;
-    --ink: #f0efeb;
-    --on-ink: #1a1a19;
-    --danger: #e0766f;
-    --success: #8fbf91;
-    --focus: rgba(240, 239, 235, 0.22);
-    --accent: #5fb0d3;
-    --accent-soft: #1b2e37;
-    --accent-fg: #8ccbe6;
-    --on-accent: #0f1d24;
+    --bg: #161513;
+    --surface: #1c1b18;
+    --surface-2: #24221f;
+    --surface-3: #2d2b27;
+    --raised: #36342f;
+    --border: #2c2a26;
+    --border-strong: #3d3a34;
+    --text: #ebe6db;
+    --muted: #a39e92;
+    --faint: #7c776c;
+    --ink: #f1ece1;
+    --on-ink: #1a1916;
+    --danger: #e07a70;
+    --success: #93bf93;
+    --focus: rgba(241, 236, 225, 0.2);
+    --accent: #73b4cf;
+    --accent-soft: #1c2c33;
+    --accent-fg: #9acde2;
+    --on-accent: #0f1c22;
     --shadow-tint: 0, 0, 0;
+    --grain-opacity: 0.06;
 
-    --st-done-bg: #1f3428; --st-done-line: #5daa7a; --st-done-fg: #9fd5b2;
-    --st-fail-bg: #3a2124; --st-fail-line: #d8666e; --st-fail-fg: #f0a5aa;
-    --st-skip-bg: #372f17; --st-skip-line: #c9a23a; --st-skip-fg: #e8cb76;
-    --st-idle-bg: #262624; --st-idle-fg: #8f8e89;
+    --st-done-bg: #1f3227; --st-done-line: #5fa779; --st-done-fg: #a2d3b1;
+    --st-fail-bg: #382224; --st-fail-line: #d4686c; --st-fail-fg: #efa7a8;
+    --st-skip-bg: #352e18; --st-skip-line: #c6a03c; --st-skip-fg: #e6ca7b;
+    --st-idle-bg: #252420; --st-idle-fg: #8f8a7f;
 
-    --p-stone-bg: #2a2a28; --p-stone-fg: #b9b8b3; --p-stone-solid: #8d8c87;
-    --p-red-bg: #3a2322; --p-red-fg: #eea19b; --p-red-solid: #d4706a;
-    --p-orange-bg: #3a2a1d; --p-orange-fg: #eeb383; --p-orange-solid: #d48e55;
-    --p-yellow-bg: #362f1a; --p-yellow-fg: #e8c869; --p-yellow-solid: #c9a23a;
-    --p-green-bg: #22301f; --p-green-fg: #a5cfa6; --p-green-solid: #6f9f70;
-    --p-teal-bg: #1d302d; --p-teal-fg: #8fcfc6; --p-teal-solid: #55a095;
-    --p-blue-bg: #1c2b38; --p-blue-fg: #9cc8ea; --p-blue-solid: #5e9bc9;
-    --p-purple-bg: #2b2538; --p-purple-fg: #c3b4e6; --p-purple-solid: #9381c4;
-    --p-pink-bg: #36222c; --p-pink-fg: #e8a7c6; --p-pink-solid: #c9779e;
+    --p-stone-bg: #292825; --p-stone-fg: #bab5aa; --p-stone-solid: #8d887e;
+    --p-red-bg: #382321; --p-red-fg: #eca39b; --p-red-solid: #cf716a;
+    --p-orange-bg: #382a1e; --p-orange-fg: #ebb487; --p-orange-solid: #cf8d57;
+    --p-yellow-bg: #342e1b; --p-yellow-fg: #e5c86f; --p-yellow-solid: #c4a03d;
+    --p-green-bg: #222e20; --p-green-fg: #a6cda6; --p-green-solid: #6f9c70;
+    --p-teal-bg: #1e2e2b; --p-teal-fg: #92ccc3; --p-teal-solid: #569c92;
+    --p-blue-bg: #1d2a35; --p-blue-fg: #a0c6e5; --p-blue-solid: #5f99c4;
+    --p-purple-bg: #2a2535; --p-purple-fg: #c4b6e3; --p-purple-solid: #9282bf;
+    --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
 
     color-scheme: dark;
   }
@@ -119,7 +123,7 @@
   --color-tone-fg: var(--tone-fg);
   --color-tone-solid: var(--tone-solid);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
 }
@@ -130,10 +134,24 @@ html {
 }
 
 body {
+  position: relative;
+  isolation: isolate;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* Grano de papel: ruido fijo, detrás de todo, sin capturar toques. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 ::selection {
@@ -146,19 +164,52 @@ body {
   outline-offset: 2px;
 }
 
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
 /* Números alineados en montos y contadores. */
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
+/* Titular editorial en serif: contraste fuerte, tracking cerrado. */
+.display {
+  font-family: var(--font-newsreader), ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  letter-spacing: -0.022em;
+  line-height: 1.05;
+}
+
+/* Cifra grande en serif (puntaje, saldo, racha). */
+.figure {
+  font-family: var(--font-newsreader), ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+  font-variant-numeric: lining-nums proportional-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* Rótulo chico de metadatos: mono, versalitas, tracking abierto. */
+.kicker {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* Entrada suave de bloques. Solo transform + opacity. */
 @media (prefers-reduced-motion: no-preference) {
   .rise {
-    animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--i, 0) * 60ms);
+    animation: rise 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 50ms);
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
   }
 }
@@ -169,11 +220,13 @@ dialog.sheet {
   width: 100%;
   max-width: 100%;
   max-height: 92dvh;
-  border-radius: 14px 14px 0 0;
+  border-radius: 12px 12px 0 0;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
   padding: 0;
+  box-shadow: 0 -12px 40px -20px rgba(var(--shadow-tint), 0.25);
 }
 /* El scroll de una hoja no arrastra la página de atrás. */
 dialog.sheet,
@@ -189,13 +242,15 @@ summary {
   touch-action: manipulation;
 }
 dialog.sheet::backdrop {
-  background: rgba(20, 20, 18, 0.32);
+  background: rgba(30, 26, 20, 0.34);
 }
 @media (min-width: 640px) {
   dialog.sheet {
     margin: auto;
     max-width: 30rem;
-    border-radius: 12px;
+    border-radius: 8px;
+    border-bottom: 1px solid var(--border-strong);
+    box-shadow: 0 24px 60px -28px rgba(var(--shadow-tint), 0.35);
   }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -217,7 +272,7 @@ dialog.sheet::backdrop {
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--surface-2);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -234,16 +289,15 @@ dialog.sheet::backdrop {
   }
 }
 
-/* Sombra de lo que flota (botón de escribir, botón flotante, tooltips), teñida con el fondo. */
+/* Lo poco que flota (botón de escribir, botón flotante, tooltips): sombra corta y teñida. */
 .lift {
   box-shadow:
-    0 1px 2px rgba(var(--shadow-tint), 0.06),
-    0 10px 28px -12px rgba(var(--shadow-tint), 0.28);
+    0 1px 2px rgba(var(--shadow-tint), 0.08),
+    0 8px 20px -12px rgba(var(--shadow-tint), 0.3);
 }
 
 /* Lectura larga en serif: cortes de línea prolijos y guiones en español. */
 .prose-serif {
-  /* @theme inline no publica --font-serif como variable: se usa la de next/font. */
   font-family: var(--font-newsreader), ui-serif, Georgia, serif;
   text-wrap: pretty;
   hyphens: auto;

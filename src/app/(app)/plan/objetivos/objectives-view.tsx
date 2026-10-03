@@ -64,7 +64,7 @@ export function ObjectivesView({
           </Button>
         }
       />
-      <main className="mx-auto max-w-3xl px-4 lg:px-8">
+      <main className="mx-auto max-w-3xl px-4 lg:px-10">
         <div className="flex flex-wrap items-center gap-3 py-3 lg:pt-5">
           <div className="w-full max-w-sm">
             <Segmented
@@ -85,28 +85,28 @@ export function ObjectivesView({
         </div>
 
         {groups.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-6">
-            <p className="text-sm text-muted">No hay resultados clave para este filtro.</p>
+          <div className="mt-2 grid justify-items-start gap-3 border-y border-line py-8">
+            <p className="display text-[20px] text-muted italic">No hay resultados clave para este filtro.</p>
             <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
               <Plus size={15} /> Nuevo resultado
             </Button>
           </div>
         ) : (
-          <div className="grid gap-6 pb-4">
+          <div className="grid gap-12 pt-2 pb-4">
             {groups.map((g, gi) => {
               const pct = objectivePct(g);
               return (
-                <section key={g.id || "loose"} className="rise grid gap-2" style={{ "--i": gi } as React.CSSProperties}>
-                  <header className="flex items-end justify-between gap-3 px-1">
-                    <h2 className="text-[17px] font-semibold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
-                    {pct !== null && <span className="tabular text-[13px] font-medium text-muted">{pct}%</span>}
+                <section key={g.id || "loose"} className="rise grid gap-3" style={{ "--i": gi } as React.CSSProperties}>
+                  <header className="flex items-end justify-between gap-3">
+                    <h2 className="display text-[28px]">{g.title.replace(/^\d+\s+/, "")}</h2>
+                    {pct !== null && <span className="figure pb-1 text-[26px] text-muted">{pct}%</span>}
                   </header>
                   {pct !== null && (
-                    <div className="mx-1 h-1.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                      <div className="h-full rounded-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
+                    <div className="h-[3px] overflow-hidden bg-line" aria-hidden>
+                      <div className="h-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
-                  <ul className="grid gap-2 pt-1">
+                  <ul className="grid border-t border-line">
                     {g.keyResults.map((k) => (
                       <KrRow key={k.id} kr={k} today={today} onOpen={() => sheet.current?.open(k)} />
                     ))}
@@ -122,9 +122,9 @@ export function ObjectivesView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nuevo resultado clave"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
       >
-        <Plus size={26} weight="bold" />
+        <Plus size={24} />
       </button>
 
       <KrSheet ref={sheet} objectives={objectives} />
@@ -142,14 +142,14 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
       <button
         type="button"
         onClick={onOpen}
-        className="grid w-full gap-2 rounded-[14px] border border-line bg-surface p-3.5 text-left transition-colors hover:border-line-strong"
+        className="grid w-full gap-2 border-b border-line px-1 py-4 text-left transition-colors hover:bg-surface-2/50"
       >
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", finished && "text-muted")}>
+          <span className={cx("min-w-0 flex-1 text-[16px] leading-snug font-medium", finished && "text-muted")}>
             {k.title}
           </span>
           {left !== null && (
-            <span className={cx("tabular shrink-0 text-[12px] font-medium", left < 0 ? "text-danger" : "text-muted")}>
+            <span className={cx("shrink-0 font-mono text-[11px] font-medium tabular", left < 0 ? "text-danger" : "text-muted")}>
               {daysLeftLabel(left)}
             </span>
           )}
@@ -160,8 +160,8 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
             {k.kind === "habit" ? <ArrowsClockwise size={13} aria-hidden /> : <Lightning size={13} aria-hidden />}
             {k.kind === "habit" ? "Hábito" : "Actividad"}
           </span>
-          {k.quarters.length > 0 && <span className="text-[12px] text-faint">{k.quarters.join(", ")}</span>}
-          {k.deadline && <span className="tabular text-[12px] text-faint">{formatShort(k.deadline)}</span>}
+          {k.quarters.length > 0 && <span className="font-mono text-[11px] text-muted">{k.quarters.join(", ")}</span>}
+          {k.deadline && <span className="font-mono text-[11px] text-muted tabular">{formatShort(k.deadline)}</span>}
         </span>
         {pct !== null && (
           <ProgressSquares
@@ -235,7 +235,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       )}
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Tipo</span>
+        <span className="kicker">Tipo</span>
         <Segmented
           name="kind"
           value={kind}
@@ -248,7 +248,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Estado</span>
+        <span className="kicker">Estado</span>
         <Segmented
           name="status"
           value={status}
@@ -258,12 +258,12 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Trimestres</span>
+        <span className="kicker">Trimestres</span>
         <div className="grid grid-cols-4 gap-1.5">
           {QUARTERS.map((q) => (
             <label
               key={q}
-              className="flex h-10 cursor-pointer items-center justify-center rounded-[10px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
+              className="flex h-11 cursor-pointer items-center justify-center rounded-[4px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
             >
               <input type="checkbox" name="quarters" value={q} defaultChecked={kr?.quarters.includes(q)} className="sr-only" />
               {q}

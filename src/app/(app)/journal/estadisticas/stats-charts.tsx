@@ -72,7 +72,7 @@ export function MonthHeatmap({
       <div className="grid grid-cols-[2.5rem_repeat(12,minmax(0,1fr))] gap-[3px] sm:gap-1">
         <span />
         {MONTH_INITIALS.map((l, i) => (
-          <span key={i} aria-hidden className="pb-0.5 text-center text-[11px] text-muted">
+          <span key={i} aria-hidden className="pb-0.5 text-center font-mono text-[10.5px] text-muted">
             {l}
           </span>
         ))}
@@ -94,7 +94,7 @@ export function MonthHeatmap({
                   onBlur={() => setFocus((f) => (f === m ? null : f))}
                   style={{ background: RAMP[b] }}
                   className={cx(
-                    "aspect-square rounded-[4px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)]",
+                    "aspect-square rounded-[2px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)] motion-reduce:hover:scale-100",
                     m === currentMonth && "shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--accent)]",
                   )}
                 />
@@ -106,12 +106,12 @@ export function MonthHeatmap({
       <div className="flex items-center justify-end gap-1.5 text-[12px] text-muted" aria-hidden>
         Menos
         {RAMP.map((c, i) => (
-          <span key={i} className="size-3 rounded-[3px]" style={{ background: c }} />
+          <span key={i} className="size-3 rounded-[2px]" style={{ background: c }} />
         ))}
         Más
       </div>
       <details className="text-sm">
-        <summary className="cursor-pointer text-[13px] text-muted select-none">Ver como tabla</summary>
+        <summary className="kicker inline-flex min-h-11 cursor-pointer items-center select-none hover:text-fg">Ver como tabla</summary>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[22rem] text-[13px]">
             <thead>
@@ -145,7 +145,7 @@ export function MonthHeatmap({
 function Row({ year, children }: { year: string; children: React.ReactNode }) {
   return (
     <>
-      <span className="tabular self-center text-[12px] text-muted">{year}</span>
+      <span className="self-center font-mono text-[11px] text-muted tabular">{year}</span>
       {children}
     </>
   );
@@ -200,7 +200,7 @@ export function MonthColumns({
                 onPointerLeave={() => setHover((x) => (x === i ? null : x))}
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover((x) => (x === i ? null : x))}
-                className={cx("group relative flex items-end justify-center rounded-t-md transition-colors", hover === i && "bg-surface-2/70")}
+                className={cx("group relative flex items-end justify-center rounded-t-[4px] transition-colors", hover === i && "bg-surface-2/70")}
               >
                 <span
                   className={cx(
@@ -222,7 +222,7 @@ export function MonthColumns({
       </div>
       <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }} aria-hidden>
         {months.map((m) => (
-          <span key={m} className={cx("text-center text-[11px]", m === selected ? "font-semibold text-fg" : "text-muted")}>
+          <span key={m} className={cx("text-center font-mono text-[10.5px] uppercase", m === selected ? "font-semibold text-fg" : "text-muted")}>
             {short(m).slice(0, 3)}
           </span>
         ))}
@@ -240,7 +240,7 @@ export function WeekdayBars({ values }: { values: number[] }) {
   return (
     <ul className="grid gap-2">
       {values.map((v, i) => (
-        <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)_3rem] items-center gap-3 text-[13px]">
+        <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)_3rem] items-center gap-3 border-b border-line py-1.5 text-[14px] last:border-b-0">
           <span className={cx(i === top ? "font-medium text-fg" : "text-muted")}>{labels[i]}</span>
           <span className="block h-2.5">
             <span
@@ -248,7 +248,7 @@ export function WeekdayBars({ values }: { values: number[] }) {
               style={{ width: `${Math.max(2, (v / max) * 100)}%` }}
             />
           </span>
-          <span className="tabular text-right text-muted" title={`${v} entradas`}>
+          <span className="text-right font-mono text-[12px] text-muted tabular" title={`${v} entradas`}>
             {Math.round((v / total) * 100)}%
           </span>
         </li>

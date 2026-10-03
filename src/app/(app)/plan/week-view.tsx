@@ -100,47 +100,47 @@ export function WeekView({
         }
       />
 
-      <main className="mx-auto max-w-6xl px-4 lg:px-8">
+      <main className="mx-auto max-w-6xl px-4 lg:px-10">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 lg:pt-5">
           <div className="flex items-center gap-1">
             <Link
               href={`/plan?semana=${prev}`}
               aria-label="Semana anterior"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg hover:bg-surface-2"
             >
-              <CaretLeft size={18} weight="bold" />
+              <CaretLeft size={18} />
             </Link>
-            <h2 className="tabular min-w-36 text-center text-[15px] font-semibold">
+            <h2 className="display min-w-40 text-center text-[21px]">
               {formatShort(monday)} al {formatShort(addDays(monday, 6))}
             </h2>
             <Link
               href={`/plan?semana=${next}`}
               aria-label="Semana siguiente"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg hover:bg-surface-2"
             >
-              <CaretRight size={18} weight="bold" />
+              <CaretRight size={18} />
             </Link>
           </div>
           {!isThisWeek && (
-            <Link href="/plan" className="text-sm font-medium text-accent-fg hover:underline">
+            <Link href="/plan" className="inline-flex min-h-11 items-center text-sm font-medium text-accent-fg hover:underline">
               Esta semana
             </Link>
           )}
           {work.length > 0 && (
-            <p className="tabular ml-auto text-[13px] text-muted">
+            <p className="kicker tabular ml-auto">
               {doneCount} de {work.length} hechos
             </p>
           )}
         </div>
         {copyMsg && (
-          <p role="status" className="mb-3 rounded-md bg-accent-soft px-3 py-2 text-[13px] text-accent-fg">
+          <p role="status" className="mb-3 border-l-[1.5px] border-accent py-1 pl-3 text-[14px] text-accent-fg">
             {copyMsg}
           </p>
         )}
 
         {/* Celular: tira de días + lista del día elegido */}
         <div className="lg:hidden">
-          <div className="grid grid-cols-7 gap-1.5 pb-4" role="tablist" aria-label="Días">
+          <div className="grid grid-cols-7 gap-1 border-y border-line py-2 mb-5" role="tablist" aria-label="Días">
             {days.map((d) => {
               const active = d === selected;
               const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
@@ -153,23 +153,28 @@ export function WeekView({
                   aria-selected={active}
                   onClick={() => setSelected(d)}
                   className={cx(
-                    "relative flex flex-col items-center rounded-[12px] pt-1.5 pb-2 transition-colors",
-                    active ? "bg-accent text-on-accent" : "bg-surface-2 text-fg hover:bg-surface-3",
+                    "relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[6px] transition-colors",
+                    active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
                   )}
                 >
-                  <span className={cx("text-[11px]", active ? "text-on-accent/85" : "text-muted")}>
+                  <span
+                    className={cx(
+                      "font-mono text-[10px] font-medium tracking-[0.08em] uppercase",
+                      active ? "text-on-ink/75" : "text-muted",
+                    )}
+                  >
                     {SHORT[weekday(d)]}
                   </span>
-                  <span className="tabular text-[17px] font-semibold">{Number(d.slice(8))}</span>
+                  <span className="figure text-[21px]">{Number(d.slice(8))}</span>
                   <span
                     className={cx(
                       "mt-0.5 h-1.5 w-1.5 rounded-full",
-                      count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-accent" : "bg-accent") : active ? "bg-on-accent/50" : "bg-faint",
+                      count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-ink" : "bg-accent") : active ? "bg-on-ink/50" : "bg-faint",
                     )}
                     aria-hidden
                   />
                   {d === today && !active && (
-                    <span className="absolute inset-x-3 top-0 h-[3px] rounded-b-full bg-accent" aria-hidden />
+                    <span className="absolute inset-x-3 top-0 h-[2px] rounded-b-full bg-accent" aria-hidden />
                   )}
                 </button>
               );
@@ -188,17 +193,24 @@ export function WeekView({
         </div>
 
         {/* Escritorio: tablero de 7 columnas */}
-        <div className="hidden grid-cols-7 gap-2.5 lg:grid">
+        <div className="hidden grid-cols-7 border-t border-fg/80 lg:grid">
           {days.map((d) => {
             const list = byDay.get(d)!;
             return (
-              <section key={d} aria-label={WEEKDAY_LONG[weekday(d)]} className="grid content-start gap-2">
-                <header className="flex items-baseline gap-1.5 px-1 pb-1">
-                  <span className={cx("text-[13px] font-semibold", d === today ? "text-accent-fg" : "text-fg")}>
-                    {WEEKDAY_LONG[weekday(d)]}
+              <section
+                key={d}
+                aria-label={WEEKDAY_LONG[weekday(d)]}
+                className={cx(
+                  "grid min-h-[60dvh] content-start border-r border-line px-2 pb-6 first:pl-0 last:border-r-0 last:pr-0",
+                  d === today && "bg-[color-mix(in_oklab,var(--accent)_4%,transparent)]",
+                )}
+              >
+                <header className="flex items-end justify-between gap-1.5 border-b border-line px-1 pt-3 pb-2.5">
+                  <span className="grid gap-0.5">
+                    <span className={cx("kicker", d === today && "text-accent-fg!")}>{WEEKDAY_LONG[weekday(d)]}</span>
+                    <span className="figure text-[30px]">{Number(d.slice(8))}</span>
                   </span>
-                  <span className="tabular text-[13px] text-muted">{Number(d.slice(8))}</span>
-                  <span className="tabular ml-auto text-[12px] text-faint">{list.length || ""}</span>
+                  <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.length || ""}</span>
                 </header>
                 {list.map((b) => (
                   <BlockCard
@@ -214,7 +226,7 @@ export function WeekView({
                 <button
                   type="button"
                   onClick={() => openNew(d)}
-                  className="flex h-9 items-center gap-1.5 rounded-[10px] px-2 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+                  className="mt-1 flex h-10 items-center gap-1.5 rounded-[4px] px-1 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
                 >
                   <Plus size={14} /> Nuevo
                 </button>
@@ -228,9 +240,9 @@ export function WeekView({
         type="button"
         onClick={() => openNew(selected)}
         aria-label="Nuevo bloque"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
       >
-        <Plus size={26} weight="bold" />
+        <Plus size={24} />
       </button>
 
       <BlockSheet ref={sheet} categories={categories} habits={habits} tasks={tasks} />
@@ -259,22 +271,22 @@ function DayList({
 }) {
   return (
     <section aria-label={WEEKDAY_LONG[weekday(day)]}>
-      <h3 className="pb-2 text-[13px] font-medium text-muted">
+      <h3 className="display pb-3 text-[24px] first-letter:uppercase">
         {day === today ? "Hoy, " : ""}
         {WEEKDAY_LONG[weekday(day)].toLowerCase()} {Number(day.slice(8))}
       </h3>
       {blocks.length === 0 ? (
-        <div className="grid justify-items-start gap-2 rounded-[14px] border border-dashed border-line-strong p-6">
-          <p className="text-sm text-muted">Nada planeado para este día.</p>
+        <div className="grid justify-items-start gap-3 border-t border-line py-8">
+          <p className="display text-[20px] text-muted italic">Nada planeado para este día.</p>
           <Button variant="outline" size="sm" onClick={onNew}>
             <Plus size={15} /> Agregar bloque
           </Button>
         </div>
       ) : (
-        <ol className="grid gap-2">
+        <ol className="grid border-t border-line">
           {blocks.map((b) => (
-            <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-2">
-              <span className="tabular pt-3 text-right text-[12px] leading-tight text-muted">
+            <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-3 border-b border-line">
+              <span className="pt-3.5 text-right font-mono text-[11.5px] leading-tight text-muted tabular">
                 {b.startTime ? b.startTime.replace(/^0/, "") : "Todo el día"}
                 {b.endTime && <span className="block text-faint">{b.endTime.replace(/^0/, "")}</span>}
               </span>
@@ -313,16 +325,16 @@ function BlockCard({
   return (
     <article
       className={cx(
-        "group relative flex items-start gap-2 rounded-[12px] border p-2.5 transition-colors",
-        free ? "border-dashed border-line-strong bg-transparent" : "border-line bg-surface hover:border-line-strong",
-        b.done && !free && "bg-surface-2/60",
+        "group relative flex items-start gap-2 transition-colors",
+        compact ? "border-b border-line px-1 py-2.5" : "py-2.5 pr-1",
+        free && "opacity-80",
       )}
     >
       <button type="button" onClick={onEdit} className="grid min-w-0 flex-1 gap-1.5 text-left">
         <span
           className={cx(
-            "text-[14px] leading-snug font-medium",
-            free && "text-muted",
+            "text-[14.5px] leading-snug font-medium",
+            free && "font-serif text-[16px] font-normal text-muted italic",
             b.done && !free && "text-muted line-through decoration-faint",
           )}
         >
@@ -338,7 +350,7 @@ function BlockCard({
             </span>
           )}
         </span>
-        {compact && range && <span className="tabular text-[12px] text-muted">{range}</span>}
+        {compact && range && <span className="font-mono text-[11px] text-muted tabular">{range}</span>}
         {b.place && (
           <span className="inline-flex items-center gap-1 text-[12px] text-muted">
             <MapPin size={12} aria-hidden /> {b.place}
@@ -358,10 +370,10 @@ function BlockCard({
         >
           <span
             className={cx(
-              "inline-flex size-6 items-center justify-center rounded-[7px] border-2 transition-colors",
+              "inline-flex size-[22px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
               b.done
                 ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
-                : "border-line-strong bg-surface",
+                : "border-fg/45 bg-transparent group-hover:border-fg/70",
             )}
           >
             {b.done && <Check size={14} weight="bold" />}

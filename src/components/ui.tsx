@@ -17,12 +17,13 @@ export function Button({ variant = "primary", size = "md", className, ...props }
     <button
       {...props}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-md font-medium whitespace-nowrap transition-[background-color,transform,opacity] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none",
-        size === "md" ? "h-10 px-4 text-sm" : "h-8 px-3 text-[13px]",
-        variant === "primary" && "bg-ink text-on-ink hover:opacity-90",
-        variant === "accent" && "bg-accent text-on-accent hover:opacity-90",
+        "inline-flex items-center justify-center gap-2 rounded-[4px] font-medium whitespace-nowrap transition-[background-color,border-color,color,transform,opacity] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none motion-reduce:active:scale-100",
+        size === "md" ? "h-11 px-4 text-[14px]" : "h-9 px-3 text-[13px]",
+        variant === "primary" && "bg-ink text-on-ink hover:opacity-85",
+        // En Papel la acción principal se escribe con tinta: "accent" queda como alias de primary.
+        variant === "accent" && "bg-ink text-on-ink hover:opacity-85",
         variant === "ghost" && "text-fg hover:bg-surface-2",
-        variant === "outline" && "border border-line-strong text-fg hover:bg-surface-2",
+        variant === "outline" && "border border-line-strong bg-transparent text-fg hover:border-fg/40 hover:bg-surface-2",
         variant === "danger" && "text-danger hover:bg-[var(--st-fail-bg)]",
         className,
       )}
@@ -44,7 +45,7 @@ export function IconButton({
       className={cx(
         // El área táctil se agranda 4px por lado sin cambiar el tamaño visible (44px con size-9).
         !/\b(absolute|fixed|sticky)\b/.test(className ?? "") && "relative",
-        "inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-95",
+        "inline-flex size-9 items-center justify-center rounded-[4px] text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-95 motion-reduce:active:scale-100",
         className,
       )}
     >
@@ -66,7 +67,7 @@ export function Field({
 }) {
   return (
     <label className={cx("grid gap-1.5", className)}>
-      <span className="text-[13px] font-medium text-muted">{label}</span>
+      <span className="kicker">{label}</span>
       {children}
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </label>
@@ -74,7 +75,7 @@ export function Field({
 }
 
 export const inputClass =
-  "h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-sm text-fg placeholder:text-faint outline-none transition-colors focus:border-fg/40 focus:ring-2 focus:ring-[var(--focus)]";
+  "h-11 w-full rounded-[4px] border border-line-strong bg-surface px-3 text-[15px] text-fg placeholder:text-faint outline-none transition-colors focus:border-fg/50 focus:ring-2 focus:ring-[var(--focus)]";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
@@ -95,7 +96,7 @@ export function Segmented<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="grid auto-cols-fr grid-flow-col rounded-md bg-surface-2 p-0.5" role="radiogroup">
+    <div className="grid auto-cols-fr grid-flow-col rounded-[5px] border border-line bg-surface-2 p-[3px]" role="radiogroup">
       {options.map((o) => (
         <button
           type="button"
@@ -104,8 +105,8 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            "h-8 rounded-[5px] px-2 text-[13px] font-medium transition-colors",
-            value === o.value ? "bg-raised text-fg shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-muted hover:text-fg",
+            "h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors",
+            value === o.value ? "bg-raised text-fg shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)]" : "text-muted hover:text-fg",
           )}
         >
           {o.label}
@@ -144,20 +145,20 @@ export const Sheet = forwardRef<
         if (e.target === dlg.current) dlg.current?.close();
       }}
     >
-      <div className="flex items-center justify-between border-b border-line px-5 py-3">
-        <h2 className="text-[15px] font-semibold">{title}</h2>
+      <div className="flex items-center justify-between border-b border-line py-3 pr-3 pl-5">
+        <h2 className="display truncate text-[22px]">{title}</h2>
         <IconButton label="Cerrar" type="button" onClick={() => dlg.current?.close()}>
           <X size={18} />
         </IconButton>
       </div>
-      <div className="max-h-[calc(92dvh-56px)] overflow-y-auto px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <div className="max-h-[calc(92dvh-60px)] overflow-y-auto px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {children}
       </div>
     </dialog>
   );
 });
 
-/** Cuadrado de color con el ícono de la categoría, como en HabitNow. */
+/** Cuadrado de color con el ícono de la categoría, como en HabitNow (en Papel: pastel con tinta). */
 export function ToneSquare({
   children,
   size = 40,
@@ -170,7 +171,7 @@ export function ToneSquare({
   return (
     <span
       style={{ ...style, width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[10px] bg-tone-solid text-white"
+      className="inline-flex shrink-0 items-center justify-center rounded-[8px] bg-tone text-tone-fg"
     >
       {children}
     </span>

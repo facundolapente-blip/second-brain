@@ -12,7 +12,7 @@ export function CategoryTag({ category, className }: { category?: CategoryDTO | 
     <span
       style={tone(category.color)}
       className={cx(
-        "inline-flex h-[22px] items-center rounded-[5px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
+        "inline-flex h-[22px] items-center rounded-[3px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
         className,
       )}
     >
@@ -26,7 +26,7 @@ export function StatusPill({ label, toneKey }: { label: string; toneKey: string 
   return (
     <span
       style={tone(toneKey)}
-      className="inline-flex h-[22px] items-center rounded-full bg-tone px-2 text-[12px] leading-none font-medium whitespace-nowrap text-tone-fg"
+      className="inline-flex h-[22px] items-center gap-1.5 rounded-full bg-tone px-2 font-mono text-[10.5px] leading-none font-medium tracking-[0.06em] whitespace-nowrap text-tone-fg uppercase"
     >
       {label}
     </span>
@@ -48,7 +48,7 @@ export function Fires({ n, size = 13 }: { n: number; size?: number }) {
 /** Selector de prioridad: tocás el fueguito que querés (tocar el mismo lo baja a 0). */
 export function FirePicker({ value, onChange, name }: { value: number; onChange: (n: number) => void; name?: string }) {
   return (
-    <div className="flex h-10 items-center gap-0.5" role="radiogroup" aria-label="Prioridad">
+    <div className="flex h-11 items-center gap-0.5" role="radiogroup" aria-label="Prioridad">
       {[1, 2, 3, 4].map((p) => (
         <button
           key={p}
@@ -58,7 +58,7 @@ export function FirePicker({ value, onChange, name }: { value: number; onChange:
           aria-label={`${p} ${p === 1 ? "fueguito" : "fueguitos"}`}
           onClick={() => onChange(value === p ? 0 : p)}
           className={cx(
-            "inline-flex size-10 items-center justify-center rounded-md transition-colors",
+            "inline-flex size-11 items-center justify-center rounded-[4px] transition-colors",
             p <= value ? "text-[var(--p-orange-solid)]" : "text-faint hover:text-muted",
           )}
         >
@@ -80,11 +80,11 @@ export function ProgressSquares({ pct, label }: { pct: number | null; label?: st
         {Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
-            className={cx("size-[9px] rounded-[2px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-surface-3")}
+            className={cx("h-[10px] w-[7px] rounded-[1px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-line-strong/70")}
           />
         ))}
       </span>
-      {label && <span className="tabular text-[12px] text-muted">{label}</span>}
+      {label && <span className="font-mono text-[11px] text-muted tabular">{label}</span>}
     </span>
   );
 }

@@ -90,7 +90,7 @@ export function HabitsList({
             {archived ? (
               <Link
                 href="/habitos/lista"
-                className="inline-flex h-9 items-center rounded-md px-2 text-sm text-accent hover:bg-surface-2"
+                className="inline-flex h-11 items-center rounded-[4px] px-2 text-sm font-medium text-accent-fg hover:bg-surface-2"
               >
                 Volver
               </Link>
@@ -99,7 +99,7 @@ export function HabitsList({
                 href="/habitos/archivados"
                 aria-label="Archivados"
                 title="Archivados"
-                className="inline-flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Archive size={21} />
               </Link>
@@ -118,9 +118,9 @@ export function HabitsList({
         }
       />
 
-      <main className="mx-auto grid max-w-3xl gap-3 px-3 pt-2 sm:px-4 lg:px-8 lg:pt-5">
+      <main className="mx-auto grid max-w-3xl px-4 pt-2 lg:px-10 lg:pt-4">
         {(searching || activeCategory) && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 pb-3">
             {searching && (
               <input
                 autoFocus
@@ -128,7 +128,7 @@ export function HabitsList({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar hábito"
                 aria-label="Buscar hábito"
-                className="h-10 min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--focus)]"
+                className="h-11 min-w-0 flex-1 rounded-[4px] border border-line-strong bg-surface px-3 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-[var(--focus)]"
               />
             )}
             {activeCategory && (
@@ -136,7 +136,7 @@ export function HabitsList({
                 type="button"
                 onClick={() => setCategory(null)}
                 style={tone(activeCategory.color)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-tone px-2.5 text-[13px] font-medium text-tone-fg"
+                className="inline-flex h-9 items-center gap-1.5 rounded-[4px] bg-tone px-2.5 text-[13px] font-medium text-tone-fg"
               >
                 {activeCategory.name}
                 <X size={13} weight="bold" />
@@ -146,7 +146,7 @@ export function HabitsList({
         )}
 
         {habits.length === 0 ? (
-          <div className="mt-4 rounded-[12px] border border-dashed border-line-strong p-8 text-sm text-muted">
+          <div className="mt-6 border-y border-line py-10 text-[15px] text-muted">
             {archived ? (
               "No hay hábitos archivados."
             ) : (
@@ -159,7 +159,7 @@ export function HabitsList({
             )}
           </div>
         ) : visible.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted">Ningún hábito coincide.</p>
+          <p className="display py-16 text-center text-[22px] text-muted italic">Ningún hábito coincide.</p>
         ) : (
           visible.map((h, i) => (
             <HabitCard
@@ -209,24 +209,24 @@ function HabitCard({
   return (
     <article
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise rounded-[14px] border border-line bg-surface px-4 pt-3.5 pb-2"
+      className="rise border-b border-line pt-5 pb-2 first-of-type:border-t"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1">
-          <h2 className="truncate text-[16px] font-semibold tracking-tight">{habit.name}</h2>
+          <h2 className="display truncate text-[22px]">{habit.name}</h2>
           <span>
             <HabitBadge habit={habit} />
           </span>
         </div>
-        <ToneSquare size={36} style={tone(habit.color)}>
+        <ToneSquare size={38} style={tone(habit.color)}>
           <HabitIcon name={habit.icon} size={20} weight="fill" />
         </ToneSquare>
       </div>
 
-      <div className="mt-3 grid grid-cols-7 justify-items-center gap-1">
+      <div className="mt-4 grid grid-cols-7 justify-items-center gap-1">
         {days.map((d) => (
           <div key={d} className="grid justify-items-center gap-1.5">
-            <span className={cx("text-[12px]", d === today ? "font-semibold text-fg" : "text-muted")}>
+            <span className={cx("font-mono text-[10.5px] tracking-[0.08em] uppercase", d === today ? "font-semibold text-fg" : "text-muted")}>
               {WEEKDAY_SHORT[weekday(d)]}
             </span>
             <DayCircle date={d} state={dayState(habit, logs, d, today)} onTap={() => tap(d)} />
@@ -234,21 +234,23 @@ function HabitCard({
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-[13px] font-medium" style={tone(habit.color)}>
-        <span className="tabular inline-flex items-center gap-1 text-fg" title="Racha actual">
-          <LinkSimple size={16} weight="bold" className="text-tone-fg" />
-          {streak}
+      <div className="mt-3 flex items-center gap-5 text-[13px]" style={tone(habit.color)}>
+        <span className="inline-flex items-baseline gap-1.5 text-muted" title="Racha actual">
+          <LinkSimple size={14} weight="bold" className="self-center text-tone-fg" aria-hidden />
+          <span className="figure text-[19px] text-fg">{streak}</span>
+          <span className="sr-only">de racha</span>
         </span>
-        <span className="tabular inline-flex items-center gap-1 text-fg" title="Puntaje del hábito">
-          <CheckCircle size={16} weight="bold" className="text-tone-fg" />
-          {score}%
+        <span className="inline-flex items-baseline gap-1.5 text-muted" title="Puntaje del hábito">
+          <CheckCircle size={14} weight="bold" className="self-center text-tone-fg" aria-hidden />
+          <span className="figure text-[19px] text-fg">{score}%</span>
+          <span className="sr-only">de puntaje</span>
         </span>
         <div className="ml-auto flex items-center">
           <Link
             href={`/habitos/${habit.id}?tab=calendario`}
             aria-label="Calendario"
             title="Calendario"
-            className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <CalendarBlank size={20} />
           </Link>
@@ -256,7 +258,7 @@ function HabitCard({
             href={`/habitos/${habit.id}?tab=estadisticas`}
             aria-label="Estadísticas"
             title="Estadísticas"
-            className="inline-flex size-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <ChartBar size={20} />
           </Link>

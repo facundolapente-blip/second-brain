@@ -79,7 +79,7 @@ export function HomeActions({
 
       {searching && (
         <div className="absolute inset-x-0 top-[env(safe-area-inset-top)] z-10 bg-bg">
-          <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4 lg:h-16 lg:px-8">
+          <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-24 lg:px-10">
             <MagnifyingGlass size={18} className="shrink-0 text-muted" />
             <input
               autoFocus
@@ -90,9 +90,9 @@ export function HomeActions({
               placeholder="Buscar en el journal"
               aria-label="Buscar en el journal"
               enterKeyHint="search"
-              className="h-10 min-w-0 flex-1 bg-transparent text-[16px] outline-none! placeholder:text-faint"
+              className="display h-11 min-w-0 flex-1 bg-transparent text-[22px] outline-none! placeholder:text-faint"
             />
-            <button type="button" onClick={closeSearch} className="h-9 shrink-0 px-2 text-sm font-medium text-accent-fg">
+            <button type="button" onClick={closeSearch} className="h-11 shrink-0 px-2 text-sm font-medium text-accent-fg">
               Cancelar
             </button>
           </div>
@@ -102,7 +102,7 @@ export function HomeActions({
       <Sheet ref={sheet} title="Filtrar">
         <div className="grid gap-6">
           <section className="grid gap-2.5">
-            <h3 className="text-[13px] font-medium text-muted">Ánimo</h3>
+            <h3 className="kicker">Ánimo</h3>
             <div className="grid grid-cols-5 gap-1.5">
               {MOODS.map((m) => {
                 const on = mood === m.value;
@@ -113,7 +113,7 @@ export function HomeActions({
                     aria-pressed={on}
                     onClick={() => nav({ animo: on ? null : String(m.value) })}
                     className={cx(
-                      "grid justify-items-center gap-1 rounded-md py-2.5 text-[12px] transition-colors",
+                      "grid min-h-16 justify-items-center gap-1 rounded-[4px] py-2.5 text-[12px] transition-colors",
                       on ? "bg-accent-soft font-medium text-accent-fg" : "text-muted hover:bg-surface-2",
                     )}
                   >
@@ -125,7 +125,7 @@ export function HomeActions({
             </div>
           </section>
           <section className="grid gap-2.5">
-            <h3 className="text-[13px] font-medium text-muted">Etiqueta</h3>
+            <h3 className="kicker">Etiqueta</h3>
             {tags.length === 0 ? (
               <p className="text-sm text-muted">Todavía no usaste etiquetas. Se agregan al final de cada entrada.</p>
             ) : (
@@ -139,7 +139,7 @@ export function HomeActions({
                       aria-pressed={on}
                       onClick={() => nav({ etiqueta: on ? null : t })}
                       className={cx(
-                        "h-8 rounded-full border px-3 text-[13px] transition-colors",
+                        "h-9 rounded-full border px-3 text-[13px] transition-colors",
                         on ? "border-accent bg-accent-soft font-medium text-accent-fg" : "border-line-strong text-fg hover:bg-surface-2",
                       )}
                     >
@@ -216,50 +216,48 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
   return (
     <section
       aria-label={title}
-      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 rounded-[14px] border border-line bg-surface-2/60 p-4 lg:p-5"
+      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-4 border-y border-line py-5"
       style={{ "--i": 1 } as React.CSSProperties}
     >
-      <div className="flex items-start gap-2.5 pr-10">
-        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-accent-fg">
-          <ClockCounterClockwise size={18} weight="bold" aria-hidden />
-        </span>
-        <div className="grid min-w-0">
-          <h2 className="text-[15px] leading-tight font-semibold">{title}</h2>
-          <p className="text-[13px] text-muted">{line}</p>
-        </div>
+      <div className="grid min-w-0 gap-1 pr-12">
+        <h2 className="kicker flex items-center gap-1.5 text-accent-fg!">
+          <ClockCounterClockwise size={14} weight="bold" aria-hidden />
+          {title}
+        </h2>
+        <p className="text-[14px] text-muted">{line}</p>
       </div>
-      <IconButton label="Cerrar recuerdo por hoy" onClick={dismiss} className="absolute top-3 right-3">
+      <IconButton label="Cerrar recuerdo por hoy" onClick={dismiss} className="absolute top-3 right-0">
         <X size={16} />
       </IconButton>
 
       <Link
         href={`/journal/${first.id}`}
-        className="group grid gap-1.5 rounded-[10px] border-l-2 border-accent/40 py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
+        className="group grid gap-2 border-l-[1.5px] border-accent/50 py-1 pr-2 pl-5 transition-colors hover:border-accent lg:pl-6"
       >
-        <span className="text-[12.5px] text-muted">
+        <span className="kicker">
           {memory.kind === "years" ? `${yearsAgo(first.date, today)}, ` : ""}
           {formatShort(first.date)}
           {showYear(first.date) && ` ${first.date.slice(0, 4)}`}
         </span>
-        {first.title && <span className="font-serif text-[17px] leading-snug font-semibold">{first.title}</span>}
-        <span className="prose-serif line-clamp-3 text-[16px] leading-[1.6] text-fg/85">
+        {first.title && <span className="display text-[22px] leading-snug">{first.title}</span>}
+        <span className="prose-serif line-clamp-3 text-[19px] leading-[1.55] text-fg/90 italic">
           {first.excerpt || (!first.title && "Sin texto")}
         </span>
       </Link>
 
       {rest.length > 0 && (
-        <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5 border-t border-line pt-2">
+        <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line border-t border-line">
           {rest.slice(0, 3).map((e) => (
             <li key={e.id}>
               <Link
                 href={`/journal/${e.id}`}
-                className="flex min-h-11 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-3 active:bg-surface-3"
+                className="flex min-h-11 items-center gap-3 px-1 py-2 transition-colors hover:bg-surface-2 active:bg-surface-2"
               >
-                <span className="tabular min-w-[78px] shrink-0 text-[13px] text-muted">
+                <span className="min-w-[84px] shrink-0 font-mono text-[11.5px] text-muted tabular">
                   {formatShort(e.date)}
                   {showYear(e.date) && ` ${e.date.slice(0, 4)}`}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-serif text-[15px]">{e.title || e.excerpt || "Sin texto"}</span>
+                <span className="min-w-0 flex-1 truncate font-serif text-[16px]">{e.title || e.excerpt || "Sin texto"}</span>
                 {e.mood && (
                   <span className="shrink-0 text-muted">
                     <MoodIcon mood={e.mood} size={18} />
@@ -279,12 +277,12 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
-    <div className="grid justify-items-start gap-3 rounded-[14px] border border-dashed border-line-strong p-8">
-      <span className="inline-flex size-10 items-center justify-center rounded-[10px] bg-accent-soft text-accent-fg">
-        <PenNib size={22} aria-hidden />
-      </span>
-      <h2 className="font-serif text-[22px] leading-tight font-semibold tracking-tight">Todavía no escribiste nada</h2>
-      <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
+    <div className="grid justify-items-start gap-3 border-y border-line py-10">
+      <p className="kicker flex items-center gap-1.5">
+        <PenNib size={14} aria-hidden /> Primera página
+      </p>
+      <h2 className="display text-[32px]">Todavía no escribiste nada</h2>
+      <p className="max-w-[52ch] text-[15px] leading-relaxed text-muted">
         Una entrada por día alcanza. Contá qué pasó, cómo te sentiste y qué te quedó dando vueltas. Se guarda sola mientras escribís.
       </p>
       <Button variant="accent" onClick={() => write()} disabled={pending}>

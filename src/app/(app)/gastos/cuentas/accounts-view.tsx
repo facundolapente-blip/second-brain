@@ -130,21 +130,21 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           <>
             <section className="grid gap-3 pt-2 pb-5 lg:pt-6">
               {Object.keys(totals).length > 0 && (
-                <dl className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
+                <dl className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] border-t border-line">
                   {Object.keys(totals)
                     .sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
                     .map((c) => {
                       const n = active.filter((a) => a.currency === c).length;
                       return (
-                        <div key={c} className="grid gap-1 rounded-[12px] border border-line bg-surface px-3.5 py-3">
-                          <dt className="flex items-center justify-between gap-2 text-[13px] text-muted">
+                        <div key={c} className="grid gap-1.5 border-b border-line py-4 pr-4">
+                          <dt className="kicker flex items-center justify-between gap-2">
                             Total en {CURRENCY_NAME[c] ?? c}
-                            <span className="rounded-[4px] bg-surface-2 px-1.5 py-px font-mono text-[11px]">{c}</span>
+                            <span className="rounded-[3px] border border-line-strong px-1.5 py-px font-mono text-[10.5px] tracking-normal">{c}</span>
                           </dt>
-                          <dd className="text-[clamp(1.25rem,5.6vw,1.625rem)] leading-tight font-semibold tracking-[-0.02em]">
+                          <dd className="figure text-[clamp(2rem,9vw,2.75rem)]">
                             <Balance cents={totals[c]} currency={c} hero />
                           </dd>
-                          <dd className="text-[12px] text-muted">{n === 1 ? "1 cuenta" : `${n} cuentas`}</dd>
+                          <dd className="text-[13px] text-muted">{n === 1 ? "1 cuenta" : `${n} cuentas`}</dd>
                         </div>
                       );
                     })}
@@ -152,13 +152,13 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
               )}
             </section>
 
-            <ul className="grid gap-0.5 border-t border-line pt-2">
+            <ul className="grid divide-y divide-line border-y border-line">
               {sorted.map((a, i) => (
                 <li key={a.id} className="rise flex items-center gap-1" style={{ "--i": i } as React.CSSProperties}>
                   <button
                     type="button"
                     onClick={() => (sorting ? undefined : edit(a))}
-                    className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[12px] px-2 py-3 text-left transition-colors hover:bg-surface-2"
+                    className="flex min-h-16 min-w-0 flex-1 items-center gap-3.5 px-1 py-3 text-left transition-colors hover:bg-surface-2/70"
                   >
                     <AccountAvatar account={a} size={40} />
                     <span className="grid min-w-0 flex-1 gap-0.5">
@@ -167,7 +167,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                         {ACCOUNT_TYPES[a.type] ?? a.type} · {a.currency}
                       </span>
                     </span>
-                    <Balance cents={a.balanceCents} currency={a.currency} className="text-[15px] font-medium" />
+                    <Balance cents={a.balanceCents} currency={a.currency} className="font-mono text-[14px] font-medium" />
                     {!sorting && <CaretRight size={14} className="text-muted" aria-hidden />}
                   </button>
                   {sorting && (
@@ -186,7 +186,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
 
             {archived.length > 0 && (
               <details className="mt-6 border-t border-line pt-3">
-                <summary className="cursor-pointer px-2 py-1 text-sm text-muted select-none">
+                <summary className="kicker inline-flex min-h-11 cursor-pointer items-center px-1 select-none hover:text-fg">
                   Archivadas ({archived.length})
                 </summary>
                 <ul className="mt-1 grid gap-0.5">
@@ -195,7 +195,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                       <button
                         type="button"
                         onClick={() => edit(a)}
-                        className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left opacity-70 transition-colors hover:bg-surface-2"
+                        className="flex w-full items-center gap-3.5 px-1 py-2.5 text-left opacity-70 transition-colors hover:bg-surface-2"
                       >
                         <AccountAvatar account={a} size={34} />
                         <span className="min-w-0 flex-1 truncate text-[15px]">{a.name}</span>
@@ -250,7 +250,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           />
 
           <Field label="Saldo inicial" hint="Lo que tenía la cuenta antes del primer movimiento que cargues. Puede ser negativo.">
-            <span className="flex h-10 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+            <span className="flex h-10 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
               <span className="text-sm text-muted">{currencySymbol(draft.currency)}</span>
               <input
                 name="initialBalance"
@@ -266,7 +266,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           </Field>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Color</span>
+            <span className="kicker">Color</span>
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((p) => (
                 <button
@@ -359,7 +359,7 @@ function ChipGroup({
 }) {
   return (
     <div className="grid gap-2">
-      <span className="text-[13px] font-medium text-muted">{label}</span>
+      <span className="kicker">{label}</span>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={label}>
         {options.map((o) => (
           <button
@@ -370,7 +370,7 @@ function ChipGroup({
             disabled={disabled && value !== o.value}
             onClick={() => onChange(o.value)}
             className={cx(
-              "h-9 rounded-md border px-3 text-[13px] transition-colors disabled:opacity-40",
+              "h-9 rounded-[4px] border px-3 text-[13px] transition-colors disabled:opacity-40",
               value === o.value ? "border-fg bg-ink font-medium text-on-ink" : "border-line-strong hover:bg-surface-2",
             )}
           >
@@ -394,7 +394,7 @@ function IconBtn({
       aria-label={label}
       title={label}
       {...props}
-      className="inline-flex size-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-30"
+      className="inline-flex size-10 items-center justify-center rounded-[4px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-30"
     >
       {children}
     </button>

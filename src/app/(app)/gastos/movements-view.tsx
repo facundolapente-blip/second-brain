@@ -107,7 +107,7 @@ export function MovementsView({
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 lg:px-8">
+      <main className="mx-auto max-w-3xl px-4 lg:px-10">
         {!hasAccounts ? (
           <EmptyBlock title="Empezá por tus cuentas" icon={<Bank size={22} aria-hidden />}>
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
@@ -116,7 +116,7 @@ export function MovementsView({
             </p>
             <Link
               href="/gastos/cuentas?nueva=1"
-              className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+              className="inline-flex h-11 items-center rounded-[4px] bg-ink px-4 text-sm font-medium text-on-ink transition-opacity hover:opacity-85"
             >
               Crear cuenta
             </Link>
@@ -129,13 +129,13 @@ export function MovementsView({
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
                 </div>
                 <div className="grid gap-1">
-                  <span className="text-[13px] text-muted">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
+                  <span className="kicker">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
                   <NetHero cents={net[mainCur] ?? 0} currency={mainCur} />
                   {netCurrencies.slice(1).map((c) => (
-                    <Amount key={c} cents={net[c]} currency={c} className="text-[17px] font-semibold text-fg" />
+                    <Amount key={c} cents={net[c]} currency={c} className="figure text-[24px] text-fg" />
                   ))}
                 </div>
-                <dl className="grid grid-cols-2 gap-2">
+                <dl className="grid grid-cols-2 divide-x divide-line border-y border-line">
                   <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
                   <FlowTile label="Gastos" totals={flows.exp} kind="out" />
                 </dl>
@@ -157,16 +157,16 @@ export function MovementsView({
 
             {groups.length === 0 ? (
               <div className="grid justify-items-center gap-2 border-t border-line py-16 text-center">
-                <span className="inline-flex size-11 items-center justify-center rounded-full bg-surface-2 text-muted">
-                  <Receipt size={22} aria-hidden />
+                <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
+                  <Receipt size={20} aria-hidden />
                 </span>
-                <p className="text-[15px] font-medium">No hay movimientos este mes</p>
+                <p className="display text-[24px]">No hay movimientos este mes</p>
                 <p className="max-w-[34ch] text-sm text-muted">
                   {selection ? "En las cuentas elegidas. Probá con todas o con otro mes." : "Cargá el primero con el botón de más."}
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 border-t border-line pt-2">
+              <div className="grid gap-6 pt-2">
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -177,12 +177,12 @@ export function MovementsView({
                       style={{ "--i": Math.min(gi, 8) } as React.CSSProperties}
                     >
                       {/* En el celular el día queda pegado arriba mientras se recorre su lista. */}
-                      <header className="z-10 -mx-2 flex items-baseline justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
-                        <h3 className="text-[13px] font-semibold first-letter:uppercase">
+                      <header className="z-10 -mx-4 flex items-baseline justify-between gap-3 border-b border-fg/80 bg-bg/92 px-4 pt-3 pb-2 backdrop-blur-md max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
+                        <h3 className="display text-[19px] first-letter:uppercase">
                           {label}
-                          {relative && <span className="ml-2 font-normal text-muted">{formatShort(g.date)}</span>}
+                          {relative && <span className="kicker ml-2.5">{formatShort(g.date)}</span>}
                         </h3>
-                        <TotalsInline totals={g.net} className="text-[13px] font-medium" />
+                        <TotalsInline totals={g.net} className="font-mono text-[12.5px] font-medium" />
                       </header>
                       <ul>
                         {g.txs.map((t) => (
@@ -218,7 +218,7 @@ export function MovementsView({
  */
 function NetHero({ cents, currency }: { cents: number; currency: string }) {
   return (
-    <span className="text-[40px] leading-none font-semibold tracking-[-0.025em] lg:text-[44px]">
+    <span className="figure text-[52px] lg:text-[64px]">
       <Amount cents={cents} currency={currency} hero className={cx(cents > 0 && "text-fg!")} />
     </span>
   );
@@ -228,8 +228,8 @@ function NetHero({ cents, currency }: { cents: number; currency: string }) {
 function FlowTile({ label, totals, kind }: { label: string; totals: Record<string, number>; kind: "in" | "out" }) {
   const cur = sortedCurrencies(totals);
   return (
-    <div className="grid content-start gap-1 rounded-[12px] border border-line bg-surface px-3 py-2.5">
-      <dt className="flex items-center gap-1.5 text-[13px] text-muted">
+    <div className="grid content-start gap-1.5 px-0 py-3 [&+&]:pl-4">
+      <dt className="kicker flex items-center gap-1.5">
         <span
           aria-hidden
           className={cx(
@@ -241,7 +241,7 @@ function FlowTile({ label, totals, kind }: { label: string; totals: Record<strin
         </span>
         {label}
       </dt>
-      <dd className="tabular grid text-[15px] font-semibold">
+      <dd className="tabular grid font-mono text-[15px] font-medium">
         {cur.length === 0 ? <span>{moneyCents(0)}</span> : cur.map((c) => <span key={c}>{moneyCents(totals[c], c)}</span>)}
       </dd>
     </div>
@@ -252,7 +252,7 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon?: 
   return (
     <Link
       href={href}
-      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className="inline-flex h-10 items-center gap-1.5 rounded-[4px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
     >
       {icon}
       {label}

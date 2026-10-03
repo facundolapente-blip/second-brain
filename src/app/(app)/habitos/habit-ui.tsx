@@ -96,7 +96,7 @@ const STATE_CLASS: Record<DayState, string> = {
   failed: "bg-[var(--st-fail-bg)] border-[var(--st-fail-line)] text-[var(--st-fail-fg)]",
   skipped: "bg-[var(--st-skip-bg)] border-[var(--st-skip-line)] text-[var(--st-skip-fg)]",
   missed: "bg-[var(--st-fail-bg)] border-transparent text-[var(--st-fail-fg)]",
-  pending: "bg-surface border-fg/70 text-fg",
+  pending: "bg-transparent border-fg/75 text-fg",
   idle: "bg-[var(--st-idle-bg)] border-transparent text-[var(--st-idle-fg)]",
   before: "bg-transparent border-transparent text-faint",
 };
@@ -135,15 +135,15 @@ export function DayCircle({
       disabled={future || state === "before"}
       aria-label={`${formatLong(date)}${STATE_LABEL[state] ? `, ${STATE_LABEL[state]}` : ""}${hasNote ? ", con nota" : ""}`}
       className={cx(
-        "tabular relative inline-flex items-center justify-center border-2 font-medium transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:active:scale-100",
+        "tabular relative inline-flex items-center justify-center rounded-full border-[1.5px] font-medium transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:active:scale-100 motion-reduce:transition-none motion-reduce:active:scale-100",
         size === "md"
-          ? "size-10 rounded-[13px] text-[15px] sm:size-11"
-          : "size-9 rounded-[11px] text-sm sm:size-10 sm:rounded-[12px]",
-        future ? "border-line bg-transparent text-fg/80" : STATE_CLASS[state],
+          ? "size-10 text-[15px] sm:size-11"
+          : "size-9 text-sm sm:size-10",
+        future ? "border-line border-dotted bg-transparent text-fg/70" : STATE_CLASS[state],
       )}
     >
       {day}
-      {hasNote && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-accent" />}
+      {hasNote && <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-bg bg-accent" />}
     </button>
   );
 }
@@ -154,7 +154,7 @@ export function HabitBadge({ habit, text }: { habit: HabitDTO; text?: string }) 
   return (
     <span
       style={tone(habit.color)}
-      className="inline-flex items-center gap-1 rounded-[5px] bg-tone px-1.5 py-0.5 text-[12px] leading-none font-medium text-tone-fg"
+      className="inline-flex items-center gap-1 rounded-[3px] bg-tone px-1.5 py-[3px] text-[12px] leading-none font-medium text-tone-fg"
     >
       {text ?? frequencyLabel(habit)}
       {habit.priority > 1 && (
@@ -188,20 +188,20 @@ export function PeriodNav({
       <button
         type="button"
         onClick={onPrev}
-        className="inline-flex size-9 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+        className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg hover:bg-surface-2"
         aria-label="Anterior"
       >
         <CaretLeft size={18} weight="bold" />
       </button>
       <div className="grid text-center leading-tight" aria-live="polite">
-        <span className="text-[15px] font-semibold first-letter:uppercase">{title}</span>
-        {subtitle && <span className="tabular text-[13px] text-muted">{subtitle}</span>}
+        <span className="display text-[22px] first-letter:uppercase">{title}</span>
+        {subtitle && <span className="kicker tabular mt-0.5">{subtitle}</span>}
       </div>
       <button
         type="button"
         onClick={onNext}
         disabled={nextDisabled}
-        className="inline-flex size-9 items-center justify-center rounded-md text-accent hover:bg-surface-2 disabled:opacity-30"
+        className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg hover:bg-surface-2 disabled:opacity-30"
         aria-label="Siguiente"
       >
         <CaretRight size={18} weight="bold" />
@@ -258,7 +258,7 @@ export function CalendarMonth({
       />
       <div className="grid grid-cols-7 justify-items-center gap-y-2">
         {WEEK_HEAD.map((w, i) => (
-          <span key={w} className={cx("pb-1 text-[12px] font-medium", i >= 5 ? "text-accent" : "text-muted")}>
+          <span key={w} className={cx("kicker pb-1", i >= 5 && "text-accent-fg!")}>
             {w}
           </span>
         ))}
@@ -329,7 +329,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
       <Sheet ref={sheet} title={habit?.name ?? ""}>
         {habit && target && (
           <div className="grid gap-5">
-            <p className="text-sm text-muted first-letter:uppercase">{formatLong(target.date)}</p>
+            <p className="kicker">{formatLong(target.date)}</p>
 
             {isCount && (
               <div className="grid gap-3">
@@ -337,7 +337,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   <button
                     type="button"
                     onClick={() => setValue((v) => Math.max(0, v - 1))}
-                    className="inline-flex size-12 items-center justify-center rounded-[13px] bg-surface-2 text-fg active:scale-95"
+                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg transition-colors hover:bg-surface-2 active:scale-95"
                     aria-label="Restar uno"
                   >
                     <Minus size={20} weight="bold" />
@@ -349,17 +349,17 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                       value={value}
                       min={0}
                       onChange={(e) => setValue(Math.max(0, Number(e.target.value) || 0))}
-                      className="tabular w-24 bg-transparent text-center text-4xl font-semibold tracking-tight outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                      className="figure w-24 bg-transparent text-center text-5xl outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       aria-label="Cantidad"
                     />
-                    <p className="text-xs text-muted">
+                    <p className="kicker mt-1">
                       de {habit.target} {habit.unit ?? ""}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setValue((v) => v + 1)}
-                    className="inline-flex size-12 items-center justify-center rounded-[13px] bg-surface-2 text-fg active:scale-95"
+                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg transition-colors hover:bg-surface-2 active:scale-95"
                     aria-label="Sumar uno"
                   >
                     <Plus size={20} weight="bold" />
@@ -398,7 +398,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
             </div>
 
             <label className="grid gap-1.5">
-              <span className="text-[13px] font-medium text-muted">Nota del día</span>
+              <span className="kicker">Nota del día</span>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -454,9 +454,9 @@ function StatusOption({
       type="button"
       onClick={onClick}
       className={cx(
-        "flex h-16 flex-col items-center justify-center gap-1 rounded-[10px] text-[13px] font-medium transition-transform active:scale-95",
+        "flex h-16 flex-col items-center justify-center gap-1 rounded-[6px] text-[13px] font-medium transition-transform active:scale-95 motion-reduce:active:scale-100",
         cls,
-        active && "ring-2 ring-current ring-inset",
+        active && "ring-[1.5px] ring-current ring-inset",
       )}
     >
       {icon}

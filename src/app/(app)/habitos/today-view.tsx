@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowBendUpRight, Check, Plus, X } from "@phosphor-icons/react";
-import { addDays, diffDays, weekday } from "@/lib/dates";
+import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
 import { dayState, isScheduled, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
@@ -52,6 +52,7 @@ export function TodayView({
     <>
       <PageHeader
         title={selected === today ? "Hoy" : relativeTitle(selected, today)}
+        kicker={formatLong(selected)}
         tabs={<HabitsTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => form.current?.create()}>
@@ -67,28 +68,28 @@ export function TodayView({
           {habits.length === 0 ? (
             <EmptyState onCreate={() => form.current?.create()} />
           ) : visible.length === 0 ? (
-            <p className="py-16 text-center text-sm text-muted">No hay hábitos para este día.</p>
+            <p className="display py-20 text-center text-[22px] text-muted italic">No hay hábitos para este día.</p>
           ) : (
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-line border-b border-line">
               {visible.map((h, i) => {
                 const hLogs = logs[h.id] ?? {};
                 const log = hLogs[selected];
                 const state = dayState(h, hLogs, selected, today);
                 const isCount = h.target > 1 || !!h.unit;
                 return (
-                  <li key={h.id} className="rise flex items-center gap-4 py-3.5" style={{ "--i": i } as React.CSSProperties}>
+                  <li key={h.id} className="rise flex items-center gap-4 py-4" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
                       onClick={() => daySheet.current?.show(h, selected)}
                       disabled={isFuture}
                       className="flex min-w-0 flex-1 items-center gap-4 text-left"
                     >
-                      <ToneSquare size={44} style={tone(h.color)}>
-                        <HabitIcon name={h.icon} size={24} weight="fill" />
+                      <ToneSquare size={42} style={tone(h.color)}>
+                        <HabitIcon name={h.icon} size={22} weight="fill" />
                       </ToneSquare>
                       <span className="grid min-w-0 gap-1">
                         <span className="flex items-baseline gap-2">
-                          <span className="truncate text-[16px] font-medium">{h.name}</span>
+                          <span className="truncate text-[16.5px] font-medium tracking-[-0.01em]">{h.name}</span>
                           {isCount && (
                             <span className="tabular shrink-0 text-sm text-muted">
                               {log?.s === "done" ? log.v : 0}
@@ -159,7 +160,7 @@ function DateStrip({
   return (
     <div
       ref={scroller}
-      className="relative flex snap-x gap-2 overflow-x-auto px-4 pt-2 pb-4 [scrollbar-width:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
+      className="relative flex snap-x gap-1 overflow-x-auto border-b border-line px-3 pt-1 pb-3 [scrollbar-width:none] lg:px-8 lg:pt-4 [&::-webkit-scrollbar]:hidden"
     >
       {days.map((d) => {
         const active = d === selected;
@@ -171,24 +172,24 @@ function DateStrip({
             type="button"
             onClick={() => onSelect(d)}
             className={cx(
-              "relative flex w-[52px] shrink-0 snap-center flex-col items-center overflow-hidden rounded-[14px] transition-colors duration-200",
-              active ? "bg-accent text-on-accent" : "bg-surface-2 text-muted hover:bg-surface-3",
+              "relative flex h-[68px] w-[50px] shrink-0 snap-center flex-col items-center justify-center gap-1 rounded-[6px] transition-colors duration-200",
+              active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
             )}
+            aria-pressed={active}
           >
-            <span className={cx("pt-2 pb-1 text-[12px]", active ? "text-on-accent/85" : "text-muted")}>
-              {WEEKDAY_SHORT[weekday(d)]}
-            </span>
             <span
               className={cx(
-                "tabular flex h-9 w-full items-center justify-center text-lg font-medium",
-                active ? "bg-black/10" : "bg-surface-3/60 text-fg",
+                "font-mono text-[10.5px] font-medium tracking-[0.08em] uppercase",
+                active ? "text-on-ink/75" : "text-muted",
               )}
             >
-              {Number(d.slice(8))}
+              {WEEKDAY_SHORT[weekday(d)]}
             </span>
+            <span className="figure text-[23px]">{Number(d.slice(8))}</span>
             {isToday && (
               <span
-                className={cx("absolute bottom-1 h-[3px] w-4 rounded-full", active ? "bg-on-accent/80" : "bg-accent")}
+                aria-hidden
+                className={cx("absolute bottom-1.5 size-1 rounded-full", active ? "bg-on-ink/80" : "bg-accent")}
               />
             )}
           </button>
@@ -201,27 +202,27 @@ function DateStrip({
 function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => void; disabled?: boolean }) {
   const map: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
     done: {
-      cls: "bg-[var(--st-done-bg)] text-[var(--st-done-line)]",
-      icon: <Check size={22} weight="bold" />,
+      cls: "border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
+      icon: <Check size={20} weight="bold" />,
       label: "Hecho",
     },
     failed: {
-      cls: "bg-[var(--st-fail-bg)] text-[var(--st-fail-line)]",
-      icon: <X size={20} weight="bold" />,
+      cls: "border-[var(--st-fail-line)] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
+      icon: <X size={18} weight="bold" />,
       label: "Fallado",
     },
     skipped: {
-      cls: "bg-[var(--st-skip-bg)] text-[var(--st-skip-line)]",
-      icon: <ArrowBendUpRight size={20} weight="bold" />,
+      cls: "border-[var(--st-skip-line)] bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
+      icon: <ArrowBendUpRight size={18} weight="bold" />,
       label: "Salteado",
     },
     partial: {
-      cls: "bg-[var(--st-done-bg)] text-[var(--st-done-line)] ring-2 ring-inset ring-[var(--st-done-line)]/40",
+      cls: "border-dashed border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
       icon: null,
       label: "A medias",
     },
   };
-  const s = map[state] ?? { cls: "bg-surface-3", icon: null, label: "Marcar como hecho" };
+  const s = map[state] ?? { cls: "border-line-strong hover:border-fg/50", icon: null, label: "Marcar como hecho" };
   return (
     <button
       type="button"
@@ -229,7 +230,7 @@ function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => v
       disabled={disabled}
       aria-label={s.label}
       className={cx(
-        "inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] duration-200 active:scale-90 disabled:opacity-40",
+        "inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:opacity-40 motion-reduce:transition-none motion-reduce:active:scale-100",
         s.cls,
       )}
     >
@@ -244,17 +245,18 @@ export function Fab({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Nuevo hábito"
-      className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_rgba(42,127,163,0.55)] transition-transform active:scale-95 lg:hidden"
+      className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
     >
-      <Plus size={26} weight="bold" />
+      <Plus size={24} />
     </button>
   );
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="mt-6 grid justify-items-start gap-3 rounded-[12px] border border-dashed border-line-strong p-8">
-      <h2 className="text-lg font-semibold tracking-tight">Todavía no hay hábitos</h2>
+    <div className="mt-8 grid justify-items-start gap-3 border-y border-line py-10">
+      <p className="kicker">Hábitos</p>
+      <h2 className="display text-[30px]">Todavía no hay hábitos</h2>
       <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
         Creá el primero. Elegí la frecuencia (todos los días, algunos días o unas veces por semana) y marcalo acá cada día.
       </p>
