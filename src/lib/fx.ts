@@ -48,8 +48,12 @@ export async function getRates(): Promise<Rates> {
   return FALLBACK;
 }
 
-/** Centavos de cualquier moneda a centavos de pesos (moneda desconocida = 0). */
+/**
+ * Centavos de cualquier moneda a centavos de pesos (moneda desconocida = 0).
+ * Lo convertido se redondea a pesos enteros: los centavos de una cotización son ruido.
+ */
 export function toUyu(cents: number, currency: string, rates: Rates): number {
+  if (currency === "UYU") return cents;
   const r = rates.toUyu[currency];
-  return r ? Math.round(cents * r) : 0;
+  return r ? Math.round((cents * r) / 100) * 100 : 0;
 }

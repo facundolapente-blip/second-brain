@@ -205,6 +205,9 @@ export function BudgetsView({
         <section aria-label="Presupuestos puntuales" className="grid content-start gap-4 lg:col-span-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="display text-[22px]">Puntuales</h2>
+            <Link href="/gastos/metas" className="ml-auto mr-1 text-[13px] text-accent-fg underline-offset-4 hover:underline">
+              Metas de ahorro →
+            </Link>
             <Button
               size="sm"
               variant="outline"

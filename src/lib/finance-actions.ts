@@ -7,6 +7,8 @@ import { addDays, fromDbDate, isISODate, todayISO, toDbDate } from "./dates";
 import { isFrequency, nextOnOrAfter } from "./schedule-logic";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { calibrarSaldos } from "./importers/gastos-saldos";
+import { getClassifier } from "./finance";
+import { parseQuick } from "./smart-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
@@ -530,4 +532,194 @@ export async function adjustBalance(accountId: string, realRaw: string, date: st
   });
   refrescar();
   return { ok: true };
+}
+
+// ─── Clasificación y carga rápida ───────────────────────────────────────────
+
+/** Categoría sugerida para un título (aprende de lo que ya clasificaste). */
+export async function suggestCategory(title: string, kind: string): Promise<string | null> {
+  await exigirSesion();
+  if (!title.trim() || (kind !== "expense" && kind !== "income")) return null;
+  const classify = await getClassifier();
+  return classify(title.slice(0, 120), kind)?.categoryId ?? null;
+}
+
+/** Aplica de una vez varias sugerencias de "Sin clasificar". */
+export async function applySuggestions(pairs: { id: string; categoryId: string }[]) {
+  await exigirSesion();
+  if (!Array.isArray(pairs) || pairs.length > 1000) return;
+  const cats = new Map((await prisma.category.findMany({ select: { id: true, kind: true } })).map((c) => [c.id, c.kind]));
+  for (const p of pairs) {
+    const tx = await prisma.transaction.findUnique({ where: { id: String(p.id) }, select: { kind: true, categoryId: true } });
+    if (!tx || tx.categoryId || cats.get(String(p.categoryId)) !== tx.kind) continue;
+    await prisma.transaction.update({ where: { id: String(p.id) }, data: { categoryId: String(p.categoryId) } });
+  }
+  refrescar();
+}
+
+/**
+ * Carga rápida escribiendo: "350 almuerzo itau", "+2450 disco santander ayer".
+ * Sin cuenta en el texto usa la del último movimiento cargado de esa moneda.
+ */
+export async function quickAdd(text: string): Promise<ActionResult & { summary?: string }> {
+  await exigirSesion();
+  const accounts = await prisma.account.findMany({ where: { archivedAt: null }, select: { id: true, name: true, currency: true } });
+  const p = parseQuick(String(text ?? "").slice(0, 200), accounts);
+  if (!p) return { ok: false, error: "Poné al menos un monto, por ejemplo: 350 almuerzo itau" };
+  let accountId = p.accountId;
+  if (!accountId) {
+    const last = await prisma.transaction.findFirst({
+      where: { account: { archivedAt: null, ...(p.currency ? { currency: p.currency } : {}) } },
+      orderBy: { createdAt: "desc" },
+      select: { accountId: true },
+    });
+    accountId = last?.accountId ?? accounts.find((a) => a.currency === (p.currency ?? "UYU"))?.id ?? accounts[0]?.id ?? null;
+  }
+  if (!accountId) return { ok: false, error: "Creá una cuenta primero." };
+  const acc = accounts.find((a) => a.id === accountId)!;
+  const classify = await getClassifier();
+  const categoryId = p.title ? (classify(p.title, p.kind)?.categoryId ?? null) : null;
+  const date = addDays(todayISO(), -p.daysAgo);
+  const tx = await prisma.transaction.create({
+    data: {
+      kind: p.kind,
+      date: toDbDate(date),
+      title: p.title || null,
+      amount: centsToDecimalString(p.amountCents),
+      accountId,
+      categoryId,
+    },
+    include: { category: { select: { name: true } } },
+  });
+  refrescar();
+  const what = `${p.kind === "income" ? "Ingreso" : "Gasto"} de ${centsToDecimalString(p.amountCents)} ${acc.currency} en ${acc.name}`;
+  const when = p.daysAgo ? (p.daysAgo === 1 ? " · ayer" : " · anteayer") : "";
+  return { ok: true, id: tx.id, summary: `${what} · ${tx.category ? tx.category.name : "sin clasificar"}${when}` };
+}
+
+// ─── Deudas ─────────────────────────────────────────────────────────────────
+
+export async function saveDebt(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await exigirSesion();
+  const id = texto(fd, "id", 40) || null;
+  const person = texto(fd, "person", 60);
+  if (!person) return { ok: false, error: "¿Quién?" };
+  const cents = parseAmount(texto(fd, "amount", 30));
+  if (cents === null) return { ok: false, error: "Escribí un monto mayor a cero." };
+  const dateRaw = texto(fd, "date", 10);
+  const data = {
+    person,
+    direction: texto(fd, "direction") === "i_owe" ? "i_owe" : "owed_to_me",
+    amount: centsToDecimalString(cents),
+    currency: (CURRENCIES as readonly string[]).includes(texto(fd, "currency")) ? texto(fd, "currency") : "UYU",
+    date: toDbDate(isISODate(dateRaw) ? dateRaw : todayISO()),
+    note: texto(fd, "note", 500) || null,
+  };
+  if (id) await prisma.debt.update({ where: { id }, data });
+  else await prisma.debt.create({ data });
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Salda una deuda. Si se elige cuenta, carga el movimiento: lo que te
+ * devuelven entra como ingreso (o reintegro de la categoría elegida) y lo que
+ * pagás sale como gasto.
+ */
+export async function settleDebt(id: string, accountId: string | null, categoryId: string | null): Promise<ActionResult> {
+  await exigirSesion();
+  const d = await prisma.debt.findUnique({ where: { id } });
+  if (!d) return { ok: false, error: "Esa deuda ya no existe." };
+  let settleTxId: string | null = null;
+  if (accountId) {
+    const acc = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!acc) return { ok: false, error: "Elegí una cuenta." };
+    const kind = d.direction === "owed_to_me" ? "income" : "expense";
+    const cat = categoryId ? await prisma.category.findUnique({ where: { id: categoryId } }) : null;
+    const okCat = !!cat && !cat.isAdjustment && (cat.kind === kind || (kind === "income" && cat.kind === "expense"));
+    const tx = await prisma.transaction.create({
+      data: {
+        kind,
+        date: toDbDate(todayISO()),
+        title: d.direction === "owed_to_me" ? `${d.person} me devolvió` : `Le pagué a ${d.person}`,
+        amount: d.amount,
+        accountId: acc.id,
+        categoryId: okCat ? cat.id : null,
+        note: d.note,
+      },
+    });
+    settleTxId = tx.id;
+  }
+  await prisma.debt.update({ where: { id }, data: { settledAt: new Date(), settleTxId } });
+  refrescar();
+  return { ok: true };
+}
+
+export async function reopenDebt(id: string) {
+  await exigirSesion();
+  await prisma.debt.update({ where: { id }, data: { settledAt: null } });
+  refrescar();
+}
+
+export async function deleteDebt(id: string) {
+  await exigirSesion();
+  await prisma.debt.deleteMany({ where: { id } });
+  refrescar();
+}
+
+// ─── Metas de ahorro ────────────────────────────────────────────────────────
+
+export async function saveGoal(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await exigirSesion();
+  const id = texto(fd, "id", 40) || null;
+  const name = texto(fd, "name", 80);
+  if (!name) return { ok: false, error: "Ponele un nombre (por ejemplo, Viaje a Europa)." };
+  const cents = parseAmount(texto(fd, "target", 30));
+  if (cents === null) return { ok: false, error: "¿Cuánto querés juntar?" };
+  const deadline = texto(fd, "deadline", 10);
+  const accountId = texto(fd, "accountId", 40) || null;
+  if (accountId && !(await prisma.account.findUnique({ where: { id: accountId }, select: { id: true } }))) {
+    return { ok: false, error: "Esa cuenta ya no existe." };
+  }
+  const color = texto(fd, "color");
+  const data = {
+    name,
+    target: centsToDecimalString(cents),
+    currency: (CURRENCIES as readonly string[]).includes(texto(fd, "currency")) ? texto(fd, "currency") : "UYU",
+    deadline: isISODate(deadline) ? toDbDate(deadline) : null,
+    accountId,
+    icon: texto(fd, "icon", 40) || "PiggyBank",
+    color: isPaletteKey(color) ? color : "green",
+  };
+  if (id) await prisma.savingsGoal.update({ where: { id }, data });
+  else await prisma.savingsGoal.create({ data });
+  refrescar();
+  return { ok: true };
+}
+
+/** Suma (o resta, con negativo) a lo juntado a mano de una meta. */
+export async function addToGoal(id: string, raw: string): Promise<ActionResult> {
+  await exigirSesion();
+  const s = raw.trim();
+  const neg = /^[-−]/.test(s);
+  const cents = parseAmount(s.replace(/^[-−]/, ""));
+  if (cents === null) return { ok: false, error: "Escribí un monto." };
+  const g = await prisma.savingsGoal.findUnique({ where: { id } });
+  if (!g) return { ok: false, error: "Esa meta ya no existe." };
+  const next = Math.max(0, Math.round(Number(g.saved) * 100) + (neg ? -cents : cents));
+  await prisma.savingsGoal.update({ where: { id }, data: { saved: centsToDecimalString(next) } });
+  refrescar();
+  return { ok: true };
+}
+
+export async function archiveGoal(id: string, archived: boolean) {
+  await exigirSesion();
+  await prisma.savingsGoal.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
+  refrescar();
+}
+
+export async function deleteGoal(id: string) {
+  await exigirSesion();
+  await prisma.savingsGoal.deleteMany({ where: { id } });
+  refrescar();
 }

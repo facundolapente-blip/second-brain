@@ -4,7 +4,8 @@ import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, to
 import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
-import { getAccounts, NOT_ADJUSTMENT, runSchedules } from "./finance";
+import { getAccounts, getCategoryBudgets, NOT_ADJUSTMENT, runSchedules } from "./finance";
+import { budgetState, monthShare } from "./budget-logic";
 import { getRates, toUyu } from "./fx";
 import { toCents, type CurrencyTotals } from "./finance-logic";
 import { isFreeBlock, sortBlocks, type BlockDTO } from "./plan-logic";
@@ -52,10 +53,11 @@ export async function getDashboard() {
 
   await runSchedules();
   const rates = await getRates();
-  const [checkToday, checkYesterday, weight] = await Promise.all([
+  const [checkToday, checkYesterday, weight, { budgets }] = await Promise.all([
     getCheckin(today),
     getCheckin(addDays(today, -1)),
     lastWeight(),
+    getCategoryBudgets(today.slice(0, 7)),
   ]);
   const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, tasks] = await Promise.all([
     getHabitsWithLogs(),
@@ -268,6 +270,25 @@ export async function getDashboard() {
       topCategories,
       balances,
       netWorth,
+      // Presupuestos que se pasaron, están cerca del tope o van rápido.
+      budgetAlerts: budgets
+        .map((b) => {
+          const c = catById.get(b.categoryId);
+          return {
+            categoryId: b.categoryId,
+            name: c?.name ?? "?",
+            color: c?.color ?? "stone",
+            icon: c?.icon ?? "Tag",
+            spentCents: b.spentCents,
+            amountCents: b.amountCents,
+            currency: b.currency,
+            state: budgetState(b.spentCents, b.amountCents, monthShare(month, today)),
+          };
+        })
+        .filter((b) => b.state !== "ok")
+        .sort((a, b) => b.spentCents / b.amountCents - a.spentCents / a.amountCents),
+      budgetCount: budgets.length,
+      quickAccounts: accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency })),
       usdRate: rates.toUyu.USD ?? null,
     },
     plan: {

@@ -9,14 +9,17 @@ type Tab = { href: string; label: string; icon?: Icon; mobile: boolean };
 
 const TABS: Tab[] = [
   { href: "/gastos", label: "Movimientos", icon: Receipt, mobile: true },
+  { href: "/gastos/historial", label: "Historial", mobile: false },
   { href: "/gastos/cuentas", label: "Cuentas", icon: Bank, mobile: true },
+  { href: "/gastos/presupuestos", label: "Presupuestos", icon: PiggyBank, mobile: true },
+  { href: "/gastos/metas", label: "Metas", mobile: false },
+  { href: "/gastos/deudas", label: "Deudas", mobile: false },
+  { href: "/gastos/informes", label: "Informes", icon: ChartPieSlice, mobile: true },
+  { href: "/gastos/proyeccion", label: "Proyección", mobile: false },
   { href: "/gastos/categorias", label: "Categorías", icon: SquaresFour, mobile: true },
   { href: "/gastos/sin-clasificar", label: "Sin clasificar", mobile: false },
   { href: "/gastos/plantillas", label: "Plantillas", mobile: false },
   { href: "/gastos/recurrentes", label: "Recurrentes", mobile: false },
-  { href: "/gastos/presupuestos", label: "Presupuestos", icon: PiggyBank, mobile: true },
-  { href: "/gastos/informes", label: "Informes", icon: ChartPieSlice, mobile: true },
-  { href: "/gastos/proyeccion", label: "Proyección", mobile: false },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -24,15 +27,19 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-/** En el celular, Sin clasificar, Plantillas y Recurrentes cuelgan de Movimientos; Proyección, de Informes. */
+/**
+ * En el celular, Historial, Sin clasificar, Plantillas, Recurrentes y Deudas
+ * cuelgan de Movimientos; Metas, de Presupuestos; Proyección, de Informes.
+ */
 function mobileActive(pathname: string, href: string) {
   if (href === "/gastos/informes") return pathname.startsWith("/gastos/informes") || pathname.startsWith("/gastos/proyeccion");
+  if (href === "/gastos/presupuestos") return pathname.startsWith("/gastos/presupuestos") || pathname.startsWith("/gastos/metas");
   if (href === "/gastos") {
     return (
       pathname === "/gastos" ||
-      pathname.startsWith("/gastos/sin-clasificar") ||
-      pathname.startsWith("/gastos/plantillas") ||
-      pathname.startsWith("/gastos/recurrentes")
+      ["/gastos/historial", "/gastos/sin-clasificar", "/gastos/plantillas", "/gastos/recurrentes", "/gastos/deudas"].some((p) =>
+        pathname.startsWith(p),
+      )
     );
   }
   return pathname.startsWith(href);

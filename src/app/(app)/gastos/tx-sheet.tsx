@@ -5,7 +5,7 @@ import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, use
 import { ArrowsDownUp, Check } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
-import { deleteTransaction, saveTransaction } from "@/lib/finance-actions";
+import { deleteTransaction, saveTransaction, suggestCategory } from "@/lib/finance-actions";
 import {
   centsToInput,
   parseAmount,
@@ -32,6 +32,8 @@ type Draft = {
   date: string;
   note: string;
   projectId: string | null;
+  /** La categoría la eligió a mano (la sugerencia ya no la pisa). */
+  byHand?: boolean;
 };
 
 export type TxSheetHandle = {
@@ -85,9 +87,15 @@ export const TxSheet = forwardRef<
     };
   };
   const [d, setD] = useState<Draft>(blank);
+  // Categoría sugerida a partir del título (lo que ya clasificaste antes).
+  const [suggested, setSuggested] = useState<string | null>(null);
+  const [byHand, setByHand] = useState(false);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   function open(next: Draft) {
-    setD(next);
+    setD({ ...next, byHand: !!next.categoryId });
+    setByHand(!!next.categoryId);
+    setSuggested(null);
     setFormKey((k) => k + 1);
     sheet.current?.open();
     // En el celular el teclado numérico sale directo al abrir.
@@ -124,6 +132,23 @@ export const TxSheet = forwardRef<
   }, [state]);
 
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
+
+  function onTitle(title: string) {
+    set({ title });
+    clearTimeout(suggestTimer.current);
+    if (byHand || d.kind === "transfer" || title.trim().length < 2) return;
+    const kind = d.kind;
+    suggestTimer.current = setTimeout(async () => {
+      const id = await suggestCategory(title, kind);
+      if (!id) return;
+      setD((prev) => (prev.kind === kind && !prev.byHand ? { ...prev, categoryId: id } : prev));
+      setSuggested(id);
+    }, 350);
+  }
+  function pickCategory(categoryId: string | null) {
+    setByHand(true);
+    set({ categoryId, byHand: true });
+  }
 
   const from = accounts.find((a) => a.id === d.accountId);
   const to = accounts.find((a) => a.id === d.toAccountId);
@@ -241,7 +266,7 @@ export const TxSheet = forwardRef<
             <Input
               name="title"
               value={d.title}
-              onChange={(e) => set({ title: e.target.value })}
+              onChange={(e) => onTitle(e.target.value)}
               maxLength={120}
               placeholder={d.kind === "income" ? "Sueldo, venta…" : "Dominos, alquiler…"}
             />
@@ -297,7 +322,7 @@ export const TxSheet = forwardRef<
               <Input
                 name="title"
                 value={d.title}
-                onChange={(e) => set({ title: e.target.value })}
+                onChange={(e) => onTitle(e.target.value)}
                 maxLength={120}
                 placeholder="Opcional"
               />
@@ -308,7 +333,12 @@ export const TxSheet = forwardRef<
         {d.kind !== "transfer" && (
           <div className="grid gap-2">
             <div className="flex items-baseline justify-between">
-              <span className="kicker">Categoría</span>
+              <span className="kicker">
+                Categoría
+                {suggested && d.categoryId === suggested && !byHand && (
+                  <span className="ml-2 tracking-normal normal-case text-accent-fg">· sugerida por el título</span>
+                )}
+              </span>
               <Link href="/gastos/categorias" className="inline-flex min-h-11 items-center text-[13px] text-accent-fg hover:underline">
                 Editar categorías
               </Link>
@@ -317,12 +347,12 @@ export const TxSheet = forwardRef<
               <CategoryChip
                 label="Sin clasificar"
                 selected={d.categoryId === null}
-                onClick={() => set({ categoryId: null })}
+                onClick={() => pickCategory(null)}
               >
                 <CategoryAvatar size={34} />
               </CategoryChip>
               {kindCats.map((c) => (
-                <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => set({ categoryId: c.id })}>
+                <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => pickCategory(c.id)}>
                   <CategoryAvatar category={c} size={34} />
                 </CategoryChip>
               ))}
@@ -334,7 +364,7 @@ export const TxSheet = forwardRef<
                 </summary>
                 <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-5">
                   {refundCats.map((c) => (
-                    <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => set({ categoryId: c.id })}>
+                    <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => pickCategory(c.id)}>
                       <CategoryAvatar category={c} size={34} />
                     </CategoryChip>
                   ))}

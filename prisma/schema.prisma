@@ -298,6 +298,45 @@ model ScheduledTransaction {
   @@index([nextDate])
 }
 
+// ─── Deudas y metas de ahorro ───────────────────────────────────────────────
+
+/// Plata prestada o debida ("Deuda fede", "Nafta (me pagan)").
+model Debt {
+  id         String    @id @default(cuid())
+  person     String
+  /// owed_to_me (me deben) | i_owe (debo)
+  direction  String
+  amount     Decimal   @db.Decimal(14, 2)
+  currency   String    @default("UYU")
+  date       DateTime  @db.Date
+  note       String?
+  /// Cuándo se saldó (null = pendiente).
+  settledAt  DateTime?
+  /// Movimiento con el que se saldó (la devolución o el pago), si se cargó.
+  settleTxId String?
+  createdAt  DateTime  @default(now())
+
+  @@index([settledAt])
+}
+
+/// Meta de ahorro: un monto a juntar, opcionalmente para una fecha. El avance
+/// sale del saldo de una cuenta o de lo que se va sumando a mano.
+model SavingsGoal {
+  id         String    @id @default(cuid())
+  name       String
+  icon       String    @default("PiggyBank")
+  color      String    @default("green")
+  target     Decimal   @db.Decimal(14, 2)
+  currency   String    @default("UYU")
+  deadline   DateTime? @db.Date
+  /// Si está, el avance es el saldo de esa cuenta.
+  accountId  String?
+  /// Si no hay cuenta: lo juntado, cargado a mano.
+  saved      Decimal   @default(0) @db.Decimal(14, 2)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
 // ─── Ajustes de la app ───────────────────────────────────────────────────────
 
 /// Valores sueltos que guarda la app (por ejemplo, la última cotización del dólar).

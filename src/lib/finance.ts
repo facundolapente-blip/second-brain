@@ -1,8 +1,10 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { addDays, fromDbDate, monthBounds, toDbDate, todayISO } from "./dates";
+import { addDays, fromDbDate, monthBounds, shiftMonth, toDbDate, todayISO } from "./dates";
+import { buildClassifier, normTitle } from "./smart-logic";
 import {
   isFrequency,
   nextOnOrAfter,
@@ -430,4 +432,177 @@ export async function getProject(id: string) {
     }),
   ]);
   return { project: toProjectDTO(row, spent.get(id)), txs: txs.map(toTxDTO), candidates: candidates.map(toTxDTO) };
+}
+
+// ─── Clasificación automática ───────────────────────────────────────────────
+
+/** Clasificador armado con todo lo ya clasificado (una vez por pedido). */
+export const getClassifier = cache(async () => {
+  const rows = await prisma.transaction.findMany({
+    where: { title: { not: null }, categoryId: { not: null }, kind: { in: ["expense", "income"] }, category: { isAdjustment: false } },
+    select: { title: true, categoryId: true, kind: true },
+  });
+  return buildClassifier(rows.map((r) => ({ title: r.title!, categoryId: r.categoryId!, kind: r.kind })));
+});
+
+/** Sugerencias para los movimientos sin clasificar que tienen título. */
+export async function getSuggestions(txs: TxDTO[]): Promise<Record<string, { categoryId: string; confidence: "alta" | "media" }>> {
+  const classify = await getClassifier();
+  const out: Record<string, { categoryId: string; confidence: "alta" | "media" }> = {};
+  for (const t of txs) {
+    if (!t.title || t.kind === "transfer") continue;
+    const s = classify(t.title, t.kind);
+    if (s) out[t.id] = s;
+  }
+  return out;
+}
+
+// ─── Deudas ─────────────────────────────────────────────────────────────────
+
+export type DebtDTO = {
+  id: string;
+  person: string;
+  direction: "owed_to_me" | "i_owe";
+  amountCents: number;
+  currency: string;
+  date: string;
+  note: string | null;
+  settledAt: string | null;
+};
+
+export async function getDebts(): Promise<DebtDTO[]> {
+  const rows = await prisma.debt.findMany({ orderBy: [{ settledAt: "asc" }, { date: "desc" }] });
+  return rows.map((d) => ({
+    id: d.id,
+    person: d.person,
+    direction: d.direction === "i_owe" ? "i_owe" : "owed_to_me",
+    amountCents: toCents(d.amount),
+    currency: d.currency,
+    date: fromDbDate(d.date),
+    note: d.note,
+    settledAt: d.settledAt ? d.settledAt.toISOString().slice(0, 10) : null,
+  }));
+}
+
+// ─── Metas de ahorro ────────────────────────────────────────────────────────
+
+export type GoalDTO = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  targetCents: number;
+  currency: string;
+  deadline: string | null;
+  accountId: string | null;
+  /** Lo juntado: el saldo de la cuenta (pasado a la moneda de la meta) o lo cargado a mano. */
+  savedCents: number;
+  manualCents: number;
+  archived: boolean;
+};
+
+export async function getGoals(): Promise<GoalDTO[]> {
+  const [rows, accounts, rates] = await Promise.all([
+    prisma.savingsGoal.findMany({ orderBy: [{ archivedAt: "asc" }, { createdAt: "asc" }] }),
+    getAccounts(),
+    getRates(),
+  ]);
+  const acc = new Map(accounts.map((a) => [a.id, a]));
+  return rows.map((g) => {
+    const a = g.accountId ? acc.get(g.accountId) : undefined;
+    const fromAccount = a
+      ? g.currency === a.currency
+        ? a.balanceCents
+        : Math.round(toUyu(a.balanceCents, a.currency, rates) / (rates.toUyu[g.currency] ?? 1))
+      : null;
+    return {
+      id: g.id,
+      name: g.name,
+      icon: g.icon,
+      color: g.color,
+      targetCents: toCents(g.target),
+      currency: g.currency,
+      deadline: g.deadline ? fromDbDate(g.deadline) : null,
+      accountId: g.accountId,
+      savedCents: Math.max(0, fromAccount ?? toCents(g.saved)),
+      manualCents: toCents(g.saved),
+      archived: g.archivedAt !== null,
+    };
+  });
+}
+
+// ─── Patrimonio ─────────────────────────────────────────────────────────────
+
+/**
+ * Patrimonio en pesos al cierre de cada mes (los últimos `months`): saldo
+ * inicial + todos los movimientos hasta ese día, con la cotización de hoy.
+ */
+export async function getNetWorthSeries(months = 12) {
+  const today = todayISO();
+  const [accounts, txs, rates] = await Promise.all([
+    prisma.account.findMany({ select: { id: true, currency: true, initialBalance: true } }),
+    prisma.transaction.findMany({ select: { date: true, kind: true, amount: true, toAmount: true, accountId: true, toAccountId: true } }),
+    getRates(),
+  ]);
+  const cur = new Map(accounts.map((a) => [a.id, a.currency]));
+  const ends = Array.from({ length: months }, (_, i) => {
+    const m = shiftMonth(today.slice(0, 7), i - months + 1);
+    const end = monthBounds(m).to;
+    return { month: m, end: end > today ? today : end };
+  });
+  // Cambio en pesos de cada movimiento, por fecha.
+  const deltas: { date: string; uyu: number }[] = [];
+  for (const t of txs) {
+    const d = fromDbDate(t.date);
+    const amt = toCents(t.amount);
+    if (t.kind === "income") deltas.push({ date: d, uyu: toUyu(amt, cur.get(t.accountId) ?? "UYU", rates) });
+    else if (t.kind === "expense") deltas.push({ date: d, uyu: -toUyu(amt, cur.get(t.accountId) ?? "UYU", rates) });
+    else {
+      deltas.push({ date: d, uyu: -toUyu(amt, cur.get(t.accountId) ?? "UYU", rates) });
+      if (t.toAccountId) deltas.push({ date: d, uyu: toUyu(t.toAmount ? toCents(t.toAmount) : amt, cur.get(t.toAccountId) ?? "UYU", rates) });
+    }
+  }
+  deltas.sort((a, b) => a.date.localeCompare(b.date));
+  const start = accounts.reduce((n, a) => n + toUyu(toCents(a.initialBalance), a.currency, rates), 0);
+  let i = 0;
+  let acc = start;
+  return ends.map(({ month, end }) => {
+    while (i < deltas.length && deltas[i].date <= end) acc += deltas[i++].uyu;
+    return { month, cents: acc };
+  });
+}
+
+// ─── Historial ──────────────────────────────────────────────────────────────
+
+export type HistoryFilters = {
+  q?: string;
+  accountId?: string;
+  categoryId?: string;
+  kind?: "expense" | "income" | "transfer";
+  from?: string;
+  to?: string;
+  min?: number;
+  max?: number;
+  limit?: number;
+};
+
+/** Todos los movimientos, con buscador y filtros; del más nuevo al más viejo. */
+export async function getHistory(f: HistoryFilters): Promise<{ txs: TxDTO[]; total: number; hasMore: boolean }> {
+  const and: Prisma.TransactionWhereInput[] = [];
+  if (f.accountId) and.push({ OR: [{ accountId: f.accountId }, { toAccountId: f.accountId }] });
+  if (f.categoryId === "none") and.push({ categoryId: null, kind: { in: ["expense", "income"] } });
+  else if (f.categoryId) and.push({ categoryId: f.categoryId });
+  if (f.kind) and.push({ kind: f.kind });
+  if (f.from) and.push({ date: { gte: toDbDate(f.from) } });
+  if (f.to) and.push({ date: { lte: toDbDate(f.to) } });
+  if (f.min) and.push({ amount: { gte: (f.min / 100).toFixed(2) } });
+  if (f.max) and.push({ amount: { lte: (f.max / 100).toFixed(2) } });
+  const limit = f.limit ?? 100;
+  const rows = await prisma.transaction.findMany({ where: { AND: and }, orderBy: newestFirst, select: txSelect });
+  // El texto se busca sin tildes ni mayúsculas, en título y nota.
+  const needle = f.q ? normTitle(f.q) : "";
+  const hits = needle
+    ? rows.filter((r) => normTitle(`${r.title ?? ""} ${r.note ?? ""}`).includes(needle))
+    : rows;
+  return { txs: hits.slice(0, limit).map(toTxDTO), total: hits.length, hasMore: hits.length > limit };
 }

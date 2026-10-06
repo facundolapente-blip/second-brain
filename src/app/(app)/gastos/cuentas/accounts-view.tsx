@@ -17,6 +17,7 @@ import { Button, ConfirmButton, cx, Field, Input, Sheet, type SheetHandle } from
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { BalanceAdjuster } from "./balance-adjuster";
+import { NetWorth } from "./net-worth";
 import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
 
 type Draft = {
@@ -32,7 +33,15 @@ type Draft = {
 
 const CURRENCY_NAME: Record<string, string> = { UYU: "pesos", USD: "dólares", ARS: "pesos arg.", EUR: "euros", BRL: "reales" };
 
-export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; openNew: boolean }) {
+export function AccountsView({
+  accounts,
+  openNew,
+  netWorth,
+}: {
+  accounts: AccountDTO[];
+  openNew: boolean;
+  netWorth: { series: { month: string; cents: number }[]; usdRate: number | null };
+}) {
   const router = useRouter();
   const { setSelection } = useSelection(accounts);
   const sheet = useRef<SheetHandle>(null);
@@ -119,6 +128,11 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
       />
 
       <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
+        {active.length > 0 && (
+          <div className="pt-2 lg:pt-6">
+            <NetWorth series={netWorth.series} usdRate={netWorth.usdRate} />
+          </div>
+        )}
         {active.length === 0 ? (
           <EmptyBlock title="Todavía no hay cuentas" icon={<Bank size={22} aria-hidden />}>
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">

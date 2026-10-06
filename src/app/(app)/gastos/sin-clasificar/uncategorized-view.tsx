@@ -3,10 +3,10 @@
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { formatMonth, formatShort } from "@/lib/dates";
-import { setTransactionCategory } from "@/lib/finance-actions";
+import { applySuggestions, setTransactionCategory } from "@/lib/finance-actions";
 import { dayLabel, type AccountDTO, type CategoryDTO, type TxDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
-import { Sheet, type SheetHandle } from "@/components/ui";
+import { Button, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { AdjustAssistant } from "./adjust-assistant";
 import { Amount, CategoryAvatar, useLookups } from "../shared";
@@ -19,11 +19,13 @@ export function UncategorizedView({
   accounts,
   categories,
   txs,
+  suggestions,
   today,
 }: {
   accounts: AccountDTO[];
   categories: CategoryDTO[];
   txs: TxDTO[];
+  suggestions: Record<string, { categoryId: string; confidence: "alta" | "media" }>;
   today: string;
 }) {
   const lk = useLookups(accounts, categories);
@@ -34,6 +36,22 @@ export function UncategorizedView({
   );
   const untitled = list.filter((t) => !t.title);
   const titled = list.filter((t) => t.title);
+  const withSuggestion = titled.filter((t) => suggestions[t.id]);
+
+  function acceptAll() {
+    const pairs = withSuggestion.map((t) => ({ id: t.id, categoryId: suggestions[t.id].categoryId }));
+    startTransition(async () => {
+      removeOptimistic(pairs.map((p) => p.id));
+      await applySuggestions(pairs);
+    });
+  }
+  function acceptOne(t: TxDTO) {
+    const s = suggestions[t.id];
+    startTransition(async () => {
+      removeOptimistic(t.id);
+      await setTransactionCategory(t.id, s.categoryId);
+    });
+  }
   const [, startTransition] = useTransition();
 
   function assign(categoryId: string) {
@@ -64,6 +82,17 @@ export function UncategorizedView({
         ) : (
           <>
             <AdjustAssistant txs={untitled} accounts={accounts} lk={lk} onDone={(ids) => removeOptimistic(ids)} />
+            {withSuggestion.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-line bg-surface p-4">
+                <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-muted">
+                  <strong className="font-medium text-fg">{withSuggestion.length}</strong> se pueden clasificar solos:
+                  se parecen a otros que ya clasificaste (por el título).
+                </p>
+                <Button size="sm" onClick={acceptAll}>
+                  Aplicar las {withSuggestion.length} sugerencias
+                </Button>
+              </div>
+            )}
             <p className="pb-4 text-[15px] text-muted">
               {titled.length === 1 ? "1 movimiento" : `${titled.length} movimientos`} con título y sin categoría. Tocá uno para clasificarlo.
             </p>
@@ -103,6 +132,18 @@ export function UncategorizedView({
                         className="font-mono text-[14px] font-medium"
                       />
                     </button>
+                    {suggestions[t.id] && lk.category(suggestions[t.id].categoryId) && (
+                      <div className="-mt-1 flex items-center gap-2 border-b border-line px-1 pb-2.5 pl-[3.6rem]">
+                        <span className="text-[12.5px] text-muted">¿Es</span>
+                        <button
+                          type="button"
+                          onClick={() => acceptOne(t)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-[12.5px] font-medium text-accent-fg transition-colors hover:bg-accent hover:text-on-accent"
+                        >
+                          {lk.category(suggestions[t.id].categoryId)!.name}?
+                        </button>
+                      </div>
+                    )}
                   </li>
                 );
               })}

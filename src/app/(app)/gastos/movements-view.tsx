@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowDownLeft, ArrowsClockwise, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, ClockCounterClockwise, Handshake, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
@@ -23,6 +23,7 @@ import { Button, cx } from "@/components/ui";
 import { GastosTabs } from "./gastos-nav";
 import { AccountChips, AccountSwitcher, selectionLabel } from "./account-switcher";
 import { useSelection } from "./selection";
+import { QuickAdd } from "./quick-add";
 import { Balance, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
 import { TxSheet, type TxSheetHandle } from "./tx-sheet";
 import { CategorySpend, SideBalances } from "./month-side";
@@ -133,6 +134,7 @@ export function MovementsView({
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-x-10">
             <section className="grid gap-5 pt-1 pb-5 lg:col-start-1 lg:row-start-1 lg:pt-6">
               <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
+              <QuickAdd accounts={accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency }))} />
               <div className="grid gap-3">
                 <div className="-ml-3">
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
@@ -167,6 +169,8 @@ export function MovementsView({
                   )}
                   <QuickLink href="/gastos/plantillas" label="Plantillas" icon={<Copy size={14} aria-hidden />} />
                   <QuickLink href="/gastos/recurrentes" label="Recurrentes" icon={<ArrowsClockwise size={14} aria-hidden />} />
+                  <QuickLink href="/gastos/historial" label="Historial" icon={<ClockCounterClockwise size={14} aria-hidden />} />
+                  <QuickLink href="/gastos/deudas" label="Deudas" icon={<Handshake size={14} aria-hidden />} />
                 </div>
               </div>
               <div className="hidden gap-4 lg:grid">
