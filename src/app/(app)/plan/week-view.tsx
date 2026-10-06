@@ -116,7 +116,7 @@ export function WeekView({
         }
       />
 
-      <main className="mx-auto max-w-6xl px-4 lg:px-10">
+      <main className="mx-auto max-w-6xl px-4 lg:max-w-[110rem] lg:px-10">
         {top}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 lg:pt-5">
           <div className="flex items-center gap-1">
@@ -327,21 +327,51 @@ export function BlockCard({
   return (
     <article
       className={cx(
-        "group relative flex items-start gap-2 transition-colors",
+        "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
         compact ? "border-b border-line px-1 py-2.5" : "py-2.5 pr-1",
         free && "opacity-80",
       )}
     >
-      <button type="button" onClick={onEdit} className="grid min-w-0 flex-1 gap-1.5 text-left">
+      <button type="button" onClick={onEdit} className={cx("min-w-0 text-left", free && "col-span-2")}>
         <span
           className={cx(
-            "text-[14.5px] leading-snug font-medium",
+            "block text-[14.5px] leading-snug font-medium break-words hyphens-auto",
             free && "font-serif text-[16px] font-normal text-muted",
             b.done && !free && "text-muted line-through decoration-faint",
           )}
         >
           {b.title}
         </span>
+      </button>
+      {!free && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={b.done}
+          aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
+          className={cx(
+            "row-span-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] active:scale-90",
+            compact && "row-span-1 -my-1.5 size-9",
+          )}
+        >
+          <span
+            className={cx(
+              "inline-flex size-[22px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
+              b.done
+                ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
+                : "border-fg/45 bg-transparent group-hover:border-fg/70",
+            )}
+          >
+            {b.done && <Check size={14} weight="bold" />}
+          </span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onEdit}
+        tabIndex={-1}
+        className={cx("grid min-w-0 gap-1.5 text-left", compact ? "col-span-2" : "col-start-1")}
+      >
         <span className="flex flex-wrap items-center gap-1.5">
           <CategoryTag category={category} />
           <PriorityTag n={b.priority} />
@@ -359,29 +389,6 @@ export function BlockCard({
           </span>
         )}
       </button>
-      {!free && (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={b.done}
-          aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
-          className={cx(
-            "inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] active:scale-90",
-            compact && "-my-1.5 -mr-1.5 size-9",
-          )}
-        >
-          <span
-            className={cx(
-              "inline-flex size-[22px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
-              b.done
-                ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
-                : "border-fg/45 bg-transparent group-hover:border-fg/70",
-            )}
-          >
-            {b.done && <Check size={14} weight="bold" />}
-          </span>
-        </button>
-      )}
     </article>
   );
 }

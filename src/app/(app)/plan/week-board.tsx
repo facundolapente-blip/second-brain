@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
 import { isFreeBlock, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
+import { PRIORITIES } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
 import { BlockCard } from "./week-view";
@@ -26,7 +27,9 @@ const DRAG = "text/x-bloque";
 export function BoardList({ days, today, byDay, cats, habitName, onToggle, onEdit, onNew, onMove }: Props) {
   const [over, setOver] = useState<string | null>(null);
   return (
-    <div className="grid grid-cols-7 border-t border-fg/80">
+    // Cada día con un ancho mínimo cómodo: si no entran los 7, se corre de costado.
+    <div className="overflow-x-auto pb-2">
+    <div className="grid min-w-[73.5rem] grid-cols-[repeat(7,minmax(10.5rem,1fr))] border-t border-fg/80">
       {days.map((d) => {
         const list = byDay.get(d)!;
         return (
@@ -89,12 +92,13 @@ export function BoardList({ days, today, byDay, cats, habitName, onToggle, onEdi
         );
       })}
     </div>
+    </div>
   );
 }
 
 const FROM = 6;
 const TO = 24;
-const ROW = 44; // px por hora
+const ROW = 60; // px por hora
 const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 
 /**
@@ -106,8 +110,10 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
   const hours = Array.from({ length: TO - FROM }, (_, i) => FROM + i);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="overflow-x-auto">
+      <div className="min-w-[70rem]">
       {/* Cabecera de días y lo que no tiene hora */}
-      <div className="grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))] border-b border-line">
+      <div className="grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))] border-b border-line">
         <span />
         {days.map((d) => {
           const untimed = byDay.get(d)!.filter((b) => !b.startTime);
@@ -143,7 +149,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
       </div>
       {/* Grilla de horas */}
       <div className="max-h-[70dvh] overflow-y-auto">
-        <div className="relative grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]">
+        <div className="relative grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))]">
           <div>
             {hours.map((h) => (
               <div key={h} style={{ height: ROW }} className="pr-2 text-right font-mono text-[10.5px] text-muted">
@@ -181,16 +187,15 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                   />
                 );
               })}
-              {byDay
-                .get(d)!
-                .filter((b) => b.startTime)
-                .map((b) => {
-                  const start = Math.max(FROM * 60, mins(b.startTime!));
-                  const end = b.endTime ? mins(b.endTime) : start + 60;
+              {lanesOf(byDay.get(d)!.filter((b) => b.startTime)).map(({ b, start, end, lane, lanes }) => {
                   const top = ((start - FROM * 60) / 60) * ROW;
                   const height = Math.max(22, ((end - start) / 60) * ROW - 2);
                   return (
-                    <div key={b.id} className="absolute inset-x-1" style={{ top, height }}>
+                    <div
+                      key={b.id}
+                      className="absolute"
+                      style={{ top, height, left: `calc(${(lane / lanes) * 100}% + 3px)`, width: `calc(${100 / lanes}% - 6px)` }}
+                    >
                       <Chip b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} full />
                     </div>
                   );
@@ -199,8 +204,42 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
           ))}
         </div>
       </div>
+      </div>
+      </div>
     </div>
   );
+}
+
+/**
+ * Bloques que se pisan en el horario van lado a lado (como en un calendario):
+ * cada grupo de bloques encadenados se reparte en carriles.
+ */
+function lanesOf(blocks: BlockDTO[]) {
+  const items = blocks
+    .map((b) => {
+      const start = Math.max(FROM * 60, mins(b.startTime!));
+      return { b, start, end: Math.max(start + 30, b.endTime ? mins(b.endTime) : start + 60), lane: 0, lanes: 1 };
+    })
+    .sort((x, y) => x.start - y.start || y.end - x.end);
+  let group: typeof items = [];
+  let groupEnd = -1;
+  let laneEnds: number[] = [];
+  const close = () => {
+    for (const it of group) it.lanes = laneEnds.length;
+    group = [];
+    laneEnds = [];
+  };
+  for (const it of items) {
+    if (it.start >= groupEnd) close();
+    let lane = laneEnds.findIndex((e) => e <= it.start);
+    if (lane < 0) lane = laneEnds.push(0) - 1;
+    laneEnds[lane] = it.end;
+    it.lane = lane;
+    group.push(it);
+    groupEnd = Math.max(groupEnd, it.end);
+  }
+  close();
+  return items;
 }
 
 function Chip({
@@ -217,6 +256,7 @@ function Chip({
   full?: boolean;
 }) {
   const c = b.categoryId ? cats.get(b.categoryId) : null;
+  const priority = PRIORITIES.find((p) => p.value === b.priority);
   return (
     <div
       draggable
@@ -233,8 +273,18 @@ function Chip({
       )}
       title="Arrastralo a otro día u hora"
     >
-      <button type="button" onClick={() => onEdit(b)} className="min-w-0 flex-1 text-left">
-        <span className={cx("block truncate text-[12px] leading-tight font-medium", b.done && "line-through")}>{b.title}</span>
+      <button type="button" onClick={() => onEdit(b)} className="grid min-w-0 flex-1 content-start gap-0.5 text-left">
+        <span className={cx("block truncate text-[13px] leading-tight font-semibold", b.done && "line-through")}>{b.title}</span>
+        {(c || priority) && (
+          <span className="flex min-w-0 flex-wrap items-center gap-1 text-[10.5px] leading-tight">
+            {c && <span className="truncate font-medium">{c.name}</span>}
+            {priority && (
+              <span style={tone(priority.tone)} className="rounded-[4px] bg-tone-solid px-1 py-px font-medium text-white">
+                {priority.label}
+              </span>
+            )}
+          </span>
+        )}
         {full && b.startTime && (
           <span className="block font-mono text-[10px] opacity-75">
             {b.startTime}
