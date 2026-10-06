@@ -22,10 +22,13 @@ export function AccountSwitcher({
   accounts,
   selection,
   onChange,
+  summary,
 }: {
   accounts: AccountDTO[];
   selection: Selection;
   onChange: (s: Selection) => void;
+  /** Dato a mostrar en lugar del saldo (en Movimientos, el neto del mes). */
+  summary?: { label: string; totals: Record<string, number> };
 }) {
   const sheet = useRef<SheetHandle>(null);
   const visible = accounts.filter((a) => !a.archived);
@@ -61,10 +64,17 @@ export function AccountSwitcher({
             Cambiar <CaretDown size={13} weight="bold" aria-hidden />
           </span>
         </span>
-        <span className="grid gap-0.5">
-          <span className="kicker">Saldo actual</span>
-          <TotalsInline totals={balance} align="start" balance className="figure text-[26px]" />
-        </span>
+        {summary ? (
+          <span className="grid gap-0.5">
+            <span className="kicker">{summary.label}</span>
+            <TotalsInline totals={summary.totals} align="start" className="figure text-[20px]" />
+          </span>
+        ) : (
+          <span className="grid gap-0.5">
+            <span className="kicker">Saldo actual</span>
+            <TotalsInline totals={balance} align="start" balance className="figure text-[26px]" />
+          </span>
+        )}
       </button>
 
       <Sheet ref={sheet} title="Cuentas">

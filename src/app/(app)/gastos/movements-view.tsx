@@ -6,6 +6,7 @@ import { ArrowDownLeft, ArrowsClockwise, ArrowUpRight, Bank, CaretRight, Copy, P
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
+  balanceByCurrency,
   dayLabel,
   groupByDay,
   netByCurrency,
@@ -19,9 +20,9 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
 import { GastosTabs } from "./gastos-nav";
-import { AccountChips, AccountSwitcher } from "./account-switcher";
+import { AccountChips, AccountSwitcher, selectionLabel } from "./account-switcher";
 import { useSelection } from "./selection";
-import { Amount, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
+import { Balance, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
 import { TxSheet, type TxSheetHandle } from "./tx-sheet";
 import { CategorySpend, SideBalances } from "./month-side";
 
@@ -84,9 +85,11 @@ export function MovementsView({
     return { inc, exp };
   }, [visible, lk]);
 
+  const balance = useMemo(
+    () => balanceByCurrency(selection ? accounts : accounts.filter((a) => !a.archived), selection),
+    [accounts, selection],
+  );
   const showAccount = selection === null || selection.length > 1;
-  const netCurrencies = sortedCurrencies(net);
-  const mainCur = netCurrencies[0] ?? "UYU";
   const isCurrent = month === today.slice(0, 7);
 
   return (
@@ -132,11 +135,8 @@ export function MovementsView({
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
                 </div>
                 <div className="grid gap-1">
-                  <span className="kicker">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
-                  <NetHero cents={net[mainCur] ?? 0} currency={mainCur} />
-                  {netCurrencies.slice(1).map((c) => (
-                    <Amount key={c} cents={net[c]} currency={c} className="figure text-[24px] text-fg" />
-                  ))}
+                  <span className="kicker">Saldo actual · {selectionLabel(accounts, selection)}</span>
+                  <BalanceHero totals={balance} />
                 </div>
                 <dl className="grid grid-cols-2 divide-x divide-line border-y border-line lg:max-w-xl">
                   <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
@@ -148,7 +148,12 @@ export function MovementsView({
             {/* Celular: debajo del resumen. Computadora: panel lateral fijo con saldos y gasto por categoría. */}
             <aside className="grid content-start gap-4 pb-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-6 lg:pb-0">
               <div className="grid gap-2">
-                <AccountSwitcher accounts={accounts} selection={selection} onChange={setSelection} />
+                <AccountSwitcher
+                  accounts={accounts}
+                  selection={selection}
+                  onChange={setSelection}
+                  summary={{ label: isCurrent ? "Neto del mes en curso" : "Neto del mes", totals: net }}
+                />
                 <div className="flex flex-wrap gap-2">
                   {uncategorized > 0 && (
                     <QuickLink
@@ -228,10 +233,16 @@ export function MovementsView({
  * La cifra del mes: grande, en tinta (no en verde) y con signo explícito; el
  * color queda para los montos chicos de la lista.
  */
-function NetHero({ cents, currency }: { cents: number; currency: string }) {
+/** Saldo de las cuentas elegidas: la cifra protagonista (lo que queda). */
+function BalanceHero({ totals }: { totals: Record<string, number> }) {
+  const cur = sortedCurrencies(totals);
+  if (cur.length === 0) return <span className="figure text-[52px] lg:text-[64px]">{moneyCents(0)}</span>;
   return (
-    <span className="figure text-[52px] lg:text-[64px]">
-      <Amount cents={cents} currency={currency} hero className={cx(cents > 0 && "text-fg!")} />
+    <span className="grid gap-0.5">
+      <Balance cents={totals[cur[0]]} currency={cur[0]} hero className="figure text-[52px] lg:text-[64px]" />
+      {cur.slice(1).map((c) => (
+        <Balance key={c} cents={totals[c]} currency={c} hero className="figure text-[26px] text-fg" />
+      ))}
     </span>
   );
 }

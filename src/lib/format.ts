@@ -1,23 +1,17 @@
-const cache = new Map<string, Intl.NumberFormat>();
+const whole = new Intl.NumberFormat("es-UY", { maximumFractionDigits: 0 });
+const cents2 = new Intl.NumberFormat("es-UY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function nf(currency: string, decimals: boolean): Intl.NumberFormat {
-  const key = `${currency}:${decimals}`;
-  let f = cache.get(key);
-  if (!f) {
-    f = new Intl.NumberFormat("es-UY", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: decimals ? 2 : 0,
-      maximumFractionDigits: decimals ? 2 : 0,
-    });
-    cache.set(key, f);
-  }
-  return f;
-}
+const SYMBOL: Record<string, string> = { UYU: "$", USD: "US$", ARS: "AR$", EUR: "€", BRL: "R$" };
 
-/** "$ 1.250" o "US$ 40,50": decimales solo si los tiene. */
+/**
+ * "$ 1.250" o "US$ 40,50": decimales solo si los tiene. El símbolo va a mano
+ * porque el estilo "currency" de Intl cambia según el navegador (en algunos
+ * celulares sale "UYU 1.250").
+ */
 export function money(value: number, currency = "UYU"): string {
-  return nf(currency, Math.round(value * 100) % 100 !== 0).format(value);
+  const decimals = Math.round(value * 100) % 100 !== 0;
+  const n = (decimals ? cents2 : whole).format(Math.abs(value));
+  return `${value < 0 ? "-" : ""}${SYMBOL[currency] ?? currency} ${n}`;
 }
 
 export const CURRENCIES = ["UYU", "USD", "ARS", "EUR", "BRL"] as const;
