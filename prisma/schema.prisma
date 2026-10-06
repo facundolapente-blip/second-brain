@@ -258,6 +258,27 @@ model ScheduledTransaction {
   @@index([nextDate])
 }
 
+// ─── Check-in diario ────────────────────────────────────────────────────────
+
+/// Cómo estuvo el día, en pocos toques desde Inicio. Uno por día; todo opcional.
+model DailyCheckin {
+  id         String   @id @default(cuid())
+  date       DateTime @unique @db.Date
+  /// Ánimo del 1 (muy mal) al 5 (muy bien), la misma escala que el journal.
+  mood       Int?
+  /// Energía del 1 al 5.
+  energy     Int?
+  /// Estrés del 1 (nada) al 5 (mucho).
+  stress     Int?
+  /// Horas dormidas la noche anterior, en minutos.
+  sleepMin   Int?
+  /// Peso en gramos.
+  weightG    Int?
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 // ─── Login (Better Auth) ────────────────────────────────────────────────────
 
 model AuthUser {

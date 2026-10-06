@@ -28,6 +28,7 @@ import { setBlockDone } from "@/lib/plan-actions";
 import { writeOnDay } from "@/lib/journal-actions";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
+import { CheckinCard } from "./checkin-card";
 
 const WD = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -95,6 +96,7 @@ export function InicioView({ d }: { d: Dashboard }) {
           </div>
         </section>
 
+        <CheckinCard today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} />
         <HabitsToday d={d} />
         <PlanToday d={d} />
         <WeekMix d={d} />

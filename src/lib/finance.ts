@@ -2,7 +2,14 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { fromDbDate, monthBounds, toDbDate, todayISO } from "./dates";
+import { addDays, fromDbDate, monthBounds, toDbDate, todayISO } from "./dates";
+import {
+  isFrequency,
+  nextOnOrAfter,
+  occurrencesBetween,
+  type ScheduleDTO,
+  type ScheduleFrequency,
+} from "./schedule-logic";
 import {
   SELECTION_COOKIE,
   toCents,
@@ -208,4 +215,77 @@ export async function getSelection(): Promise<Selection> {
 export function parseMonth(raw: unknown): string {
   if (typeof raw === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) return raw;
   return todayISO().slice(0, 7);
+}
+
+// ─── Recurrentes ────────────────────────────────────────────────────────────
+
+/**
+ * Carga los movimientos recurrentes que ya tocaban (hasta hoy) y adelanta la
+ * próxima fecha. Se llama al abrir Gastos o Inicio: no hace falta un cron. Cada
+ * movimiento generado lleva un id estable (programa + día), así que dos
+ * pedidos a la vez no lo duplican.
+ */
+export async function runSchedules() {
+  const today = todayISO();
+  const due = await prisma.scheduledTransaction.findMany({
+    where: { active: true, autoConfirm: true, nextDate: { lte: toDbDate(today) } },
+  });
+  for (const s of due) {
+    const rule = {
+      startDate: fromDbDate(s.startDate),
+      frequency: (isFrequency(s.frequency) ? s.frequency : "monthly") as ScheduleFrequency,
+      interval: s.interval,
+      endDate: s.endDate ? fromDbDate(s.endDate) : null,
+    };
+    const dates = occurrencesBetween(rule, fromDbDate(s.nextDate!), today);
+    if (dates.length) {
+      await prisma.transaction.createMany({
+        data: dates.map((d) => ({
+          kind: s.kind,
+          date: toDbDate(d),
+          title: s.title,
+          amount: s.amount,
+          accountId: s.accountId,
+          categoryId: s.categoryId,
+          toAccountId: s.toAccountId,
+          toAmount: s.toAmount,
+          note: s.note,
+          scheduleId: s.id,
+          source: "schedule",
+          externalId: `${s.id}#${d}`,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    const next = nextOnOrAfter(rule, addDays(today, 1));
+    await prisma.scheduledTransaction.update({
+      where: { id: s.id },
+      data: { nextDate: next ? toDbDate(next) : null },
+    });
+  }
+}
+
+export async function getSchedules(): Promise<ScheduleDTO[]> {
+  const rows = await prisma.scheduledTransaction.findMany({
+    include: { _count: { select: { transactions: true } } },
+    orderBy: [{ active: "desc" }, { nextDate: "asc" }, { createdAt: "asc" }],
+  });
+  return rows.map((s) => ({
+    id: s.id,
+    kind: s.kind === "income" ? "income" : s.kind === "transfer" ? "transfer" : "expense",
+    title: s.title,
+    amountCents: toCents(s.amount),
+    accountId: s.accountId,
+    categoryId: s.categoryId,
+    toAccountId: s.toAccountId,
+    toAmountCents: s.toAmount === null ? null : toCents(s.toAmount),
+    note: s.note,
+    frequency: isFrequency(s.frequency) ? s.frequency : "monthly",
+    interval: s.interval,
+    startDate: fromDbDate(s.startDate),
+    nextDate: s.nextDate ? fromDbDate(s.nextDate) : null,
+    endDate: s.endDate ? fromDbDate(s.endDate) : null,
+    active: s.active,
+    generated: s._count.transactions,
+  }));
 }

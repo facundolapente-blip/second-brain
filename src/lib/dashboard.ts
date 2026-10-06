@@ -7,6 +7,7 @@ import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-lo
 import { getAccounts } from "./finance";
 import { toCents, type CurrencyTotals } from "./finance-logic";
 import { isFreeBlock, sortBlocks, type BlockDTO } from "./plan-logic";
+import { getCheckin, lastWeight } from "./checkin";
 
 /**
  * Resumen de los cuatro módulos para Inicio. Todo se calcula acá (servidor) y
@@ -48,6 +49,11 @@ export async function getDashboard() {
     return `${prevMonth}-${String(Math.min(dayOfMonth, last)).padStart(2, "0")}`;
   })();
 
+  const [checkToday, checkYesterday, weight] = await Promise.all([
+    getCheckin(today),
+    getCheckin(addDays(today, -1)),
+    lastWeight(),
+  ]);
   const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, tasks] = await Promise.all([
     getHabitsWithLogs(),
     prisma.journalEntry.findMany({
@@ -215,6 +221,7 @@ export async function getDashboard() {
   return {
     today,
     hour: hourNow(),
+    checkin: { today: checkToday, yesterday: checkYesterday, lastWeightG: weight },
     habits: {
       today: habitsToday,
       doneToday: habitsToday.filter((h) => h.state === "done").length,
