@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Minus, Plus } from "@phosphor-icons/react";
-import { bumpTaskProgress } from "@/lib/plan-actions";
+import { bumpTaskProgress, reorderTasks } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
   applyTaskView,
@@ -11,12 +11,14 @@ import {
   progressPct,
   repeatLabel,
   TASK_STATUS,
+  SORTABLE_VIEWS,
   TASK_VIEWS,
   type CategoryDTO,
   type TaskDTO,
   type TaskView,
 } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
+import { mergeOrder, Sortable, SortableItem } from "@/components/sortable";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, ProgressBar, StatusPill } from "../plan-ui";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
@@ -32,17 +34,34 @@ export function TasksBoard({
   tasks,
   categories,
   today,
+  manualOrder = false,
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
   today: string;
+  /** Si se arrastró alguna vez, las vistas ordenables usan ese orden. */
+  manualOrder?: boolean;
 }) {
   const [view, setView] = useState<TaskView>("todo");
   const [all, setAll] = useState(false);
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
-  const matching = applyTaskView(tasks, view);
+  // Orden optimista mientras se guarda lo arrastrado.
+  const [localOrder, setLocalOrder] = useState<Map<string, number> | null>(null);
+  const [, startOrder] = useTransition();
+  const manual = manualOrder || localOrder !== null;
+  const ordered = localOrder ? tasks.map((t) => ({ ...t, order: localOrder.get(t.id) ?? t.order })) : tasks;
+  const matching = applyTaskView(ordered, view, manual);
+  const canSort = SORTABLE_VIEWS.includes(view);
+  function reorder(visibleNew: string[]) {
+    // La base es el orden de esta vista seguido por el resto: lo que no se ve no se mueve.
+    const viewIds = matching.map((t) => t.id);
+    const rest = [...ordered].sort((a, b) => a.order - b.order).map((t) => t.id).filter((id) => !viewIds.includes(id));
+    const full = mergeOrder([...viewIds, ...rest], visibleNew);
+    setLocalOrder(new Map(full.map((id, i) => [id, i])));
+    startOrder(() => reorderTasks(full));
+  }
   const visible = all ? matching : matching.slice(0, LIMIT);
   const hidden = matching.length - visible.length;
   const schedule = (t: TaskDTO) =>
@@ -71,7 +90,7 @@ export function TasksBoard({
         className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden"
       >
         {TASK_VIEWS.map((v) => {
-          const n = applyTaskView(tasks, v.id).length;
+          const n = applyTaskView(ordered, v.id, manual).length;
           const on = v.id === view;
           return (
             <button
@@ -102,19 +121,22 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} />
+          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} />
+          {/* Celular: mantener apretada una tarea y moverla para cambiar el orden. */}
+          <Sortable ids={visible.map((t) => t.id)} onReorder={reorder} disabled={!canSort}>
           <ul className="grid border-t border-line lg:hidden">
-            {visible.map((t, i) => (
+            {visible.map((t) => (
               <TaskRow
                 key={t.id}
-                index={i}
                 task={t}
                 category={t.categoryId ? cats.get(t.categoryId) : null}
                 today={today}
                 onOpen={() => sheet.current?.open(t)}
+                sortable={canSort}
               />
             ))}
           </ul>
+          </Sortable>
         </>
       )}
       {(hidden > 0 || (all && matching.length > LIMIT)) && (
@@ -142,20 +164,20 @@ function TaskRow({
   category,
   today,
   onOpen,
-  index,
+  sortable,
 }: {
   task: TaskDTO;
   category?: CategoryDTO | null;
   today: string;
   onOpen: () => void;
-  index: number;
+  sortable: boolean;
 }) {
   const left = daysLeft(t.deadline, today);
   const pct = progressPct(t.progress, t.goal);
   const st = TASK_STATUS[t.status];
   const done = t.status === "done";
   return (
-    <li className="rise border-b border-line" style={{ "--i": Math.min(index, 8) } as React.CSSProperties}>
+    <SortableItem id={t.id} disabled={!sortable} className="border-b border-line bg-bg">
       <button type="button" onClick={onOpen} className="grid w-full gap-2.5 px-1 py-3.5 text-left">
         <span className="flex items-start gap-3">
           <span className="grid min-w-0 flex-1 gap-0.5">
@@ -176,7 +198,7 @@ function TaskRow({
           {!done && <ProgressButtons task={t} />}
         </div>
       )}
-    </li>
+    </SortableItem>
   );
 }
 
@@ -224,11 +246,16 @@ function TaskTable({
   cats,
   today,
   onOpen,
+  sortable,
+  onReorder,
 }: {
   tasks: TaskDTO[];
   cats: Map<string, CategoryDTO>;
   today: string;
   onOpen: (t: TaskDTO) => void;
+  /** Clic y arrastrar una fila para cambiar el orden. */
+  sortable: boolean;
+  onReorder: (ids: string[]) => void;
 }) {
   return (
     <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
@@ -243,17 +270,21 @@ function TaskTable({
             <th className="py-3 pr-5 pl-3 font-medium">Progreso</th>
           </tr>
         </thead>
+        <Sortable ids={tasks.map((t) => t.id)} onReorder={onReorder} disabled={!sortable}>
         <tbody>
-          {tasks.map((t, i) => {
+          {tasks.map((t) => {
             const left = daysLeft(t.deadline, today);
             const pct = progressPct(t.progress, t.goal);
             const st = TASK_STATUS[t.status];
             const done = t.status === "done";
             return (
-              <tr
+              <SortableItem
+                as="tr"
                 key={t.id}
-                className="group rise border-b border-line transition-colors last:border-b-0 hover:bg-surface-2/60"
-                style={{ "--i": Math.min(i, 8) } as React.CSSProperties}
+                id={t.id}
+                disabled={!sortable}
+                className="group border-b border-line bg-surface transition-colors last:border-b-0 hover:bg-surface-2/60"
+                draggingClass="shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
               >
                 <td className="py-2 pr-3 pl-3">
                   <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full content-center gap-0.5 rounded-lg px-2 text-left">
@@ -283,10 +314,11 @@ function TaskTable({
                     <span className="text-faint" aria-label="Sin progreso">–</span>
                   )}
                 </td>
-              </tr>
+              </SortableItem>
             );
           })}
         </tbody>
+        </Sortable>
       </table>
     </div>
   );

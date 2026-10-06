@@ -3,9 +3,6 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import {
-  ArrowsDownUp,
-  CaretDown,
-  CaretUp,
   Leaf,
   Archive,
   ArrowCounterClockwise,
@@ -21,7 +18,7 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react";
-import { archiveHabit, deleteHabit, reorderHabits } from "@/lib/habit-actions";
+import { archiveHabit, deleteHabit } from "@/lib/habit-actions";
 import { addDays, weekday } from "@/lib/dates";
 import { cleanDays, currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap, type PackedLogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
@@ -30,7 +27,8 @@ import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
-import { DayCircle, DaySheet, HabitBadge, useDayTap, useHabitLogs, type DaySheetHandle, type MarkFn } from "./habit-ui";
+import { DayCircle, DaySheet, HabitBadge, useDayTap, useHabitLogs, useHabitOrder, type DaySheetHandle, type MarkFn } from "./habit-ui";
+import { Sortable, SortableItem } from "@/components/sortable";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { Fab } from "./today-view";
@@ -43,7 +41,7 @@ export function HabitsList({
   archived = false,
   manualOrder = false,
 }: {
-  /** Si se ordenó a mano alguna vez, la lista respeta ese orden. */
+  /** Si se ordenó arrastrando alguna vez, la lista respeta ese orden. */
   manualOrder?: boolean;
   habits: HabitDTO[];
   logs: PackedLogMap;
@@ -59,15 +57,9 @@ export function HabitsList({
   const daySheet = useRef<DaySheetHandle>(null);
 
   const q = query.trim().toLowerCase();
-  // Mismo orden que HabitNow: prioridad y después nombre.
-  const [reordering, setReordering] = useState(false);
-  const [order, setOrder] = useState<string[]>([]);
-  const [, startOrder] = useTransition();
-  const visible = habits
-    .filter((h) => (!q || h.name.toLowerCase().includes(q)) && (!category || h.categoryId === category))
-    .sort((a, b) =>
-      manualOrder ? a.order - b.order || a.name.localeCompare(b.name, "es") : b.priority - a.priority || a.name.localeCompare(b.name, "es"),
-    );
+  // El orden arrastrado (el mismo de Hoy) o prioridad y nombre, como HabitNow.
+  const { sorted, reorder } = useHabitOrder(habits, manualOrder);
+  const visible = sorted.filter((h) => (!q || h.name.toLowerCase().includes(q)) && (!category || h.categoryId === category));
   const activeCategory = categories.find((c) => c.id === category);
 
   return (
@@ -78,17 +70,6 @@ export function HabitsList({
         tabs={<HabitsTabs />}
         actions={
           <>
-            {!archived && habits.length > 1 && (
-              <IconButton
-                label="Ordenar a mano"
-                onClick={() => {
-                  setOrder(visible.map((h) => h.id));
-                  setReordering(true);
-                }}
-              >
-                <ArrowsDownUp size={21} />
-              </IconButton>
-            )}
             <IconButton label="Buscar" onClick={() => setSearching((s) => !s)}>
               <MagnifyingGlass size={21} />
             </IconButton>
@@ -180,59 +161,15 @@ export function HabitsList({
               </div>
             )}
           </div>
-        ) : reordering ? (
-          <section className="grid max-w-xl gap-3 pt-2">
-            <p className="text-[13.5px] text-muted">Subí o bajá cada hábito. La lista va a quedar siempre en este orden.</p>
-            <ol className="grid divide-y divide-line rounded-2xl border border-line bg-surface">
-              {order.map((id, i) => {
-                const h = habits.find((x) => x.id === id);
-                if (!h) return null;
-                const move = (d: number) =>
-                  setOrder((o) => {
-                    const n = [...o];
-                    [n[i], n[i + d]] = [n[i + d], n[i]];
-                    return n;
-                  });
-                return (
-                  <li key={id} className="flex items-center gap-3 px-3 py-2">
-                    <span className="w-6 text-center font-mono text-[12px] text-muted">{i + 1}</span>
-                    <HabitAvatar icon={h.icon} color={h.color} size={30} />
-                    <span className="min-w-0 flex-1 truncate text-[15px]">{h.name}</span>
-                    <IconButton label={`Subir ${h.name}`} disabled={i === 0} onClick={() => move(-1)}>
-                      <CaretUp size={18} weight="bold" />
-                    </IconButton>
-                    <IconButton label={`Bajar ${h.name}`} disabled={i === order.length - 1} onClick={() => move(1)}>
-                      <CaretDown size={18} weight="bold" />
-                    </IconButton>
-                  </li>
-                );
-              })}
-            </ol>
-            <div className="flex gap-2">
-              <Button
-                onClick={() =>
-                  startOrder(async () => {
-                    // Los que no se ven (filtrados) quedan al final, en su orden.
-                    const rest = habits.map((h) => h.id).filter((id) => !order.includes(id));
-                    await reorderHabits([...order, ...rest]);
-                    setReordering(false);
-                  })
-                }
-              >
-                Guardar orden
-              </Button>
-              <Button variant="ghost" onClick={() => setReordering(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </section>
         ) : visible.length === 0 ? (
           <p className="display py-16 text-center text-[22px] text-muted">Ningún hábito coincide.</p>
         ) : (
+          // Mantener apretado una tarjeta (o clic y arrastrar) y moverla para cambiar el orden.
+          <Sortable ids={visible.map((h) => h.id)} onReorder={reorder} grid disabled={archived}>
           <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
           {visible.map((h) => (
+            <SortableItem key={h.id} id={h.id} as="div" disabled={archived} draggingClass="rounded-2xl shadow-[0_16px_40px_-14px_rgba(0,0,0,0.4)]">
             <HabitCard
-              key={h.id}
               habit={h}
               logs={logs[h.id] ?? {}}
               today={today}
@@ -240,8 +177,10 @@ export function HabitsList({
               onDetail={(habit, date) => daySheet.current?.show(habit, date)}
               onEdit={() => form.current?.edit(h)}
             />
+            </SortableItem>
           ))}
           </div>
+          </Sortable>
         )}
       </main>
 

@@ -43,7 +43,12 @@ export type TaskDTO = {
   /** Se repite al terminarla: daily | weekly | monthly. */
   repeat: "daily" | "weekly" | "monthly" | null;
   repeatEvery: number;
+  /** Orden arrastrado a mano. */
+  order: number;
 };
+
+/** Vistas donde se puede arrastrar: en "Con deadline" manda la fecha y en "Terminadas", cuándo. */
+export const SORTABLE_VIEWS: TaskView[] = ["todo", "priority", "chill", "backlog"];
 
 export const REPEAT_LABEL = { daily: "día", weekly: "semana", monthly: "mes" } as const;
 
@@ -166,21 +171,26 @@ export const TASK_VIEWS: { id: TaskView; label: string }[] = [
 const active = (t: TaskDTO) => t.status === "todo" || t.status === "doing";
 
 /** Las vistas guardadas de Notion: filtro y orden de cada una. */
-export function applyTaskView(tasks: TaskDTO[], view: TaskView): TaskDTO[] {
+export function applyTaskView(tasks: TaskDTO[], view: TaskView, manualOrder = false): TaskDTO[] {
   const byDeadline = (a: TaskDTO, b: TaskDTO) =>
     (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999");
   const byPriority = (a: TaskDTO, b: TaskDTO) => b.priority - a.priority || byDeadline(a, b);
+  // Desde que se arrastró una vez, las vistas que se pueden ordenar usan ese orden.
+  const byOrder = (a: TaskDTO, b: TaskDTO) => a.order - b.order;
+  const manual = manualOrder && SORTABLE_VIEWS.includes(view);
   switch (view) {
     case "todo":
-      return tasks.filter(active).sort((a, b) => (a.status === b.status ? byPriority(a, b) : a.status === "doing" ? -1 : 1));
+      return tasks
+        .filter(active)
+        .sort(manual ? byOrder : (a, b) => (a.status === b.status ? byPriority(a, b) : a.status === "doing" ? -1 : 1));
     case "deadline":
       return tasks.filter((t) => active(t) && t.deadline).sort(byDeadline);
     case "priority":
-      return tasks.filter((t) => active(t) && t.priority >= 3).sort(byPriority);
+      return tasks.filter((t) => active(t) && t.priority >= 3).sort(manual ? byOrder : byPriority);
     case "chill":
-      return tasks.filter((t) => active(t) && t.priority <= 1).sort(byDeadline);
+      return tasks.filter((t) => active(t) && t.priority <= 1).sort(manual ? byOrder : byDeadline);
     case "backlog":
-      return tasks.filter((t) => t.status === "backlog").sort(byPriority);
+      return tasks.filter((t) => t.status === "backlog").sort(manual ? byOrder : byPriority);
     case "done":
       return tasks.filter((t) => t.status === "done");
   }

@@ -515,6 +515,8 @@ model PlanTask {
   /// backlog (Programadas, para algún día) | todo (Sin empezar) | doing (En curso) | done (Terminado)
   status      String        @default("todo")
   /// 0 a 4 fueguitos.
+  /// Orden arrastrado a mano (vale desde que se usa una vez, `AppSetting "tareas_orden_manual"`).
+  order       Int           @default(0)
   priority    Int           @default(1)
   deadline    DateTime?     @db.Date
   /// Progreso y meta numéricos opcionales (por ejemplo 2 de 3 entregas).

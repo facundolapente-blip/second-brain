@@ -8,7 +8,8 @@ import { HabitAvatar } from "@/lib/habit-icons";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
-import { DaySheet, HabitBadge, useHabitLogs, type DaySheetHandle } from "./habit-ui";
+import { DaySheet, HabitBadge, useHabitLogs, useHabitOrder, type DaySheetHandle } from "./habit-ui";
+import { Sortable, SortableItem } from "@/components/sortable";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { TodayPanel } from "./today-panel";
@@ -21,11 +22,14 @@ export function TodayView({
   logs: initialLogs,
   categories,
   today,
+  manualOrder = false,
 }: {
   habits: HabitDTO[];
   logs: PackedLogMap;
   categories: CategoryDTO[];
   today: string;
+  /** Si se ordenó arrastrando alguna vez, Hoy y la Lista usan ese orden. */
+  manualOrder?: boolean;
 }) {
   const { logs, mark } = useHabitLogs(initialLogs);
   const [selected, setSelected] = useState(today);
@@ -37,10 +41,9 @@ export function TodayView({
     [today],
   );
 
-  // Orden fijo (prioridad y nombre): al tildar, la fila no cambia de lugar.
-  const visible = habits
-    .filter((h) => showsOn(h, logs[h.id] ?? {}, selected))
-    .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name, "es"));
+  // Orden fijo (el arrastrado, o prioridad y nombre): al tildar, la fila no cambia de lugar.
+  const { sorted, reorder } = useHabitOrder(habits, manualOrder);
+  const visible = sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected));
 
   const isFuture = selected > today;
 
@@ -68,6 +71,8 @@ export function TodayView({
           ) : visible.length === 0 ? (
             <p className="display py-20 text-center text-[22px] text-muted">No hay hábitos para este día.</p>
           ) : (
+            // Mantener apretado (o clic y arrastrar) y mover para cambiar el orden.
+            <Sortable ids={visible.map((h) => h.id)} onReorder={reorder}>
             <ul className="divide-y divide-line border-b border-line lg:border-b-0">
               {visible.map((h) => {
                 const hLogs = logs[h.id] ?? {};
@@ -75,7 +80,7 @@ export function TodayView({
                 const state = dayState(h, hLogs, selected, today);
                 const isCount = h.target > 1 || !!h.unit;
                 return (
-                  <li key={h.id} className="flex items-center gap-3 py-1.5 lg:gap-4 lg:py-4">
+                  <SortableItem key={h.id} id={h.id} className="flex items-center gap-3 bg-bg py-1.5 lg:gap-4 lg:bg-surface lg:py-4">
                     <button
                       type="button"
                       onClick={() => daySheet.current?.show(h, selected)}
@@ -107,10 +112,11 @@ export function TodayView({
                         else mark(h.id, selected, nextStatus(log), 1);
                       }}
                     />
-                  </li>
+                  </SortableItem>
                 );
               })}
             </ul>
+            </Sortable>
           )}
         </div>
         </section>

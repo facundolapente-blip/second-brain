@@ -139,6 +139,8 @@ function diff(before: Record<string, unknown>, after: Record<string, unknown>) {
 // ─── Tareas ─────────────────────────────────────────────────────────────────
 const STATUS: Record<string, string> = { Programadas: "backlog", "Sin empezar": "todo", "En curso": "doing", Terminado: "done" };
 const allTasks = await prisma.planTask.findMany();
+// Las nuevas entran arriba de todo (como las creadas en la app).
+let minOrder = (await prisma.planTask.aggregate({ _min: { order: true } }))._min.order ?? 0;
 const usedTasks = new Set<string>();
 let tasksNew = 0;
 let tasksChanged = 0;
@@ -195,7 +197,7 @@ for (const r of tasksCsv) {
     say(`+ tarea: ${r.Nombre}${deadline ? ` (deadline ${deadline})` : ""}`);
     if (!DRY) {
       const created = await prisma.planTask.create({
-        data: { ...data, source: SOURCE, externalId, completedAt: status === "done" ? new Date() : null },
+        data: { ...data, order: --minOrder, source: SOURCE, externalId, completedAt: status === "done" ? new Date() : null },
       });
       allTasks.push(created);
       usedTasks.add(created.id);

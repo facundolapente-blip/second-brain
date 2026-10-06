@@ -89,6 +89,7 @@ export async function getTasks(): Promise<TaskDTO[]> {
     subtasks: t.subtasks.map((s) => ({ id: s.id, title: s.title, done: s.done })),
     repeat: t.repeat === "daily" || t.repeat === "weekly" || t.repeat === "monthly" ? t.repeat : null,
     repeatEvery: t.repeatEvery,
+    order: t.order,
   }));
 }
 

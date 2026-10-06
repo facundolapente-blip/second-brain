@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, use
 import { useRouter } from "next/navigation";
 import { enqueue, flushQueue, isNetworkError, pendingOps } from "@/lib/offline-queue";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
-import { setHabitLog } from "@/lib/habit-actions";
+import { reorderHabits, setHabitLog } from "@/lib/habit-actions";
 import {
   dayState,
   frequencyLabel,
@@ -21,6 +21,7 @@ import { addDays, formatLong, monthBounds, shiftMonth, weekday } from "@/lib/dat
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
+import { mergeOrder } from "@/components/sortable";
 
 // ─── Estado optimista de las marcas ─────────────────────────────────────────
 
@@ -502,4 +503,28 @@ function StatusOption({
       {label}
     </button>
   );
+}
+
+/**
+ * Orden de los hábitos, el mismo en Hoy y en la Lista: el que se armó arrastrando
+ * (si se usó alguna vez) o prioridad y nombre. `reorder` recibe los visibles en su
+ * orden nuevo; los que no se ven (filtrados, o que no tocan ese día) no se mueven.
+ */
+export function useHabitOrder(habits: HabitDTO[], manualOrder: boolean) {
+  const [local, setLocal] = useState<string[] | null>(null);
+  const [, start] = useTransition();
+  const base = [...habits]
+    .sort((a, b) =>
+      manualOrder ? a.order - b.order || a.name.localeCompare(b.name, "es") : b.priority - a.priority || a.name.localeCompare(b.name, "es"),
+    )
+    .map((h) => h.id);
+  const ids = local ? [...local.filter((id) => base.includes(id)), ...base.filter((id) => !local.includes(id))] : base;
+  const byId = new Map(habits.map((h) => [h.id, h]));
+  const sorted = ids.map((id) => byId.get(id)!).filter(Boolean);
+  function reorder(visibleNew: string[]) {
+    const full = mergeOrder(ids, visibleNew);
+    setLocal(full);
+    start(() => reorderHabits(full));
+  }
+  return { sorted, reorder };
 }

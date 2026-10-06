@@ -224,9 +224,12 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     .map((x) => x.trim())
     .filter(Boolean)
     .slice(0, 50);
+  // Las nuevas van arriba de todo (si no, con el orden a mano quedarían escondidas al final).
+  const first = await prisma.planTask.aggregate({ _min: { order: true } });
   const created = await prisma.planTask.create({
     data: {
       ...data,
+      order: (first._min.order ?? 0) - 1,
       completedAt: status === "done" ? new Date() : null,
       subtasks: { create: steps.map((title, order) => ({ title: title.slice(0, 200), order })) },
     },
@@ -257,6 +260,20 @@ export async function bumpTaskProgress(id: string, delta: 1 | -1) {
   if (!t) return;
   const next = Math.max(0, (t.progress ?? 0) + delta);
   await prisma.planTask.update({ where: { id }, data: { progress: t.goal ? Math.min(t.goal, next) : next } });
+  refrescar();
+}
+
+/** Orden arrastrado: recibe todas las tareas en el orden nuevo. Desde ahí las vistas lo usan. */
+export async function reorderTasks(ids: string[]) {
+  await exigirSesion();
+  if (!Array.isArray(ids)) return;
+  const clean = ids.map(String).slice(0, 2000);
+  await prisma.$transaction(clean.map((id, i) => prisma.planTask.updateMany({ where: { id }, data: { order: i } })));
+  await prisma.appSetting.upsert({
+    where: { key: "tareas_orden_manual" },
+    create: { key: "tareas_orden_manual", value: "1" },
+    update: { value: "1" },
+  });
   refrescar();
 }
 
@@ -407,6 +424,8 @@ async function spawnNext(id: string) {
       notes: t.notes,
       repeat: t.repeat,
       repeatEvery: t.repeatEvery,
+      // Toma el lugar de la que se terminó.
+      order: t.order,
       subtasks: { create: t.subtasks.map((s) => ({ title: s.title, order: s.order })) },
     },
   });
