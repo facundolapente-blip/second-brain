@@ -17,6 +17,7 @@ import {
 import type { LinkableHabit } from "@/lib/plan";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
+import { tone } from "@/lib/palette";
 import { Menu } from "@/components/menu";
 import { BlockSheet, type BlockSheetHandle } from "./block-sheet";
 import { CategoryTag, categoryMap, Fires } from "./plan-ui";
@@ -106,41 +107,48 @@ export function WeekView({
             <Link
               href={`/plan?semana=${prev}`}
               aria-label="Semana anterior"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-md border border-line-strong text-fg hover:border-rule hover:bg-surface-2"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
-            <h2 className="tabular min-w-36 text-center text-[15px] font-semibold">
+            <h2 className="tabular min-w-40 text-center text-[15px] font-semibold uppercase">
               {formatShort(monday)} al {formatShort(addDays(monday, 6))}
             </h2>
             <Link
               href={`/plan?semana=${next}`}
               aria-label="Semana siguiente"
-              className="inline-flex size-10 items-center justify-center rounded-md text-accent hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-md border border-line-strong text-fg hover:border-rule hover:bg-surface-2"
             >
               <CaretRight size={18} weight="bold" />
             </Link>
           </div>
           {!isThisWeek && (
-            <Link href="/plan" className="text-sm font-medium text-accent-fg hover:underline">
+            <Link href="/plan" className="label-mono inline-flex min-h-11 items-center text-accent-fg hover:underline">
               Esta semana
             </Link>
           )}
           {work.length > 0 && (
-            <p className="tabular ml-auto text-[13px] text-muted">
-              {doneCount} de {work.length} hechos
+            <p className="ml-auto flex items-center gap-2.5">
+              <span className="tabular text-[20px] leading-none font-semibold">
+                {String(doneCount).padStart(2, "0")}
+                <span className="text-[14px] text-muted">/{String(work.length).padStart(2, "0")}</span>
+              </span>
+              <span className="label-mono text-muted">hechos</span>
+              <span aria-hidden className="relative hidden h-2.5 w-24 border border-line-strong sm:block">
+                <span className="absolute inset-y-0 left-0 bg-[var(--st-done-line)]" style={{ width: `${(doneCount / work.length) * 100}%` }} />
+              </span>
             </p>
           )}
         </div>
         {copyMsg && (
-          <p role="status" className="mb-3 rounded-md bg-accent-soft px-3 py-2 text-[13px] text-accent-fg">
+          <p role="status" className="mb-3 border border-rule border-l-4 border-l-accent bg-surface px-3 py-2 text-[13px]">
             {copyMsg}
           </p>
         )}
 
         {/* Celular: tira de días + lista del día elegido */}
         <div className="lg:hidden">
-          <div className="grid grid-cols-7 gap-1.5 pb-4" role="tablist" aria-label="Días">
+          <div className="mb-4 grid grid-cols-7 border border-line-strong" role="tablist" aria-label="Días">
             {days.map((d) => {
               const active = d === selected;
               const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
@@ -153,24 +161,22 @@ export function WeekView({
                   aria-selected={active}
                   onClick={() => setSelected(d)}
                   className={cx(
-                    "relative flex flex-col items-center rounded-none pt-1.5 pb-2 transition-colors",
-                    active ? "bg-accent text-on-accent" : "bg-surface-2 text-fg hover:bg-surface-3",
+                    "relative flex min-h-[64px] flex-col items-center justify-center gap-0.5 border-r border-line transition-colors last:border-r-0",
+                    active ? "bg-ink text-on-ink" : "bg-surface text-fg hover:bg-surface-2",
                   )}
                 >
-                  <span className={cx("text-[11px]", active ? "text-on-accent/85" : "text-muted")}>
+                  <span className={cx("label-mono text-[10px]", active ? "text-on-ink/75" : "text-muted")}>
                     {SHORT[weekday(d)]}
                   </span>
-                  <span className="tabular text-[17px] font-semibold">{Number(d.slice(8))}</span>
+                  <span className="tabular text-[18px] leading-none font-semibold">{Number(d.slice(8))}</span>
                   <span
                     className={cx(
-                      "mt-0.5 h-1.5 w-1.5 rounded-full",
-                      count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-accent" : "bg-accent") : active ? "bg-on-accent/50" : "bg-faint",
+                      "mt-1 h-1.5 w-1.5",
+                      count === 0 ? "bg-transparent" : pending ? "bg-accent" : active ? "bg-on-ink/50" : "bg-faint",
                     )}
                     aria-hidden
                   />
-                  {d === today && !active && (
-                    <span className="absolute inset-x-3 top-0 h-[3px] rounded-b-full bg-accent" aria-hidden />
-                  )}
+                  {d === today && <span className="absolute inset-x-0 top-0 h-[3px] bg-accent" aria-hidden />}
                 </button>
               );
             })}
@@ -188,17 +194,18 @@ export function WeekView({
         </div>
 
         {/* Escritorio: tablero de 7 columnas */}
-        <div className="hidden grid-cols-7 gap-2.5 lg:grid">
+        <div className="hidden grid-cols-7 gap-px border border-line-strong bg-line-strong lg:grid">
           {days.map((d) => {
             const list = byDay.get(d)!;
             return (
-              <section key={d} aria-label={WEEKDAY_LONG[weekday(d)]} className="grid content-start gap-2">
-                <header className="flex items-baseline gap-1.5 px-1 pb-1">
-                  <span className={cx("text-[13px] font-semibold", d === today ? "text-accent-fg" : "text-fg")}>
-                    {WEEKDAY_LONG[weekday(d)]}
+              <section key={d} aria-label={WEEKDAY_LONG[weekday(d)]} className="grid min-h-[60dvh] content-start gap-1.5 bg-surface p-1.5">
+                <header className={cx("relative -mx-1.5 -mt-1.5 mb-0.5 flex items-baseline gap-1.5 border-b border-line px-2.5 pt-2.5 pb-2", d === today && "bg-surface-2")}>
+                  {d === today && <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-accent" />}
+                  <span className={cx("label-mono", d === today ? "font-bold text-fg" : "text-muted")}>
+                    {WEEKDAY_LONG[weekday(d)].slice(0, 3)}
                   </span>
-                  <span className="tabular text-[13px] text-muted">{Number(d.slice(8))}</span>
-                  <span className="tabular ml-auto text-[12px] text-faint">{list.length || ""}</span>
+                  <span className="tabular text-[20px] leading-none font-semibold">{Number(d.slice(8))}</span>
+                  <span className="tabular ml-auto text-[11px] text-faint">{list.length ? String(list.length).padStart(2, "0") : ""}</span>
                 </header>
                 {list.map((b) => (
                   <BlockCard
@@ -214,7 +221,7 @@ export function WeekView({
                 <button
                   type="button"
                   onClick={() => openNew(d)}
-                  className="flex h-9 items-center gap-1.5 rounded-[2px] px-2 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+                  className="label-mono flex h-9 items-center gap-1.5 border border-dashed border-transparent px-2 text-[10.5px] text-faint transition-colors hover:border-line-strong hover:text-muted"
                 >
                   <Plus size={14} /> Nuevo
                 </button>
@@ -228,7 +235,7 @@ export function WeekView({
         type="button"
         onClick={() => openNew(selected)}
         aria-label="Nuevo bloque"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift fixed right-4 bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center border border-rule bg-accent text-on-accent transition-[transform,box-shadow] duration-150 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -259,7 +266,7 @@ function DayList({
 }) {
   return (
     <section aria-label={WEEKDAY_LONG[weekday(day)]}>
-      <h3 className="pb-2 text-[13px] font-medium text-muted">
+      <h3 className="label-mono pb-2 text-muted">
         {day === today ? "Hoy, " : ""}
         {WEEKDAY_LONG[weekday(day)].toLowerCase()} {Number(day.slice(8))}
       </h3>
@@ -271,10 +278,10 @@ function DayList({
           </Button>
         </div>
       ) : (
-        <ol className="grid gap-2">
+        <ol className="grid gap-2 border-l border-line-strong">
           {blocks.map((b) => (
             <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-2">
-              <span className="tabular pt-3 text-right text-[12px] leading-tight text-muted">
+              <span className="tabular pt-3 pr-1 text-right text-[12px] leading-tight font-medium text-fg">
                 {b.startTime ? b.startTime.replace(/^0/, "") : "Todo el día"}
                 {b.endTime && <span className="block text-faint">{b.endTime.replace(/^0/, "")}</span>}
               </span>
@@ -312,10 +319,12 @@ function BlockCard({
   const range = timeRange(b);
   return (
     <article
+      style={category ? tone(category.color) : undefined}
       className={cx(
-        "group relative flex items-start gap-2 rounded-none border p-2.5 transition-colors",
-        free ? "border-dashed border-line-strong bg-transparent" : "border-line bg-surface hover:border-line-strong",
-        b.done && !free && "bg-surface-2/60",
+        "group relative flex items-start gap-2 border border-l-[3px] p-2.5 transition-colors",
+        free ? "border-dashed border-line-strong bg-transparent" : "border-line-strong bg-surface hover:border-rule",
+        !free && (category ? "border-l-tone-solid" : "border-l-rule"),
+        b.done && !free && "bg-surface-2",
       )}
     >
       <button type="button" onClick={onEdit} className="grid min-w-0 flex-1 gap-1.5 text-left">
@@ -358,10 +367,10 @@ function BlockCard({
         >
           <span
             className={cx(
-              "inline-flex size-6 items-center justify-center rounded-[2px] border-2 transition-colors",
+              "inline-flex size-6 items-center justify-center rounded-[2px] border-[1.5px] transition-colors",
               b.done
-                ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
-                : "border-line-strong bg-surface",
+                ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-[var(--on-st)]"
+                : "border-rule bg-surface",
             )}
           >
             {b.done && <Check size={14} weight="bold" />}

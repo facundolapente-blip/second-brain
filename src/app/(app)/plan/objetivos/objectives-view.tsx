@@ -97,13 +97,13 @@ export function ObjectivesView({
               const pct = objectivePct(g);
               return (
                 <section key={g.id || "loose"} className="rise grid gap-2" style={{ "--i": gi } as React.CSSProperties}>
-                  <header className="flex items-end justify-between gap-3 px-1">
-                    <h2 className="text-[17px] font-semibold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
-                    {pct !== null && <span className="tabular text-[13px] font-medium text-muted">{pct}%</span>}
+                  <header className="flex items-end justify-between gap-3 border-b border-rule pb-1.5">
+                    <h2 className="text-[19px] leading-tight font-bold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
+                    {pct !== null && <span className="tabular text-[20px] leading-none font-semibold">{pct}%</span>}
                   </header>
                   {pct !== null && (
-                    <div className="mx-1 h-1.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                      <div className="h-full rounded-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
+                    <div className="h-2 overflow-hidden border border-line-strong" aria-hidden>
+                      <div className="h-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
                   <ul className="grid gap-2 pt-1">
@@ -122,7 +122,7 @@ export function ObjectivesView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nuevo resultado clave"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift fixed right-4 bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center border border-rule bg-accent text-on-accent transition-[transform,box-shadow] duration-150 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -142,10 +142,10 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
       <button
         type="button"
         onClick={onOpen}
-        className="grid w-full gap-2 border border-line-strong bg-surface p-3.5 text-left transition-colors hover:border-line-strong"
+        className="grid w-full gap-2 border border-line-strong bg-surface p-3.5 text-left transition-colors hover:border-rule"
       >
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", finished && "text-muted")}>
+          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-semibold tracking-tight", finished && "text-muted")}>
             {k.title}
           </span>
           {left !== null && (
@@ -160,7 +160,7 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
             {k.kind === "habit" ? <ArrowsClockwise size={13} aria-hidden /> : <Lightning size={13} aria-hidden />}
             {k.kind === "habit" ? "Hábito" : "Actividad"}
           </span>
-          {k.quarters.length > 0 && <span className="text-[12px] text-faint">{k.quarters.join(", ")}</span>}
+          {k.quarters.length > 0 && <span className="label-mono text-[10px] text-muted">{k.quarters.join(" ")}</span>}
           {k.deadline && <span className="tabular text-[12px] text-faint">{formatShort(k.deadline)}</span>}
         </span>
         {pct !== null && (
@@ -263,7 +263,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
           {QUARTERS.map((q) => (
             <label
               key={q}
-              className="flex h-10 cursor-pointer items-center justify-center rounded-[2px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
+              className="label-mono flex h-11 cursor-pointer items-center justify-center rounded-[2px] border border-line-strong text-muted transition-colors select-none has-checked:border-rule has-checked:bg-ink has-checked:font-bold has-checked:text-on-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
             >
               <input type="checkbox" name="quarters" value={q} defaultChecked={kr?.quarters.includes(q)} className="sr-only" />
               {q}

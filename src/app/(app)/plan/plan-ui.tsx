@@ -12,7 +12,7 @@ export function CategoryTag({ category, className }: { category?: CategoryDTO | 
     <span
       style={tone(category.color)}
       className={cx(
-        "inline-flex h-[22px] items-center rounded-[2px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
+        "inline-flex h-[22px] items-center gap-1 rounded-[2px] border border-tone-solid/40 bg-tone px-1.5 text-[11.5px] leading-none font-medium text-tone-fg",
         className,
       )}
     >
@@ -37,7 +37,7 @@ export function StatusPill({ label, toneKey }: { label: string; toneKey: string 
 export function Fires({ n, size = 13 }: { n: number; size?: number }) {
   if (n <= 0) return null;
   return (
-    <span className="inline-flex items-center text-[var(--p-orange-solid)]" aria-label={`Prioridad ${n} de 4`}>
+    <span className="inline-flex items-center text-accent-fg" aria-label={`Prioridad ${n} de 4`}>
       {Array.from({ length: n }, (_, i) => (
         <Fire key={i} size={size} weight="fill" aria-hidden />
       ))}
@@ -48,7 +48,7 @@ export function Fires({ n, size = 13 }: { n: number; size?: number }) {
 /** Selector de prioridad: tocás el fueguito que querés (tocar el mismo lo baja a 0). */
 export function FirePicker({ value, onChange, name }: { value: number; onChange: (n: number) => void; name?: string }) {
   return (
-    <div className="flex h-10 items-center gap-0.5" role="radiogroup" aria-label="Prioridad">
+    <div className="inline-grid h-11 grid-cols-4 gap-px self-start border border-line-strong bg-line-strong" role="radiogroup" aria-label="Prioridad">
       {[1, 2, 3, 4].map((p) => (
         <button
           key={p}
@@ -58,8 +58,9 @@ export function FirePicker({ value, onChange, name }: { value: number; onChange:
           aria-label={`${p} ${p === 1 ? "fueguito" : "fueguitos"}`}
           onClick={() => onChange(value === p ? 0 : p)}
           className={cx(
-            "inline-flex size-10 items-center justify-center rounded-md transition-colors",
-            p <= value ? "text-[var(--p-orange-solid)]" : "text-faint hover:text-muted",
+            "inline-flex size-11 items-center justify-center bg-surface transition-colors",
+            p <= value ? "text-accent-fg" : "text-faint hover:text-muted",
+            p === value && "bg-surface-2",
           )}
         >
           <Fire size={20} weight={p <= value ? "fill" : "regular"} />
@@ -80,7 +81,7 @@ export function ProgressSquares({ pct, label }: { pct: number | null; label?: st
         {Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
-            className={cx("size-[9px] rounded-[2px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-surface-3")}
+            className={cx("h-[10px] w-[7px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-surface-3")}
           />
         ))}
       </span>

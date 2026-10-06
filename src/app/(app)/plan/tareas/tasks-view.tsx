@@ -75,12 +75,12 @@ export function TasksView({
                 aria-selected={on}
                 onClick={() => setView(v.id)}
                 className={cx(
-                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[2px] border px-3.5 text-[13px] transition-colors",
-                  on ? "border-ink bg-ink font-medium text-on-ink" : "border-line text-muted hover:bg-surface-2 hover:text-fg",
+                  "label-mono inline-flex h-11 shrink-0 items-center gap-2 rounded-[2px] border px-3.5 text-[10.5px] transition-colors",
+                  on ? "border-rule bg-ink font-bold text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
                 )}
               >
                 {v.label}
-                <span className={cx("tabular text-[12px]", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
+                <span className={cx("tabular text-[11px] tracking-normal", on ? "text-accent" : "text-faint")}>{String(n).padStart(2, "0")}</span>
               </button>
             );
           })}
@@ -115,7 +115,7 @@ export function TasksView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nueva tarea"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="lift fixed right-4 bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center border border-rule bg-accent text-on-accent transition-[transform,box-shadow] duration-150 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -151,19 +151,19 @@ function TaskRow({
   const urgent = left !== null && left <= 2 && t.status !== "done";
   return (
     <li
-      className="rise border border-line-strong bg-surface transition-colors hover:border-line-strong"
+      className="rise border border-line-strong bg-surface transition-colors hover:border-rule"
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
     >
       <button type="button" onClick={onOpen} className="grid w-full gap-2 p-3.5 text-left">
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", t.status === "done" && "text-muted line-through decoration-faint")}>
+          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-semibold tracking-tight", t.status === "done" && "text-muted line-through decoration-faint")}>
             {t.title}
           </span>
           {left !== null && t.status !== "done" && (
             <span
               className={cx(
                 "tabular shrink-0 text-[12px] font-medium",
-                left < 0 ? "text-danger" : urgent ? "text-[var(--p-orange-fg)]" : "text-muted",
+                left < 0 ? "text-danger" : urgent ? "text-accent-fg" : "text-muted",
               )}
             >
               {daysLeftLabel(left)}
@@ -195,7 +195,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, -1))}
                 aria-label="Restar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Minus size={16} weight="bold" />
               </button>
@@ -203,7 +203,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, 1))}
                 aria-label="Sumar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Plus size={16} weight="bold" />
               </button>
