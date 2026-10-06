@@ -16,6 +16,7 @@ const TABS: Tab[] = [
   { href: "/gastos/recurrentes", label: "Recurrentes", mobile: false },
   { href: "/gastos/presupuestos", label: "Presupuestos", icon: PiggyBank, mobile: true },
   { href: "/gastos/informes", label: "Informes", icon: ChartPieSlice, mobile: true },
+  { href: "/gastos/proyeccion", label: "Proyección", mobile: false },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -23,8 +24,9 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-/** En el celular, Sin clasificar, Plantillas y Recurrentes cuelgan de Movimientos. */
+/** En el celular, Sin clasificar, Plantillas y Recurrentes cuelgan de Movimientos; Proyección, de Informes. */
 function mobileActive(pathname: string, href: string) {
+  if (href === "/gastos/informes") return pathname.startsWith("/gastos/informes") || pathname.startsWith("/gastos/proyeccion");
   if (href === "/gastos") {
     return (
       pathname === "/gastos" ||

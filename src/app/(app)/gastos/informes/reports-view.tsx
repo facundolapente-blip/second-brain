@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, ChartBar } from "@phosphor-icons/react";
 import { addDays, formatMonth, monthBounds, shiftMonth, weekday } from "@/lib/dates";
@@ -120,6 +121,12 @@ export function ReportsView({
         {/* Filtros: una sola fila arriba de todo lo que afectan. */}
         <div className="lg:col-span-12">
           <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
+          <Link
+            href="/gastos/proyeccion"
+            className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg lg:hidden"
+          >
+            Ver la proyección de gastos →
+          </Link>
         </div>
         <section className="grid gap-3 lg:col-span-12 lg:grid-cols-[1fr_minmax(0,340px)] lg:items-center" aria-label="Filtros">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
