@@ -1,5 +1,7 @@
 "use client";
 
+import { FixedSuggestions } from "./fixed-suggestions";
+import type { FixedSuggestion } from "@/lib/smart-logic";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { ArrowsClockwise, Pause, Play, Plus } from "@phosphor-icons/react";
 import { deleteSchedule, saveSchedule, setScheduleActive, type ActionResult } from "@/lib/finance-actions";
@@ -24,11 +26,13 @@ export function SchedulesView({
   accounts,
   categories,
   schedules,
+  suggestions,
   today,
 }: {
   accounts: AccountDTO[];
   categories: CategoryDTO[];
   schedules: ScheduleDTO[];
+  suggestions: FixedSuggestion[];
   today: string;
 }) {
   const lk = useLookups(accounts, categories);
@@ -67,6 +71,7 @@ export function SchedulesView({
         }
       />
       <main className="mx-auto grid max-w-3xl gap-5 px-4 pt-2 lg:px-10 lg:pt-6">
+        <FixedSuggestions suggestions={suggestions} accounts={accounts} categories={categories} />
         {schedules.length === 0 ? (
           <EmptyBlock title="Sin recurrentes todavía" icon={<ArrowsClockwise size={22} aria-hidden />}>
             <p className="max-w-[48ch] text-sm leading-relaxed text-muted">

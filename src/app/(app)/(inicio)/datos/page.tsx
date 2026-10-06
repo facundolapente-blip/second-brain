@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Datos" };
 
 export default async function DatosPage() {
-  const [habits, logs, lastLog, entries, lastEntry, txs, lastTx, checkins, blocks] = await Promise.all([
+  const [habits, logs, lastLog, entries, lastEntry, txs, lastTx, checkins, blocks, stepDays, lastSteps] = await Promise.all([
     prisma.habit.count(),
     prisma.habitLog.count(),
     prisma.habitLog.findFirst({ orderBy: { date: "desc" }, select: { date: true } }),
@@ -18,6 +18,8 @@ export default async function DatosPage() {
     prisma.transaction.findFirst({ orderBy: { date: "desc" }, select: { date: true } }),
     prisma.dailyCheckin.count(),
     prisma.planBlock.count(),
+    prisma.dailyCheckin.count({ where: { steps: { not: null } } }),
+    prisma.dailyCheckin.findFirst({ where: { steps: { not: null } }, orderBy: { date: "desc" }, select: { date: true } }),
   ]);
   const d = (x: { date: Date } | null) => (x ? fromDbDate(x.date) : null);
   const enabled = backupsEnabled();
@@ -41,6 +43,8 @@ export default async function DatosPage() {
           lastTx: d(lastTx),
           checkins,
           blocks,
+          stepDays,
+          lastSteps: d(lastSteps),
         }}
         backups={<Backups enabled={enabled} backups={backups} status={status} />}
       />

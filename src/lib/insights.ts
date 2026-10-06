@@ -104,6 +104,28 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
     });
   }
 
+  // Pasos: 8.000 o más contra menos.
+  const stepsMood = split(past, (d) => (d.steps === null ? null : d.steps >= 8000), (d) => d.mood);
+  if (stepsMood && Math.abs(stepsMood.a - stepsMood.b) >= 0.25) {
+    out.push({
+      id: "pasos-animo",
+      module: "inicio",
+      text: `Los días con 8.000 pasos o más tu ánimo promedio es ${stepsMood.a.toFixed(1)}; con menos, ${stepsMood.b.toFixed(1)}`,
+      detail: `${stepsMood.na} y ${stepsMood.nb} días con pasos y ánimo`,
+      weight: Math.abs(stepsMood.a - stepsMood.b) / 2 + 0.3,
+    });
+  }
+  const stepsSleep = split(past, (d) => (d.steps === null || d.sleepMin === null ? null : d.steps >= 8000), (d) => d.sleepMin);
+  if (stepsSleep && Math.abs(stepsSleep.a - stepsSleep.b) >= 20) {
+    out.push({
+      id: "pasos-sueno",
+      module: "inicio",
+      text: `Los días que caminás 8.000 pasos o más dormís ${Math.round(stepsSleep.a)} min; los otros, ${Math.round(stepsSleep.b)} min`,
+      detail: `${stepsSleep.na} y ${stepsSleep.nb} días`,
+      weight: Math.abs(stepsSleep.a - stepsSleep.b) / 120 + 0.2,
+    });
+  }
+
   // Escribir en el journal y los hábitos del día.
   const wroteHabits = split(
     past,
@@ -174,6 +196,7 @@ export const METRICS = [
   { id: "energy", label: "Energía", get: (d: DayMetrics) => d.energy },
   { id: "stress", label: "Estrés", get: (d: DayMetrics) => d.stress },
   { id: "sleep", label: "Sueño", get: (d: DayMetrics) => d.sleepMin },
+  { id: "steps", label: "Pasos", get: (d: DayMetrics) => d.steps },
   { id: "spent", label: "Gasto", get: (d: DayMetrics) => d.spentCents },
   { id: "words", label: "Palabras", get: (d: DayMetrics) => d.words },
   { id: "plan", label: "Plan %", get: (d: DayMetrics) => (d.blocksTotal ? d.blocksDone / d.blocksTotal : null) },

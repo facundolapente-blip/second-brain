@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { summarizeCard, type CardMove, type CardSummary } from "./card-logic";
 import { addDays, dayOfInstant, fromDbDate, monthBounds, shiftMonth, todayISO, toDbDate } from "./dates";
-import { buildClassifier, normTitle } from "./smart-logic";
+import { buildClassifier, findFixedExpenses, type FixedSuggestion, normTitle } from "./smart-logic";
 import {
   isFrequency,
   nextOnOrAfter,
@@ -661,3 +661,38 @@ export async function getHistory(f: HistoryFilters): Promise<{ txs: TxDTO[]; tot
     : rows;
   return { txs: hits.slice(0, limit).map(toTxDTO), total: hits.length, hasMore: hits.length > limit };
 }
+
+/** Gastos que parecen fijos y todavía no son recurrentes (ni se descartaron). */
+export async function getFixedSuggestions(): Promise<FixedSuggestion[]> {
+  const today = todayISO();
+  const from = `${shiftMonth(today.slice(0, 7), -5)}-01`;
+  const [rows, schedules, ignored] = await Promise.all([
+    prisma.transaction.findMany({
+      where: {
+        kind: "expense",
+        date: { gte: toDbDate(from), lte: toDbDate(today) },
+        title: { not: null },
+        installmentGroup: null,
+        scheduleId: null,
+        ...NOT_ADJUSTMENT,
+      },
+      select: { title: true, accountId: true, categoryId: true, amount: true, date: true },
+    }),
+    prisma.scheduledTransaction.findMany({ where: { active: true }, select: { title: true, accountId: true } }),
+    prisma.appSetting.findUnique({ where: { key: FIXED_IGNORED } }),
+  ]);
+  const skip = new Set(schedules.filter((s) => s.title).map((s) => `${normTitle(s.title!)}|${s.accountId}`));
+  try {
+    for (const k of JSON.parse(ignored?.value ?? "[]") as string[]) skip.add(k);
+  } catch {
+    // lista rota: se ignora
+  }
+  return findFixedExpenses(
+    rows.map((r) => ({ title: r.title!, accountId: r.accountId, categoryId: r.categoryId, cents: toCents(r.amount), date: fromDbDate(r.date) })),
+    today,
+    skip,
+  );
+}
+
+/** AppSetting con las sugerencias de gastos fijos que se descartaron. */
+export const FIXED_IGNORED = "fijos_ignorados";

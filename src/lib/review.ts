@@ -29,6 +29,7 @@ export function summarize(days: DayMetrics[]) {
     energy: avg(days.map((d) => d.energy)),
     stress: avg(days.map((d) => d.stress)),
     sleepMin: avg(days.map((d) => d.sleepMin)),
+    steps: avg(days.map((d) => d.steps)),
   };
 }
 

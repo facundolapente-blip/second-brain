@@ -25,6 +25,7 @@ export type DayMetrics = {
   stress: number | null;
   sleepMin: number | null;
   weightG: number | null;
+  steps: number | null;
   wrote: boolean;
   words: number;
   /** En pesos uruguayos (los dólares, con la cotización del día). */
@@ -66,6 +67,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       stress: null,
       sleepMin: null,
       weightG: null,
+      steps: null,
       wrote: false,
       words: 0,
       spentCents: 0,
@@ -95,6 +97,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     m.stress = c.stress;
     m.sleepMin = c.sleepMin;
     m.weightG = c.weightG;
+    m.steps = c.steps;
   }
   for (const e of entries) {
     const m = byDate.get(fromDbDate(e.date));

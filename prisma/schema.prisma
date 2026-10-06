@@ -412,6 +412,8 @@ model DailyCheckin {
   sleepMin   Int?
   /// Peso en gramos.
   weightG    Int?
+  /// Pasos del día (importados de Google Fit, Samsung Health o un CSV).
+  steps      Int?
   note       String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

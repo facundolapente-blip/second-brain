@@ -1,5 +1,5 @@
 import { formatMonth, todayISO } from "@/lib/dates";
-import { getMonthlySummary } from "@/lib/monthly";
+import { getMonthlySummary, getYearSummary } from "@/lib/monthly";
 import { SummaryView } from "./summary-view";
 
 export const dynamic = "force-dynamic";
@@ -10,17 +10,25 @@ function monthOf(mes: string | string[] | undefined) {
   return typeof mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) && mes <= current ? mes : current;
 }
 
+/** El año pedido (no futuro), o null si no se pidió uno. */
+function yearOf(anio: string | string[] | undefined) {
+  return typeof anio === "string" && /^\d{4}$/.test(anio) && anio <= todayISO().slice(0, 4) && anio >= "2000" ? anio : null;
+}
+
 export async function generateMetadata({ searchParams }: PageProps<"/resumen">) {
-  const m = monthOf((await searchParams).mes);
+  const sp = await searchParams;
+  const y = yearOf(sp.anio);
   // El título es el nombre del PDF al guardarlo.
-  return { title: `Resumen de ${formatMonth(m)}` };
+  return { title: y ? `Tu año ${y}` : `Resumen de ${formatMonth(monthOf(sp.mes))}` };
 }
 
 export default async function ResumenPage({ searchParams }: PageProps<"/resumen">) {
-  const s = await getMonthlySummary(monthOf((await searchParams).mes));
+  const sp = await searchParams;
+  const y = yearOf(sp.anio);
+  const s = y ? await getYearSummary(y) : await getMonthlySummary(monthOf(sp.mes));
   return (
     <div data-module="inicio" className="min-h-dvh">
-      <SummaryView key={s.month} s={s} />
+      <SummaryView key={`${s.period.kind}-${s.period.key}`} s={s} />
     </div>
   );
 }

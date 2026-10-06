@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { CheckCircle, DownloadSimple, FileArrowUp, Medal, Notebook, Wallet, WarningCircle, type Icon } from "@phosphor-icons/react";
 import { importBackup, type ImportResult } from "@/lib/data-actions";
+import { HealthImport } from "./health-import";
 import { formatShort } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
 import { cx } from "@/components/ui";
@@ -17,6 +18,8 @@ type Stats = {
   lastTx: string | null;
   checkins: number;
   blocks: number;
+  stepDays: number;
+  lastSteps: string | null;
 };
 
 const nf = new Intl.NumberFormat("es-UY");
@@ -32,7 +35,7 @@ export function DataView({ stats, backups }: { stats: Stats; backups: React.Reac
             Subí el archivo que exporta cada app. No se borra nada: lo nuevo se suma, lo que ya estaba no se duplica y las
             notas, ánimos y etiquetas que pusiste acá se respetan.
           </p>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
             <ImportCard
               kind="habitnow"
               title="HabitNow"
@@ -59,6 +62,9 @@ export function DataView({ stats, backups }: { stats: Stats; backups: React.Reac
               accept=".csv"
               how="Exportá el CSV de la app. Las transferencias no vienen en el export: cargalas acá a mano."
               status={`${nf.format(stats.txs)} movimientos${stats.lastTx ? `, el último del ${formatShort(stats.lastTx)}` : ""}`}
+            />
+            <HealthImport
+              status={stats.stepDays ? `Pasos de ${nf.format(stats.stepDays)} días${stats.lastSteps ? `, el último del ${formatShort(stats.lastSteps)}` : ""}` : "Todavía sin datos"}
             />
           </div>
         </section>

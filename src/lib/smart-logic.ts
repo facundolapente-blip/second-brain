@@ -147,3 +147,69 @@ export function parseQuick(text: string, accounts: QuickAccount[]): QuickParse |
   const title = titleRaw ? titleRaw.charAt(0).toUpperCase() + titleRaw.slice(1) : "";
   return { amountCents, kind, title, accountId, currency, daysAgo };
 }
+
+// ─── Gastos fijos ───────────────────────────────────────────────────────────
+
+export type FixedRow = { title: string; accountId: string; categoryId: string | null; cents: number; date: string };
+
+export type FixedSuggestion = {
+  key: string;
+  title: string;
+  accountId: string;
+  categoryId: string | null;
+  /** El monto de la última vez (las suscripciones suben de precio). */
+  amountCents: number;
+  /** Día del mes en que suele caer. */
+  day: number;
+  months: number;
+  lastDate: string;
+};
+
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+};
+
+/**
+ * Gastos que se repiten cada mes con monto parecido (alquiler, Spotify, gimnasio):
+ * mismo título y cuenta en al menos 3 de los últimos 6 meses, uno solo por mes,
+ * el 70% dentro de ±15% del monto típico y todavía vigente (en los últimos 2 meses).
+ */
+export function findFixedExpenses(rows: FixedRow[], today: string, skip: Set<string>): FixedSuggestion[] {
+  const groups = new Map<string, FixedRow[]>();
+  for (const r of rows) {
+    const t = normTitle(r.title);
+    if (t.length < 3) continue;
+    const key = `${t}|${r.accountId}`;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  const month = today.slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const recent = new Set([month, new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7)]);
+  const out: FixedSuggestion[] = [];
+  for (const [key, list] of groups) {
+    if (skip.has(key)) continue;
+    const months = new Set(list.map((r) => r.date.slice(0, 7)));
+    if (months.size < 3 || list.length > months.size * 1.5) continue;
+    if (![...months].some((mm) => recent.has(mm))) continue;
+    const typical = median(list.map((r) => r.cents));
+    const close = list.filter((r) => Math.abs(r.cents - typical) <= typical * 0.15).length;
+    if (close < list.length * 0.7) continue;
+    const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+    const last = sorted.at(-1)!;
+    const cats = new Map<string | null, number>();
+    for (const r of list) cats.set(r.categoryId, (cats.get(r.categoryId) ?? 0) + 1);
+    out.push({
+      key,
+      title: last.title,
+      accountId: last.accountId,
+      categoryId: [...cats].sort((a, b) => b[1] - a[1])[0][0],
+      amountCents: last.cents,
+      day: median(list.map((r) => Number(r.date.slice(8)))),
+      months: months.size,
+      lastDate: last.date,
+    });
+  }
+  return out.sort((a, b) => b.amountCents - a.amountCents);
+}

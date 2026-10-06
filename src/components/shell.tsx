@@ -22,7 +22,7 @@ const MODULES: Module[] = [
 /** Herramientas que cruzan los módulos. */
 const TOOLS: { href: string; label: string; icon: Icon }[] = [
   { href: "/semana", label: "Revisión semanal", icon: ClipboardText },
-  { href: "/resumen", label: "Resumen del mes", icon: CalendarCheck },
+  { href: "/resumen", label: "Resumen mes y año", icon: CalendarCheck },
   { href: "/analisis", label: "Análisis", icon: ChartLineUp },
   { href: "/historial", label: "Historial y papelera", icon: ClockCounterClockwise },
   { href: "/datos", label: "Datos", icon: Database },

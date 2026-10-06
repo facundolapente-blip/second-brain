@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
-import { addDays, fromDbDate, isISODate, todayISO, toDbDate } from "./dates";
+import { addDays, fromDbDate, isISODate, shiftMonth, todayISO, toDbDate } from "./dates";
 import { isFrequency, nextOnOrAfter } from "./schedule-logic";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { calibrarSaldos } from "./importers/gastos-saldos";
-import { getClassifier } from "./finance";
+import { FIXED_IGNORED, getClassifier } from "./finance";
 import { logActivity, trashAndDelete } from "./trash";
 import { parseQuick } from "./smart-logic";
-import { installmentDate, splitInstallments } from "./card-logic";
+import { dayIn, installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
@@ -781,4 +781,56 @@ export async function deleteGoal(id: string) {
   await exigirSesion();
   await trashAndDelete("goal", id);
   refrescar();
+}
+
+// ─── Gastos fijos sugeridos ─────────────────────────────────────────────────
+
+/** Pasa un gasto fijo detectado a recurrente mensual, desde la próxima vez que toca. */
+export async function acceptFixed(input: { key: string; title: string; accountId: string; categoryId: string | null; amountCents: number; day: number; lastDate: string }) {
+  await exigirSesion();
+  const account = await prisma.account.findUnique({ where: { id: String(input.accountId) } });
+  if (!account) return { ok: false as const, error: "La cuenta ya no existe." };
+  const cents = Math.round(Number(input.amountCents));
+  if (!Number.isInteger(cents) || cents <= 0) return { ok: false as const, error: "Monto inválido." };
+  const day = Math.min(31, Math.max(1, Math.round(Number(input.day)) || 1));
+  const today = todayISO();
+  // Si este mes ya se pagó, arranca el que viene; si no, este mes (o el que viene si el día ya pasó).
+  const thisMonth = today.slice(0, 7);
+  const paidThisMonth = isISODate(input.lastDate) && input.lastDate.slice(0, 7) === thisMonth;
+  let start = dayIn(thisMonth, day);
+  if (paidThisMonth || start < today) start = dayIn(shiftMonth(thisMonth, 1), day);
+  const cat = input.categoryId ? await prisma.category.findUnique({ where: { id: input.categoryId }, select: { id: true, kind: true } }) : null;
+  const created = await prisma.scheduledTransaction.create({
+    data: {
+      kind: "expense",
+      title: String(input.title).slice(0, 120),
+      amount: centsToDecimalString(cents),
+      accountId: account.id,
+      categoryId: cat?.kind === "expense" ? cat.id : null,
+      frequency: "monthly",
+      interval: 1,
+      startDate: toDbDate(start),
+      nextDate: toDbDate(start),
+    },
+  });
+  await logActivity("created", "schedule", created.id, `${created.title} (detectado como fijo)`);
+  revalidatePath("/gastos", "layout");
+  return { ok: true as const };
+}
+
+/** "No es fijo": la sugerencia no vuelve a aparecer. */
+export async function ignoreFixed(key: string) {
+  await exigirSesion();
+  const k = String(key).slice(0, 200);
+  const row = await prisma.appSetting.findUnique({ where: { key: FIXED_IGNORED } });
+  let list: string[] = [];
+  try {
+    list = JSON.parse(row?.value ?? "[]");
+  } catch {
+    list = [];
+  }
+  if (!list.includes(k)) list.push(k);
+  const value = JSON.stringify(list.slice(-300));
+  await prisma.appSetting.upsert({ where: { key: FIXED_IGNORED }, create: { key: FIXED_IGNORED, value }, update: { value } });
+  revalidatePath("/gastos/recurrentes");
 }
