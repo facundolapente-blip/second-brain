@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
-import { isISODate, todayISO, toDbDate } from "./dates";
+import { addDays, fromDbDate, isISODate, todayISO, toDbDate } from "./dates";
+import { isFrequency, nextOnOrAfter } from "./schedule-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
@@ -12,6 +13,7 @@ export type ActionResult = { ok: true; id?: string } | { ok: false; error: strin
 
 function refrescar() {
   revalidatePath("/gastos", "layout");
+  revalidatePath("/");
 }
 
 function texto(fd: FormData, key: string, max = 200): string {
@@ -245,5 +247,116 @@ export async function renameTemplate(id: string, name: string) {
 export async function deleteTemplate(id: string) {
   await exigirSesion();
   await prisma.txTemplate.deleteMany({ where: { id } });
+  refrescar();
+}
+
+// ─── Recurrentes ────────────────────────────────────────────────────────────
+
+/**
+ * Crea o edita un movimiento recurrente. Arranca desde hoy: no carga los que
+ * ya pasaron (para no duplicar lo que se cargó a mano). Si hoy toca, se carga
+ * hoy mismo al abrir Gastos.
+ */
+export async function saveSchedule(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await exigirSesion();
+  const id = texto(fd, "id", 40) || null;
+  const kind = texto(fd, "kind") as TxKind;
+  if (!TX_KINDS.includes(kind)) return { ok: false, error: "Tipo de movimiento inválido." };
+  const amount = parseAmount(texto(fd, "amount", 30));
+  if (amount === null) return { ok: false, error: "Escribí un monto mayor a cero." };
+  const account = await prisma.account.findUnique({ where: { id: texto(fd, "accountId", 40) } });
+  if (!account) return { ok: false, error: "Elegí una cuenta." };
+
+  const frequency = texto(fd, "frequency");
+  if (!isFrequency(frequency)) return { ok: false, error: "Elegí cada cuánto se repite." };
+  const interval = Math.max(1, Math.min(60, Math.round(Number(texto(fd, "interval", 3)) || 1)));
+  const startRaw = texto(fd, "startDate", 10);
+  if (!isISODate(startRaw)) return { ok: false, error: "Elegí la fecha de la primera vez." };
+  const endRaw = texto(fd, "endDate", 10);
+  const endDate = isISODate(endRaw) ? endRaw : null;
+  if (endDate && endDate < startRaw) return { ok: false, error: "La fecha de fin es anterior al inicio." };
+
+  let categoryId: string | null = null;
+  let toAccountId: string | null = null;
+  let toAmount: number | null = null;
+  if (kind === "transfer") {
+    const to = await prisma.account.findUnique({ where: { id: texto(fd, "toAccountId", 40) } });
+    if (!to) return { ok: false, error: "Elegí la cuenta de destino." };
+    if (to.id === account.id) return { ok: false, error: "La cuenta de origen y la de destino son la misma." };
+    toAccountId = to.id;
+    if (to.currency === account.currency) toAmount = amount;
+    else {
+      toAmount = parseAmount(texto(fd, "toAmount", 30));
+      if (toAmount === null) return { ok: false, error: `Escribí cuánto llega a "${to.name}" (en ${to.currency}).` };
+    }
+  } else {
+    categoryId = texto(fd, "categoryId", 40) || null;
+    if (categoryId) {
+      const cat = await prisma.category.findUnique({ where: { id: categoryId } });
+      if (!cat || cat.kind !== kind) categoryId = null;
+    }
+  }
+
+  // La próxima vez: desde hoy, o desde el día después del último que ya generó.
+  const rule = { startDate: startRaw, frequency, interval, endDate };
+  let from = todayISO();
+  if (id) {
+    const last = await prisma.transaction.findFirst({ where: { scheduleId: id }, orderBy: { date: "desc" }, select: { date: true } });
+    if (last) {
+      const after = addDays(fromDbDate(last.date), 1);
+      if (after > from) from = after;
+    }
+  }
+  const next = nextOnOrAfter(rule, from);
+
+  const data = {
+    kind,
+    title: texto(fd, "title", 120) || null,
+    amount: centsToDecimalString(amount),
+    accountId: account.id,
+    categoryId,
+    toAccountId,
+    toAmount: toAmount === null ? null : centsToDecimalString(toAmount),
+    note: texto(fd, "note", 2000) || null,
+    frequency,
+    interval,
+    startDate: toDbDate(startRaw),
+    endDate: endDate ? toDbDate(endDate) : null,
+    nextDate: next ? toDbDate(next) : null,
+    autoConfirm: true,
+  };
+  if (id) await prisma.scheduledTransaction.update({ where: { id }, data });
+  else await prisma.scheduledTransaction.create({ data });
+  refrescar();
+  return { ok: true };
+}
+
+export async function setScheduleActive(id: string, active: boolean) {
+  await exigirSesion();
+  const s = await prisma.scheduledTransaction.findUnique({ where: { id } });
+  if (!s) return;
+  // Al reactivar no se cargan los que pasaron mientras estuvo en pausa.
+  const next = active
+    ? nextOnOrAfter(
+        {
+          startDate: fromDbDate(s.startDate),
+          frequency: isFrequency(s.frequency) ? s.frequency : "monthly",
+          interval: s.interval,
+          endDate: s.endDate ? fromDbDate(s.endDate) : null,
+        },
+        todayISO(),
+      )
+    : null;
+  await prisma.scheduledTransaction.update({
+    where: { id },
+    data: { active, ...(active ? { nextDate: next ? toDbDate(next) : null } : {}) },
+  });
+  refrescar();
+}
+
+/** Borra el recurrente; los movimientos que ya cargó se quedan. */
+export async function deleteSchedule(id: string) {
+  await exigirSesion();
+  await prisma.scheduledTransaction.deleteMany({ where: { id } });
   refrescar();
 }

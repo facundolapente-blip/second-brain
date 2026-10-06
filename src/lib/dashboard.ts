@@ -4,7 +4,7 @@ import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, to
 import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
-import { getAccounts } from "./finance";
+import { getAccounts, runSchedules } from "./finance";
 import { toCents, type CurrencyTotals } from "./finance-logic";
 import { isFreeBlock, sortBlocks, type BlockDTO } from "./plan-logic";
 import { getCheckin, lastWeight } from "./checkin";
@@ -49,6 +49,7 @@ export async function getDashboard() {
     return `${prevMonth}-${String(Math.min(dayOfMonth, last)).padStart(2, "0")}`;
   })();
 
+  await runSchedules();
   const [checkToday, checkYesterday, weight] = await Promise.all([
     getCheckin(today),
     getCheckin(addDays(today, -1)),

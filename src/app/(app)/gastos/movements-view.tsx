@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowDownLeft, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
@@ -157,6 +157,7 @@ export function MovementsView({
                     />
                   )}
                   <QuickLink href="/gastos/plantillas" label="Plantillas" icon={<Copy size={14} aria-hidden />} />
+                  <QuickLink href="/gastos/recurrentes" label="Recurrentes" icon={<ArrowsClockwise size={14} aria-hidden />} />
                 </div>
               </div>
               <div className="hidden gap-4 lg:grid">

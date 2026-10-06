@@ -13,6 +13,7 @@ const TABS: Tab[] = [
   { href: "/gastos/categorias", label: "Categorías", icon: SquaresFour, mobile: true },
   { href: "/gastos/sin-clasificar", label: "Sin clasificar", mobile: false },
   { href: "/gastos/plantillas", label: "Plantillas", mobile: false },
+  { href: "/gastos/recurrentes", label: "Recurrentes", mobile: false },
   { href: "/gastos/informes", label: "Informes", icon: ChartPieSlice, mobile: true },
 ];
 
@@ -21,10 +22,15 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-/** En el celular, Sin clasificar y Plantillas cuelgan de Movimientos. */
+/** En el celular, Sin clasificar, Plantillas y Recurrentes cuelgan de Movimientos. */
 function mobileActive(pathname: string, href: string) {
   if (href === "/gastos") {
-    return pathname === "/gastos" || pathname.startsWith("/gastos/sin-clasificar") || pathname.startsWith("/gastos/plantillas");
+    return (
+      pathname === "/gastos" ||
+      pathname.startsWith("/gastos/sin-clasificar") ||
+      pathname.startsWith("/gastos/plantillas") ||
+      pathname.startsWith("/gastos/recurrentes")
+    );
   }
   return pathname.startsWith(href);
 }

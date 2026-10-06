@@ -1,10 +1,11 @@
 import "./gastos.css";
-import { getSelection } from "@/lib/finance";
+import { getSelection, runSchedules } from "@/lib/finance";
 import { GastosNav } from "./gastos-nav";
 import { SelectionProvider } from "./selection";
 
 export default async function GastosLayout({ children }: LayoutProps<"/gastos">) {
-  const selection = await getSelection();
+  // Los recurrentes que ya tocaban se cargan antes de mostrar nada.
+  const [selection] = await Promise.all([getSelection(), runSchedules()]);
   return (
     <SelectionProvider initial={selection}>
       {/* Abajo deja lugar para la barra inferior y el botón flotante. */}
