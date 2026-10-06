@@ -9,6 +9,7 @@ import {
   daysLeft,
   daysLeftLabel,
   progressPct,
+  repeatLabel,
   TASK_STATUS,
   TASK_VIEWS,
   type CategoryDTO,
@@ -163,7 +164,7 @@ function TaskRow({
         <span className="flex items-start gap-3">
           <span className="grid min-w-0 flex-1 gap-0.5">
             <span className={cx("text-[15.5px] leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
-            {t.scheduled && !done && <span className="text-[12px] text-muted">Agendada en la semana</span>}
+            <TaskMeta t={t} done={done} />
           </span>
           <Deadline deadline={t.deadline} left={left} done={done} />
         </span>
@@ -261,7 +262,7 @@ function TaskTable({
                 <td className="py-2 pr-3 pl-3">
                   <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full content-center gap-0.5 rounded-lg px-2 text-left">
                     <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
-                    {t.scheduled && !done && <span className="text-[12px] text-muted">Agendada en la semana</span>}
+                    <TaskMeta t={t} done={done} />
                   </button>
                 </td>
                 <td className="px-3 py-2">
@@ -293,4 +294,13 @@ function TaskTable({
       </table>
     </div>
   );
+}
+
+/** Debajo del título: pasos, si se repite y si está agendada. */
+function TaskMeta({ t, done }: { t: TaskDTO; done: boolean }) {
+  const steps = t.subtasks.length ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length} pasos` : null;
+  const rep = repeatLabel(t.repeat, t.repeatEvery);
+  const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, t.scheduled && !done ? "agendada" : null].filter(Boolean);
+  if (!parts.length) return null;
+  return <span className="text-[12px] text-muted first-letter:uppercase">{parts.join(" · ")}</span>;
 }

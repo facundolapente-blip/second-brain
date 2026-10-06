@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
+import { flushQueue, pendingCount } from "@/lib/offline-queue";
 import { cx } from "./ui";
 
 type Module = { href: string; label: string; icon: Icon; color: string };
@@ -170,9 +171,36 @@ function useRefreshOnReturn() {
   }, [router]);
 }
 
+/**
+ * Sin señal: registra el service worker (solo en producción), avisa cuando no
+ * hay conexión y, al volver, manda lo que quedó en cola.
+ */
+function useOffline() {
+  const router = useRouter();
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+    const update = async () => {
+      setOffline(!navigator.onLine);
+      if (navigator.onLine && pendingCount() > 0 && (await flushQueue()) > 0) router.refresh();
+    };
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, [router]);
+  return offline;
+}
+
 export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
   const [drawer, setDrawer] = useState(false);
   useRefreshOnReturn();
+  const offline = useOffline();
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>
@@ -211,7 +239,14 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
           </aside>
         </div>
 
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0">
+          {offline && (
+            <p role="status" className="sticky top-0 z-40 bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
+              Sin conexión: estás viendo lo último guardado. Lo que marques en Hábitos se guarda cuando vuelva la señal.
+            </p>
+          )}
+          {children}
+        </div>
       </div>
     </DrawerCtx.Provider>
   );

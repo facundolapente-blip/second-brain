@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import {
+  ArrowsDownUp,
+  CaretDown,
+  CaretUp,
+  Leaf,
   Archive,
   ArrowCounterClockwise,
   CalendarBlank,
@@ -17,9 +21,9 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react";
-import { archiveHabit, deleteHabit } from "@/lib/habit-actions";
+import { archiveHabit, deleteHabit, reorderHabits } from "@/lib/habit-actions";
 import { addDays, weekday } from "@/lib/dates";
-import { currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap, type PackedLogMap } from "@/lib/habit-logic";
+import { cleanDays, currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap, type PackedLogMap } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
@@ -37,7 +41,10 @@ export function HabitsList({
   categories,
   today,
   archived = false,
+  manualOrder = false,
 }: {
+  /** Si se ordenó a mano alguna vez, la lista respeta ese orden. */
+  manualOrder?: boolean;
   habits: HabitDTO[];
   logs: PackedLogMap;
   categories: CategoryDTO[];
@@ -53,9 +60,14 @@ export function HabitsList({
 
   const q = query.trim().toLowerCase();
   // Mismo orden que HabitNow: prioridad y después nombre.
+  const [reordering, setReordering] = useState(false);
+  const [order, setOrder] = useState<string[]>([]);
+  const [, startOrder] = useTransition();
   const visible = habits
     .filter((h) => (!q || h.name.toLowerCase().includes(q)) && (!category || h.categoryId === category))
-    .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name, "es"));
+    .sort((a, b) =>
+      manualOrder ? a.order - b.order || a.name.localeCompare(b.name, "es") : b.priority - a.priority || a.name.localeCompare(b.name, "es"),
+    );
   const activeCategory = categories.find((c) => c.id === category);
 
   return (
@@ -66,6 +78,17 @@ export function HabitsList({
         tabs={<HabitsTabs />}
         actions={
           <>
+            {!archived && habits.length > 1 && (
+              <IconButton
+                label="Ordenar a mano"
+                onClick={() => {
+                  setOrder(visible.map((h) => h.id));
+                  setReordering(true);
+                }}
+              >
+                <ArrowsDownUp size={21} />
+              </IconButton>
+            )}
             <IconButton label="Buscar" onClick={() => setSearching((s) => !s)}>
               <MagnifyingGlass size={21} />
             </IconButton>
@@ -159,6 +182,54 @@ export function HabitsList({
               </div>
             )}
           </div>
+        ) : reordering ? (
+          <section className="grid max-w-xl gap-3 pt-2">
+            <p className="text-[13.5px] text-muted">Subí o bajá cada hábito. La lista va a quedar siempre en este orden.</p>
+            <ol className="grid divide-y divide-line rounded-2xl border border-line bg-surface">
+              {order.map((id, i) => {
+                const h = habits.find((x) => x.id === id);
+                if (!h) return null;
+                const move = (d: number) =>
+                  setOrder((o) => {
+                    const n = [...o];
+                    [n[i], n[i + d]] = [n[i + d], n[i]];
+                    return n;
+                  });
+                return (
+                  <li key={id} className="flex items-center gap-3 px-3 py-2">
+                    <span className="w-6 text-center font-mono text-[12px] text-muted">{i + 1}</span>
+                    <ToneSquare size={30} style={tone(h.color)}>
+                      <HabitIcon name={h.icon} size={16} weight="fill" />
+                    </ToneSquare>
+                    <span className="min-w-0 flex-1 truncate text-[15px]">{h.name}</span>
+                    <IconButton label={`Subir ${h.name}`} disabled={i === 0} onClick={() => move(-1)}>
+                      <CaretUp size={18} weight="bold" />
+                    </IconButton>
+                    <IconButton label={`Bajar ${h.name}`} disabled={i === order.length - 1} onClick={() => move(1)}>
+                      <CaretDown size={18} weight="bold" />
+                    </IconButton>
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="flex gap-2">
+              <Button
+                onClick={() =>
+                  startOrder(async () => {
+                    // Los que no se ven (filtrados) quedan al final, en su orden.
+                    const rest = habits.map((h) => h.id).filter((id) => !order.includes(id));
+                    await reorderHabits([...order, ...rest]);
+                    setReordering(false);
+                  })
+                }
+              >
+                Guardar orden
+              </Button>
+              <Button variant="ghost" onClick={() => setReordering(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </section>
         ) : visible.length === 0 ? (
           <p className="display py-16 text-center text-[22px] text-muted">Ningún hábito coincide.</p>
         ) : (
@@ -208,6 +279,7 @@ function HabitCard({
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
   const streak = currentStreak(habit, logs, today);
   const score = habitScore(habit, logs, today);
+  const clean = cleanDays(habit, logs, today);
 
   return (
     <article
@@ -237,6 +309,14 @@ function HabitCard({
         ))}
       </div>
 
+      {habit.isQuit && (
+        <p className="mt-3 flex items-baseline gap-1.5 text-[13px] text-muted">
+          <Leaf size={14} weight="fill" className="self-center text-[var(--st-done-line)]" aria-hidden />
+          <span className="figure text-[19px] text-fg">{clean.current}</span>
+          {clean.current === 1 ? "día limpio" : "días limpios"}
+          {clean.best > clean.current && <span className="ml-1">· récord {clean.best}</span>}
+        </p>
+      )}
       <div className="mt-3 flex items-center gap-5 text-[13px]" style={tone(habit.color)}>
         <span className="inline-flex items-baseline gap-1.5 text-muted" title="Racha actual">
           <LinkSimple size={14} weight="bold" className="self-center text-tone-fg" aria-hidden />

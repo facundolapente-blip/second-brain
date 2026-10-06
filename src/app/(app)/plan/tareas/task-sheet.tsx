@@ -1,8 +1,8 @@
 "use client";
 
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { CalendarPlus } from "@phosphor-icons/react";
-import { deleteTask, saveTask } from "@/lib/plan-actions";
+import { CalendarPlus, Check, Plus, X } from "@phosphor-icons/react";
+import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask } from "@/lib/plan-actions";
 import { TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
@@ -124,6 +124,28 @@ function TaskForm({
         </Field>
       </div>
 
+      <div className="grid grid-cols-[1fr_6rem] gap-3">
+        <Field label="Se repite" hint="Al terminarla aparece la siguiente.">
+          <select name="repeat" defaultValue={task?.repeat ?? ""} className={inputClass}>
+            <option value="">No</option>
+            <option value="daily">Cada día</option>
+            <option value="weekly">Cada semana</option>
+            <option value="monthly">Cada mes</option>
+          </select>
+        </Field>
+        <Field label="Cada">
+          <Input name="repeatEvery" type="number" min={1} max={60} defaultValue={task?.repeatEvery ?? 1} />
+        </Field>
+      </div>
+
+      {task ? (
+        <Subtasks task={task} />
+      ) : (
+        <Field label="Pasos (opcional)" hint="Uno por renglón: después los vas tildando.">
+          <textarea name="subtasks" rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} placeholder={"Escribir el guion\nGrabar\nEditar"} />
+        </Field>
+      )}
+
       <label className="flex min-h-11 items-center gap-3 text-sm">
         <input type="checkbox" name="scheduled" defaultChecked={task?.scheduled} className="size-5 accent-[var(--accent)]" />
         Agendada (ya tiene lugar en la semana)
@@ -163,5 +185,84 @@ function TaskForm({
         )}
       </div>
     </form>
+  );
+}
+
+/** Pasos de una tarea: se tildan, se agregan y se sacan al instante. */
+function Subtasks({ task }: { task: TaskDTO }) {
+  const [items, setItems] = useState(task.subtasks);
+  const [text, setText] = useState("");
+  const [, start] = useTransition();
+  const done = items.filter((s) => s.done).length;
+
+  function add() {
+    const t = text.trim();
+    if (!t) return;
+    setItems((x) => [...x, { id: `tmp-${x.length}`, title: t, done: false }]);
+    setText("");
+    start(() => addSubtask(task.id, t));
+  }
+
+  return (
+    <div className="grid gap-2">
+      <span className="kicker">
+        Pasos {items.length > 0 && <span className="tracking-normal normal-case">· {done} de {items.length}</span>}
+      </span>
+      {items.length > 0 && (
+        <ul className="grid divide-y divide-line rounded-xl border border-line">
+          {items.map((s) => (
+            <li key={s.id} className="flex items-center gap-2 px-2">
+              <button
+                type="button"
+                aria-pressed={s.done}
+                onClick={() => {
+                  setItems((x) => x.map((y) => (y.id === s.id ? { ...y, done: !y.done } : y)));
+                  if (!s.id.startsWith("tmp-")) start(() => toggleSubtask(s.id, !s.done));
+                }}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 text-left"
+              >
+                <span
+                  className={cx(
+                    "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border",
+                    s.done ? "border-accent bg-accent text-on-accent" : "border-line-strong",
+                  )}
+                >
+                  {s.done && <Check size={12} weight="bold" />}
+                </span>
+                <span className={cx("truncate text-[14px]", s.done && "text-muted line-through")}>{s.title}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`Sacar ${s.title}`}
+                onClick={() => {
+                  setItems((x) => x.filter((y) => y.id !== s.id));
+                  if (!s.id.startsWith("tmp-")) start(() => deleteSubtask(s.id));
+                }}
+                className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg"
+              >
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="Agregar un paso"
+          maxLength={200}
+        />
+        <Button type="button" variant="outline" onClick={add} aria-label="Agregar paso">
+          <Plus size={15} />
+        </Button>
+      </div>
+    </div>
   );
 }

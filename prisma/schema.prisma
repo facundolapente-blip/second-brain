@@ -72,6 +72,8 @@ model Habit {
   unit         String?
   /// Prioridad (la banderita): ordena la lista de Hoy, más alta arriba.
   priority     Int            @default(1)
+  /// Hábito de dejar algo (No fumar): muestra los días limpios.
+  isQuit       Boolean        @default(false)
   /// Inicio de la pista actual: la tarjeta, la racha y el puntaje cuentan desde acá.
   /// Las pistas anteriores están en HabitTrack.
   startDate    DateTime       @db.Date
@@ -497,14 +499,30 @@ model PlanTask {
   scheduled   Boolean       @default(false)
   notes       String?
   completedAt DateTime?
+  /// Tarea que se repite: al terminarla aparece la siguiente (daily | weekly | monthly).
+  repeat      String?
+  repeatEvery Int           @default(1)
   source      String?
   externalId  String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   blocks      PlanBlock[]
+  subtasks    PlanSubtask[]
 
   @@unique([source, externalId])
   @@index([status])
+}
+
+/// Paso de una tarea (checklist).
+model PlanSubtask {
+  id     String   @id @default(cuid())
+  taskId String
+  task   PlanTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title  String
+  done   Boolean  @default(false)
+  order  Int      @default(0)
+
+  @@index([taskId])
 }
 
 /// Un bloque de la semana ("Daily Planning"): algo para hacer un día, con horario opcional.
@@ -559,6 +577,10 @@ model PlanKeyResult {
   deadline    DateTime?      @db.Date
   progress    Float?
   goal        Float?
+  /// Se mide solo: habit (cumplimiento de un hábito), account (saldo de una
+  /// cuenta) o goal (meta de ahorro). Null = progreso a mano.
+  linkType    String?
+  linkId      String?
   source      String?
   externalId  String?
   createdAt   DateTime       @default(now())

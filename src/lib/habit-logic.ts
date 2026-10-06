@@ -453,3 +453,24 @@ export function unpackAll(p: PackedLogMap): Record<string, LogMap> {
 function diffDaysUtc(a: string, b: string) {
   return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
 }
+
+// ─── Días limpios (hábitos de dejar algo) ───────────────────────────────────
+
+/**
+ * Para un hábito de dejar algo (No fumar): días seguidos sin un "fallado"
+ * hasta hoy, y el récord. Empieza a contar desde el inicio de la pista.
+ */
+export function cleanDays(h: Pick<HabitRule, "startDate">, logs: LogMap, today: string): { current: number; best: number } {
+  const fails = Object.entries(logs)
+    .filter(([d, l]) => l.s === "failed" && d >= h.startDate && d <= today)
+    .map(([d]) => d)
+    .sort();
+  let best = 0;
+  let from = h.startDate;
+  for (const f of fails) {
+    best = Math.max(best, diffDaysUtc(f, from));
+    from = addDays(f, 1);
+  }
+  const current = Math.max(0, diffDaysUtc(today, from) + (from <= today ? 1 : 0));
+  return { current, best: Math.max(best, current) };
+}

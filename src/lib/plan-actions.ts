@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
-import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate } from "./dates";
+import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
 import { isTime, QUARTERS, type KrStatus, type TaskStatus } from "./plan-logic";
 
@@ -181,9 +181,12 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     goal: entero(fd, "goal", 0, 1_000_000),
     scheduled: fd.get("scheduled") === "on",
     notes: texto(fd, "notes", 4000) || null,
+    repeat: ["daily", "weekly", "monthly"].includes(texto(fd, "repeat")) ? texto(fd, "repeat") : null,
+    repeatEvery: entero(fd, "repeatEvery", 1, 60) ?? 1,
   };
   if (id) {
     const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true } });
+    if (status === "done" && before?.status !== "done") await spawnNext(id);
     await prisma.planTask.update({
       where: { id },
       data: {
@@ -194,8 +197,18 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     refrescar();
     return { ok: true, id };
   }
+  // Pasos escritos al crear (uno por renglón).
+  const steps = texto(fd, "subtasks", 4000)
+    .split(/\r?\n/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 50);
   const created = await prisma.planTask.create({
-    data: { ...data, completedAt: status === "done" ? new Date() : null },
+    data: {
+      ...data,
+      completedAt: status === "done" ? new Date() : null,
+      subtasks: { create: steps.map((title, order) => ({ title: title.slice(0, 200), order })) },
+    },
   });
   await logActivity("created", "task", created.id, title);
   refrescar();
@@ -205,6 +218,8 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
 export async function setTaskStatus(id: string, status: TaskStatus) {
   await exigirSesion();
   if (!TASK_STATUSES.includes(status)) throw new Error("Estado inválido");
+  const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true } });
+  if (status === "done" && before?.status !== "done") await spawnNext(id);
   const t = await prisma.planTask.update({
     where: { id },
     data: { status, completedAt: status === "done" ? new Date() : null },
@@ -272,6 +287,7 @@ export async function saveKeyResult(_prev: ActionResult | null, fd: FormData): P
     deadline: deadline ? toDbDate(deadline) : null,
     progress: decimal(fd, "progress"),
     goal: decimal(fd, "goal"),
+    ...linkOf(texto(fd, "link", 60)),
   };
   if (id) await prisma.planKeyResult.update({ where: { id }, data });
   else await prisma.planKeyResult.create({ data });
@@ -301,4 +317,98 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
   }
   refrescar();
   return { ok: true };
+}
+
+/**
+ * Mueve un bloque a otro día (y opcionalmente a otra hora, conservando la
+ * duración). Si estaba hecho y vinculado a un hábito, la marca se muda con él.
+ */
+export async function moveBlock(id: string, date: string, startTime?: string | null) {
+  await exigirSesion();
+  if (!isISODate(date)) return;
+  const b = await prisma.planBlock.findUnique({ where: { id } });
+  if (!b) return;
+  let start = b.startTime;
+  let end = b.endTime;
+  if (startTime !== undefined && (startTime === null || isTime(startTime))) {
+    if (startTime && b.startTime && b.endTime) {
+      const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+      const dur = mins(b.endTime) - mins(b.startTime);
+      const e = Math.min(23 * 60 + 59, mins(startTime) + dur);
+      end = `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`;
+    } else if (!startTime) end = null;
+    start = startTime;
+  }
+  const to = toDbDate(date);
+  await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end } });
+  if (b.done && +b.date !== +to) {
+    await syncHabit(b.habitId, b.date, false);
+    await syncHabit(b.habitId, to, true);
+  }
+  refrescar(b.done && !!b.habitId);
+}
+
+// ─── Tareas que se repiten y pasos ──────────────────────────────────────────
+
+function shiftDate(iso: string, repeat: string, every: number): string {
+  if (repeat === "daily") return addDays(iso, every);
+  if (repeat === "weekly") return addDays(iso, 7 * every);
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + every, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(d, last));
+  return t.toISOString().slice(0, 10);
+}
+
+/** Al terminar una tarea que se repite aparece la siguiente (con los pasos sin tildar). */
+async function spawnNext(id: string) {
+  const t = await prisma.planTask.findUnique({ where: { id }, include: { subtasks: { orderBy: { order: "asc" } } } });
+  if (!t?.repeat) return;
+  const base = t.deadline ? fromDbDate(t.deadline) : todayISO();
+  const next = shiftDate(base, t.repeat, t.repeatEvery);
+  const created = await prisma.planTask.create({
+    data: {
+      title: t.title,
+      categoryId: t.categoryId,
+      status: "todo",
+      priority: t.priority,
+      deadline: toDbDate(next),
+      goal: t.goal,
+      progress: t.goal ? 0 : null,
+      notes: t.notes,
+      repeat: t.repeat,
+      repeatEvery: t.repeatEvery,
+      subtasks: { create: t.subtasks.map((s) => ({ title: s.title, order: s.order })) },
+    },
+  });
+  // La que se terminó deja de repetirse (la posta la toma la nueva).
+  await prisma.planTask.update({ where: { id }, data: { repeat: null } });
+  await logActivity("created", "task", created.id, `${t.title} (se repite, para el ${next})`);
+}
+
+export async function addSubtask(taskId: string, title: string) {
+  await exigirSesion();
+  const tt = title.trim().slice(0, 200);
+  if (!tt) return;
+  const max = await prisma.planSubtask.aggregate({ where: { taskId }, _max: { order: true } });
+  await prisma.planSubtask.create({ data: { taskId, title: tt, order: (max._max.order ?? -1) + 1 } });
+  refrescar();
+}
+
+export async function toggleSubtask(id: string, done: boolean) {
+  await exigirSesion();
+  await prisma.planSubtask.update({ where: { id }, data: { done } });
+  refrescar();
+}
+
+export async function deleteSubtask(id: string) {
+  await exigirSesion();
+  await prisma.planSubtask.deleteMany({ where: { id } });
+  refrescar();
+}
+
+/** "habit:id" → { linkType, linkId }; vacío o raro → sin vínculo. */
+function linkOf(raw: string): { linkType: string | null; linkId: string | null } {
+  const m = raw.match(/^(habit|account|goal):([a-z0-9]{10,40})$/i);
+  return m ? { linkType: m[1], linkId: m[2] } : { linkType: null, linkId: null };
 }

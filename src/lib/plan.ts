@@ -1,10 +1,14 @@
 import "server-only";
 import { prisma } from "./prisma";
+import { getHabitsWithLogs } from "./habits";
+import { habitScore } from "./habit-logic";
+import { getAccounts, getGoals } from "./finance";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
 import type {
   BlockDTO,
   CategoryDTO,
   KeyResultDTO,
+  KrLinkOption,
   KrStatus,
   ObjectiveDTO,
   TaskDTO,
@@ -78,7 +82,7 @@ export async function getWeek(day: string) {
 
 export async function getTasks(): Promise<TaskDTO[]> {
   const rows = await prisma.planTask.findMany({
-    include: { _count: { select: { blocks: true } } },
+    include: { _count: { select: { blocks: true } }, subtasks: { orderBy: [{ order: "asc" }] } },
     orderBy: [{ createdAt: "asc" }],
   });
   return rows.map((t) => ({
@@ -93,15 +97,40 @@ export async function getTasks(): Promise<TaskDTO[]> {
     scheduled: t.scheduled || t._count.blocks > 0,
     notes: t.notes,
     blockCount: t._count.blocks,
+    subtasks: t.subtasks.map((s) => ({ id: s.id, title: s.title, done: s.done })),
+    repeat: t.repeat === "daily" || t.repeat === "weekly" || t.repeat === "monthly" ? t.repeat : null,
+    repeatEvery: t.repeatEvery,
   }));
 }
 
 export async function getObjectives(): Promise<{ objectives: ObjectiveDTO[]; loose: KeyResultDTO[] }> {
-  const [objs, krs] = await Promise.all([
+  const [objs, krs, { habits, logs, today }, accounts, goals] = await Promise.all([
     prisma.planObjective.findMany({ orderBy: [{ order: "asc" }, { title: "asc" }] }),
     prisma.planKeyResult.findMany({ orderBy: [{ createdAt: "asc" }] }),
+    getHabitsWithLogs(),
+    getAccounts(),
+    getGoals(),
   ]);
+  // Lo que se mide solo: cumplimiento de un hábito, saldo de una cuenta, avance de una meta.
+  const autoOf = (k: (typeof krs)[number]): KeyResultDTO["auto"] => {
+    if (!k.linkType || !k.linkId) return null;
+    if (k.linkType === "habit") {
+      const h = habits.find((x) => x.id === k.linkId);
+      return h ? { progress: habitScore(h, logs[h.id] ?? {}, today), goal: 100, label: `% de ${h.name}` } : null;
+    }
+    if (k.linkType === "account") {
+      const a = accounts.find((x) => x.id === k.linkId);
+      return a ? { progress: Math.round(a.balanceCents) / 100, goal: k.goal, label: `saldo de ${a.name}` } : null;
+    }
+    if (k.linkType === "goal") {
+      const g = goals.find((x) => x.id === k.linkId);
+      return g ? { progress: g.savedCents / 100, goal: g.targetCents / 100, label: g.name } : null;
+    }
+    return null;
+  };
   const dto = (k: (typeof krs)[number]): KeyResultDTO => ({
+    link: k.linkType && k.linkId ? `${k.linkType}:${k.linkId}` : null,
+    auto: autoOf(k),
     id: k.id,
     objectiveId: k.objectiveId,
     title: k.title,
@@ -120,4 +149,18 @@ export async function getObjectives(): Promise<{ objectives: ObjectiveDTO[]; loo
     })),
     loose: krs.filter((k) => !k.objectiveId).map(dto),
   };
+}
+
+/** Hábitos, cuentas y metas para vincular resultados clave. */
+export async function getKrLinkOptions(): Promise<KrLinkOption[]> {
+  const [habits, accounts, goals] = await Promise.all([
+    prisma.habit.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.account.findMany({ where: { archivedAt: null }, select: { id: true, name: true, currency: true }, orderBy: { order: "asc" } }),
+    prisma.savingsGoal.findMany({ where: { archivedAt: null }, select: { id: true, name: true } }),
+  ]);
+  return [
+    ...habits.map((h) => ({ value: `habit:${h.id}`, label: h.name, group: "Hábitos" as const })),
+    ...accounts.map((a) => ({ value: `account:${a.id}`, label: `${a.name} (${a.currency})`, group: "Cuentas" as const })),
+    ...goals.map((g) => ({ value: `goal:${g.id}`, label: g.name, group: "Metas de ahorro" as const })),
+  ];
 }

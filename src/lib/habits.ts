@@ -20,6 +20,10 @@ export type HabitDTO = {
   target: number;
   unit: string | null;
   priority: number;
+  /** Hábito de dejar algo: muestra los días limpios. */
+  isQuit: boolean;
+  /** Orden manual de la lista. */
+  order: number;
   startDate: string;
   archived: boolean;
   /** Pistas cerradas, de la más vieja a la más nueva. */
@@ -79,6 +83,8 @@ function toDTO(h: HabitRow): HabitDTO {
     target: h.target,
     unit: h.unit,
     priority: h.priority,
+    isQuit: h.isQuit,
+    order: h.order,
     startDate: fromDbDate(h.startDate),
     archived: h.archivedAt !== null,
     tracks: h.tracks.map((t) => ({

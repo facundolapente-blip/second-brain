@@ -107,6 +107,7 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     target,
     unit,
     priority: entero(fd, "priority", 1, 5, 1),
+    isQuit: fd.get("isQuit") === "on",
     startDate: toDbDate(startDate),
   };
 
@@ -190,6 +191,12 @@ export async function deleteHabit(id: string) {
 export async function reorderHabits(ids: string[]) {
   await exigirSesion();
   await prisma.$transaction(ids.map((id, i) => prisma.habit.update({ where: { id }, data: { order: i } })));
+  // Desde que se ordena a mano, la lista respeta ese orden (no el de prioridad).
+  await prisma.appSetting.upsert({
+    where: { key: "habitos_orden_manual" },
+    create: { key: "habitos_orden_manual", value: "1" },
+    update: { value: "1" },
+  });
   refrescar();
 }
 

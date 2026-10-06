@@ -11,6 +11,7 @@ import {
   progressPct,
   QUARTERS,
   type KeyResultDTO,
+  type KrLinkOption,
   type KrStatus,
   type ObjectiveDTO,
 } from "@/lib/plan-logic";
@@ -37,10 +38,12 @@ const fmtNum = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits:
 export function ObjectivesView({
   objectives,
   loose,
+  links,
   today,
 }: {
   objectives: ObjectiveDTO[];
   loose: KeyResultDTO[];
+  links: KrLinkOption[];
   today: string;
 }) {
   const [quarter, setQuarter] = useState<Quarter>("all");
@@ -133,12 +136,14 @@ export function ObjectivesView({
         <Plus size={24} />
       </button>
 
-      <KrSheet ref={sheet} objectives={objectives} />
+      <KrSheet ref={sheet} objectives={objectives} links={links} />
     </>
   );
 }
 
-function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOpen: () => void }) {
+function KrRow({ kr: raw, today, onOpen }: { kr: KeyResultDTO; today: string; onOpen: () => void }) {
+  // Si se mide solo, el progreso sale del vínculo.
+  const k = raw.auto ? { ...raw, progress: raw.auto.progress, goal: raw.auto.goal ?? raw.goal } : raw;
   const pct = krPct(k);
   const st = KR_STATUS[k.status];
   const left = k.status === "todo" || k.status === "doing" ? daysLeft(k.deadline, today) : null;
@@ -168,6 +173,7 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
           </span>
           {k.quarters.length > 0 && <span className="font-mono text-[11px] text-muted">{k.quarters.join(", ")}</span>}
           {k.deadline && <span className="font-mono text-[11px] text-muted tabular">{formatShort(k.deadline)}</span>}
+          {raw.auto && <span className="text-[12px] text-accent-fg">· se mide solo: {raw.auto.label}</span>}
         </span>
         {pct !== null && (
           <ProgressBar
@@ -182,7 +188,7 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
 
 type KrSheetHandle = { open: (kr?: KeyResultDTO) => void };
 
-const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[] }>(function KrSheet({ objectives }, ref) {
+const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[]; links: KrLinkOption[] }>(function KrSheet({ objectives, links }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [kr, setKr] = useState<KeyResultDTO | undefined>();
   const [key, setKey] = useState(0);
@@ -195,12 +201,12 @@ const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[] }>(functi
   }));
   return (
     <Sheet ref={sheet} title={kr ? "Editar resultado clave" : "Nuevo resultado clave"}>
-      <KrForm key={key} kr={kr} objectives={objectives} onDone={() => sheet.current?.close()} />
+      <KrForm key={key} kr={kr} objectives={objectives} links={links} onDone={() => sheet.current?.close()} />
     </Sheet>
   );
 });
 
-function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: ObjectiveDTO[]; onDone: () => void }) {
+function KrForm({ kr, objectives, links, onDone }: { kr?: KeyResultDTO; objectives: ObjectiveDTO[]; links: KrLinkOption[]; onDone: () => void }) {
   const [state, action, pending] = useActionState(saveKeyResult, null);
   const [kind, setKind] = useState<"activity" | "habit">(kr?.kind ?? "activity");
   const [status, setStatus] = useState<KrStatus>(kr?.status ?? "todo");
@@ -277,6 +283,24 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
           ))}
         </div>
       </div>
+
+      <Field label="Se mide solo con (opcional)" hint="Vinculado, el progreso se calcula solo: el % de un hábito, el saldo de una cuenta o lo juntado en una meta.">
+        <select name="link" defaultValue={kr?.link ?? ""} className={inputClass}>
+          <option value="">A mano</option>
+          {(["Hábitos", "Cuentas", "Metas de ahorro"] as const).map((g) => {
+            const opts = links.filter((l) => l.group === g);
+            return opts.length ? (
+              <optgroup key={g} label={g}>
+                {opts.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null;
+          })}
+        </select>
+      </Field>
 
       <div className="grid grid-cols-3 gap-3">
         <Field label="Progreso">

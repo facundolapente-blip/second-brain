@@ -38,7 +38,21 @@ export type TaskDTO = {
   scheduled: boolean;
   notes: string | null;
   blockCount: number;
+  /** Pasos (checklist). */
+  subtasks: { id: string; title: string; done: boolean }[];
+  /** Se repite al terminarla: daily | weekly | monthly. */
+  repeat: "daily" | "weekly" | "monthly" | null;
+  repeatEvery: number;
 };
+
+export const REPEAT_LABEL = { daily: "día", weekly: "semana", monthly: "mes" } as const;
+
+/** "Se repite cada semana", "cada 2 meses". */
+export function repeatLabel(repeat: TaskDTO["repeat"], every: number): string | null {
+  if (!repeat) return null;
+  const unit = REPEAT_LABEL[repeat];
+  return every > 1 ? `Cada ${every} ${repeat === "monthly" ? "meses" : `${unit}s`}` : `Cada ${unit}`;
+}
 
 export type BlockDTO = {
   id: string;
@@ -65,7 +79,14 @@ export type KeyResultDTO = {
   deadline: string | null;
   progress: number | null;
   goal: number | null;
+  /** Vínculo para medirse solo: "habit:id", "account:id" o "goal:id". */
+  link: string | null;
+  /** Progreso calculado desde el vínculo (pisa al cargado a mano). */
+  auto: { progress: number; goal: number | null; label: string } | null;
 };
+
+/** Opciones para vincular un resultado clave. */
+export type KrLinkOption = { value: string; label: string; group: "Hábitos" | "Cuentas" | "Metas de ahorro" };
 
 export type ObjectiveDTO = { id: string; title: string; keyResults: KeyResultDTO[] };
 

@@ -69,7 +69,9 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Las vistas de Hábitos reciben las marcas compactas (`packAll`/`unpackAll` en `habit-logic.ts`: un carácter por día): la página pesa ~140 KB en vez de ~500.
 - Facu sigue usando HabitNow y manda backups nuevos: `node --env-file=.env scripts/import-habitnow.ts <backup.hn> --update` (reconoce hábitos por nombre, toma pistas, frecuencia y marcas de HabitNow, no borra nada, conserva notas y vínculos del Plan). `--replace` borra todo; nunca usarlo con datos reales.
 - Reglas calibradas con el backup real de HabitNow (`scripts/import-habitnow.ts`): los salteados no bajan la meta semanal, la primera semana se prorratea, la semana en curso entra al puntaje solo si se cumplió. El % de la tarjeta es el puntaje.
-- Pendiente: reordenar a mano, recordatorios.
+- **Orden manual** (botón Ordenar en la Lista, `reorderHabits`): desde que se usa una vez, la Lista respeta `Habit.order` (`AppSetting "habitos_orden_manual"`); Hoy sigue por pendientes y prioridad.
+- **Días limpios** (`Habit.isQuit`, casilla en el formulario; la migración marcó los de "Malos hábitos"): días seguidos sin fallado y récord (`cleanDays`).
+- **Sin señal**: `public/sw.js` (solo producción) guarda archivos y páginas vistas; las marcas de hábitos hechas sin conexión van a una cola local (`lib/offline-queue.ts`), se ven igual y se mandan al volver la señal. Pendiente: recordatorios.
 
 ## Journal
 
@@ -116,6 +118,9 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 
 - Reemplaza el "Plan Semanal" de Notion. Dos pantallas: **Semana y tareas** (`/plan?semana=YYYY-MM-DD`): como en Notion, en la misma página van arriba las **tareas** (`TasksBoard` en `plan/tareas/tasks-view.tsx`, pasado como `top` a `WeekView`; vistas guardadas Para hacer, Con deadline, Prioridades, Más chill, Programadas, Terminadas; muestra 6 y "Ver todas") y abajo la **semana** (bloques de lunes a domingo; en el celular tira de días + lista del día, en escritorio tablero de 7 columnas). `/plan/tareas` redirige a `/plan#tareas`. Y **Objetivos** (`/plan/objetivos`, objetivos con resultados clave, filtro por trimestre).
 - Modelos: `PlanBlock` (día, `startTime`/`endTime` "HH:MM" opcionales, prioridad 0 a 4 = Baja/Media/Alta/Urgente (antes fueguitos; Facu no quiere íconos tipo emoji), `done`, `taskId`, `habitId`), `PlanTask` (status `backlog|todo|doing|done` = Programada / Sin empezar / En curso / Terminado, deadline, progreso/meta, `scheduled` = Agendada), `PlanObjective` + `PlanKeyResult` (kind activity/habit, status todo/doing/done/closed, `quarters`), `PlanCategory`.
+- Escritorio: vista **Lista** (7 columnas) o **Por horas** (calendario 6 a 24 h; tocar un hueco crea un bloque a esa hora); en las dos los bloques se **arrastran** a otro día u hora (`moveBlock`, conserva la duración y muda la marca del hábito si estaba hecho). En `week-board.tsx`.
+- **Tareas**: pasos (`PlanSubtask`, se tildan en la hoja) y **repetición** (`repeat` daily/weekly/monthly + `repeatEvery`): al terminarla se crea la siguiente con la fecha corrida y los pasos sin tildar (`spawnNext`).
+- **Resultados clave que se miden solos** (`linkType`/`linkId`: habit = % de cumplimiento, account = saldo, goal = lo juntado en una meta de ahorro); se calcula en `getObjectives` (`auto`).
 - **Vínculo con Hábitos**: un bloque con `habitId` marca el hábito como hecho ese día al tildarlo (`syncHabit` en `plan-actions.ts`); al destildarlo solo borra la marca si era "hecho" (no pisa fallados ni salteados). El formulario sugiere vincular si el nombre coincide con un hábito.
 - "Copiar a la semana que viene" duplica los bloques (sin el hecho). "Agendar en la semana" desde una tarea abre un bloque con la tarea vinculada.
 - Un bloque llamado "Libre" se ve tenue y no cuenta en "N de M hechos".

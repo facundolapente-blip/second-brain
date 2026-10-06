@@ -1,6 +1,8 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { enqueue, flushQueue, pendingOps } from "@/lib/offline-queue";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
 import { setHabitLog } from "@/lib/habit-actions";
 import {
@@ -50,22 +52,48 @@ function applyMark(prev: DayLog | undefined, m: Mark): DayLog | null {
  * Las marcas se ven al instante y la server action confirma por detrás. Cuando
  * vuelve, la página se revalida y los datos reales reemplazan a los optimistas.
  */
+function withMark(state: Record<string, LogMap>, m: Mark): Record<string, LogMap> {
+  const next = { ...(state[m.habitId] ?? {}) };
+  const log = applyMark(next[m.date], m);
+  if (log) next[m.date] = log;
+  else delete next[m.date];
+  return { ...state, [m.habitId]: next };
+}
+
 export function useHabitLogs(packed: PackedLogMap) {
+  const router = useRouter();
+  // Marcas hechas sin señal que todavía no llegaron al servidor (ver offline-queue).
+  const [queued, setQueued] = useState<Mark[]>([]);
+  useEffect(() => {
+    const load = () => setQueued(pendingOps().filter((o) => o.type === "habit"));
+    load();
+    const online = async () => {
+      if ((await flushQueue()) > 0) router.refresh();
+      load();
+    };
+    window.addEventListener("online", online);
+    return () => window.removeEventListener("online", online);
+  }, [router]);
   // Llegan compactas (ver packLogs); se abren una vez por cada versión del servidor.
-  const initial = useMemo(() => unpackAll(packed), [packed]);
-  const [logs, apply] = useOptimistic(initial, (state, m: Mark) => {
-    const next = { ...(state[m.habitId] ?? {}) };
-    const log = applyMark(next[m.date], m);
-    if (log) next[m.date] = log;
-    else delete next[m.date];
-    return { ...state, [m.habitId]: next };
-  });
+  const initial = useMemo(() => queued.reduce(withMark, unpackAll(packed)), [packed, queued]);
+  const [logs, apply] = useOptimistic(initial, withMark);
   const [, startTransition] = useTransition();
 
   const mark: MarkFn = (habitId, date, status, value = 1, note) => {
+    const m: Mark = { habitId, date, status, value, note };
+    const keep = () => {
+      enqueue({ type: "habit", ...m });
+      setQueued((q) => [...q, m]);
+    };
+    if (!navigator.onLine) return keep();
     startTransition(async () => {
-      apply({ habitId, date, status, value, note });
-      await setHabitLog(habitId, date, status, value, note);
+      apply(m);
+      try {
+        await setHabitLog(habitId, date, status, value, note);
+      } catch {
+        // Se cortó la señal en el medio: queda en la cola.
+        keep();
+      }
     });
   };
 

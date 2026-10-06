@@ -161,10 +161,11 @@ async function snapshot(kind: TrashKind, id: string): Promise<{ label: string; d
       return b ? { label: `${b.title} (${formatShort(fromDbDate(b.date))}${b.startTime ? ` ${b.startTime}` : ""})`, data: { row: b } } : null;
     }
     case "task": {
-      const t = await prisma.planTask.findUnique({ where: { id } });
+      const t = await prisma.planTask.findUnique({ where: { id }, include: { subtasks: true } });
       if (!t) return null;
+      const { subtasks, ...row } = t;
       const blockIds = await prisma.planBlock.findMany({ where: { taskId: id }, select: { id: true } });
-      return { label: t.title, data: { row: t, blockIds: blockIds.map((x) => x.id) } };
+      return { label: t.title, data: { row, subtasks, blockIds: blockIds.map((x) => x.id) } };
     }
     case "keyResult": {
       const k = await prisma.planKeyResult.findUnique({ where: { id } });
@@ -327,6 +328,8 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
       return null;
     case "task":
       await prisma.planTask.create({ data: { ...row, categoryId: await orNull(exists.planCategory, row.categoryId) } });
+      const subtasks = (data.subtasks as never[]) ?? [];
+      if (subtasks.length) await prisma.planSubtask.createMany({ data: subtasks });
       await prisma.planBlock.updateMany({ where: { id: { in: ids(data.blockIds) } }, data: { taskId: row.id } });
       return null;
     case "keyResult":

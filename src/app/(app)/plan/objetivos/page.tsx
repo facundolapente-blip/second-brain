@@ -1,10 +1,10 @@
 import { todayISO } from "@/lib/dates";
-import { getObjectives } from "@/lib/plan";
+import { getKrLinkOptions, getObjectives } from "@/lib/plan";
 import { ObjectivesView } from "./objectives-view";
 
 export const metadata = { title: "Objetivos · Plan" };
 
 export default async function ObjetivosPage() {
-  const { objectives, loose } = await getObjectives();
-  return <ObjectivesView objectives={objectives} loose={loose} today={todayISO()} />;
+  const [{ objectives, loose }, links] = await Promise.all([getObjectives(), getKrLinkOptions()]);
+  return <ObjectivesView objectives={objectives} loose={loose} links={links} today={todayISO()} />;
 }

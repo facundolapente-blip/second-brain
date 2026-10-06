@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { CaretLeft, CaretRight, Check, Copy, DotsThreeVertical, MapPin, Medal, Plus } from "@phosphor-icons/react";
-import { copyWeekToNext, setBlockDone } from "@/lib/plan-actions";
+import { copyWeekToNext, moveBlock, setBlockDone } from "@/lib/plan-actions";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
@@ -21,6 +21,7 @@ import { Menu } from "@/components/menu";
 import { BlockSheet, type BlockSheetHandle } from "./block-sheet";
 import { CategoryTag, categoryMap, PriorityTag } from "./plan-ui";
 import { PlanTabs } from "./plan-nav";
+import { BoardHours, BoardList } from "./week-board";
 
 const SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -45,9 +46,11 @@ export function WeekView({
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const isThisWeek = days.includes(today);
   const [selected, setSelected] = useState(isThisWeek ? today : monday);
-  const [blocks, applyDone] = useOptimistic(initialBlocks, (state, m: { id: string; done: boolean }) =>
-    state.map((b) => (b.id === m.id ? { ...b, done: m.done } : b)),
+  // Cambios optimistas: tildar o mover (día y hora).
+  const [blocks, applyDone] = useOptimistic(initialBlocks, (state, m: Partial<BlockDTO> & { id: string }) =>
+    state.map((b) => (b.id === m.id ? { ...b, ...m } : b)),
   );
+  const [view, setView] = useState<"lista" | "horas">("lista");
   const [, startTransition] = useTransition();
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const sheet = useRef<BlockSheetHandle>(null);
@@ -64,8 +67,18 @@ export function WeekView({
       await setBlockDone(b.id, !b.done);
     });
   }
-  const openNew = (date: string) => sheet.current?.open({ date });
+  const openNew = (date: string, startTime?: string) => sheet.current?.open(startTime ? { date, startTime } : { date });
+  function move(id: string, date: string, startTime?: string | null) {
+    const b = blocks.find((x) => x.id === id);
+    if (!b || (b.date === date && (startTime === undefined || startTime === b.startTime))) return;
+    startTransition(async () => {
+      applyDone({ id, date, ...(startTime !== undefined ? { startTime } : {}) });
+      await moveBlock(id, date, startTime);
+    });
+  }
   const openEdit = (b: BlockDTO) => sheet.current?.open(b);
+
+  const boardProps = { days, today, byDay, cats, habitName, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move };
 
   const prev = addDays(monday, -7);
   const next = addDays(monday, 7);
@@ -196,47 +209,32 @@ export function WeekView({
           />
         </div>
 
-        {/* Escritorio: tablero de 7 columnas */}
-        <div className="hidden grid-cols-7 border-t border-fg/80 lg:grid">
-          {days.map((d) => {
-            const list = byDay.get(d)!;
-            return (
-              <section
-                key={d}
-                aria-label={WEEKDAY_LONG[weekday(d)]}
-                className={cx(
-                  "grid min-h-[60dvh] min-w-0 content-start border-r border-line px-2.5 pb-6 first:pl-0 last:border-r-0 last:pr-0",
-                  d === today && "bg-[color-mix(in_oklab,var(--accent)_4%,transparent)]",
-                )}
-              >
-                <header className="flex items-end justify-between gap-1.5 border-b border-line px-1 pt-3 pb-2.5">
-                  <span className="grid gap-0.5">
-                    <span className={cx("kicker", d === today && "text-accent-fg!")}>{WEEKDAY_LONG[weekday(d)]}</span>
-                    <span className="figure text-[30px]">{Number(d.slice(8))}</span>
-                  </span>
-                  <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.length || ""}</span>
-                </header>
-                {list.map((b) => (
-                  <BlockCard
-                    key={b.id}
-                    block={b}
-                    compact
-                    category={b.categoryId ? cats.get(b.categoryId) : null}
-                    habit={b.habitId ? habitName.get(b.habitId) : undefined}
-                    onToggle={() => toggle(b)}
-                    onEdit={() => openEdit(b)}
-                  />
-                ))}
+        {/* Escritorio: lista de 7 columnas o calendario por horas; los bloques se arrastran. */}
+        <div className="hidden lg:block">
+          <div className="mb-3 flex justify-end">
+            <div role="radiogroup" aria-label="Vista" className="inline-flex rounded-full bg-surface-2 p-1">
+              {(["lista", "horas"] as const).map((v) => (
                 <button
+                  key={v}
                   type="button"
-                  onClick={() => openNew(d)}
-                  className="mt-1 flex h-11 items-center gap-1.5 rounded-[4px] px-1 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                  role="radio"
+                  aria-checked={view === v}
+                  onClick={() => setView(v)}
+                  className={cx(
+                    "h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors",
+                    view === v ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
+                  )}
                 >
-                  <Plus size={14} /> Nuevo
+                  {v === "lista" ? "Lista" : "Por horas"}
                 </button>
-              </section>
-            );
-          })}
+              ))}
+            </div>
+          </div>
+          {view === "lista" ? (
+            <BoardList {...boardProps} />
+          ) : (
+            <BoardHours {...boardProps} />
+          )}
         </div>
       </main>
 
@@ -309,7 +307,7 @@ function DayList({
   );
 }
 
-function BlockCard({
+export function BlockCard({
   block: b,
   category,
   habit,

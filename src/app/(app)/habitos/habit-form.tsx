@@ -17,6 +17,7 @@ export type Draft = {
   id?: string;
   name: string;
   description: string;
+  isQuit: boolean;
   categoryId: string;
   frequency: Frequency;
   weekdays: number[];
@@ -33,6 +34,7 @@ function emptyDraft(today: string): Draft {
   return {
     name: "",
     description: "",
+    isQuit: false,
     categoryId: "",
     frequency: "daily",
     weekdays: [],
@@ -51,6 +53,7 @@ export function fromHabit(h: HabitDTO): Draft {
     id: h.id,
     name: h.name,
     description: h.description ?? "",
+    isQuit: h.isQuit,
     categoryId: h.categoryId ?? "",
     frequency: h.frequency,
     weekdays: h.weekdays,
@@ -273,7 +276,18 @@ export function HabitFormBody({
         </Field>
       </div>
 
-      <Field label="Nota (opcional)">
+      <label className="flex min-h-11 items-center gap-2.5 text-[14px]">
+          <input
+            type="checkbox"
+            name="isQuit"
+            checked={draft.isQuit}
+            onChange={(e) => set("isQuit", e.target.checked)}
+            className="size-4 accent-[var(--accent)]"
+          />
+          Es para dejar algo (muestra los días limpios)
+        </label>
+
+        <Field label="Nota (opcional)">
         <textarea
           name="description"
           value={draft.description}
