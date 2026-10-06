@@ -1,7 +1,12 @@
 import { ImageResponse } from "next/og";
+import { BRAIN_PATH, ICON_GRADIENT } from "./brand";
 
-/** Ícono de la app: la "F" del menú, en tinta sobre el fondo cálido. */
-export function appIcon(size: number, radius = 0.22) {
+/**
+ * Ícono de la app: un cerebro blanco sobre el degradé. `scale` es el tamaño del
+ * cerebro respecto del ícono (más chico en el "maskable", que Android recorta).
+ */
+export function appIcon(size: number, radius = 0.22, scale = 0.62) {
+  const s = Math.round(size * scale);
   return new ImageResponse(
     (
       <div
@@ -11,15 +16,13 @@ export function appIcon(size: number, radius = 0.22) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#1d1d1b",
-          color: "#fafaf9",
+          backgroundImage: ICON_GRADIENT,
           borderRadius: size * radius,
-          fontSize: size * 0.56,
-          fontWeight: 600,
-          letterSpacing: "-0.04em",
         }}
       >
-        F
+        <svg width={s} height={s} viewBox="0 0 256 256" fill="#ffffff">
+          <path d={BRAIN_PATH} />
+        </svg>
       </div>
     ),
     { width: size, height: size },

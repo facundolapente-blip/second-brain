@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-import { CalendarCheck, ChartLineUp, ClipboardText, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
+import { Brain, CalendarCheck, ChartLineUp, ClipboardText, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
+import { ICON_GRADIENT } from "@/lib/brand";
 import { cx } from "./ui";
 
 type Module = { href: string; label: string; icon: Icon; color: string };
@@ -98,8 +99,11 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
 function Brand() {
   return (
     <div className="flex items-center gap-3 px-3">
-      <span className="inline-flex size-8 items-center justify-center rounded-[10px] bg-[var(--mod-habitos)] text-[14px] font-semibold text-white">
-        F
+      <span
+        className="inline-flex size-8 items-center justify-center rounded-[10px] text-white"
+        style={{ backgroundImage: ICON_GRADIENT }}
+      >
+        <Brain size={18} weight="bold" aria-hidden />
       </span>
       <span className="text-[16px] font-semibold tracking-tight text-side-on">Second Brain</span>
     </div>

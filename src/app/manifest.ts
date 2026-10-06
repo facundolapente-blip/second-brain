@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Second Brain",
     short_name: "Second Brain",
     description: "Hábitos, journal, gastos y plan semanal.",
-    start_url: "/habitos",
+    start_url: "/",
     display: "standalone",
     background_color: "#fbfbfa",
     theme_color: "#fbfbfa",
@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     icons: [
       { src: "/icon-192", sizes: "192x192", type: "image/png" },
       { src: "/icon-512", sizes: "512x512", type: "image/png" },
-      { src: "/icon-512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icon-maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }
