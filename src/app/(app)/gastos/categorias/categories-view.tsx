@@ -49,28 +49,28 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         }
       />
 
-      <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-2 lg:px-8 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl gap-10 px-4 pt-2 lg:px-10 lg:pt-6">
         {sections.map((s) => {
           const list = categories.filter((c) => c.kind === s.kind);
           return (
-            <section key={s.kind} className="grid gap-2">
-              <div className="flex items-baseline justify-between px-2">
-                <h2 className="text-[15px] font-semibold">{s.title}</h2>
+            <section key={s.kind} className="grid gap-1">
+              <div className="flex items-baseline justify-between border-b border-fg/80 pb-2">
+                <h2 className="display text-[26px]">{s.title}</h2>
                 <button
                   type="button"
                   onClick={() => create(s.kind)}
-                  className="text-[13px] text-accent-fg hover:underline"
+                  className="inline-flex min-h-11 items-center text-[13px] font-medium text-accent-fg hover:underline"
                 >
                   Agregar
                 </button>
               </div>
-              <ul className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-8">
                 {list.map((c, i) => (
-                  <li key={c.id} className="rise" style={{ "--i": i } as React.CSSProperties}>
+                  <li key={c.id} className="rise border-b border-line" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
                       onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount })}
-                      className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex min-h-16 w-full items-center gap-3.5 px-1 py-2.5 text-left transition-colors hover:bg-surface-2/70"
                     >
                       <CategoryAvatar category={c} />
                       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -123,7 +123,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Color</span>
+            <span className="kicker">Color</span>
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((p) => (
                 <button
@@ -142,7 +142,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           </div>
 
           <div className="grid gap-2">
-            <span className="text-[13px] font-medium text-muted">Ícono</span>
+            <span className="kicker">Ícono</span>
             <div className="grid grid-cols-8 gap-1.5">
               {Object.keys(FINANCE_ICONS).map((name) => (
                 <button

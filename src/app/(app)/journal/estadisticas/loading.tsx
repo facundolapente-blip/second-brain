@@ -11,7 +11,7 @@ export default function Loading() {
             <Bone className="h-12 w-40" />
             <Bone className="h-4 w-64" />
           </div>
-          <Bone className="h-[104px] rounded-[12px]" />
+          <Bone className="h-[104px] rounded-[8px]" />
         </div>
         <div className="grid gap-3">
           <Bone className="h-5 w-28" />

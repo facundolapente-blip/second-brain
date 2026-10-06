@@ -103,7 +103,7 @@ function BlockForm({
       <p className="-mt-3 text-xs text-muted">Sin hora, el bloque queda para todo el día.</p>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Categoría</span>
+        <span className="kicker">Categoría</span>
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => {
             const on = categoryId === c.id;
@@ -115,7 +115,7 @@ function BlockForm({
                 style={tone(c.color)}
                 aria-pressed={on}
                 className={cx(
-                  "h-9 rounded-md border px-3 text-[13px] transition-colors",
+                  "h-9 rounded-[4px] border px-3 text-[13px] transition-colors",
                   on ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
@@ -127,12 +127,12 @@ function BlockForm({
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Prioridad</span>
+        <span className="kicker">Prioridad</span>
         <FirePicker value={priority} onChange={setPriority} name="priority" />
       </div>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Hábito vinculado</span>
+        <span className="kicker">Hábito vinculado</span>
         <select
           value={habitId}
           onChange={(e) => setHabitId(e.target.value)}
@@ -150,7 +150,7 @@ function BlockForm({
           <button
             type="button"
             onClick={() => setHabitId(suggested.id)}
-            className="inline-flex items-center gap-1.5 justify-self-start rounded-md text-[13px] font-medium text-accent-fg hover:underline"
+            className="inline-flex items-center gap-1.5 justify-self-start rounded-[4px] text-[13px] font-medium text-accent-fg hover:underline"
           >
             <Medal size={15} weight="fill" /> Vincular con el hábito {suggested.name}
           </button>

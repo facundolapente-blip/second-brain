@@ -39,7 +39,7 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4">
+    <form onSubmit={onSubmit} className="grid gap-5">
       <Segmented
         value={mode}
         onChange={setMode}
@@ -60,7 +60,11 @@ function LoginForm() {
           required
         />
       </Field>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
       <Button type="submit" variant="accent" disabled={pending}>
         {pending ? "Un segundo..." : mode === "in" ? "Entrar" : "Crear contraseña"}
       </Button>
@@ -70,13 +74,14 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-dvh place-items-center px-4">
+    <main className="grid min-h-dvh place-items-center px-5 py-12">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2.5">
-          <span className="inline-flex size-8 items-center justify-center rounded-md bg-ink text-sm font-semibold text-on-ink">
-            F
-          </span>
-          <span className="text-base font-semibold tracking-tight">Second Brain</span>
+        <div className="mb-10 grid gap-3 border-b border-fg/80 pb-6">
+          <p className="kicker">Cuaderno de Facu</p>
+          <h1 className="display text-[52px] leading-[0.95] italic">Second Brain</h1>
+          <p className="prose-serif text-[17px] leading-snug text-muted">
+            Hábitos, journal, gastos y la semana, en un mismo cuaderno.
+          </p>
         </div>
         <Suspense>
           <LoginForm />

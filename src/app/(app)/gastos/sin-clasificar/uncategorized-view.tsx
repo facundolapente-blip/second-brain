@@ -49,19 +49,19 @@ export function UncategorizedView({
 
       <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-6">
         {list.length === 0 ? (
-          <div className="mt-6 flex items-center gap-3 rounded-[12px] border border-line p-6">
+          <div className="mt-6 flex items-center gap-3 border-y border-line py-8">
             <CheckCircle size={28} weight="fill" className="text-accent" />
             <div className="grid gap-0.5">
-              <h2 className="text-[15px] font-semibold">Todo clasificado</h2>
+              <h2 className="display text-[24px]">Todo clasificado</h2>
               <p className="text-sm text-muted">Los movimientos que cargues sin categoría van a aparecer acá.</p>
             </div>
           </div>
         ) : (
           <>
-            <p className="px-2 pb-3 text-sm text-muted">
+            <p className="pb-4 text-[15px] text-muted">
               {list.length === 1 ? "1 movimiento" : `${list.length} movimientos`} sin categoría. Tocá uno para clasificarlo.
             </p>
-            <ul className="grid gap-0.5 border-t border-line pt-2">
+            <ul className="grid">
               {list.map((t, i) => {
                 const acc = lk.account(t.accountId);
                 // Separador de mes cuando cambia (la lista viene de la más nueva a la más vieja).
@@ -69,7 +69,7 @@ export function UncategorizedView({
                 return (
                   <li key={t.id}>
                     {newMonth && (
-                      <h2 className="z-10 -mx-2 bg-bg/90 px-4 pt-3 pb-1.5 text-[13px] font-semibold backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
+                      <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-bg/92 px-4 pt-4 pb-2 text-[20px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
                         {formatMonth(t.date.slice(0, 7))}
                       </h2>
                     )}
@@ -79,7 +79,7 @@ export function UncategorizedView({
                         setCurrent(t);
                         sheet.current?.open();
                       }}
-                      className="flex w-full items-center gap-3.5 rounded-[12px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex min-h-16 w-full items-center gap-3.5 border-b border-line px-1 py-2.5 text-left transition-colors hover:bg-surface-2/70"
                     >
                       <CategoryAvatar />
                       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -94,7 +94,7 @@ export function UncategorizedView({
                       <Amount
                         cents={t.kind === "income" ? t.amountCents : -t.amountCents}
                         currency={acc?.currency ?? "UYU"}
-                        className="text-[15px] font-medium"
+                        className="font-mono text-[14px] font-medium"
                       />
                     </button>
                   </li>
@@ -112,7 +112,7 @@ export function UncategorizedView({
               key={c.id}
               type="button"
               onClick={() => assign(c.id)}
-              className="flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-3 text-center transition-colors hover:bg-surface-2 active:bg-surface-2"
+              className="flex flex-col items-center gap-1.5 rounded-[6px] px-1 py-3 text-center transition-colors hover:bg-surface-2 active:bg-surface-2"
             >
               <CategoryAvatar category={c} size={40} />
               <span className="line-clamp-2 text-[12.5px] leading-tight">{c.name}</span>

@@ -19,7 +19,7 @@ function isActive(pathname: string, href: string) {
 export function PlanNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+    <nav aria-label="Plan" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-3">
         {TABS.map((t) => {
           const active = isActive(pathname, t.href);
@@ -29,17 +29,14 @@ export function PlanNav() {
               key={t.href}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className="flex flex-col items-center gap-1 pt-2 pb-2.5"
+              className="relative flex flex-col items-center gap-1 pt-2.5 pb-2"
             >
               <span
-                className={cx(
-                  "flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200",
-                  active ? "bg-accent-soft text-accent-fg" : "text-muted",
-                )}
-              >
-                <Ico size={22} weight={active ? "fill" : "regular"} />
-              </span>
-              <span className={cx("text-[12px]", active ? "font-semibold text-fg" : "text-muted")}>{t.label}</span>
+                aria-hidden
+                className={cx("absolute top-0 h-[2px] w-8 rounded-full transition-colors", active ? "bg-accent" : "bg-transparent")}
+              />
+              <Ico size={22} weight={active ? "fill" : "regular"} className={active ? "text-fg" : "text-muted"} />
+              <span className={cx("text-[11.5px]", active ? "font-semibold text-fg" : "text-muted")}>{t.label}</span>
             </Link>
           );
         })}
@@ -52,7 +49,7 @@ export function PlanNav() {
 export function PlanTabs() {
   const pathname = usePathname();
   return (
-    <div className="hidden gap-1 border-b border-line lg:flex">
+    <div className="hidden gap-6 border-b border-line lg:flex">
       {TABS.map((t) => {
         const active = isActive(pathname, t.href);
         return (
@@ -61,8 +58,8 @@ export function PlanTabs() {
             href={t.href}
             aria-current={active ? "page" : undefined}
             className={cx(
-              "-mb-px border-b-2 px-3 pb-2.5 text-sm transition-colors",
-              active ? "border-accent font-medium text-fg" : "border-transparent text-muted hover:text-fg",
+              "-mb-px border-b-[1.5px] pb-3 text-[14px] transition-colors",
+              active ? "border-fg font-medium text-fg" : "border-transparent text-muted hover:text-fg",
             )}
           >
             {t.label}

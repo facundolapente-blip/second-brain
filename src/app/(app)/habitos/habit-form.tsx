@@ -134,7 +134,7 @@ export function HabitFormBody({
       </Field>
 
       <div className="grid gap-1.5">
-        <span className="text-[13px] font-medium text-muted">Categoría</span>
+        <span className="kicker">Categoría</span>
         <input type="hidden" name="categoryId" value={draft.categoryId} />
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => {
@@ -146,7 +146,7 @@ export function HabitFormBody({
                 onClick={() => set("categoryId", active ? "" : c.id)}
                 style={tone(c.color)}
                 className={cx(
-                  "inline-flex h-9 items-center gap-2 rounded-md border pr-3 pl-1 text-[13px] transition-colors",
+                  "inline-flex h-9 items-center gap-2 rounded-[4px] border pr-3 pl-1 text-[13px] transition-colors",
                   active ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
@@ -161,7 +161,7 @@ export function HabitFormBody({
       </div>
 
       <div className="grid gap-2">
-        <span className="text-[13px] font-medium text-muted">Frecuencia</span>
+        <span className="kicker">Frecuencia</span>
         <Segmented
           name="frequency"
           value={draft.frequency}
@@ -180,7 +180,7 @@ export function HabitFormBody({
                 <label
                   key={d}
                   className={cx(
-                    "flex h-10 cursor-pointer items-center justify-center rounded-[10px] border text-[13px] font-medium transition-colors select-none",
+                    "flex aspect-square cursor-pointer items-center justify-center rounded-full border text-[12px] font-medium transition-colors select-none",
                     on ? "border-accent bg-accent-soft text-accent-fg" : "border-line text-muted hover:bg-surface-2",
                   )}
                 >
@@ -216,7 +216,7 @@ export function HabitFormBody({
       </div>
 
       <div className="grid gap-2">
-        <span className="text-[13px] font-medium text-muted">Cómo se mide</span>
+        <span className="kicker">Cómo se mide</span>
         <Segmented
           name="kind"
           value={draft.kind}
@@ -243,9 +243,9 @@ export function HabitFormBody({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-1.5">
-          <span className="text-[13px] font-medium text-muted">Prioridad</span>
+          <span className="kicker">Prioridad</span>
           <input type="hidden" name="priority" value={draft.priority} />
-          <div className="flex h-10 items-center gap-1">
+          <div className="flex h-11 items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((p) => (
               <button
                 key={p}
@@ -253,7 +253,7 @@ export function HabitFormBody({
                 onClick={() => set("priority", p)}
                 aria-label={`Prioridad ${p}`}
                 className={cx(
-                  "inline-flex size-8 items-center justify-center rounded-md transition-colors",
+                  "inline-flex h-11 w-8 items-center justify-center rounded-[4px] transition-colors",
                   p <= draft.priority ? "text-accent" : "text-faint hover:text-muted",
                 )}
               >
@@ -308,11 +308,11 @@ function Stepper({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex h-10 items-center rounded-md border border-line-strong">
+    <div className="flex h-11 items-center rounded-[4px] border border-line-strong">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="h-full w-9 text-lg text-muted hover:text-fg"
+        className="h-full w-10 text-lg text-muted hover:text-fg"
         aria-label="Menos"
       >
         −
@@ -330,7 +330,7 @@ function Stepper({
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="h-full w-9 text-lg text-muted hover:text-fg"
+        className="h-full w-10 text-lg text-muted hover:text-fg"
         aria-label="Más"
       >
         +
