@@ -5,7 +5,7 @@ import {
   Coffee, Coins, Confetti, CreditCard, DeviceMobile, FilmSlate, FirstAid, ForkKnife, GameController,
   GasPump, Gift, GraduationCap, HandCoins, Hamburger, Heartbeat, House, Laptop, Lightning, Money,
   MusicNotes, PawPrint, PiggyBank, Pill, Pizza, Question, Receipt, Repeat, Scissors, ShoppingBag,
-  ShoppingCart, Sparkle, Storefront, Tag, Taxi, Television, TShirt, Wallet, WifiHigh, Wine, Wrench,
+  ShoppingCart, Sparkle, Storefront, Suitcase, Tag, Taxi, Television, TShirt, Wallet, WifiHigh, Wine, Wrench,
   type Icon,
 } from "@phosphor-icons/react";
 
@@ -15,7 +15,7 @@ export const FINANCE_ICONS: Record<string, Icon> = {
   Confetti, FilmSlate, MusicNotes, GameController, Television,
   House, Lightning, WifiHigh, Wrench, DeviceMobile, Laptop,
   Heartbeat, FirstAid, Pill, Scissors, Barbell, Sparkle,
-  Bus, Car, Taxi, GasPump, Airplane,
+  Bus, Car, Taxi, GasPump, Airplane, Suitcase,
   ShoppingBag, TShirt, Gift, Repeat, Receipt,
   GraduationCap, BookOpen, Baby, PawPrint,
   Briefcase, Money, Coins, HandCoins, PiggyBank, ChartLineUp, Bank, CreditCard, Wallet,

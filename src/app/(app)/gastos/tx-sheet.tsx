@@ -18,6 +18,7 @@ import {
 } from "@/lib/finance-logic";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { AccountAvatar, CategoryAvatar } from "./shared";
+import { useProjects } from "./projects";
 
 type Draft = {
   id?: string;
@@ -30,6 +31,7 @@ type Draft = {
   categoryId: string | null;
   date: string;
   note: string;
+  projectId: string | null;
 };
 
 export type TxSheetHandle = {
@@ -56,6 +58,7 @@ export const TxSheet = forwardRef<
 >(function TxSheet({ accounts, categories, templates, selection }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const projects = useProjects();
   const [formKey, setFormKey] = useState(0);
   const [state, action, pending] = useActionState(saveTransaction, null);
   const [, startTransition] = useTransition();
@@ -76,6 +79,7 @@ export const TxSheet = forwardRef<
       categoryId: null,
       date: todayISO(),
       note: "",
+      projectId: null,
     };
   };
   const [d, setD] = useState<Draft>(blank);
@@ -108,6 +112,7 @@ export const TxSheet = forwardRef<
         categoryId: tx.categoryId,
         date: tx.date,
         note: tx.note ?? "",
+        projectId: tx.projectId,
       }),
     fromTemplate: (t) => open(applyTemplate(blank(), t)),
   }));
@@ -169,6 +174,7 @@ export const TxSheet = forwardRef<
         <input type="hidden" name="accountId" value={d.accountId} />
         <input type="hidden" name="toAccountId" value={d.kind === "transfer" ? d.toAccountId : ""} />
         <input type="hidden" name="categoryId" value={d.kind === "transfer" ? "" : (d.categoryId ?? "")} />
+        <input type="hidden" name="projectId" value={d.kind === "transfer" ? "" : (d.projectId ?? "")} />
 
         {!d.id && templates.length > 0 && (
           <div className="-mx-5 flex gap-2 overflow-x-auto px-5 fin-scroll">
@@ -349,6 +355,28 @@ export const TxSheet = forwardRef<
             />
           </div>
         </div>
+
+        {d.kind !== "transfer" && (projects.length > 0 || d.projectId) && (
+          <div className="grid gap-2">
+            <span className="kicker">Presupuesto puntual</span>
+            <div className="flex flex-wrap gap-1.5">
+              {[{ id: null as string | null, name: "Ninguno" }, ...projects].map((p) => (
+                <button
+                  key={p.id ?? "none"}
+                  type="button"
+                  aria-pressed={d.projectId === p.id}
+                  onClick={() => set({ projectId: p.id })}
+                  className={cx(
+                    "h-10 rounded-full border px-3.5 text-[13px] transition-colors",
+                    d.projectId === p.id ? "border-fg bg-ink text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
+                  )}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Field label="Nota">
           <textarea

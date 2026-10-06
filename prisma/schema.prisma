@@ -162,8 +162,39 @@ model Category {
   transactions Transaction[]
   templates    TxTemplate[]
   schedules    ScheduledTransaction[]
+  budget       CategoryBudget?
 
   @@unique([name, kind])
+}
+
+/// Presupuesto mensual de una categoría de gasto: lo mismo todos los meses.
+model CategoryBudget {
+  id         String   @id @default(cuid())
+  categoryId String   @unique
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  amount     Decimal  @db.Decimal(14, 2)
+  /// Solo cuentan los gastos de cuentas en esta moneda.
+  currency   String   @default("UYU")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+/// Presupuesto puntual (un viaje, las vacaciones, una mudanza): un monto total
+/// y los movimientos que se le asignan.
+model BudgetProject {
+  id           String        @id @default(cuid())
+  name         String
+  /// Nombre del ícono (ver src/lib/finance-icons.tsx).
+  icon         String        @default("Airplane")
+  color        String        @default("teal")
+  amount       Decimal       @db.Decimal(14, 2)
+  currency     String        @default("UYU")
+  startDate    DateTime?     @db.Date
+  endDate      DateTime?     @db.Date
+  note         String?
+  archivedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
 }
 
 /// Un movimiento. El monto siempre es positivo: el signo lo da `kind`.
@@ -188,6 +219,9 @@ model Transaction {
   toAccount   Account?              @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
   toAmount    Decimal?              @db.Decimal(14, 2)
   note        String?
+  /// Presupuesto puntual al que se asignó (viaje, vacaciones...).
+  projectId   String?
+  project     BudgetProject?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   /// Si lo generó una orden permanente o un movimiento programado.
   scheduleId  String?
   schedule    ScheduledTransaction? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
@@ -203,6 +237,7 @@ model Transaction {
   @@index([accountId])
   @@index([toAccountId])
   @@index([categoryId])
+  @@index([projectId])
 }
 
 /// Plantilla: un movimiento guardado para repetirlo rápido (el monto es opcional).

@@ -47,6 +47,8 @@ export type TxDTO = {
   toAccountId: string | null;
   toAmountCents: number | null;
   note: string | null;
+  /** Presupuesto puntual al que está asignado. */
+  projectId: string | null;
 };
 
 export type TemplateDTO = {

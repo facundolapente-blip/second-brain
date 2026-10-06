@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bank, ChartPieSlice, Receipt, SquaresFour, type Icon } from "@phosphor-icons/react";
+import { Bank, ChartPieSlice, PiggyBank, Receipt, SquaresFour, type Icon } from "@phosphor-icons/react";
 import { cx } from "@/components/ui";
 
 type Tab = { href: string; label: string; icon?: Icon; mobile: boolean };
@@ -14,6 +14,7 @@ const TABS: Tab[] = [
   { href: "/gastos/sin-clasificar", label: "Sin clasificar", mobile: false },
   { href: "/gastos/plantillas", label: "Plantillas", mobile: false },
   { href: "/gastos/recurrentes", label: "Recurrentes", mobile: false },
+  { href: "/gastos/presupuestos", label: "Presupuestos", icon: PiggyBank, mobile: true },
   { href: "/gastos/informes", label: "Informes", icon: ChartPieSlice, mobile: true },
 ];
 
@@ -41,7 +42,7 @@ export function GastosNav() {
   const tabs = TABS.filter((t) => t.mobile);
   return (
     <nav aria-label="Gastos" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-4">
+      <div className="mx-auto grid max-w-lg grid-cols-5">
         {tabs.map((t) => {
           const active = mobileActive(pathname, t.href);
           const Ico = t.icon!;

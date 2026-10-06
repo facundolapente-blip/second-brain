@@ -22,6 +22,12 @@ function texto(fd: FormData, key: string, max = 200): string {
 
 // ─── Movimientos ────────────────────────────────────────────────────────────
 
+async function validProject(id: string): Promise<string | null> {
+  if (!id) return null;
+  const p = await prisma.budgetProject.findUnique({ where: { id }, select: { id: true } });
+  return p?.id ?? null;
+}
+
 /** Crea o edita un gasto, ingreso o transferencia. Opcionalmente lo guarda como plantilla. */
 export async function saveTransaction(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await exigirSesion();
@@ -79,6 +85,7 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
     toAccountId,
     toAmount: toAmount === null ? null : centsToDecimalString(toAmount),
     note: texto(fd, "note", 2000) || null,
+    projectId: kind === "transfer" ? null : await validProject(texto(fd, "projectId", 40)),
   };
 
   const saved = id
@@ -358,5 +365,83 @@ export async function setScheduleActive(id: string, active: boolean) {
 export async function deleteSchedule(id: string) {
   await exigirSesion();
   await prisma.scheduledTransaction.deleteMany({ where: { id } });
+  refrescar();
+}
+
+// ─── Presupuestos ───────────────────────────────────────────────────────────
+
+/** Pone (o cambia) el presupuesto mensual de una categoría de gasto. Vacío o 0 lo saca. */
+export async function saveCategoryBudget(categoryId: string, raw: string): Promise<ActionResult> {
+  await exigirSesion();
+  const cat = await prisma.category.findUnique({ where: { id: categoryId } });
+  if (!cat || cat.kind !== "expense") return { ok: false, error: "Esa categoría no es de gastos." };
+  if (!raw.trim() || raw.trim() === "0") {
+    await prisma.categoryBudget.deleteMany({ where: { categoryId } });
+    refrescar();
+    return { ok: true };
+  }
+  const cents = parseAmount(raw);
+  if (cents === null) return { ok: false, error: "Escribí un monto mayor a cero." };
+  const amount = centsToDecimalString(cents);
+  await prisma.categoryBudget.upsert({
+    where: { categoryId },
+    create: { categoryId, amount },
+    update: { amount },
+  });
+  refrescar();
+  return { ok: true };
+}
+
+/** Crea o edita un presupuesto puntual (viaje, vacaciones...). */
+export async function saveProject(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await exigirSesion();
+  const id = texto(fd, "id", 40) || null;
+  const name = texto(fd, "name", 80);
+  if (!name) return { ok: false, error: "Ponele un nombre (por ejemplo, Viaje a Brasil)." };
+  const cents = parseAmount(texto(fd, "amount", 30));
+  if (cents === null) return { ok: false, error: "Escribí cuánto querés gastar en total." };
+  const currency = (CURRENCIES as readonly string[]).includes(texto(fd, "currency")) ? texto(fd, "currency") : "UYU";
+  const start = texto(fd, "startDate", 10);
+  const end = texto(fd, "endDate", 10);
+  const startDate = isISODate(start) ? start : null;
+  const endDate = isISODate(end) ? end : null;
+  if (startDate && endDate && endDate < startDate) return { ok: false, error: "La fecha de fin es anterior al inicio." };
+  const color = texto(fd, "color");
+  const data = {
+    name,
+    amount: centsToDecimalString(cents),
+    currency,
+    startDate: startDate ? toDbDate(startDate) : null,
+    endDate: endDate ? toDbDate(endDate) : null,
+    icon: texto(fd, "icon", 40) || "Airplane",
+    color: isPaletteKey(color) ? color : "teal",
+    note: texto(fd, "note", 2000) || null,
+  };
+  const saved = id
+    ? await prisma.budgetProject.update({ where: { id }, data })
+    : await prisma.budgetProject.create({ data });
+  refrescar();
+  return { ok: true, id: saved.id };
+}
+
+export async function archiveProject(id: string, archived: boolean) {
+  await exigirSesion();
+  await prisma.budgetProject.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
+  refrescar();
+}
+
+/** Borra el presupuesto puntual; sus movimientos quedan, sin asignar. */
+export async function deleteProject(id: string) {
+  await exigirSesion();
+  await prisma.budgetProject.deleteMany({ where: { id } });
+  refrescar();
+}
+
+/** Asigna (o saca) movimientos de un presupuesto puntual. */
+export async function setTransactionsProject(ids: string[], projectId: string | null) {
+  await exigirSesion();
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) return;
+  if (projectId && !(await prisma.budgetProject.findUnique({ where: { id: projectId }, select: { id: true } }))) return;
+  await prisma.transaction.updateMany({ where: { id: { in: ids.map(String) } }, data: { projectId } });
   refrescar();
 }

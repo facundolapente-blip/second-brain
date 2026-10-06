@@ -10,6 +10,7 @@ import {
   type ScheduleDTO,
   type ScheduleFrequency,
 } from "./schedule-logic";
+import type { CategoryBudgetDTO, ProjectDTO } from "./budget-logic";
 import {
   SELECTION_COOKIE,
   toCents,
@@ -56,6 +57,7 @@ const txSelect = {
   toAccountId: true,
   toAmount: true,
   note: true,
+  projectId: true,
 } satisfies Prisma.TransactionSelect;
 
 type TxRow = Prisma.TransactionGetPayload<{ select: typeof txSelect }>;
@@ -72,6 +74,7 @@ function toTxDTO(t: TxRow): TxDTO {
     toAccountId: t.toAccountId,
     toAmountCents: t.toAmount === null ? null : toCents(t.toAmount),
     note: t.note,
+    projectId: t.projectId,
   };
 }
 
@@ -288,4 +291,122 @@ export async function getSchedules(): Promise<ScheduleDTO[]> {
     active: s.active,
     generated: s._count.transactions,
   }));
+}
+
+// ─── Presupuestos ───────────────────────────────────────────────────────────
+
+/** Presupuestos mensuales por categoría con lo gastado en el mes (en su moneda). */
+export async function getCategoryBudgets(month: string): Promise<{
+  budgets: CategoryBudgetDTO[];
+  /** Gasto del mes en pesos de las categorías sin presupuesto (null = sin clasificar). */
+  unbudgeted: { categoryId: string | null; spentCents: number }[];
+}> {
+  const { from, to } = monthBounds(month);
+  const [budgets, accounts, spent] = await Promise.all([
+    prisma.categoryBudget.findMany(),
+    prisma.account.findMany({ select: { id: true, currency: true } }),
+    prisma.transaction.groupBy({
+      by: ["categoryId", "accountId"],
+      where: { kind: "expense", date: { gte: toDbDate(from), lte: toDbDate(to) } },
+      _sum: { amount: true },
+    }),
+  ]);
+  const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
+  const byCat = new Map<string, number>(); // "categoría|moneda" → centavos
+  for (const g of spent) {
+    const k = `${g.categoryId ?? ""}|${currencyOf.get(g.accountId) ?? "UYU"}`;
+    byCat.set(k, (byCat.get(k) ?? 0) + (g._sum.amount ? toCents(g._sum.amount) : 0));
+  }
+  const withBudget = new Set(budgets.map((b) => b.categoryId));
+  const unbudgeted = new Map<string | null, number>();
+  for (const [k, cents] of byCat) {
+    const [cat, cur] = k.split("|");
+    if (cur !== "UYU" || withBudget.has(cat)) continue;
+    unbudgeted.set(cat || null, (unbudgeted.get(cat || null) ?? 0) + cents);
+  }
+  return {
+    budgets: budgets.map((b) => ({
+      categoryId: b.categoryId,
+      amountCents: toCents(b.amount),
+      currency: b.currency,
+      spentCents: byCat.get(`${b.categoryId}|${b.currency}`) ?? 0,
+    })),
+    unbudgeted: [...unbudgeted].map(([categoryId, spentCents]) => ({ categoryId, spentCents })).sort((a, b) => b.spentCents - a.spentCents),
+  };
+}
+
+type ProjectRow = Awaited<ReturnType<typeof prisma.budgetProject.findMany>>[number];
+
+async function projectSpent(ids: string[]) {
+  const sums = await prisma.transaction.groupBy({
+    by: ["projectId", "kind"],
+    where: { projectId: { in: ids }, kind: { in: ["expense", "income"] } },
+    _sum: { amount: true },
+    _count: true,
+  });
+  const spent = new Map<string, { cents: number; n: number }>();
+  for (const g of sums) {
+    if (!g.projectId) continue;
+    const cur = spent.get(g.projectId) ?? { cents: 0, n: 0 };
+    const c = g._sum.amount ? toCents(g._sum.amount) : 0;
+    cur.cents += g.kind === "expense" ? c : -c;
+    cur.n += g._count;
+    spent.set(g.projectId, cur);
+  }
+  return spent;
+}
+
+function toProjectDTO(p: ProjectRow, s?: { cents: number; n: number }): ProjectDTO {
+  return {
+    id: p.id,
+    name: p.name,
+    icon: p.icon,
+    color: p.color,
+    amountCents: toCents(p.amount),
+    currency: p.currency,
+    startDate: p.startDate ? fromDbDate(p.startDate) : null,
+    endDate: p.endDate ? fromDbDate(p.endDate) : null,
+    note: p.note,
+    archived: p.archivedAt !== null,
+    spentCents: s?.cents ?? 0,
+    txCount: s?.n ?? 0,
+  };
+}
+
+/** Presupuestos puntuales (viajes, vacaciones), los activos primero. */
+export async function getProjects(): Promise<ProjectDTO[]> {
+  const rows = await prisma.budgetProject.findMany({ orderBy: [{ archivedAt: "asc" }, { createdAt: "desc" }] });
+  const spent = await projectSpent(rows.map((r) => r.id));
+  return rows.map((r) => toProjectDTO(r, spent.get(r.id))).sort((a, b) => Number(a.archived) - Number(b.archived));
+}
+
+/** Para el formulario de movimientos: los puntuales activos. */
+export async function getActiveProjects(): Promise<{ id: string; name: string }[]> {
+  return prisma.budgetProject.findMany({
+    where: { archivedAt: null },
+    select: { id: true, name: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/**
+ * Un presupuesto puntual con sus movimientos y los que se le podrían sumar:
+ * gastos de sus fechas (o de los últimos 60 días si no tiene) sin asignar.
+ */
+export async function getProject(id: string) {
+  const row = await prisma.budgetProject.findUnique({ where: { id } });
+  if (!row) return null;
+  const spent = await projectSpent([id]);
+  const from = row.startDate ? fromDbDate(row.startDate) : addDays(todayISO(), -60);
+  const to = row.endDate ? fromDbDate(row.endDate) : todayISO();
+  const [txs, candidates] = await Promise.all([
+    prisma.transaction.findMany({ where: { projectId: id }, orderBy: newestFirst, select: txSelect }),
+    prisma.transaction.findMany({
+      where: { projectId: null, kind: "expense", date: { gte: toDbDate(addDays(from, -7)), lte: toDbDate(addDays(to, 7)) } },
+      orderBy: newestFirst,
+      select: txSelect,
+      take: 200,
+    }),
+  ]);
+  return { project: toProjectDTO(row, spent.get(id)), txs: txs.map(toTxDTO), candidates: candidates.map(toTxDTO) };
 }
