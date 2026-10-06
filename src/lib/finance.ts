@@ -3,6 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { summarizeCard, type CardMove, type CardSummary } from "./card-logic";
 import { addDays, dayOfInstant, fromDbDate, monthBounds, shiftMonth, todayISO, toDbDate } from "./dates";
 import { buildClassifier, normTitle } from "./smart-logic";
 import {
@@ -63,6 +64,9 @@ const txSelect = {
   note: true,
   projectId: true,
   attachments: { select: { id: true, width: true, height: true }, orderBy: { createdAt: "asc" } },
+  installmentGroup: true,
+  installmentNo: true,
+  installmentCount: true,
 } satisfies Prisma.TransactionSelect;
 
 type TxRow = Prisma.TransactionGetPayload<{ select: typeof txSelect }>;
@@ -81,6 +85,10 @@ function toTxDTO(t: TxRow): TxDTO {
     note: t.note,
     projectId: t.projectId,
     photos: t.attachments,
+    installment:
+      t.installmentGroup && t.installmentNo && t.installmentCount
+        ? { group: t.installmentGroup, no: t.installmentNo, count: t.installmentCount }
+        : null,
   };
 }
 
@@ -127,7 +135,47 @@ export async function getAccounts(): Promise<AccountDTO[]> {
       order: a.order,
       archived: a.archivedAt !== null,
       txCount: count.get(a.id) ?? 0,
+      closingDay: a.closingDay,
+      dueDay: a.dueDay,
+      limitCents: a.creditLimit === null ? null : toCents(a.creditLimit),
     };
+  });
+}
+
+/** Tarjetas de crédito: el último resumen, el que está en curso y las cuotas que faltan. */
+export async function getCardSummaries(accounts?: AccountDTO[]): Promise<CardSummary[]> {
+  const cards = (accounts ?? (await getAccounts())).filter((a) => a.type === "card" && !a.archived);
+  if (!cards.length) return [];
+  const ids = cards.map((c) => c.id);
+  const txs = await prisma.transaction.findMany({
+    where: { OR: [{ accountId: { in: ids } }, { toAccountId: { in: ids } }] },
+    select: {
+      date: true,
+      kind: true,
+      amount: true,
+      toAmount: true,
+      accountId: true,
+      toAccountId: true,
+      installmentGroup: true,
+      category: { select: { isAdjustment: true } },
+    },
+    orderBy: { date: "asc" },
+  });
+  const today = todayISO();
+  return cards.map((c) => {
+    const moves: CardMove[] = [];
+    for (const t of txs) {
+      // Los ajustes de saldo corrigen la deuda pero no son compras del resumen.
+      if (t.category?.isAdjustment) continue;
+      const date = fromDbDate(t.date);
+      if (t.accountId === c.id) {
+        const cents = toCents(t.amount);
+        moves.push({ date, chargeCents: t.kind === "income" ? -cents : cents, paymentCents: 0, installment: !!t.installmentGroup });
+      } else if (t.toAccountId === c.id && t.toAmount !== null) {
+        moves.push({ date, chargeCents: 0, paymentCents: toCents(t.toAmount), installment: false });
+      }
+    }
+    return summarizeCard(c, moves, today);
   });
 }
 

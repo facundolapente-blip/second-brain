@@ -145,6 +145,11 @@ model Account {
   /// Clave de color de la paleta (ver src/lib/palette.ts).
   color          String                 @default("stone")
   order          Int                    @default(0)
+  /// Tarjeta de crédito: día del mes en que cierra el estado de cuenta y en que vence.
+  closingDay     Int?
+  dueDay         Int?
+  /// Límite de la tarjeta (opcional).
+  creditLimit    Decimal?               @db.Decimal(14, 2)
   archivedAt     DateTime?
   createdAt      DateTime               @default(now())
   transactions   Transaction[]          @relation("TxAccount")
@@ -242,8 +247,13 @@ model Transaction {
   updatedAt   DateTime              @default(now()) @updatedAt
 
   @@unique([source, externalId])
+  /// Compra en cuotas: todas las cuotas comparten el grupo; cada una va en su mes.
+  installmentGroup String?
+  installmentNo    Int?
+  installmentCount Int?
   attachments Attachment[]
 
+  @@index([installmentGroup])
   @@index([date])
   @@index([accountId])
   @@index([toAccountId])

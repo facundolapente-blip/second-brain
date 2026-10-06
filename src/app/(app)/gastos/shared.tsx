@@ -229,6 +229,7 @@ export function TxRow({
     );
   } else {
     subtitle = category?.name ?? "Sin clasificar";
+    if (tx.installment) subtitle += ` · cuota ${tx.installment.no}/${tx.installment.count}`;
     if (showAccount && account) subtitle += ` · ${account.name}`;
   }
 

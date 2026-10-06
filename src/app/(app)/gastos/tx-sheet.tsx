@@ -5,7 +5,9 @@ import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, use
 import { ArrowsDownUp, Check, Camera, X } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
-import { deleteTransaction, saveTransaction, suggestCategory } from "@/lib/finance-actions";
+import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory } from "@/lib/finance-actions";
+import { splitInstallments } from "@/lib/card-logic";
+import { moneyCents } from "@/lib/format";
 import {
   centsToInput,
   parseAmount,
@@ -37,6 +39,9 @@ type Draft = {
   byHand?: boolean;
   /** Comprobantes ya guardados (al editar). */
   photos?: Photo[];
+  /** Compra en cuotas (al cargar con tarjeta) y, al editar, de qué compra es. */
+  installments?: string;
+  installment?: TxDTO["installment"];
 };
 
 export type TxSheetHandle = {
@@ -131,6 +136,7 @@ export const TxSheet = forwardRef<
         note: tx.note ?? "",
         projectId: tx.projectId,
         photos: tx.photos,
+        installment: tx.installment,
       }),
     fromTemplate: (t) => open(applyTemplate(blank(), t)),
   }));
@@ -448,6 +454,29 @@ export const TxSheet = forwardRef<
           </div>
         )}
 
+        {!d.id && d.kind === "expense" && accounts.find((a) => a.id === d.accountId)?.type === "card" && (
+          <Field label="Cuotas" hint={installmentHint(d, accounts.find((a) => a.id === d.accountId)?.currency ?? "UYU")}>
+            <select
+              name="installments"
+              value={d.installments ?? "1"}
+              onChange={(e) => set({ installments: e.target.value })}
+              className={inputClass}
+            >
+              {[1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 18, 24].map((n) => (
+                <option key={n} value={n}>
+                  {n === 1 ? "Un pago" : `${n} cuotas`}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {d.id && d.installment && (
+          <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[13px] text-muted">
+            Cuota {d.installment.no} de {d.installment.count} de una compra en cuotas. Lo que cambies acá vale solo para esta cuota.
+          </p>
+        )}
+
         <Field label="Nota">
           <textarea
             name="note"
@@ -522,6 +551,18 @@ export const TxSheet = forwardRef<
             }}
           >
             Eliminar movimiento
+          </ConfirmButton>
+        )}
+
+        {d.id && d.installment && (
+          <ConfirmButton
+            onConfirm={() => {
+              const group = d.installment!.group;
+              startTransition(() => deleteInstallments(group));
+              sheet.current?.close();
+            }}
+          >
+            Eliminar las {d.installment.count} cuotas
           </ConfirmButton>
         )}
 
@@ -625,4 +666,13 @@ function CategoryChip({
       )}
     </button>
   );
+}
+
+/** "6 cuotas de $ 1.250" debajo del selector. */
+function installmentHint(d: Draft, currency: string): string | undefined {
+  const n = Number(d.installments ?? "1");
+  const total = parseAmount(d.amount);
+  if (n < 2 || total === null) return "Cada cuota cae en su mes, en el resumen que le toca.";
+  const parts = splitInstallments(total, n);
+  return `${n} cuotas de ${moneyCents(parts[1], currency)}${parts[0] !== parts[1] ? ` (la primera ${moneyCents(parts[0], currency)})` : ""}, una por mes.`;
 }

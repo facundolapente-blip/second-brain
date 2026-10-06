@@ -10,6 +10,7 @@ import { calibrarSaldos } from "./importers/gastos-saldos";
 import { getClassifier } from "./finance";
 import { logActivity, trashAndDelete } from "./trash";
 import { parseQuick } from "./smart-logic";
+import { installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
@@ -95,6 +96,31 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
     projectId: kind === "transfer" ? null : await validProject(texto(fd, "projectId", 40)),
   };
 
+  // Compra en cuotas con tarjeta: una por mes, cada una en su resumen.
+  const count = Number(texto(fd, "installments", 2));
+  if (!id && kind === "expense" && account.type === "card" && Number.isInteger(count) && count >= 2 && count <= 36) {
+    const group = crypto.randomUUID();
+    const parts = splitInstallments(amount, count);
+    const rows = parts.map((cents, i) => ({
+      ...data,
+      date: toDbDate(installmentDate(date, i)),
+      amount: centsToDecimalString(cents),
+      installmentGroup: group,
+      installmentNo: i + 1,
+      installmentCount: count,
+    }));
+    const first = await prisma.transaction.create({ data: rows[0] });
+    if (rows.length > 1) await prisma.transaction.createMany({ data: rows.slice(1) });
+    await logActivity(
+      "created",
+      "transaction",
+      first.id,
+      `Compra en ${count} cuotas ${centsToDecimalString(amount)} ${account.currency}${data.title ? ` · ${data.title}` : ""} (${account.name})`,
+    );
+    refrescar();
+    return { ok: true, id: first.id };
+  }
+
   const saved = id
     ? await prisma.transaction.update({ where: { id }, data })
     : await prisma.transaction.create({ data });
@@ -131,6 +157,15 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
 export async function deleteTransaction(id: string) {
   await exigirSesion();
   await trashAndDelete("transaction", id);
+  refrescar();
+}
+
+/** Borra todas las cuotas de una compra (cada una va a la papelera). */
+export async function deleteInstallments(group: string) {
+  await exigirSesion();
+  if (typeof group !== "string" || !/^[0-9a-f-]{36}$/.test(group)) return;
+  const rows = await prisma.transaction.findMany({ where: { installmentGroup: group }, select: { id: true } });
+  for (const r of rows) await trashAndDelete("transaction", r.id);
   refrescar();
 }
 
@@ -171,6 +206,11 @@ export async function saveAccount(_prev: ActionResult | null, fd: FormData): Pro
   if (initial === null) return { ok: false, error: "El saldo inicial no es un número válido." };
   const color = texto(fd, "color");
 
+  const day = (k: string) => {
+    const n = Number(texto(fd, k, 2));
+    return type === "card" && Number.isInteger(n) && n >= 1 && n <= 31 ? n : null;
+  };
+  const limit = type === "card" ? parseAmount(texto(fd, "creditLimit", 30)) : null;
   const data = {
     name,
     type,
@@ -178,6 +218,9 @@ export async function saveAccount(_prev: ActionResult | null, fd: FormData): Pro
     initialBalance: centsToDecimalString(initial),
     icon: ACCOUNT_TYPE_ICON[type] ?? "Wallet",
     color: isPaletteKey(color) ? color : "stone",
+    closingDay: day("closingDay"),
+    dueDay: day("dueDay"),
+    creditLimit: limit === null ? null : centsToDecimalString(limit),
   };
 
   if (id) {

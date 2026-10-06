@@ -5,7 +5,7 @@ import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, to
 import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
-import { getAccounts, getCategoryBudgets, NOT_ADJUSTMENT, runSchedules } from "./finance";
+import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, runSchedules } from "./finance";
 import { budgetState, monthShare } from "./budget-logic";
 import { getRates, toUyu } from "./fx";
 import { toCents, type CurrencyTotals } from "./finance-logic";
@@ -291,6 +291,10 @@ export async function getDashboard() {
         .filter((b) => b.state !== "ok")
         .sort((a, b) => b.spentCents / b.amountCents - a.spentCents / a.amountCents),
       budgetCount: budgets.length,
+      // Tarjetas con el resumen sin pagar que vence en los próximos 5 días (o ya venció).
+      cardAlerts: (await getCardSummaries(accounts))
+        .filter((c) => c.last && c.last.leftCents > 0 && diffDays(c.last.due, today) <= 5 && diffDays(c.last.due, today) >= -10)
+        .map((c) => ({ accountId: c.accountId, name: c.name, currency: c.currency, leftCents: c.last!.leftCents, due: c.last!.due })),
       quickAccounts: accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency })),
       usdRate: rates.toUyu.USD ?? null,
     },

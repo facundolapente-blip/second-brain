@@ -10,6 +10,7 @@ import {
   ChartLineUp,
   Check,
   ClipboardText,
+  CreditCard,
   Flame,
   Medal,
   NotePencil,
@@ -665,6 +666,31 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
   return (
     <Card title="Gastos del mes" href="/gastos/informes" hrefLabel="Informes" color="var(--c-gastos)" className="lg:col-span-7" i={4}>
       <QuickAdd accounts={g.quickAccounts} />
+      {g.cardAlerts.length > 0 && (
+        <ul className="grid gap-1.5" aria-label="Tarjetas por vencer">
+          {g.cardAlerts.map((c) => {
+            const late = c.due < d.today;
+            return (
+              <li key={c.accountId}>
+                <Link
+                  href={`/gastos?nuevo=1&pagar=${c.accountId}&monto=${c.leftCents}`}
+                  className={cx(
+                    "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
+                    late ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
+                  )}
+                >
+                  <CreditCard size={15} weight="fill" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">
+                    <strong className="font-semibold">{c.name}</strong>: {late ? "venció" : c.due === d.today ? "vence hoy" : "vence"}{" "}
+                    {c.due === d.today ? "" : `el ${formatShort(c.due)}`}
+                  </span>
+                  <span className="tabular shrink-0 font-medium">{moneyCents(c.leftCents, c.currency)}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {g.budgetAlerts.length > 0 && (
         <ul className="grid gap-1.5" aria-label="Avisos de presupuesto">
           {g.budgetAlerts.slice(0, 3).map((a) => (

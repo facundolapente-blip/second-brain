@@ -17,6 +17,8 @@ import { Button, ConfirmButton, cx, Field, Input, Sheet, type SheetHandle } from
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { BalanceAdjuster } from "./balance-adjuster";
+import { CardPanel } from "./card-panel";
+import type { CardSummary } from "@/lib/card-logic";
 import { NetWorth } from "./net-worth";
 import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
 
@@ -29,16 +31,23 @@ type Draft = {
   color: string;
   archived: boolean;
   txCount: number;
+  closingDay: string;
+  dueDay: string;
+  limit: string;
 };
 
 const CURRENCY_NAME: Record<string, string> = { UYU: "pesos", USD: "dólares", ARS: "pesos arg.", EUR: "euros", BRL: "reales" };
 
 export function AccountsView({
   accounts,
+  cards,
+  today,
   openNew,
   netWorth,
 }: {
   accounts: AccountDTO[];
+  cards: CardSummary[];
+  today: string;
   openNew: boolean;
   netWorth: { series: { month: string; cents: number }[]; usdRate: number | null };
 }) {
@@ -94,6 +103,9 @@ export function AccountsView({
       color: a.color,
       archived: a.archived,
       txCount: a.txCount,
+      closingDay: a.closingDay ? String(a.closingDay) : "",
+      dueDay: a.dueDay ? String(a.dueDay) : "",
+      limit: a.limitCents ? centsToInput(a.limitCents) : "",
     });
   }
 
@@ -176,6 +188,14 @@ export function AccountsView({
                 </dl>
               )}
             </section>
+
+            {cards.length > 0 && (
+              <div className="mb-6 grid gap-3 lg:grid-cols-2">
+                {cards.map((c) => (
+                  <CardPanel key={c.accountId} card={c} today={today} />
+                ))}
+              </div>
+            )}
 
             <ul className="grid divide-y divide-line border-y border-line lg:grid-cols-3 lg:gap-4 lg:divide-y-0 lg:border-y-0">
               {sorted.map((a, i) => (
@@ -287,6 +307,50 @@ export function AccountsView({
             hint={draft.id && draft.txCount > 0 ? "No se cambia en una cuenta con movimientos." : undefined}
           />
 
+          {draft.type === "card" && (
+            <div className="grid gap-3 rounded-xl bg-surface-2 p-3">
+              <p className="text-[12.5px] text-muted">
+                Con el día de cierre y de vencimiento la app calcula cuánto viene en cada resumen. Los pagos son transferencias
+                desde tu cuenta a la tarjeta.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Día de cierre">
+                  <Input
+                    name="closingDay"
+                    type="number"
+                    min={1}
+                    max={31}
+                    inputMode="numeric"
+                    value={draft.closingDay}
+                    onChange={(e) => setDraft({ ...draft, closingDay: e.target.value })}
+                    placeholder="Ej. 25"
+                  />
+                </Field>
+                <Field label="Día de vencimiento">
+                  <Input
+                    name="dueDay"
+                    type="number"
+                    min={1}
+                    max={31}
+                    inputMode="numeric"
+                    value={draft.dueDay}
+                    onChange={(e) => setDraft({ ...draft, dueDay: e.target.value })}
+                    placeholder="Ej. 5"
+                  />
+                </Field>
+              </div>
+              <Field label="Límite (opcional)">
+                <Input
+                  name="creditLimit"
+                  inputMode="decimal"
+                  value={draft.limit}
+                  onChange={(e) => setDraft({ ...draft, limit: e.target.value })}
+                  placeholder="0"
+                />
+              </Field>
+            </div>
+          )}
+
           <Field label="Saldo inicial" hint="Lo que tenía la cuenta antes del primer movimiento. Para corregir el saldo de hoy (o de un día pasado) usá Ajustar saldo, abajo.">
             <span className="flex h-10 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
               <span className="text-sm text-muted">{currencySymbol(draft.currency)}</span>
@@ -388,7 +452,7 @@ export function AccountsView({
 }
 
 function blank(): Draft {
-  return { name: "", type: "bank", currency: "UYU", initial: "", color: "blue", archived: false, txCount: 0 };
+  return { name: "", type: "bank", currency: "UYU", initial: "", color: "blue", archived: false, txCount: 0, closingDay: "", dueDay: "", limit: "" };
 }
 
 function ChipGroup({

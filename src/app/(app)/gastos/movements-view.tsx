@@ -7,6 +7,7 @@ import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
   balanceByCurrency,
+  centsToInput,
   flowOf,
   dayLabel,
   groupByDay,
@@ -74,10 +75,25 @@ export function MovementsView({
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (!p.has("nuevo") || !hasAccounts) return;
-    form.current?.create(p.get("titulo") ? { title: p.get("titulo")!.slice(0, 120) } : undefined);
-    p.delete("nuevo");
-    p.delete("titulo");
+    const card = accounts.find((a) => a.id === p.get("pagar") && !a.archived);
+    if (card) {
+      // Pagar la tarjeta: transferencia desde una cuenta de la misma moneda.
+      const from = accounts.find((a) => !a.archived && a.type !== "card" && a.currency === card.currency);
+      const cents = Number(p.get("monto"));
+      form.current?.create({
+        kind: "transfer",
+        toAccountId: card.id,
+        ...(from ? { accountId: from.id } : {}),
+        title: `Pago ${card.name}`,
+        amount: Number.isInteger(cents) && cents > 0 ? centsToInput(cents) : "",
+      });
+    } else {
+      form.current?.create(p.get("titulo") ? { title: p.get("titulo")!.slice(0, 120) } : undefined);
+    }
+    for (const k of ["nuevo", "titulo", "pagar", "monto"]) p.delete(k);
     window.history.replaceState(null, "", `${window.location.pathname}${p.size ? `?${p}` : ""}`);
+    // Solo al entrar con esos parámetros.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasAccounts]);
 
   const visible = useMemo(() => txs.filter((t) => touchesSelection(t, selection)), [txs, selection]);

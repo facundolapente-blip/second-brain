@@ -24,6 +24,10 @@ export type AccountDTO = {
   order: number;
   archived: boolean;
   txCount: number;
+  /** Tarjeta de crédito: día de cierre y de vencimiento, límite. */
+  closingDay: number | null;
+  dueDay: number | null;
+  limitCents: number | null;
 };
 
 export type CategoryDTO = {
@@ -53,6 +57,8 @@ export type TxDTO = {
   projectId: string | null;
   /** Comprobantes (fotos). */
   photos: { id: string; width: number | null; height: number | null }[];
+  /** Cuota de una compra en cuotas. */
+  installment: { group: string; no: number; count: number } | null;
 };
 
 export type TemplateDTO = {
