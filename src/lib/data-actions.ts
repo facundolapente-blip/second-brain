@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
+import { logActivity } from "./trash";
 import { importHabitNow } from "./importers/habitnow";
 import { importMyDiary, linesFromDocx, linesFromPdf, linesFromText, parseEntries } from "./importers/mydiary";
 import { importGastosCsv } from "./importers/gastos-csv";
@@ -43,6 +44,7 @@ export async function importBackup(_prev: ImportResult, fd: FormData): Promise<I
     } else {
       return { ok: false, error: "Tipo de backup desconocido." };
     }
+    await logActivity("imported", "import", null, `${file.name}: ${message}`);
     revalidatePath("/", "layout");
     return { ok: true, message };
   } catch (e) {

@@ -337,6 +337,40 @@ model SavingsGoal {
   createdAt  DateTime  @default(now())
 }
 
+// ─── Papelera y actividad ───────────────────────────────────────────────────
+
+/// Lo borrado en cualquier módulo: la foto completa para poder restaurarlo.
+/// Se vacía sola a los 30 días.
+model TrashItem {
+  id        String   @id @default(cuid())
+  /// transaction | account | category | template | schedule | project | debt | goal |
+  /// habit | habitCategory | journal | block | task | keyResult
+  kind      String
+  entityId  String
+  /// Cómo se muestra ("Gasto $ 350 · Almuerzo").
+  label     String
+  /// habitos | journal | gastos | plan
+  module    String
+  data      Json
+  deletedAt DateTime @default(now())
+
+  @@index([deletedAt])
+}
+
+/// Qué se hizo en la app: creado, editado, borrado, restaurado, importado.
+model Activity {
+  id       String   @id @default(cuid())
+  at       DateTime @default(now())
+  /// created | updated | deleted | restored | purged | imported | done
+  action   String
+  kind     String
+  entityId String?
+  label    String
+  module   String
+
+  @@index([at])
+}
+
 // ─── Ajustes de la app ───────────────────────────────────────────────────────
 
 /// Valores sueltos que guarda la app (por ejemplo, la última cotización del dólar).

@@ -3,11 +3,11 @@ import { isISODate } from "@/lib/dates";
 import { parseAmount } from "@/lib/finance-logic";
 import { HistoryView } from "./history-view";
 
-export const metadata = { title: "Historial · Gastos" };
+export const metadata = { title: "Buscar · Gastos" };
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim() : "");
 
-export default async function HistorialPage({ searchParams }: PageProps<"/gastos/historial">) {
+export default async function HistorialPage({ searchParams }: PageProps<"/gastos/buscar">) {
   const sp = await searchParams;
   const kind = str(sp.tipo);
   const filters = {

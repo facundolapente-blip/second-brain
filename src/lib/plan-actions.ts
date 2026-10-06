@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
+import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate } from "./dates";
 import { isPaletteKey } from "./palette";
 import { isTime, QUARTERS, type KrStatus, type TaskStatus } from "./plan-logic";
@@ -97,6 +98,7 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     return { ok: true, id };
   }
   const created = await prisma.planBlock.create({ data });
+  await logActivity("created", "block", created.id, `${title} (${date})`);
   if (data.taskId) await prisma.planTask.update({ where: { id: data.taskId }, data: { scheduled: true } });
   refrescar();
   return { ok: true, id: created.id };
@@ -113,7 +115,7 @@ export async function deleteBlock(id: string) {
   await exigirSesion();
   const block = await prisma.planBlock.findUnique({ where: { id } });
   if (!block) return;
-  await prisma.planBlock.delete({ where: { id } });
+  await trashAndDelete("block", id);
   // Si estaba hecho y vinculado a un hábito, la marca se va con él.
   if (block.done) await syncHabit(block.habitId, block.date, false);
   refrescar(block.done && !!block.habitId);
@@ -195,6 +197,7 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
   const created = await prisma.planTask.create({
     data: { ...data, completedAt: status === "done" ? new Date() : null },
   });
+  await logActivity("created", "task", created.id, title);
   refrescar();
   return { ok: true, id: created.id };
 }
@@ -202,10 +205,11 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
 export async function setTaskStatus(id: string, status: TaskStatus) {
   await exigirSesion();
   if (!TASK_STATUSES.includes(status)) throw new Error("Estado inválido");
-  await prisma.planTask.update({
+  const t = await prisma.planTask.update({
     where: { id },
     data: { status, completedAt: status === "done" ? new Date() : null },
   });
+  if (status === "done") await logActivity("done", "task", id, `Terminada: ${t.title}`);
   refrescar();
 }
 
@@ -221,7 +225,7 @@ export async function bumpTaskProgress(id: string, delta: 1 | -1) {
 
 export async function deleteTask(id: string) {
   await exigirSesion();
-  await prisma.planTask.delete({ where: { id } });
+  await trashAndDelete("task", id);
   refrescar();
 }
 
@@ -277,7 +281,7 @@ export async function saveKeyResult(_prev: ActionResult | null, fd: FormData): P
 
 export async function deleteKeyResult(id: string) {
   await exigirSesion();
-  await prisma.planKeyResult.delete({ where: { id } });
+  await trashAndDelete("keyResult", id);
   refrescar();
 }
 

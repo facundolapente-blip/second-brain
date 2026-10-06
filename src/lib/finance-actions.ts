@@ -8,6 +8,7 @@ import { isFrequency, nextOnOrAfter } from "./schedule-logic";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { calibrarSaldos } from "./importers/gastos-saldos";
 import { getClassifier } from "./finance";
+import { logActivity, trashAndDelete } from "./trash";
 import { parseQuick } from "./smart-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
@@ -97,6 +98,12 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
   const saved = id
     ? await prisma.transaction.update({ where: { id }, data })
     : await prisma.transaction.create({ data });
+  await logActivity(
+    id ? "updated" : "created",
+    "transaction",
+    saved.id,
+    `${kind === "income" ? "Ingreso" : kind === "expense" ? "Gasto" : "Transferencia"} ${centsToDecimalString(amount)} ${account.currency}${data.title ? ` · ${data.title}` : ""} (${account.name})`,
+  );
 
   if (fd.get("saveTemplate") === "on") {
     const last = await prisma.txTemplate.aggregate({ _max: { order: true } });
@@ -123,7 +130,7 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
 
 export async function deleteTransaction(id: string) {
   await exigirSesion();
-  await prisma.transaction.deleteMany({ where: { id } });
+  await trashAndDelete("transaction", id);
   refrescar();
 }
 
@@ -183,11 +190,13 @@ export async function saveAccount(_prev: ActionResult | null, fd: FormData): Pro
       return { ok: false, error: "No se puede cambiar la moneda de una cuenta con movimientos." };
     }
     await prisma.account.update({ where: { id }, data });
+    await logActivity("updated", "account", id, name);
     refrescar();
     return { ok: true, id };
   }
   const last = await prisma.account.aggregate({ _max: { order: true } });
   const created = await prisma.account.create({ data: { ...data, order: (last._max.order ?? 0) + 1 } });
+  await logActivity("created", "account", created.id, name);
   refrescar();
   return { ok: true, id: created.id };
 }
@@ -203,7 +212,7 @@ export async function deleteAccount(id: string): Promise<ActionResult> {
   await exigirSesion();
   const used = await prisma.transaction.count({ where: { OR: [{ accountId: id }, { toAccountId: id }] } });
   if (used > 0) return { ok: false, error: "Tiene movimientos: archivala en vez de borrarla." };
-  await prisma.account.delete({ where: { id } });
+  await trashAndDelete("account", id);
   refrescar();
   return { ok: true };
 }
@@ -244,7 +253,7 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
 /** Borra la categoría; sus movimientos quedan sin clasificar. */
 export async function deleteCategory(id: string) {
   await exigirSesion();
-  await prisma.category.delete({ where: { id } });
+  await trashAndDelete("category", id);
   refrescar();
 }
 
@@ -260,7 +269,7 @@ export async function renameTemplate(id: string, name: string) {
 
 export async function deleteTemplate(id: string) {
   await exigirSesion();
-  await prisma.txTemplate.deleteMany({ where: { id } });
+  await trashAndDelete("template", id);
   refrescar();
 }
 
@@ -339,8 +348,10 @@ export async function saveSchedule(_prev: ActionResult | null, fd: FormData): Pr
     nextDate: next ? toDbDate(next) : null,
     autoConfirm: true,
   };
-  if (id) await prisma.scheduledTransaction.update({ where: { id }, data });
-  else await prisma.scheduledTransaction.create({ data });
+  const savedSch = id
+    ? await prisma.scheduledTransaction.update({ where: { id }, data })
+    : await prisma.scheduledTransaction.create({ data });
+  await logActivity(id ? "updated" : "created", "schedule", savedSch.id, `${data.title ?? "Recurrente"} · ${data.amount} ${account.currency}`);
   refrescar();
   return { ok: true };
 }
@@ -371,7 +382,7 @@ export async function setScheduleActive(id: string, active: boolean) {
 /** Borra el recurrente; los movimientos que ya cargó se quedan. */
 export async function deleteSchedule(id: string) {
   await exigirSesion();
-  await prisma.scheduledTransaction.deleteMany({ where: { id } });
+  await trashAndDelete("schedule", id);
   refrescar();
 }
 
@@ -427,6 +438,7 @@ export async function saveProject(_prev: ActionResult | null, fd: FormData): Pro
   const saved = id
     ? await prisma.budgetProject.update({ where: { id }, data })
     : await prisma.budgetProject.create({ data });
+  await logActivity(id ? "updated" : "created", "project", saved.id, `${name} · ${data.amount} ${currency}`);
   refrescar();
   return { ok: true, id: saved.id };
 }
@@ -440,7 +452,7 @@ export async function archiveProject(id: string, archived: boolean) {
 /** Borra el presupuesto puntual; sus movimientos quedan, sin asignar. */
 export async function deleteProject(id: string) {
   await exigirSesion();
-  await prisma.budgetProject.deleteMany({ where: { id } });
+  await trashAndDelete("project", id);
   refrescar();
 }
 
@@ -485,6 +497,7 @@ export async function convertToTransfer(id: string, otherAccountId: string): Pro
     where: { id },
     data: { kind: "transfer", accountId: from, toAccountId: to, toAmount: tx.amount, categoryId: null, projectId: null },
   });
+  await logActivity("updated", "transaction", id, `Convertido en transferencia: ${tx.amount} ${tx.account.currency} con ${other.name}`);
   await calibrarSaldos(prisma);
   refrescar();
   return { ok: true };
@@ -518,6 +531,7 @@ export async function adjustBalance(accountId: string, realRaw: string, date: st
   }
   const diff = real - balance;
   if (diff === 0) return { ok: true };
+  await logActivity("updated", "account", accountId, `${acc.name}: saldo ajustado a ${centsToDecimalString(real)} (${day})`);
   const adj = await ensureAdjustmentCategories(prisma);
   await prisma.transaction.create({
     data: {
@@ -592,6 +606,7 @@ export async function quickAdd(text: string): Promise<ActionResult & { summary?:
     include: { category: { select: { name: true } } },
   });
   refrescar();
+  await logActivity("created", "transaction", tx.id, `${p.kind === "income" ? "Ingreso" : "Gasto"} ${centsToDecimalString(p.amountCents)} ${acc.currency}${p.title ? ` · ${p.title}` : ""} (carga rápida)`);
   const what = `${p.kind === "income" ? "Ingreso" : "Gasto"} de ${centsToDecimalString(p.amountCents)} ${acc.currency} en ${acc.name}`;
   const when = p.daysAgo ? (p.daysAgo === 1 ? " · ayer" : " · anteayer") : "";
   return { ok: true, id: tx.id, summary: `${what} · ${tx.category ? tx.category.name : "sin clasificar"}${when}` };
@@ -615,8 +630,8 @@ export async function saveDebt(_prev: ActionResult | null, fd: FormData): Promis
     date: toDbDate(isISODate(dateRaw) ? dateRaw : todayISO()),
     note: texto(fd, "note", 500) || null,
   };
-  if (id) await prisma.debt.update({ where: { id }, data });
-  else await prisma.debt.create({ data });
+  const saved = id ? await prisma.debt.update({ where: { id }, data }) : await prisma.debt.create({ data });
+  await logActivity(id ? "updated" : "created", "debt", saved.id, `${person}: ${data.direction === "i_owe" ? "le debés" : "te debe"} ${data.amount} ${data.currency}`);
   refrescar();
   return { ok: true };
 }
@@ -651,6 +666,7 @@ export async function settleDebt(id: string, accountId: string | null, categoryI
     settleTxId = tx.id;
   }
   await prisma.debt.update({ where: { id }, data: { settledAt: new Date(), settleTxId } });
+  await logActivity("done", "debt", id, `Saldada: ${d.person}`);
   refrescar();
   return { ok: true };
 }
@@ -663,7 +679,7 @@ export async function reopenDebt(id: string) {
 
 export async function deleteDebt(id: string) {
   await exigirSesion();
-  await prisma.debt.deleteMany({ where: { id } });
+  await trashAndDelete("debt", id);
   refrescar();
 }
 
@@ -691,8 +707,8 @@ export async function saveGoal(_prev: ActionResult | null, fd: FormData): Promis
     icon: texto(fd, "icon", 40) || "PiggyBank",
     color: isPaletteKey(color) ? color : "green",
   };
-  if (id) await prisma.savingsGoal.update({ where: { id }, data });
-  else await prisma.savingsGoal.create({ data });
+  const saved = id ? await prisma.savingsGoal.update({ where: { id }, data }) : await prisma.savingsGoal.create({ data });
+  await logActivity(id ? "updated" : "created", "goal", saved.id, `${name} · ${data.target} ${data.currency}`);
   refrescar();
   return { ok: true };
 }
@@ -720,6 +736,6 @@ export async function archiveGoal(id: string, archived: boolean) {
 
 export async function deleteGoal(id: string) {
   await exigirSesion();
-  await prisma.savingsGoal.deleteMany({ where: { id } });
+  await trashAndDelete("goal", id);
   refrescar();
 }

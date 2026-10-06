@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-import { CalendarCheck, ChartLineUp, ClipboardText, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
+import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
 import { cx } from "./ui";
@@ -22,6 +22,7 @@ const MODULES: Module[] = [
 const TOOLS: { href: string; label: string; icon: Icon }[] = [
   { href: "/semana", label: "Revisión semanal", icon: ClipboardText },
   { href: "/analisis", label: "Análisis", icon: ChartLineUp },
+  { href: "/historial", label: "Historial y papelera", icon: ClockCounterClockwise },
   { href: "/datos", label: "Datos", icon: Database },
 ];
 

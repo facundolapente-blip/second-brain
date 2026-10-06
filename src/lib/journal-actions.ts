@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
+import { logActivity, trashAndDelete } from "./trash";
 import { addDays, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
@@ -46,6 +47,7 @@ export async function writeOnDay(date?: string, nueva = false) {
   }
   await limpiarVacias();
   const created = await prisma.journalEntry.create({ data: { date: toDbDate(day) }, select: { id: true } });
+  await logActivity("created", "journal", created.id, `Entrada del ${day}`);
   redirect(`/journal/${created.id}`);
 }
 
@@ -98,7 +100,7 @@ export async function discardIfEmpty(id: string) {
 export async function deleteEntry(id: string) {
   await exigirSesion();
   if (!validId(id)) throw new Error("Entrada inválida");
-  await prisma.journalEntry.deleteMany({ where: { id } });
+  await trashAndDelete("journal", id);
   refrescar();
   redirect("/journal");
 }

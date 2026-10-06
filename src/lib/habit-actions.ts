@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
+import { logActivity, trashAndDelete } from "./trash";
 import { isISODate, todayISO, toDbDate } from "./dates";
 import { isPaletteKey } from "./palette";
 import type { LogStatus } from "./habit-logic";
@@ -174,13 +175,14 @@ export async function mergeLastTrack(habitId: string): Promise<ActionResult> {
 
 export async function archiveHabit(id: string, archived: boolean) {
   await exigirSesion();
-  await prisma.habit.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
+  const h = await prisma.habit.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
+  await logActivity(archived ? "updated" : "restored", "habit", id, `${h.name} ${archived ? "archivado" : "desarchivado"}`);
   refrescar();
 }
 
 export async function deleteHabit(id: string) {
   await exigirSesion();
-  await prisma.habit.delete({ where: { id } });
+  await trashAndDelete("habit", id);
   refrescar();
 }
 
@@ -219,6 +221,6 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
 /** Borra la categoría; sus hábitos quedan sin categoría. */
 export async function deleteCategory(id: string) {
   await exigirSesion();
-  await prisma.habitCategory.delete({ where: { id } });
+  await trashAndDelete("habitCategory", id);
   refrescar();
 }

@@ -9,7 +9,7 @@ type Tab = { href: string; label: string; icon?: Icon; mobile: boolean };
 
 const TABS: Tab[] = [
   { href: "/gastos", label: "Movimientos", icon: Receipt, mobile: true },
-  { href: "/gastos/historial", label: "Historial", mobile: false },
+  { href: "/gastos/buscar", label: "Buscar", mobile: false },
   { href: "/gastos/cuentas", label: "Cuentas", icon: Bank, mobile: true },
   { href: "/gastos/presupuestos", label: "Presupuestos", icon: PiggyBank, mobile: true },
   { href: "/gastos/metas", label: "Metas", mobile: false },
@@ -37,7 +37,7 @@ function mobileActive(pathname: string, href: string) {
   if (href === "/gastos") {
     return (
       pathname === "/gastos" ||
-      ["/gastos/historial", "/gastos/sin-clasificar", "/gastos/plantillas", "/gastos/recurrentes", "/gastos/deudas"].some((p) =>
+      ["/gastos/buscar", "/gastos/sin-clasificar", "/gastos/plantillas", "/gastos/recurrentes", "/gastos/deudas"].some((p) =>
         pathname.startsWith(p),
       )
     );

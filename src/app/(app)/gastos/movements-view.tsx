@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowDownLeft, ArrowsClockwise, ClockCounterClockwise, Handshake, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
@@ -169,7 +169,7 @@ export function MovementsView({
                   )}
                   <QuickLink href="/gastos/plantillas" label="Plantillas" icon={<Copy size={14} aria-hidden />} />
                   <QuickLink href="/gastos/recurrentes" label="Recurrentes" icon={<ArrowsClockwise size={14} aria-hidden />} />
-                  <QuickLink href="/gastos/historial" label="Historial" icon={<ClockCounterClockwise size={14} aria-hidden />} />
+                  <QuickLink href="/gastos/buscar" label="Buscar" icon={<MagnifyingGlass size={14} aria-hidden />} />
                   <QuickLink href="/gastos/deudas" label="Deudas" icon={<Handshake size={14} aria-hidden />} />
                 </div>
               </div>
