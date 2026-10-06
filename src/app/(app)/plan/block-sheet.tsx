@@ -82,7 +82,7 @@ function BlockForm({
           name="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Gym, Obligatorio, Libre..."
+          placeholder="Gym, Obligatorio, Libre…"
           autoFocus={!initial.id}
           required
           maxLength={120}
@@ -174,7 +174,7 @@ function BlockForm({
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Lugar (opcional)">
-          <Input name="place" defaultValue={initial.place ?? ""} maxLength={120} placeholder="ORT, casa..." />
+          <Input name="place" defaultValue={initial.place ?? ""} maxLength={120} placeholder="ORT, casa…" />
         </Field>
         <Field label="Nota (opcional)">
           <Input name="notes" defaultValue={initial.notes ?? ""} maxLength={2000} />
@@ -189,7 +189,7 @@ function BlockForm({
 
       <div className="grid gap-2">
         <Button type="submit" variant="accent" disabled={pending}>
-          {pending ? "Guardando..." : initial.id ? "Guardar cambios" : "Crear bloque"}
+          {pending ? "Guardando…" : initial.id ? "Guardar cambios" : "Crear bloque"}
         </Button>
         {initial.id && (
           <ConfirmButton

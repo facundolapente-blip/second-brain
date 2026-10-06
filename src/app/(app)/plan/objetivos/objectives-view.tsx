@@ -209,7 +209,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
     <form action={action} className="grid gap-5">
       {kr && <input type="hidden" name="id" value={kr.id} />}
       <Field label="Nombre">
-        <Input name="title" defaultValue={kr?.title} required maxLength={160} autoFocus={!kr} placeholder="Producir 3 tracks, Leer 3 por semana..." />
+        <Input name="title" defaultValue={kr?.title} required maxLength={160} autoFocus={!kr} placeholder="Producir 3 tracks, Leer 3 por semana…" />
       </Field>
 
       <Field label="Objetivo">
@@ -225,7 +225,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
             </option>
           ))}
           <option value="">Sin objetivo</option>
-          <option value="__new">Nuevo objetivo...</option>
+          <option value="__new">Nuevo objetivo…</option>
         </select>
       </Field>
       {objectiveId === "__new" && (
@@ -291,7 +291,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
       )}
       <div className="grid gap-2">
         <Button type="submit" variant="accent" disabled={pending}>
-          {pending ? "Guardando..." : kr ? "Guardar cambios" : "Crear resultado"}
+          {pending ? "Guardando…" : kr ? "Guardar cambios" : "Crear resultado"}
         </Button>
         {kr && (
           <ConfirmButton

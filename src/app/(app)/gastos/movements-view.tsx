@@ -177,7 +177,7 @@ export function MovementsView({
                       style={{ "--i": Math.min(gi, 8) } as React.CSSProperties}
                     >
                       {/* En el celular el día queda pegado arriba mientras se recorre su lista. */}
-                      <header className="z-10 -mx-2 flex items-baseline justify-between gap-3 bg-[color-mix(in_oklab,var(--bg)_75%,transparent)] px-4 py-2 backdrop-blur-xl max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
+                      <header className="z-10 -mx-2 flex items-baseline justify-between gap-3 px-4 py-2 max-lg:sticky max-lg:bg-[color-mix(in_oklab,var(--bg)_75%,transparent)] max-lg:backdrop-blur-xl max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
                         <h3 className="text-[13.5px] font-semibold first-letter:uppercase">
                           {label}
                           {relative && <span className="ml-2 font-normal text-muted">{formatShort(g.date)}</span>}

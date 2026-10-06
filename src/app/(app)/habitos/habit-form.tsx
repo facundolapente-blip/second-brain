@@ -126,7 +126,7 @@ export function HabitFormBody({
           name="name"
           value={draft.name}
           onChange={(e) => set("name", e.target.value)}
-          placeholder="Leer, meditar, no fumar..."
+          placeholder="Leer, meditar, no fumar…"
           autoFocus={!draft.id}
           required
           maxLength={80}
@@ -281,14 +281,14 @@ export function HabitFormBody({
           rows={2}
           maxLength={500}
           className={cx(inputClass, "h-auto py-2")}
-          placeholder="Por qué lo hacés, cómo, cuándo..."
+          placeholder="Por qué lo hacés, cómo, cuándo…"
         />
       </Field>
 
       {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
 
       <Button type="submit" variant="accent" disabled={pending} className="w-full">
-        {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear hábito"}
+        {pending ? "Guardando…" : draft.id ? "Guardar cambios" : "Crear hábito"}
       </Button>
     </form>
   );

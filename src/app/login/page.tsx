@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { Button, Field, Input, Segmented } from "@/components/ui";
+import { BrandMark } from "@/components/shell";
 
 function LoginForm() {
   const router = useRouter();
@@ -26,11 +27,7 @@ function LoginForm() {
         : await signUp.email({ email, password, name: email.split("@")[0] });
     setPending(false);
     if (res.error) {
-      setError(
-        mode === "in"
-          ? "Mail o contraseña incorrectos."
-          : (res.error.message ?? "No se pudo crear la cuenta."),
-      );
+      setError(mode === "in" ? "Mail o contraseña incorrectos." : (res.error.message ?? "No se pudo crear la cuenta."));
       return;
     }
     const volver = params.get("volver");
@@ -61,8 +58,8 @@ function LoginForm() {
         />
       </Field>
       {error && <p className="text-sm text-danger">{error}</p>}
-      <Button type="submit" variant="accent" disabled={pending}>
-        {pending ? "Un segundo..." : mode === "in" ? "Entrar" : "Crear contraseña"}
+      <Button type="submit" variant="accent" disabled={pending} className="mt-1">
+        {pending ? "Un segundo…" : mode === "in" ? "Entrar" : "Crear contraseña"}
       </Button>
     </form>
   );
@@ -70,17 +67,25 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-dvh place-items-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2.5">
-          <span className="inline-flex size-8 items-center justify-center rounded-md bg-ink text-sm font-semibold text-on-ink">
-            F
-          </span>
-          <span className="text-base font-semibold tracking-tight">Second Brain</span>
+    <main className="relative grid min-h-dvh place-items-center overflow-hidden px-4 py-10">
+      {/* Luz de farol detrás de la tarjeta. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-1/2 size-[34rem] -translate-x-1/2 -translate-y-[60%] rounded-full bg-accent opacity-[0.09] blur-[120px]"
+      />
+      <div className="relative w-full max-w-sm rounded-[30px] border border-line bg-surface/40 p-1.5 shadow-[0_40px_80px_-40px_rgba(var(--shadow-tint),0.6)]">
+        <div className="rounded-[24px] bg-surface p-6 shadow-[inset_0_1px_0_var(--edge)] sm:p-7">
+          <div className="mb-7 grid justify-items-start gap-4">
+            <BrandMark size={44} />
+            <div className="grid gap-1">
+              <h1 className="display text-[28px] leading-tight font-semibold">Second Brain</h1>
+              <p className="text-sm text-muted">Hábitos, journal, gastos y plan en un solo lugar.</p>
+            </div>
+          </div>
+          <Suspense>
+            <LoginForm />
+          </Suspense>
         </div>
-        <Suspense>
-          <LoginForm />
-        </Suspense>
       </div>
     </main>
   );

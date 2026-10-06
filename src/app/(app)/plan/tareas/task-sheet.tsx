@@ -68,7 +68,7 @@ function TaskForm({
       <input type="hidden" name="categoryId" value={categoryId} />
 
       <Field label="Nombre">
-        <Input name="title" defaultValue={task?.title} required maxLength={160} autoFocus={!task} placeholder="Obligatorio, Post Arcano..." />
+        <Input name="title" defaultValue={task?.title} required maxLength={160} autoFocus={!task} placeholder="Obligatorio, Post Arcano…" />
       </Field>
 
       <div className="grid gap-1.5">
@@ -141,7 +141,7 @@ function TaskForm({
 
       <div className="grid gap-2">
         <Button type="submit" variant="accent" disabled={pending}>
-          {pending ? "Guardando..." : task ? "Guardar cambios" : "Crear tarea"}
+          {pending ? "Guardando…" : task ? "Guardar cambios" : "Crear tarea"}
         </Button>
         {task && task.status !== "done" && (
           <Button type="button" variant="outline" onClick={() => onSchedule(task)}>

@@ -106,7 +106,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           <div className="grid gap-6">
             {years.map((g) => (
               <section key={g.year} className="grid gap-3">
-                <h2 className="num z-10 -mx-4 bg-[color-mix(in_oklab,var(--bg)_75%,transparent)] px-4 py-1.5 text-[22px] font-semibold text-muted backdrop-blur-xl max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
+                <h2 className="num z-10 -mx-4 px-4 py-1.5 text-[22px] font-semibold text-muted max-lg:sticky max-lg:bg-[color-mix(in_oklab,var(--bg)_75%,transparent)] max-lg:backdrop-blur-xl max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
                   {g.year}
                 </h2>
                 <div className="grid gap-3">

@@ -402,7 +402,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
                 maxLength={2000}
-                placeholder="Cómo te fue, qué pasó..."
+                placeholder="Cómo te fue, qué pasó…"
                 className={cx(inputClass, "h-auto py-2")}
               />
             </label>
