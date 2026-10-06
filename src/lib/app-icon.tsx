@@ -1,11 +1,11 @@
 import { ImageResponse } from "next/og";
-import { BRAIN_PATH, ICON_GRADIENT } from "./brand";
+import { BRAIN_PATH, BRAIN_VIEWBOX, ICON_GRADIENT } from "./brand";
 
 /**
- * Ícono de la app: un cerebro blanco sobre el degradé. `scale` es el tamaño del
+ * Ícono de la app: el cerebro con circuito, blanco sobre el degradé. `scale` es el tamaño del
  * cerebro respecto del ícono (más chico en el "maskable", que Android recorta).
  */
-export function appIcon(size: number, radius = 0.22, scale = 0.62) {
+export function appIcon(size: number, radius = 0.22, scale = 0.6) {
   const s = Math.round(size * scale);
   return new ImageResponse(
     (
@@ -20,7 +20,7 @@ export function appIcon(size: number, radius = 0.22, scale = 0.62) {
           borderRadius: size * radius,
         }}
       >
-        <svg width={s} height={s} viewBox="0 0 256 256" fill="#ffffff">
+        <svg width={s} height={s} viewBox={BRAIN_VIEWBOX} fill="#ffffff">
           <path d={BRAIN_PATH} />
         </svg>
       </div>
