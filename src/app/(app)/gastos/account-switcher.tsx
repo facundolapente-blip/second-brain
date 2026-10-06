@@ -46,7 +46,7 @@ export function AccountSwitcher({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-haspopup="dialog"
-        className="grid w-full gap-1.5 border border-line-strong bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong hover:bg-surface-2"
+        className="grid w-full gap-2 border border-rule bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-2"
       >
         <span className="flex items-center gap-2 text-[13px] text-muted">
           <span className="flex shrink-0 -space-x-1.5" aria-hidden>
@@ -62,8 +62,8 @@ export function AccountSwitcher({
           </span>
         </span>
         <span className="grid gap-0.5">
-          <span className="text-[12px] text-muted">Saldo actual</span>
-          <TotalsInline totals={balance} align="start" balance className="text-[18px] font-semibold tracking-tight" />
+          <span className="label-mono text-[10px] text-muted">Saldo actual</span>
+          <TotalsInline totals={balance} align="start" balance className="text-[20px] font-semibold tracking-tight" />
         </span>
       </button>
 
@@ -91,7 +91,7 @@ export function AccountSwitcher({
                   <AccountAvatar account={a} size={34} />
                   <span className="grid min-w-0 flex-1">
                     <span className={cx("truncate text-[15px]", on && "font-medium")}>{a.name}</span>
-                    <span className="text-[12px] text-muted">{a.currency}</span>
+                    <span className="label-mono text-[10px] text-muted">{a.currency}</span>
                   </span>
                   <Balance cents={a.balanceCents} currency={a.currency} className="text-[14px] font-medium" />
                 </button>
@@ -114,13 +114,13 @@ export function AccountSwitcher({
             type="button"
             onClick={() => onChange(null)}
             disabled={selection === null}
-            className="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
+            className="label-mono inline-flex h-11 items-center gap-2 rounded-md px-2 text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
             <Checks size={18} weight="bold" /> Seleccionar todas
           </button>
           <Link
             href="/gastos/cuentas"
-            className="inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className="label-mono inline-flex h-11 items-center gap-2 rounded-md px-2 text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <GearSix size={18} /> Administrar
           </Link>

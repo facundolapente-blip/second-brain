@@ -55,27 +55,27 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           return (
             <section key={s.kind} className="grid gap-2">
               <div className="flex items-baseline justify-between px-2">
-                <h2 className="text-[15px] font-semibold">{s.title}</h2>
+                <h2 className="label-mono text-fg">{s.title}</h2>
                 <button
                   type="button"
                   onClick={() => create(s.kind)}
-                  className="text-[13px] text-accent-fg hover:underline"
+                  className="label-mono inline-flex min-h-11 items-center text-accent-fg hover:underline"
                 >
                   Agregar
                 </button>
               </div>
-              <ul className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-px border border-line-strong bg-line sm:grid-cols-2">
                 {list.map((c, i) => (
-                  <li key={c.id} className="rise" style={{ "--i": i } as React.CSSProperties}>
+                  <li key={c.id} className="rise bg-surface" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
                       onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount })}
-                      className="flex w-full items-center gap-3.5 rounded-none px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
                     >
                       <CategoryAvatar category={c} />
                       <span className="grid min-w-0 flex-1 gap-0.5">
-                        <span className="truncate text-[15px] font-medium">{c.name}</span>
-                        <span className="text-[13px] text-muted">
+                        <span className="truncate text-[15px] font-semibold tracking-tight">{c.name}</span>
+                        <span className="label-mono text-[10px] text-muted">
                           {c.txCount === 0 ? "Sin movimientos" : c.txCount === 1 ? "1 movimiento" : `${c.txCount} movimientos`}
                         </span>
                       </span>

@@ -116,7 +116,7 @@ export function MovementsView({
             </p>
             <Link
               href="/gastos/cuentas?nueva=1"
-              className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+              className="label-mono inline-flex h-11 items-center rounded-md border border-rule bg-accent px-4 text-on-accent shadow-[2px_2px_0_var(--rule)]"
             >
               Crear cuenta
             </Link>
@@ -125,17 +125,17 @@ export function MovementsView({
           <>
             <section className="grid gap-5 pt-1 pb-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)] lg:items-end lg:gap-10 lg:pt-6">
               <div className="grid gap-3">
-                <div className="-ml-3">
+                <div className="pt-3">
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
                 </div>
                 <div className="grid gap-1">
-                  <span className="text-[13px] text-muted">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
+                  <span className="label-mono text-muted">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
                   <NetHero cents={net[mainCur] ?? 0} currency={mainCur} />
                   {netCurrencies.slice(1).map((c) => (
                     <Amount key={c} cents={net[c]} currency={c} className="text-[17px] font-semibold text-fg" />
                   ))}
                 </div>
-                <dl className="grid grid-cols-2 gap-2">
+                <dl className="grid grid-cols-2 gap-px border border-line-strong bg-line-strong">
                   <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
                   <FlowTile label="Gastos" totals={flows.exp} kind="out" />
                 </dl>
@@ -157,7 +157,7 @@ export function MovementsView({
 
             {groups.length === 0 ? (
               <div className="grid justify-items-center gap-2 border-t border-line py-16 text-center">
-                <span className="inline-flex size-11 items-center justify-center rounded-full bg-surface-2 text-muted">
+                <span className="inline-flex size-11 items-center justify-center border border-line-strong text-muted">
                   <Receipt size={22} aria-hidden />
                 </span>
                 <p className="text-[15px] font-medium">No hay movimientos este mes</p>
@@ -166,7 +166,7 @@ export function MovementsView({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 border-t border-line pt-2">
+              <div className="grid gap-4 border-t border-rule pt-3">
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -177,14 +177,14 @@ export function MovementsView({
                       style={{ "--i": Math.min(gi, 8) } as React.CSSProperties}
                     >
                       {/* En el celular el día queda pegado arriba mientras se recorre su lista. */}
-                      <header className="z-10 -mx-2 flex items-baseline justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
-                        <h3 className="text-[13px] font-semibold first-letter:uppercase">
+                      <header className="z-10 flex items-baseline justify-between gap-3 bg-bg py-2 max-lg:sticky max-lg:top-[calc(3.5rem+1px+env(safe-area-inset-top))]">
+                        <h3 className="label-mono text-fg">
                           {label}
-                          {relative && <span className="ml-2 font-normal text-muted">{formatShort(g.date)}</span>}
+                          {relative && <span className="ml-2 text-muted">{formatShort(g.date)}</span>}
                         </h3>
-                        <TotalsInline totals={g.net} className="text-[13px] font-medium" />
+                        <TotalsInline totals={g.net} className="text-[12.5px] font-medium" />
                       </header>
-                      <ul>
+                      <ul className="divide-y divide-line border border-line-strong bg-surface">
                         {g.txs.map((t) => (
                           <li key={t.id}>
                             <TxRow
@@ -218,7 +218,7 @@ export function MovementsView({
  */
 function NetHero({ cents, currency }: { cents: number; currency: string }) {
   return (
-    <span className="text-[40px] leading-none font-semibold tracking-[-0.025em] lg:text-[44px]">
+    <span className="text-[40px] leading-none font-semibold tracking-[-0.04em] lg:text-[48px]">
       <Amount cents={cents} currency={currency} hero className={cx(cents > 0 && "text-fg!")} />
     </span>
   );
@@ -228,12 +228,12 @@ function NetHero({ cents, currency }: { cents: number; currency: string }) {
 function FlowTile({ label, totals, kind }: { label: string; totals: Record<string, number>; kind: "in" | "out" }) {
   const cur = sortedCurrencies(totals);
   return (
-    <div className="grid content-start gap-1 border border-line-strong bg-surface px-3 py-2.5">
-      <dt className="flex items-center gap-1.5 text-[13px] text-muted">
+    <div className="grid content-start gap-1.5 bg-surface px-3 py-2.5">
+      <dt className="label-mono flex items-center gap-1.5 text-[10.5px] text-muted">
         <span
           aria-hidden
           className={cx(
-            "inline-flex size-5 items-center justify-center rounded-full",
+            "inline-flex size-5 items-center justify-center",
             kind === "in" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-fg",
           )}
         >
@@ -241,7 +241,7 @@ function FlowTile({ label, totals, kind }: { label: string; totals: Record<strin
         </span>
         {label}
       </dt>
-      <dd className="tabular grid text-[15px] font-semibold">
+      <dd className="tabular grid text-[17px] font-semibold">
         {cur.length === 0 ? <span>{moneyCents(0)}</span> : cur.map((c) => <span key={c}>{moneyCents(totals[c], c)}</span>)}
       </dd>
     </div>
@@ -252,7 +252,7 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon?: 
   return (
     <Link
       href={href}
-      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className="label-mono inline-flex h-11 items-center gap-1.5 rounded-md border border-line-strong px-3 text-[10.5px] text-muted transition-colors hover:border-rule hover:bg-surface-2 hover:text-fg"
     >
       {icon}
       {label}

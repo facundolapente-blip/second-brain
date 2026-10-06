@@ -53,7 +53,7 @@ export function CategoryAvatar({
       <span
         aria-hidden
         style={{ width: size, height: size }}
-        className="inline-flex shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-fg"
+        className="inline-flex shrink-0 items-center justify-center rounded-[2px] border border-line-strong bg-surface-2 text-fg"
       >
         <TransferIcon size={icon} weight="bold" />
       </span>
@@ -64,7 +64,7 @@ export function CategoryAvatar({
       <span
         aria-hidden
         style={{ width: size, height: size }}
-        className="inline-flex shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong text-muted"
+        className="inline-flex shrink-0 items-center justify-center rounded-[2px] border border-dashed border-line-strong text-muted"
       >
         <UncategorizedIcon size={icon} weight="bold" />
       </span>
@@ -74,7 +74,7 @@ export function CategoryAvatar({
     <span
       aria-hidden
       style={{ ...tone(category.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-tone text-tone-fg"
+      className="inline-flex shrink-0 items-center justify-center rounded-[2px] bg-tone text-tone-fg"
     >
       <FinanceIcon name={category.icon} size={icon} weight="fill" />
     </span>
@@ -115,8 +115,7 @@ export function Amount({
   return (
     <span
       className={cx(
-        "whitespace-nowrap",
-        !hero && "tabular",
+        "tabular whitespace-nowrap",
         cents > 0 ? "fin-income" : cents === 0 && "text-muted",
         className,
       )}
@@ -142,7 +141,7 @@ export function Balance({
   hero?: boolean;
 }) {
   return (
-    <span className={cx("whitespace-nowrap", !hero && "tabular", cents < 0 && "text-danger", className)}>
+    <span className={cx("tabular whitespace-nowrap", cents < 0 && "text-danger", className)}>
       {cents < 0 ? moneySigned(cents, currency) : moneyCents(cents, currency)}
     </span>
   );
@@ -240,14 +239,14 @@ export function TxRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-none px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+      className="flex min-h-[60px] w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted italic")}>{title || "Sin título"}</span>
-        <span className="truncate text-[13px] text-muted">{subtitle}</span>
+        <span className={cx("truncate text-[15px]", title ? "font-semibold tracking-tight" : "text-muted italic")}>{title || "Sin título"}</span>
+        <span className="truncate text-[12.5px] text-muted">{subtitle}</span>
       </span>
-      <span className="grid shrink-0 justify-items-end gap-0.5 text-[15px] font-medium">
+      <span className="grid shrink-0 justify-items-end gap-0.5 text-[14.5px] font-semibold">
         {internal ? (
           <span className="tabular font-normal text-muted" title="Entre cuentas elegidas: no cambia el total">
             {moneyCents(tx.amountCents, fx[0].currency)}
@@ -271,22 +270,22 @@ export function MonthNav({ month, basePath, current }: { month: string; basePath
       <Link
         href={href(shiftMonth(month, -1))}
         aria-label="Mes anterior"
-        className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="inline-flex size-11 items-center justify-center rounded-md border border-line-strong text-fg transition-colors hover:border-rule hover:bg-surface-2"
       >
         <CaretLeft size={18} weight="bold" />
       </Link>
-      <h2 className="min-w-[9.5rem] text-center text-[15px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
+      <h2 className="min-w-[9.5rem] text-center text-[17px] font-bold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
       <Link
         href={href(shiftMonth(month, 1))}
         aria-label="Mes siguiente"
-        className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="inline-flex size-11 items-center justify-center rounded-md border border-line-strong text-fg transition-colors hover:border-rule hover:bg-surface-2"
       >
         <CaretRight size={18} weight="bold" />
       </Link>
       {month !== current && (
         <Link
           href={basePath}
-          className="ml-1 inline-flex h-8 items-center rounded-md border border-line-strong px-2.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
+          className="label-mono ml-1.5 inline-flex h-11 items-center rounded-md border border-rule px-3 transition-colors hover:bg-surface-2"
         >
           Hoy
         </Link>
@@ -303,7 +302,7 @@ export function Fab({ onClick, label = "Nuevo movimiento" }: { onClick: () => vo
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="lift fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-none bg-accent text-on-accent transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
+      className="lift fixed right-4 bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center border border-rule bg-accent text-on-accent transition-[transform,box-shadow] duration-150 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none lg:hidden"
     >
       <Plus size={26} weight="bold" />
     </button>
@@ -322,9 +321,9 @@ export function EmptyBlock({
   return (
     <div className="mt-6 grid justify-items-start gap-3 border border-dashed border-line-strong p-8">
       {icon && (
-        <span className="inline-flex size-10 items-center justify-center rounded-[2px] bg-accent-soft text-accent-fg">{icon}</span>
+        <span className="inline-flex size-10 items-center justify-center border border-rule bg-accent text-on-accent">{icon}</span>
       )}
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 className="display text-[24px] uppercase">{title}</h2>
       {children}
     </div>
   );

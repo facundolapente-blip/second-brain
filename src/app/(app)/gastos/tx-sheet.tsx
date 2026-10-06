@@ -142,7 +142,7 @@ export const TxSheet = forwardRef<
           <p className="text-sm leading-relaxed text-muted">
             Todo movimiento sale de una cuenta. Creá la primera (Efectivo, tu banco, una tarjeta) y volvé.
           </p>
-          <Link href="/gastos/cuentas?nueva=1" className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-on-accent">
+          <Link href="/gastos/cuentas?nueva=1" className="label-mono inline-flex h-11 items-center justify-center rounded-md border border-rule bg-accent px-4 text-on-accent shadow-[2px_2px_0_var(--rule)]">
             Crear cuenta
           </Link>
         </div>
@@ -177,7 +177,7 @@ export const TxSheet = forwardRef<
                 key={t.id}
                 type="button"
                 onClick={() => setD((prev) => applyTemplate(prev, t))}
-                className="h-8 shrink-0 rounded-[2px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                className="h-10 shrink-0 rounded-[2px] border border-dashed border-line-strong px-3 text-[13px] text-muted transition-colors hover:border-solid hover:border-rule hover:text-fg"
               >
                 {t.name}
               </button>
@@ -196,7 +196,7 @@ export const TxSheet = forwardRef<
           <span className="label-mono text-muted">
             {d.kind === "transfer" && crossCurrency ? `Sale de ${from?.name}` : "Monto"}
           </span>
-          <span className="flex h-16 items-center gap-2.5 rounded-[2px] border border-line-strong bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
+          <span className="flex h-16 items-center gap-2.5 rounded-[2px] border border-rule bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
             <span className="text-xl font-medium text-muted">{currencySymbol(from?.currency ?? "UYU")}</span>
             <input
               ref={amountRef}
@@ -210,13 +210,13 @@ export const TxSheet = forwardRef<
               placeholder="0"
               required
               aria-describedby={state && !state.ok ? "tx-error" : undefined}
-              className="h-full w-0 min-w-0 flex-1 bg-transparent text-[32px] font-semibold tracking-[-0.02em] outline-none placeholder:text-faint"
+              className="tabular h-full w-0 min-w-0 flex-1 bg-transparent text-[32px] font-semibold tracking-[-0.03em] outline-none placeholder:text-faint"
             />
             {d.kind !== "transfer" && (
               <span
                 aria-hidden
                 className={cx(
-                  "shrink-0 rounded-[2px] px-2 py-0.5 text-[12px] font-medium",
+                  "label-mono shrink-0 px-2 py-1 text-[10.5px]",
                   d.kind === "income" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-muted",
                 )}
               >
@@ -252,7 +252,7 @@ export const TxSheet = forwardRef<
                 type="button"
                 onClick={() => set({ accountId: d.toAccountId, toAccountId: d.accountId, amount: d.toAmount || d.amount, toAmount: d.toAmount ? d.amount : "" })}
                 disabled={!d.toAccountId}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[2px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
+                className="label-mono inline-flex h-10 items-center gap-1.5 rounded-[2px] border border-line-strong bg-surface px-3 text-[10.5px] text-muted transition-colors hover:border-rule hover:text-fg disabled:opacity-40"
               >
                 <ArrowsDownUp size={15} weight="bold" aria-hidden /> Invertir
               </button>
@@ -266,7 +266,7 @@ export const TxSheet = forwardRef<
             {crossCurrency && (
               <label className="grid gap-1.5">
                 <span className="label-mono text-muted">Llega a {to?.name}</span>
-                <span className="flex h-12 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+                <span className="flex h-12 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-rule focus-within:ring-2 focus-within:ring-[var(--focus)]">
                   <span className="text-muted">{currencySymbol(to?.currency ?? "")}</span>
                   <input
                     name="toAmount"
@@ -299,7 +299,7 @@ export const TxSheet = forwardRef<
           <div className="grid gap-2">
             <div className="flex items-baseline justify-between">
               <span className="label-mono text-muted">Categoría</span>
-              <Link href="/gastos/categorias" className="text-[13px] text-accent-fg hover:underline">
+              <Link href="/gastos/categorias" className="label-mono inline-flex min-h-11 items-center text-accent-fg hover:underline">
                 Editar categorías
               </Link>
             </div>
@@ -332,8 +332,8 @@ export const TxSheet = forwardRef<
                 type="button"
                 onClick={() => set({ date: o.value })}
                 className={cx(
-                  "h-10 rounded-md border px-3.5 text-sm transition-colors",
-                  d.date === o.value ? "border-fg bg-ink text-on-ink" : "border-line-strong text-fg hover:bg-surface-2",
+                  "label-mono h-11 rounded-md border px-3.5 text-[11px] transition-colors",
+                  d.date === o.value ? "border-rule bg-ink font-bold text-on-ink" : "border-line-strong text-fg hover:bg-surface-2",
                 )}
               >
                 {o.label}
@@ -382,7 +382,7 @@ export const TxSheet = forwardRef<
         )}
 
         {/* Guardar queda siempre a mano, pegado abajo de la hoja, aunque la lista de categorías sea larga. */}
-        <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-line bg-surface/95 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+        <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-rule bg-surface px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           {state && !state.ok && (
             <p id="tx-error" role="alert" className="text-sm text-danger">
               {state.error}
@@ -437,12 +437,12 @@ function AccountPicker({
               onClick={() => onChange(a.id)}
               className={cx(
                 "flex h-11 shrink-0 items-center gap-2 rounded-[2px] border pr-3 pl-1.5 text-sm transition-colors",
-                on ? "border-fg bg-surface-2 font-medium" : "border-line-strong hover:bg-surface-2",
+                on ? "border-rule bg-surface-2 font-semibold shadow-[inset_0_0_0_1px_var(--rule)]" : "border-line-strong hover:bg-surface-2",
               )}
             >
               <AccountAvatar account={a} size={30} />
               {a.name}
-              {a.currency !== "UYU" && <span className="text-xs text-muted">{a.currency}</span>}
+              {a.currency !== "UYU" && <span className="label-mono text-[10px] text-muted">{a.currency}</span>}
             </button>
           );
         })}
@@ -468,14 +468,14 @@ function CategoryChip({
       onClick={onClick}
       aria-pressed={selected}
       className={cx(
-        "relative flex flex-col items-center gap-1.5 rounded-[2px] px-1 py-2 text-center transition-colors",
-        selected ? "bg-surface-2 ring-1 ring-fg" : "hover:bg-surface-2",
+        "relative flex flex-col items-center gap-1.5 rounded-[2px] border px-1 py-2 text-center transition-colors",
+        selected ? "border-rule bg-surface-2 shadow-[inset_0_0_0_1px_var(--rule)]" : "border-transparent hover:bg-surface-2",
       )}
     >
       {children}
       <span className="line-clamp-2 text-[11.5px] leading-tight">{label}</span>
       {selected && (
-        <span className="absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-ink text-on-ink">
+        <span className="absolute top-0 right-0 inline-flex size-4 items-center justify-center bg-accent text-on-accent">
           <Check size={10} weight="bold" />
         </span>
       )}

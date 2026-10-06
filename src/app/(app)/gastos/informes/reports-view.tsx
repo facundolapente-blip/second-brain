@@ -93,7 +93,7 @@ export function ReportsView({
         {/* Filtros: una sola fila arriba de todo lo que afectan. */}
         <section className="grid gap-3 lg:grid-cols-[1fr_minmax(0,320px)] lg:items-center" aria-label="Filtros">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="-ml-3">
+            <div className="pt-3">
               <MonthNav month={month} basePath="/gastos/informes" current={today.slice(0, 7)} />
             </div>
             {currencies.length > 1 && (
@@ -111,17 +111,17 @@ export function ReportsView({
 
         {empty ? (
           <div className="grid justify-items-start gap-2 border border-dashed border-line-strong p-8">
-            <span className="inline-flex size-10 items-center justify-center rounded-[2px] bg-accent-soft text-accent-fg">
+            <span className="inline-flex size-10 items-center justify-center border border-rule bg-accent text-on-accent">
               <ChartBar size={22} aria-hidden />
             </span>
-            <h2 className="text-lg font-semibold tracking-tight">Sin movimientos en {currency}</h2>
+            <h2 className="display text-[24px] uppercase">Sin movimientos en {currency}</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               No hay gastos ni ingresos en estos meses para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
           </div>
         ) : (
           <>
-            <section className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4" aria-label="Cifras del mes">
+            <section className="grid grid-cols-2 gap-px border border-line-strong bg-line-strong sm:grid-cols-4 max-sm:[&>*:last-child:nth-child(even)]:col-span-2" aria-label="Cifras del mes">
               <Stat
                 label={isCurrent ? "Gastado hasta hoy" : "Gastos"}
                 cents={cur.expense}
@@ -220,9 +220,9 @@ function Stat({
   const delta = prevCents !== undefined && prevCents > 0 ? (cents - prevCents) / prevCents : null;
   const good = delta !== null && (upIsGood ? delta >= 0 : delta <= 0);
   return (
-    <div className={cx("grid content-start gap-1", hero && "col-span-2 sm:col-span-1")}>
-      <span className="text-[13px] text-muted">{label}</span>
-      <span className={cx("leading-none font-semibold tracking-[-0.02em]", hero ? "text-[36px]" : "text-[22px]")}>
+    <div className={cx("grid content-start gap-1.5 bg-surface px-3.5 py-3", hero && "col-span-2 sm:col-span-1")}>
+      <span className="label-mono text-[10.5px] text-muted">{label}</span>
+      <span className={cx("tabular leading-none font-semibold tracking-[-0.03em]", hero ? "text-[34px]" : "text-[21px]")}>
         {signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}
         {moneyCents(cents, currency)}
       </span>
@@ -310,7 +310,7 @@ function PaceChart({
 
   return (
     <div className="grid gap-3">
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11.5px] text-muted">
         <LegendLine color="var(--fin-out)" label={formatMonth(month)} />
         <LegendLine color="var(--faint)" label={formatMonth(prevMonth)} />
       </div>
@@ -387,7 +387,7 @@ function PaceChart({
               {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
               {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
               <div
-                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[2px] border border-line bg-surface p-2.5 text-[12.5px]"
+                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 border border-rule bg-surface p-2.5 font-mono text-[12px]"
                 style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
               >
                 <span className="text-muted">Día {h}</span>
@@ -439,7 +439,7 @@ function Dot({ left, top, color }: { left: string; top: string; color: string })
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg"
+      className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 ring-2 ring-bg"
       style={{ left, top, background: color }}
     />
   );
@@ -498,7 +498,7 @@ function CategoryBars({
             </span>
             <span className="block h-2" aria-hidden>
               <span
-                className="block h-2 rounded-r-[4px]"
+                className="block h-2"
                 style={{ width: `${Math.max(1.5, (it.cents / max) * 100)}%`, background: color }}
               />
             </span>
@@ -551,7 +551,7 @@ function MonthlyColumns({
 
   return (
     <div className="grid gap-3">
-      <div className="flex gap-4 text-[13px] text-muted">
+      <div className="flex gap-4 font-mono text-[11.5px] text-muted">
         <LegendKey color="var(--fin-in)" label="Ingresos" />
         <LegendKey color="var(--fin-out)" label="Gastos" />
       </div>
@@ -605,7 +605,7 @@ function MonthlyColumns({
 
           {hover !== null && (
             <div
-              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[2px] border border-line bg-surface p-2.5 text-[12.5px]"
+              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 border border-rule bg-surface p-2.5 font-mono text-[12px]"
               style={{
                 left: `${((hover + 0.5) / data.length) * 100}%`,
                 transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,
@@ -621,7 +621,7 @@ function MonthlyColumns({
         <span />
         <div className="grid pt-1.5" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }} aria-hidden>
           {data.map((d) => (
-            <span key={d.month} className={cx("text-center text-[12px]", d.month === current ? "font-semibold text-fg" : "text-muted")}>
+            <span key={d.month} className={cx("label-mono text-center text-[10px] tracking-normal", d.month === current ? "font-bold text-fg" : "text-muted")}>
               {shortMonth(d.month)}
             </span>
           ))}
@@ -661,7 +661,7 @@ function MonthlyColumns({
 /** Una columna; en el mes elegido lleva su valor arriba (etiqueta directa selectiva). */
 function Column({ cents, height, color, label }: { cents: number; height: number; color: string; label: boolean }) {
   return (
-    <span className="relative block w-[clamp(8px,28%,24px)] rounded-t-[4px]" style={{ height, background: color }}>
+    <span className="relative block w-[clamp(8px,28%,24px)]" style={{ height, background: color }}>
       {label && cents > 0 && (
         <span className="tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap text-fg">
           {compact.format(cents / 100)}
