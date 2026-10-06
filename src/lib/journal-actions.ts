@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
-import { isISODate, toDbDate, todayISO } from "./dates";
+import { addDays, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
+import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
 
 function refrescar() {
@@ -100,4 +101,28 @@ export async function deleteEntry(id: string) {
   await prisma.journalEntry.deleteMany({ where: { id } });
   refrescar();
   redirect("/journal");
+}
+
+/**
+ * Abre la reflexión de la semana (la entrada con la etiqueta de revisión del
+ * domingo) o la crea con las preguntas de siempre.
+ */
+export async function writeWeeklyReview(monday: string) {
+  await exigirSesion();
+  if (!isISODate(monday)) throw new Error("Fecha inválida");
+  const sunday = addDays(startOfWeek(monday), 6);
+  const existing = await prisma.journalEntry.findFirst({
+    where: { tags: { has: REVIEW_TAG }, date: { gte: toDbDate(startOfWeek(monday)), lte: toDbDate(addDays(sunday, 1)) } },
+    select: { id: true },
+  });
+  if (existing) redirect(`/journal/${existing.id}`);
+  // Si la semana todavía no terminó, la reflexión queda en hoy.
+  const day = sunday > todayISO() ? todayISO() : sunday;
+  const created = await prisma.journalEntry.create({
+    data: { date: toDbDate(day), title: "Revisión de la semana", body: REVIEW_TEMPLATE, tags: [REVIEW_TAG] },
+    select: { id: true },
+  });
+  refrescar();
+  revalidatePath("/semana");
+  redirect(`/journal/${created.id}`);
 }

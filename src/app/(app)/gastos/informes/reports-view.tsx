@@ -14,7 +14,7 @@ import {
 } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
 import { cx, Segmented } from "@/components/ui";
-import { AccountSwitcher } from "../account-switcher";
+import { AccountChips, AccountSwitcher } from "../account-switcher";
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { CategoryAvatar, MonthNav, useLookups } from "../shared";
@@ -118,6 +118,9 @@ export function ReportsView({
 
       <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-2 pb-8 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-6">
         {/* Filtros: una sola fila arriba de todo lo que afectan. */}
+        <div className="lg:col-span-12">
+          <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
+        </div>
         <section className="grid gap-3 lg:col-span-12 lg:grid-cols-[1fr_minmax(0,340px)] lg:items-center" aria-label="Filtros">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="-ml-3">

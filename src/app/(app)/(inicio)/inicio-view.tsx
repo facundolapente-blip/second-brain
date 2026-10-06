@@ -193,7 +193,7 @@ function Card({
     <section
       aria-label={title}
       style={{ "--i": i } as React.CSSProperties}
-      className={cx("rise grid content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}
+      className={cx("rise grid min-w-0 content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}
     >
       <header className="flex items-center gap-2">
         <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />

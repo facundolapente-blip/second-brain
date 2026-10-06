@@ -1,0 +1,16 @@
+import { isISODate, todayISO } from "@/lib/dates";
+import { getWeeklyReview } from "@/lib/review";
+import { ReviewView } from "./review-view";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Revisión semanal" };
+
+export default async function SemanaPage({ searchParams }: PageProps<"/semana">) {
+  const { semana } = await searchParams;
+  const r = await getWeeklyReview(isISODate(semana) ? semana : todayISO());
+  return (
+    <div data-module="inicio" className="min-h-dvh">
+      <ReviewView key={r.monday} r={r} />
+    </div>
+  );
+}

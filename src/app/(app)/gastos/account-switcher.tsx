@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { CaretDown, Check, Checks, GearSix } from "@phosphor-icons/react";
 import { balanceByCurrency, type AccountDTO, type Selection } from "@/lib/finance-logic";
 import { cx, Sheet, type SheetHandle } from "@/components/ui";
@@ -127,5 +127,88 @@ export function AccountSwitcher({
         </div>
       </Sheet>
     </>
+  );
+}
+
+/**
+ * Fila de cuentas a la vista: un toque muestra solo esa cuenta; con "Varias"
+ * se suman o sacan de a una. La elección queda guardada (cookie), así Gastos
+ * abre siempre en la cuenta que se usa.
+ */
+export function AccountChips({
+  accounts,
+  selection,
+  onChange,
+}: {
+  accounts: AccountDTO[];
+  selection: Selection;
+  onChange: (s: Selection) => void;
+}) {
+  const visible = accounts.filter((a) => !a.archived);
+  const [multi, setMulti] = useState(selection !== null && selection.length > 1);
+
+  function pick(id: string) {
+    if (!multi) {
+      onChange(visible.length === 1 ? null : [id]);
+      return;
+    }
+    const current = selection ?? visible.map((a) => a.id);
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    if (next.length === 0) return;
+    onChange(visible.every((a) => next.includes(a.id)) ? null : next);
+  }
+
+  const chip =
+    "inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-[13.5px] transition-[background-color,border-color,color] duration-200 active:scale-[0.98]";
+
+  return (
+    <div className="fin-scroll -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label="Cuentas a mostrar">
+      <button
+        type="button"
+        aria-pressed={selection === null}
+        onClick={() => {
+          onChange(null);
+          setMulti(false);
+        }}
+        className={cx(chip, selection === null ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:text-fg")}
+      >
+        Todas
+      </button>
+      {visible.map((a) => {
+        const on = selection !== null && selection.includes(a.id);
+        return (
+          <button
+            key={a.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => pick(a.id)}
+            className={cx(chip, on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-fg hover:bg-surface-2")}
+          >
+            {multi ? (
+              <span
+                className={cx(
+                  "inline-flex size-4 items-center justify-center rounded-[4px] border",
+                  on ? "border-on-ink" : "border-line-strong",
+                )}
+              >
+                {on && <Check size={11} weight="bold" />}
+              </span>
+            ) : (
+              <AccountAvatar account={a} size={20} />
+            )}
+            {a.name}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        aria-pressed={multi}
+        onClick={() => setMulti((m) => !m)}
+        className={cx(chip, multi ? "border-accent bg-accent-soft font-medium text-accent-fg" : "border-dashed border-line-strong text-muted hover:text-fg")}
+      >
+        <Checks size={15} weight="bold" aria-hidden />
+        Varias
+      </button>
+    </div>
   );
 }

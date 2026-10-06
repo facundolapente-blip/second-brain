@@ -19,7 +19,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
 import { GastosTabs } from "./gastos-nav";
-import { AccountSwitcher } from "./account-switcher";
+import { AccountChips, AccountSwitcher } from "./account-switcher";
 import { useSelection } from "./selection";
 import { Amount, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
 import { TxSheet, type TxSheetHandle } from "./tx-sheet";
@@ -126,6 +126,7 @@ export function MovementsView({
         ) : (
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-x-10">
             <section className="grid gap-5 pt-1 pb-5 lg:col-start-1 lg:row-start-1 lg:pt-6">
+              <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
               <div className="grid gap-3">
                 <div className="-ml-3">
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
