@@ -66,9 +66,10 @@ export function TodayPanel({
           aria-valuenow={done}
           className="mt-4 h-2 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--hero-fg)_18%,transparent)]"
         >
+          {/* Se anima con transform (no con el ancho) para no recalcular el layout. */}
           <span
-            className="block h-full rounded-full bg-[var(--hero-fg)] transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-            style={{ width: `${pct}%` }}
+            className="block h-full origin-left rounded-full bg-[var(--hero-fg)] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
         <p className="hero-sub mt-3 text-[13px]">
@@ -159,7 +160,6 @@ function WeekCard({
             <button
               key={r.d}
               type="button"
-              tabIndex={0}
               aria-label={r.p ? `${formatLong(r.d)}: ${r.p.done} de ${r.p.total} hechos` : `${formatLong(r.d)}: todavía no llegó`}
               onPointerEnter={() => setHover(i)}
               onPointerLeave={() => setHover((x) => (x === i ? null : x))}

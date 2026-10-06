@@ -43,7 +43,7 @@ export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: 
           title="Cerrar lectura"
           className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
         >
-          <X size={17} />
+          <X size={17} aria-hidden />
         </Link>
       </div>
 
