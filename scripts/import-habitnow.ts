@@ -1,10 +1,14 @@
 /**
  * Importa un backup de HabitNow (.hn) a la base.
  *
- *   node --env-file=.env scripts/import-habitnow.ts <archivo.hn> [--replace]
+ *   node --env-file=.env scripts/import-habitnow.ts <archivo.hn> [--replace | --update]
  *
- * Sin --replace se niega a correr si ya hay hábitos cargados. Con --replace
+ * Sin flags se niega a correr si ya hay hábitos cargados. Con --replace
  * BORRA todos los hábitos, marcas y categorías antes de importar.
+ * Con --update no borra nada: los hábitos se reconocen por nombre (también los
+ * archivados) y de HabitNow se toman las pistas, la frecuencia y las marcas
+ * (gana HabitNow en los días que trae). Se conservan el nombre, la categoría,
+ * el orden, las notas y los vínculos con el Plan; los hábitos nuevos se crean.
  *
  * Formato del .hn (texto plano, deducido del backup):
  *   {C categorías   id;color;nombre;ícono      (nombre "00cn_xxx" = categoría de fábrica)
@@ -22,7 +26,9 @@ import { PrismaClient } from "@prisma/client";
 
 const [file] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const replace = process.argv.includes("--replace");
-if (!file) throw new Error("Uso: node --env-file=.env scripts/import-habitnow.ts <archivo.hn> [--replace]");
+const update = process.argv.includes("--update");
+if (!file) throw new Error("Uso: node --env-file=.env scripts/import-habitnow.ts <archivo.hn> [--replace | --update]");
+if (replace && update) throw new Error("--replace y --update no van juntos.");
 
 const raw = readFileSync(file, "utf8");
 const sections: Record<string, string[][]> = {};
@@ -115,8 +121,8 @@ for (const f of sections.S ?? []) checklist.set(f[0], [...(checklist.get(f[0]) ?
 const prisma = new PrismaClient();
 
 const existing = await prisma.habit.count();
-if (existing > 0 && !replace) {
-  throw new Error(`Ya hay ${existing} hábitos. Para borrarlos e importar igual, agregá --replace.`);
+if (existing > 0 && !replace && !update) {
+  throw new Error(`Ya hay ${existing} hábitos. Para sumar lo nuevo usá --update; para borrarlos e importar igual, --replace.`);
 }
 if (replace) {
   await prisma.$transaction([
@@ -156,7 +162,15 @@ function current(ts: Track[]) {
 }
 
 const trackToHabit = new Map<string, { habitId: string; kind: string; target: number }>();
-let habitOrder = 0;
+const known = new Map(
+  (await prisma.habit.findMany({ select: { id: true, name: true, order: true } })).map((h) => [
+    h.name.trim().toLowerCase(),
+    h,
+  ]),
+);
+let habitOrder = Math.max(-1, ...[...known.values()].map((h) => h.order)) + 1;
+let created = 0;
+let updated = 0;
 for (const ts of groupBy(tracks, (t) => t.group).values()) {
   const cur = current(ts);
   const archived = !ts.some((t) => t.active);
@@ -181,28 +195,39 @@ for (const ts of groupBy(tracks, (t) => t.group).values()) {
     };
   };
   const sorted = [...ts].sort((a, b) => a.start.localeCompare(b.start));
-  const past = sorted.filter((t) => t !== cur);
-  const habit = await prisma.habit.create({
-    data: {
-      name: cur.name,
-      description,
-      categoryId: catIdMap.get(cur.category) ?? null,
-      ...config(cur),
-      unit: cur.kind === "1" ? cur.unit || null : null,
-      priority: cur.priority,
-      startDate: toDb(cur.start),
-      order: habitOrder++,
-      archivedAt: archived ? toDb(lastEnd || cur.start) : null,
-      tracks: {
-        create: past.map((t) => {
-          // Una pista sin fecha de fin termina el día antes de la siguiente.
-          const next = sorted[sorted.indexOf(t) + 1];
-          const end = t.end ?? (next ? addDaysIso(next.start, -1) : t.start);
-          return { startDate: toDb(t.start), endDate: toDb(end), ...config(t) };
-        }),
-      },
-    },
-  });
+  const pastTracks = sorted
+    .filter((t) => t !== cur)
+    .map((t) => {
+      // Una pista sin fecha de fin termina el día antes de la siguiente.
+      const next = sorted[sorted.indexOf(t) + 1];
+      const end = t.end ?? (next ? addDaysIso(next.start, -1) : t.start);
+      return { startDate: toDb(t.start), endDate: toDb(end), ...config(t) };
+    });
+  const fromHabitNow = {
+    ...config(cur),
+    unit: cur.kind === "1" ? cur.unit || null : null,
+    startDate: toDb(cur.start),
+    archivedAt: archived ? toDb(lastEnd || cur.start) : null,
+  };
+  const prev = update ? known.get(cur.name.trim().toLowerCase()) : undefined;
+  const habit = prev
+    ? await prisma.habit.update({
+        where: { id: prev.id },
+        data: { ...fromHabitNow, tracks: { deleteMany: {}, create: pastTracks } },
+      })
+    : await prisma.habit.create({
+        data: {
+          name: cur.name,
+          description,
+          categoryId: catIdMap.get(cur.category) ?? null,
+          ...fromHabitNow,
+          priority: cur.priority,
+          order: habitOrder++,
+          tracks: { create: pastTracks },
+        },
+      });
+  if (prev) updated++;
+  else created++;
   for (const t of ts) trackToHabit.set(t.id, { habitId: habit.id, kind: cur.kind, target: cur.target });
 }
 
@@ -222,13 +247,33 @@ for (const f of sections.X ?? []) {
   logs.set(`${h.habitId}|${date}`, { habitId: h.habitId, date: toDb(date), status, value });
 }
 const rows = [...logs.values()];
-for (let i = 0; i < rows.length; i += 1000) {
-  await prisma.habitLog.createMany({ data: rows.slice(i, i + 1000) });
+// En --update solo se escribe lo que cambió; la nota del día queda como estaba.
+const have = new Map(
+  update
+    ? (
+        await prisma.habitLog.findMany({
+          where: { habitId: { in: [...new Set(rows.map((r) => r.habitId))] } },
+          select: { id: true, habitId: true, date: true, status: true, value: true },
+        })
+      ).map((l) => [`${l.habitId}|${l.date.toISOString().slice(0, 10)}`, l])
+    : [],
+);
+const fresh = rows.filter((r) => !have.has(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`));
+const changed = rows.flatMap((r) => {
+  const l = have.get(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`);
+  return l && (l.status !== r.status || l.value !== r.value) ? [{ id: l.id, status: r.status, value: r.value }] : [];
+});
+for (let i = 0; i < fresh.length; i += 1000) {
+  await prisma.habitLog.createMany({ data: fresh.slice(i, i + 1000) });
+}
+for (const c of changed) {
+  await prisma.habitLog.update({ where: { id: c.id }, data: { status: c.status, value: c.value } });
 }
 
 console.log(
   `Importados: ${await prisma.habit.count()} hábitos (${await prisma.habit.count({ where: { archivedAt: { not: null } } })} archivados),`,
-  `${await prisma.habitCategory.count()} categorías, ${rows.length} marcas.`,
+  `${await prisma.habitCategory.count()} categorías, ${rows.length} marcas en el backup.`,
+  update ? `Hábitos nuevos: ${created}, actualizados: ${updated}. Marcas nuevas: ${fresh.length}, cambiadas: ${changed.length}.` : "",
   skipped ? `Ignoradas: ${skipped}.` : "",
 );
 await prisma.$disconnect();

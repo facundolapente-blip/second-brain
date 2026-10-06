@@ -4,14 +4,19 @@
  * Los exports de la app de gastos no traen el saldo con el que arrancó cada
  * cuenta (y el CSV tampoco trae las transferencias). Para que el saldo de hoy
  * dé el que muestra la app, el saldo inicial se calcula al revés:
- * saldo inicial = saldo de hoy - efecto de todos los movimientos importados.
+ * saldo inicial = saldo de la captura - efecto de los movimientos hasta ese día.
+ * Lo posterior a la captura (movimientos nuevos) sí mueve el saldo de hoy.
  * Cuantas más transferencias haya cargadas, más se acerca el saldo inicial al
  * real y más fieles quedan los saldos de meses viejos.
  */
 import type { PrismaClient } from "@prisma/client";
 
-/** Saldos de hoy según la app (capturas del 2026-10-02). */
+/** Día de las capturas: SALDOS_HOY es el saldo al cierre de ese día. */
+export const FECHA_SALDOS = "2026-10-02";
+
+/** Saldos según la app en FECHA_SALDOS. */
 export const SALDOS_HOY: Record<string, number> = {
+  // Saldos de las capturas de la app (datos personales, fuera de git).
   Itau: 0,
   "Banque Heritage": 0,
   Dolares: 0,
@@ -26,7 +31,10 @@ export async function calibrarSaldos(prisma: PrismaClient) {
     const acc = await prisma.account.findFirst({ where: { name }, select: { id: true } });
     if (!acc) continue;
     const txs = await prisma.transaction.findMany({
-      where: { OR: [{ accountId: acc.id }, { toAccountId: acc.id }] },
+      where: {
+        OR: [{ accountId: acc.id }, { toAccountId: acc.id }],
+        date: { lte: new Date(`${FECHA_SALDOS}T00:00:00.000Z`) },
+      },
       select: { kind: true, amount: true, toAmount: true, accountId: true },
     });
     let net = 0;

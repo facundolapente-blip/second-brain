@@ -3,6 +3,12 @@
  *
  *   node --env-file=.env scripts/import-mydiary.ts <archivo.docx> [--drop-demo]
  *
+ * También acepta el export en PDF pasado a texto (.txt), con el mismo formato:
+ *   python -c "import pypdf,sys;print('\n'.join(p.extract_text() for p in pypdf.PdfReader(sys.argv[1]).pages))" MyDiary_*.pdf > data/mydiary.txt
+ * El PDF corta los renglones por ancho, así que los párrafos se rearman a ojo
+ * (un renglón que termina antes del margen es fin de párrafo). Como es menos
+ * fiel que el .docx, desde un .txt solo se agregan entradas que no estaban.
+ *
  * Se puede correr varias veces: cada entrada se identifica por su día y su
  * orden dentro del día (source "mydiary"), así que reimportar actualiza título y
  * texto sin duplicar, y no toca el ánimo ni las etiquetas puestos en la app.
@@ -28,11 +34,9 @@ const FOOTER = "Powered by MyDiary";
 
 const [file] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const dropDemo = process.argv.includes("--drop-demo");
-if (!file) throw new Error("Uso: node --env-file=.env scripts/import-mydiary.ts <archivo.docx> [--drop-demo]");
+if (!file) throw new Error("Uso: node --env-file=.env scripts/import-mydiary.ts <archivo.docx|.txt> [--drop-demo]");
 
-const files = unzipSync(readFileSync(file));
-const xml = files["word/document.xml"];
-if (!xml) throw new Error("No parece un .docx (falta word/document.xml).");
+const fromText = file.toLowerCase().endsWith(".txt");
 
 /** Texto de cada párrafo <w:p>, uniendo sus <w:t>. */
 function paragraphs(doc: string): string[] {
@@ -58,7 +62,32 @@ function paragraphs(doc: string): string[] {
 
 type Parsed = { date: string; title: string | null; body: string };
 
-const lines = paragraphs(strFromU8(xml));
+/**
+ * Renglones del texto del PDF con los párrafos rearmados: un renglón se pega al
+ * siguiente si la primera palabra de ese no habría entrado en el margen.
+ */
+function unwrap(text: string): string[] {
+  const raw = text.split(/\r?\n/).map((l) => l.trimEnd());
+  const width = Math.max(...raw.map((l) => l.length));
+  const out: string[] = [];
+  let joining = false;
+  for (const [i, l] of raw.entries()) {
+    if (joining) out[out.length - 1] += ` ${l}`;
+    else out.push(l);
+    const next = raw[i + 1]?.trim() ?? "";
+    const nextWord = next.split(/\s+/)[0] ?? "";
+    joining = l.length > 0 && next.length > 0 && l.length + 1 + nextWord.length > width - 3;
+  }
+  return out;
+}
+
+function docxLines(path: string) {
+  const xml = unzipSync(readFileSync(path))["word/document.xml"];
+  if (!xml) throw new Error("No parece un .docx (falta word/document.xml).");
+  return paragraphs(strFromU8(xml));
+}
+
+const lines = fromText ? unwrap(readFileSync(file, "utf8")) : docxLines(file);
 const entries: Parsed[] = [];
 let block: string[] = [];
 const flush = () => {
@@ -115,7 +144,7 @@ for (const [date, list] of perDay) {
         externalId,
         createdAt,
       },
-      update: { title: e.title, body: e.body },
+      update: fromText ? {} : { title: e.title, body: e.body },
     });
     if (exists) updated++;
     else created++;
