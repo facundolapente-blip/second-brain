@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { tone } from "@/lib/palette";
+import { motion } from "motion/react";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { CaretLeft, CaretRight, Check, Copy, DotsThreeVertical, MapPin, Medal, Plus } from "@phosphor-icons/react";
 import { copyWeekToNext, setBlockDone } from "@/lib/plan-actions";
@@ -110,7 +112,7 @@ export function WeekView({
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
-            <h2 className="tabular min-w-36 text-center text-[15px] font-semibold">
+            <h2 className="display min-w-36 text-center text-[18px] font-semibold">
               {formatShort(monday)} al {formatShort(addDays(monday, 6))}
             </h2>
             <Link
@@ -122,13 +124,23 @@ export function WeekView({
             </Link>
           </div>
           {!isThisWeek && (
-            <Link href="/plan" className="text-sm font-medium text-accent-fg hover:underline">
+            <Link href="/plan" className="inline-flex h-9 items-center rounded-full border border-line-strong bg-surface/60 px-3.5 text-[13px] font-medium transition-colors hover:bg-surface-2">
               Esta semana
             </Link>
           )}
           {work.length > 0 && (
-            <p className="tabular ml-auto text-[13px] text-muted">
-              {doneCount} de {work.length} hechos
+            <p className="ml-auto inline-flex items-center gap-2.5 text-[13px] text-muted">
+              <span className="relative block h-1.5 w-20 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                <motion.span
+                  className="absolute inset-y-0 left-0 rounded-full bg-[var(--st-done-line)]"
+                  initial={false}
+                  animate={{ width: `${(doneCount / work.length) * 100}%` }}
+                />
+              </span>
+              <span>
+                <span className="num text-[17px] font-semibold text-fg">{doneCount}</span>
+                <span className="tabular"> de {work.length} hechos</span>
+              </span>
             </p>
           )}
         </div>
@@ -153,14 +165,14 @@ export function WeekView({
                   aria-selected={active}
                   onClick={() => setSelected(d)}
                   className={cx(
-                    "relative flex flex-col items-center rounded-[12px] pt-1.5 pb-2 transition-colors",
-                    active ? "bg-accent text-on-accent" : "bg-surface-2 text-fg hover:bg-surface-3",
+                    "relative flex flex-col items-center rounded-[18px] pt-2 pb-2 transition-[background-color,transform] duration-300 ease-spring active:scale-95",
+                    active ? "btn-glow bg-accent text-on-accent" : "text-fg hover:bg-surface-2",
                   )}
                 >
-                  <span className={cx("text-[11px]", active ? "text-on-accent/85" : "text-muted")}>
+                  <span className={cx("text-[11.5px] font-medium", active ? "text-on-accent/80" : d === today ? "text-accent-fg" : "text-muted")}>
                     {SHORT[weekday(d)]}
                   </span>
-                  <span className="tabular text-[17px] font-semibold">{Number(d.slice(8))}</span>
+                  <span className="num text-[19px] font-semibold">{Number(d.slice(8))}</span>
                   <span
                     className={cx(
                       "mt-0.5 h-1.5 w-1.5 rounded-full",
@@ -168,9 +180,7 @@ export function WeekView({
                     )}
                     aria-hidden
                   />
-                  {d === today && !active && (
-                    <span className="absolute inset-x-3 top-0 h-[3px] rounded-b-full bg-accent" aria-hidden />
-                  )}
+
                 </button>
               );
             })}
@@ -194,10 +204,10 @@ export function WeekView({
             return (
               <section key={d} aria-label={WEEKDAY_LONG[weekday(d)]} className="grid content-start gap-2">
                 <header className="flex items-baseline gap-1.5 px-1 pb-1">
-                  <span className={cx("text-[13px] font-semibold", d === today ? "text-accent-fg" : "text-fg")}>
+                  <span className={cx("display text-[15px] font-semibold", d === today ? "text-accent-fg" : "text-fg")}>
                     {WEEKDAY_LONG[weekday(d)]}
                   </span>
-                  <span className="tabular text-[13px] text-muted">{Number(d.slice(8))}</span>
+                  <span className="num text-[15px] text-muted">{Number(d.slice(8))}</span>
                   <span className="tabular ml-auto text-[12px] text-faint">{list.length || ""}</span>
                 </header>
                 {list.map((b) => (
@@ -214,7 +224,7 @@ export function WeekView({
                 <button
                   type="button"
                   onClick={() => openNew(d)}
-                  className="flex h-9 items-center gap-1.5 rounded-[10px] px-2 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+                  className="flex h-10 items-center gap-1.5 rounded-[14px] px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
                 >
                   <Plus size={14} /> Nuevo
                 </button>
@@ -228,7 +238,7 @@ export function WeekView({
         type="button"
         onClick={() => openNew(selected)}
         aria-label="Nuevo bloque"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="btn-glow fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[20px] bg-accent text-on-accent transition-transform duration-300 ease-spring active:scale-90 lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -259,7 +269,7 @@ function DayList({
 }) {
   return (
     <section aria-label={WEEKDAY_LONG[weekday(day)]}>
-      <h3 className="pb-2 text-[13px] font-medium text-muted">
+      <h3 className="display pb-3 text-[18px] font-semibold first-letter:uppercase">
         {day === today ? "Hoy, " : ""}
         {WEEKDAY_LONG[weekday(day)].toLowerCase()} {Number(day.slice(8))}
       </h3>
@@ -274,7 +284,7 @@ function DayList({
         <ol className="grid gap-2">
           {blocks.map((b) => (
             <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-2">
-              <span className="tabular pt-3 text-right text-[12px] leading-tight text-muted">
+              <span className="tabular pt-3.5 text-right text-[12px] leading-tight font-medium text-muted">
                 {b.startTime ? b.startTime.replace(/^0/, "") : "Todo el día"}
                 {b.endTime && <span className="block text-faint">{b.endTime.replace(/^0/, "")}</span>}
               </span>
@@ -313,11 +323,15 @@ function BlockCard({
   return (
     <article
       className={cx(
-        "group relative flex items-start gap-2 rounded-[12px] border p-2.5 transition-colors",
-        free ? "border-dashed border-line-strong bg-transparent" : "border-line bg-surface hover:border-line-strong",
-        b.done && !free && "bg-surface-2/60",
+        "group relative flex items-start gap-2 overflow-hidden p-3 transition-[border-color,opacity] duration-300",
+        free ? "rounded-[16px] border border-dashed border-line-strong bg-transparent" : "card card-sm hover:border-line-strong",
+        b.done && !free && "opacity-70",
       )}
     >
+      {/* Filo de color de la categoría a la izquierda, como una etiqueta de agenda. */}
+      {!free && category && (
+        <span aria-hidden style={tone(category.color)} className="absolute inset-y-2.5 left-0 w-[3px] rounded-r-full bg-tone-solid" />
+      )}
       <button type="button" onClick={onEdit} className="grid min-w-0 flex-1 gap-1.5 text-left">
         <span
           className={cx(
@@ -358,9 +372,9 @@ function BlockCard({
         >
           <span
             className={cx(
-              "inline-flex size-6 items-center justify-center rounded-[7px] border-2 transition-colors",
+              "inline-flex size-6 items-center justify-center rounded-[8px] border-2 transition-[background-color,border-color,transform] duration-300 ease-spring",
               b.done
-                ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
+                ? "scale-110 border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent shadow-[0_4px_12px_-4px_var(--st-done-line)]"
                 : "border-line-strong bg-surface",
             )}
           >

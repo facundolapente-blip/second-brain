@@ -12,7 +12,7 @@ export function CategoryTag({ category, className }: { category?: CategoryDTO | 
     <span
       style={tone(category.color)}
       className={cx(
-        "inline-flex h-[22px] items-center rounded-[5px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
+        "inline-flex h-[22px] items-center rounded-full bg-tone px-2.5 text-[12px] leading-none font-medium text-tone-fg",
         className,
       )}
     >
@@ -80,7 +80,7 @@ export function ProgressSquares({ pct, label }: { pct: number | null; label?: st
         {Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
-            className={cx("size-[9px] rounded-[2px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-surface-3")}
+            className={cx("size-[9px] rounded-[3px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-surface-3")}
           />
         ))}
       </span>

@@ -98,12 +98,12 @@ export function ObjectivesView({
               return (
                 <section key={g.id || "loose"} className="rise grid gap-2" style={{ "--i": gi } as React.CSSProperties}>
                   <header className="flex items-end justify-between gap-3 px-1">
-                    <h2 className="text-[17px] font-semibold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
-                    {pct !== null && <span className="tabular text-[13px] font-medium text-muted">{pct}%</span>}
+                    <h2 className="display text-[20px] font-semibold">{g.title.replace(/^\d+\s+/, "")}</h2>
+                    {pct !== null && <span className="num text-[22px] font-semibold">{pct}%</span>}
                   </header>
                   {pct !== null && (
-                    <div className="mx-1 h-1.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                      <div className="h-full rounded-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
+                    <div className="mx-1 h-2 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                      <div className="h-full rounded-full bg-[var(--st-done-line)] shadow-[0_0_12px_-2px_var(--st-done-line)]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
                   <ul className="grid gap-2 pt-1">
@@ -122,7 +122,7 @@ export function ObjectivesView({
         type="button"
         onClick={() => sheet.current?.open()}
         aria-label="Nuevo resultado clave"
-        className="fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[18px] bg-accent text-on-accent shadow-[0_6px_20px_-6px_var(--shadow-tint)] transition-transform active:scale-95 lg:hidden"
+        className="btn-glow fixed right-5 bottom-[calc(92px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-[20px] bg-accent text-on-accent transition-transform duration-300 ease-spring active:scale-90 lg:hidden"
       >
         <Plus size={26} weight="bold" />
       </button>
@@ -142,10 +142,10 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
       <button
         type="button"
         onClick={onOpen}
-        className="grid w-full gap-2 card p-3.5 text-left transition-colors hover:border-line-strong"
+        className="grid w-full gap-2 card p-4 text-left transition-[border-color,transform] duration-300 ease-spring hover:border-line-strong active:scale-[0.99]"
       >
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", finished && "text-muted")}>
+          <span className={cx("min-w-0 flex-1 text-[15.5px] leading-snug font-semibold tracking-[-0.01em]", finished && "text-muted")}>
             {k.title}
           </span>
           {left !== null && (
@@ -263,7 +263,7 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
           {QUARTERS.map((q) => (
             <label
               key={q}
-              className="flex h-10 cursor-pointer items-center justify-center rounded-[10px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
+              className="flex h-11 cursor-pointer items-center justify-center rounded-full border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
             >
               <input type="checkbox" name="quarters" value={q} defaultChecked={kr?.quarters.includes(q)} className="sr-only" />
               {q}
