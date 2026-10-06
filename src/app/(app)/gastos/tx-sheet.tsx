@@ -266,7 +266,7 @@ export const TxSheet = forwardRef<
             {crossCurrency && (
               <label className="grid gap-1.5">
                 <span className="text-[13px] font-semibold text-muted">Llega a {to?.name}</span>
-                <span className="flex h-12 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+                <span className="flex h-12 items-center gap-2 field rounded-md border px-3.5 focus-within:border-accent focus-within:ring-4 focus-within:ring-[var(--focus)]">
                   <span className="text-muted">{currencySymbol(to?.currency ?? "")}</span>
                   <input
                     name="toAmount"

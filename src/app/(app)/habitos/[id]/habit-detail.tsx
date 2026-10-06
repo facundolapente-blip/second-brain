@@ -226,7 +226,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           max={today}
           onChange={(e) => setDate(e.target.value)}
           aria-label="Inicio de la pista nueva"
-          className="h-10 rounded-md border border-line-strong bg-surface px-3 text-sm"
+          className="field h-11 rounded-md border px-3.5 text-[15px]"
         />
         <Button
           variant="outline"

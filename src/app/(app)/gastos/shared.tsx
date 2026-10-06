@@ -53,7 +53,7 @@ export function CategoryAvatar({
       <span
         aria-hidden
         style={{ width: size, height: size }}
-        className="inline-flex shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-fg"
+        className="inline-flex shrink-0 items-center justify-center rounded-[30%] bg-accent text-on-accent"
       >
         <TransferIcon size={icon} weight="bold" />
       </span>
@@ -64,7 +64,7 @@ export function CategoryAvatar({
       <span
         aria-hidden
         style={{ width: size, height: size }}
-        className="inline-flex shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong text-muted"
+        className="inline-flex shrink-0 items-center justify-center rounded-[30%] bg-surface-3 text-muted"
       >
         <UncategorizedIcon size={icon} weight="bold" />
       </span>
@@ -74,7 +74,7 @@ export function CategoryAvatar({
     <span
       aria-hidden
       style={{ ...tone(category.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-tone text-tone-fg"
+      className="inline-flex shrink-0 items-center justify-center rounded-[30%] bg-tone-solid text-tone-on"
     >
       <FinanceIcon name={category.icon} size={icon} weight="fill" />
     </span>
@@ -87,7 +87,7 @@ export function AccountAvatar({ account, size = 36 }: { account: Pick<AccountDTO
     <span
       aria-hidden
       style={{ ...tone(account.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[12px] bg-tone-solid text-white"
+      className="inline-flex shrink-0 items-center justify-center rounded-[30%] bg-tone-solid text-tone-on"
     >
       <FinanceIcon name={account.icon} size={Math.round(size * 0.52)} weight="fill" />
     </span>
@@ -240,14 +240,14 @@ export function TxRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[16px] px-2 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+      className="flex min-h-[62px] w-full items-center gap-3.5 rounded-[16px] px-2 py-2.5 text-left transition-[background-color,transform] hover:bg-surface-2 active:scale-[0.985] active:bg-surface-2"
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className={cx("truncate text-[15px]", title ? "font-semibold" : "text-muted italic")}>{title || "Sin título"}</span>
+        <span className={cx("truncate text-[16px]", title ? "font-bold" : "text-muted italic")}>{title || "Sin título"}</span>
         <span className="truncate text-[13px] text-muted">{subtitle}</span>
       </span>
-      <span className="grid shrink-0 justify-items-end gap-0.5 text-[15px] font-semibold">
+      <span className="grid shrink-0 justify-items-end gap-0.5 text-[16px] font-extrabold">
         {internal ? (
           <span className="tabular font-normal text-muted" title="Entre cuentas elegidas: no cambia el total">
             {moneyCents(tx.amountCents, fx[0].currency)}
@@ -271,22 +271,22 @@ export function MonthNav({ month, basePath, current }: { month: string; basePath
       <Link
         href={href(shiftMonth(month, -1))}
         aria-label="Mes anterior"
-        className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="inline-flex size-11 items-center justify-center rounded-full text-accent-fg transition-[background-color,transform] hover:bg-accent-soft active:scale-90"
       >
         <CaretLeft size={18} weight="bold" />
       </Link>
-      <h2 className="min-w-[9.5rem] text-center text-[15px] font-semibold first-letter:uppercase">{formatMonth(month)}</h2>
+      <h2 className="min-w-[9.5rem] text-center text-[17px] font-extrabold first-letter:uppercase">{formatMonth(month)}</h2>
       <Link
         href={href(shiftMonth(month, 1))}
         aria-label="Mes siguiente"
-        className="inline-flex size-11 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="inline-flex size-11 items-center justify-center rounded-full text-accent-fg transition-[background-color,transform] hover:bg-accent-soft active:scale-90"
       >
         <CaretRight size={18} weight="bold" />
       </Link>
       {month !== current && (
         <Link
           href={basePath}
-          className="ml-1 inline-flex h-8 items-center rounded-full bg-accent-soft text-accent-fg px-2.5 text-[13px] font-semibold transition-colors hover:bg-surface-2"
+          className="ml-1 inline-flex h-9 items-center rounded-full bg-accent-soft px-3.5 text-[13px] font-bold text-accent-fg transition-transform active:scale-95"
         >
           Hoy
         </Link>
@@ -322,7 +322,7 @@ export function EmptyBlock({
   return (
     <div className="mt-6 grid justify-items-start gap-3 rounded-card card p-8">
       {icon && (
-        <span className="inline-flex size-10 items-center justify-center rounded-[12px] bg-accent-soft text-accent-fg">{icon}</span>
+        <span className="inline-flex size-12 items-center justify-center rounded-[15px] bg-accent text-on-accent">{icon}</span>
       )}
       <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
       {children}

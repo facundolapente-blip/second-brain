@@ -308,7 +308,7 @@ function Stepper({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex h-10 items-center rounded-md border border-line-strong">
+    <div className="field flex h-11 items-center rounded-md border">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}

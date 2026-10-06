@@ -61,7 +61,7 @@ export function UncategorizedView({
             <p className="px-2 pb-3 text-sm text-muted">
               {list.length === 1 ? "1 movimiento" : `${list.length} movimientos`} sin categoría. Tocá uno para clasificarlo.
             </p>
-            <ul className="grid gap-0.5 border-t border-line pt-2">
+            <ul className="card grid gap-0.5 rounded-card p-1.5">
               {list.map((t, i) => {
                 const acc = lk.account(t.accountId);
                 // Separador de mes cuando cambia (la lista viene de la más nueva a la más vieja).

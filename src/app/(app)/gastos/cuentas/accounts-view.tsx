@@ -152,7 +152,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
               )}
             </section>
 
-            <ul className="grid gap-0.5 border-t border-line pt-2">
+            <ul className="card grid gap-0.5 rounded-card p-1.5">
               {sorted.map((a, i) => (
                 <li key={a.id} className="rise flex items-center gap-1" style={{ "--i": i } as React.CSSProperties}>
                   <button
@@ -185,7 +185,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
             </ul>
 
             {archived.length > 0 && (
-              <details className="mt-6 border-t border-line pt-3">
+              <details className="mt-6">
                 <summary className="cursor-pointer px-2 py-1 text-sm text-muted select-none">
                   Archivadas ({archived.length})
                 </summary>
@@ -250,7 +250,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           />
 
           <Field label="Saldo inicial" hint="Lo que tenía la cuenta antes del primer movimiento que cargues. Puede ser negativo.">
-            <span className="flex h-10 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+            <span className="flex h-10 items-center gap-2 field rounded-md border px-3.5 focus-within:border-accent focus-within:ring-4 focus-within:ring-[var(--focus)]">
               <span className="text-sm text-muted">{currencySymbol(draft.currency)}</span>
               <input
                 name="initialBalance"

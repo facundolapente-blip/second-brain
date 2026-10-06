@@ -116,7 +116,7 @@ export function MovementsView({
             </p>
             <Link
               href="/gastos/cuentas?nueva=1"
-              className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
+              className="inline-flex h-11 items-center rounded-full bg-accent px-5 text-[15px] font-bold text-on-accent transition-transform active:scale-95"
             >
               Crear cuenta
             </Link>
@@ -129,7 +129,7 @@ export function MovementsView({
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
                 </div>
                 <div className="grid gap-1">
-                  <span className="text-[13px] text-muted">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
+                  <span className="text-[13px] font-semibold text-muted">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
                   <NetHero cents={net[mainCur] ?? 0} currency={mainCur} />
                   {netCurrencies.slice(1).map((c) => (
                     <Amount key={c} cents={net[c]} currency={c} className="text-[17px] font-extrabold text-fg" />
@@ -166,7 +166,7 @@ export function MovementsView({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 border-t border-line pt-2">
+              <div className="grid gap-4 pt-1">
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -177,14 +177,14 @@ export function MovementsView({
                       style={{ "--i": Math.min(gi, 8) } as React.CSSProperties}
                     >
                       {/* En el celular el día queda pegado arriba mientras se recorre su lista. */}
-                      <header className="z-10 -mx-2 flex items-baseline justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
-                        <h3 className="text-[13px] font-semibold first-letter:uppercase">
+                      <header className="frost-bg z-10 -mx-4 flex items-baseline justify-between gap-3 px-5 py-2 max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
+                        <h3 className="text-[15px] font-extrabold first-letter:uppercase">
                           {label}
                           {relative && <span className="ml-2 font-normal text-muted">{formatShort(g.date)}</span>}
                         </h3>
-                        <TotalsInline totals={g.net} className="text-[13px] font-semibold" />
+                        <TotalsInline totals={g.net} className="text-[13px] font-bold" />
                       </header>
-                      <ul>
+                      <ul className="card divide-y divide-line overflow-hidden rounded-card px-1.5">
                         {g.txs.map((t) => (
                           <li key={t.id}>
                             <TxRow
@@ -218,7 +218,7 @@ export function MovementsView({
  */
 function NetHero({ cents, currency }: { cents: number; currency: string }) {
   return (
-    <span className="text-[40px] leading-none font-extrabold tracking-[-0.025em] lg:text-[44px]">
+    <span className="text-[44px] leading-none font-black tracking-[-0.03em] lg:text-[48px]">
       <Amount cents={cents} currency={currency} hero className={cx(cents > 0 && "text-fg!")} />
     </span>
   );
@@ -228,20 +228,20 @@ function NetHero({ cents, currency }: { cents: number; currency: string }) {
 function FlowTile({ label, totals, kind }: { label: string; totals: Record<string, number>; kind: "in" | "out" }) {
   const cur = sortedCurrencies(totals);
   return (
-    <div className="grid content-start gap-1 rounded-card card px-3 py-2.5">
-      <dt className="flex items-center gap-1.5 text-[13px] text-muted">
+    <div className={cx("grid content-start gap-1 rounded-card px-3.5 py-3", kind === "in" ? "bg-[var(--p-green-bg)] text-[var(--p-green-fg)]" : "bg-[var(--p-orange-bg)] text-[var(--p-orange-fg)]")}>
+      <dt className="flex items-center gap-1.5 text-[13px] font-bold">
         <span
           aria-hidden
           className={cx(
-            "inline-flex size-5 items-center justify-center rounded-full",
-            kind === "in" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-fg",
+            "inline-flex size-6 items-center justify-center rounded-full",
+            kind === "in" ? "bg-[var(--p-green-solid)] text-[var(--p-green-on)]" : "bg-[var(--p-orange-solid)] text-[var(--p-orange-on)]",
           )}
         >
           {kind === "in" ? <ArrowDownLeft size={12} weight="bold" /> : <ArrowUpRight size={12} weight="bold" />}
         </span>
         {label}
       </dt>
-      <dd className="tabular grid text-[15px] font-semibold">
+      <dd className="tabular grid text-[17px] font-black text-fg">
         {cur.length === 0 ? <span>{moneyCents(0)}</span> : cur.map((c) => <span key={c}>{moneyCents(totals[c], c)}</span>)}
       </dd>
     </div>
@@ -252,7 +252,7 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon?: 
   return (
     <Link
       href={href}
-      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className="inline-flex h-10 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-bold text-fg shadow-[0_1px_3px_rgba(var(--shadow-tint),0.08)] transition-transform active:scale-95"
     >
       {icon}
       {label}
