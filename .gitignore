@@ -49,3 +49,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# grafo de graphify (se regenera con /graphify)
+/graphify-out/
