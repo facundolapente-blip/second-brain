@@ -7,7 +7,10 @@
  *   - Daily Planning      → bloques de la semana (PlanBlock)
  *   - Para hacer OQ2      → tareas (PlanTask)
  *   - Resultados Clave    → objetivos y resultados clave
- * Se puede correr varias veces: ids estables por contenido, no duplica.
+ * Se puede correr varias veces: reconoce lo ya importado por id de Notion o por
+ * nombre (y día, en los bloques), así un cambio de fecha u hora no duplica. No
+ * reabre lo terminado en la app, no destilda bloques, no revive lo que está en la
+ * papelera ni borra lo que solo está en la app. Con --simular muestra qué haría.
  * Además vincula los bloques con el hábito del mismo nombre (Gym) y con la
  * tarea del mismo nombre (Servicio de IA).
  */
@@ -18,9 +21,11 @@ import { PrismaClient } from "@prisma/client";
 
 const SOURCE = "notion";
 const file = process.argv[2];
-if (!file) throw new Error("Uso: node --env-file=.env scripts/import-notion-plan.ts <export.zip>");
+if (!file) throw new Error("Uso: node --env-file=.env scripts/import-notion-plan.ts <export.zip> [--simular]");
 
-const files = unzipSync(readFileSync(file));
+let files = unzipSync(readFileSync(file));
+// A veces Notion manda un .zip adentro del .zip.
+for (const [n, d] of Object.entries(files)) if (n.endsWith(".zip")) files = { ...files, ...unzipSync(d) };
 function csvByPrefix(prefix: string): Record<string, string>[] {
   const name = Object.keys(files).find((n) => n.split("/").pop()!.startsWith(prefix) && n.endsWith("_all.csv"));
   if (!name) return [];
@@ -93,107 +98,222 @@ const COLORS: Record<string, string> = {
   Producción: "purple", "Nuevos Ingresos": "teal", Casa: "orange",
 };
 
+const DRY = process.argv.includes("--simular");
 const prisma = new PrismaClient();
+const report: string[] = [];
+const say = (s: string) => report.push(s);
+const low = (s: string) => s.trim().toLowerCase();
+const isoOf = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
 
 const blocksCsv = csvByPrefix("Daily Planning");
 const tasksCsv = csvByPrefix("Para hacer");
 const krCsv = csvByPrefix("Resultados Clave");
+
+// Lo que está en la papelera de la app no se revive (por id de Notion o por nombre y fecha).
+const trashed = await prisma.trashItem.findMany({ where: { kind: { in: ["task", "block", "keyResult"] } }, select: { kind: true, data: true } });
+const inTrash = new Set<string>();
+for (const t of trashed) {
+  const row = (t.data as { row?: { externalId?: string | null; title?: string; date?: string | null; deadline?: string | null } } | null)?.row;
+  if (!row) continue;
+  if (row.externalId) inTrash.add(`${t.kind}:${row.externalId}`);
+  if (row.title) inTrash.add(`${t.kind}:${low(row.title)}|${(row.date ?? row.deadline ?? "").slice(0, 10)}`);
+}
 
 // Categorías
 const catNames = new Set([...blocksCsv.map((r) => r.Category), ...tasksCsv.map((r) => r.Categoria)].filter(Boolean));
 const catId = new Map<string, string>();
 let order = await prisma.planCategory.count();
 for (const name of catNames) {
-  const c = await prisma.planCategory.upsert({
-    where: { name },
-    create: { name, color: COLORS[name] ?? "stone", order: order++ },
-    update: {},
-  });
-  catId.set(name, c.id);
+  const found = await prisma.planCategory.findUnique({ where: { name } });
+  if (found) catId.set(name, found.id);
+  else if (DRY) say(`+ categoría nueva: ${name}`);
+  else catId.set(name, (await prisma.planCategory.create({ data: { name, color: COLORS[name] ?? "stone", order: order++ } })).id);
 }
 
-// Tareas
+/** Qué cambia entre lo que hay y lo que trae Notion (para el reporte). */
+function diff(before: Record<string, unknown>, after: Record<string, unknown>) {
+  const norm = (v: unknown) => (v instanceof Date ? isoOf(v) : Array.isArray(v) ? v.join(",") : v === undefined ? null : v);
+  return Object.keys(after).filter((k) => String(norm(before[k])) !== String(norm(after[k])));
+}
+
+// ─── Tareas ─────────────────────────────────────────────────────────────────
 const STATUS: Record<string, string> = { Programadas: "backlog", "Sin empezar": "todo", "En curso": "doing", Terminado: "done" };
+const allTasks = await prisma.planTask.findMany();
+const usedTasks = new Set<string>();
 let tasksNew = 0;
+let tasksChanged = 0;
 for (const r of tasksCsv) {
   const deadline = notionDate(r.Deadline)?.date ?? null;
   const status = STATUS[r.Estado] ?? "todo";
   const externalId = stableId("task", r.Nombre, deadline, r.Categoria);
-  const exists = await prisma.planTask.findUnique({ where: { source_externalId: { source: SOURCE, externalId } } });
+  // Misma tarea: por id de Notion, o por nombre (si en Notion le cambiaste la fecha,
+  // o la creaste también en la app). Entre las del mismo nombre, primero la que
+  // está igual de terminada o no.
+  const sameName = allTasks.filter((t) => !usedTasks.has(t.id) && low(t.title) === low(r.Nombre));
+  const existing =
+    allTasks.find((t) => t.source === SOURCE && t.externalId === externalId && !usedTasks.has(t.id)) ??
+    sameName.find((t) => (t.status === "done") === (status === "done")) ??
+    sameName[0];
+  if (!existing && (inTrash.has(`task:${externalId}`) || inTrash.has(`task:${low(r.Nombre)}|${deadline ?? ""}`))) {
+    say(`· tarea en la papelera, no se revive: ${r.Nombre}`);
+    continue;
+  }
   const data = {
     title: r.Nombre,
     categoryId: catId.get(r.Categoria) ?? null,
-    status,
+    // Lo que terminaste en la app no se reabre.
+    status: existing?.status === "done" && status !== "done" ? "done" : status,
     priority: fires(r.Prioridad),
     deadline: deadline ? toDb(deadline) : null,
     progress: num(r["Progreso Actual"]),
     goal: num(r.Meta),
     scheduled: r.Agendada === "Yes",
   };
-  await prisma.planTask.upsert({
-    where: { source_externalId: { source: SOURCE, externalId } },
-    create: { ...data, source: SOURCE, externalId, completedAt: status === "done" ? new Date() : null },
-    update: data,
-  });
-  if (!exists) tasksNew++;
+  if (existing) {
+    usedTasks.add(existing.id);
+    const changes = diff(existing, data);
+    if (!changes.length) continue;
+    tasksChanged++;
+    say(`~ tarea: ${r.Nombre} (${changes.join(", ")})`);
+    if (!DRY) {
+      await prisma.planTask.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          completedAt: data.status === "done" && existing.status !== "done" ? new Date() : undefined,
+          // Desde ahora se reconoce por el id de Notion (si no lo tiene otra).
+          ...(existing.source === null || existing.externalId !== externalId
+            ? allTasks.some((t) => t.source === SOURCE && t.externalId === externalId && t.id !== existing.id)
+              ? {}
+              : { source: SOURCE, externalId }
+            : {}),
+        },
+      });
+    }
+  } else {
+    tasksNew++;
+    say(`+ tarea: ${r.Nombre}${deadline ? ` (deadline ${deadline})` : ""}`);
+    if (!DRY) {
+      const created = await prisma.planTask.create({
+        data: { ...data, source: SOURCE, externalId, completedAt: status === "done" ? new Date() : null },
+      });
+      allTasks.push(created);
+      usedTasks.add(created.id);
+    }
+  }
 }
 
-// Bloques, vinculados a hábitos y tareas por nombre
-const habits = await prisma.habit.findMany({ where: { archivedAt: null }, select: { id: true, name: true } });
-const habitByName = new Map(habits.map((h) => [h.name.toLowerCase(), h.id]));
-const tasks = await prisma.planTask.findMany({ select: { id: true, title: true } });
-const taskByName = new Map(tasks.map((t) => [t.title.toLowerCase(), t.id]));
+// ─── Bloques (vinculados a hábitos y tareas por nombre) ─────────────────────
+const habits = await prisma.habit.findMany({ where: { archivedAt: null }, select: { id: true, name: true, target: true } });
+const habitByName = new Map(habits.map((h) => [low(h.name), h]));
+const taskByName = new Map((await prisma.planTask.findMany({ select: { id: true, title: true } })).map((t) => [low(t.title), t.id]));
+const parsed = blocksCsv.map((r) => ({ r, d: notionDate(r["Due date"]) }));
+const dates = parsed.map((p) => p.d?.date).filter((x): x is string => !!x).sort();
+const allBlocks = dates.length
+  ? await prisma.planBlock.findMany({ where: { date: { gte: toDb(dates[0]), lte: toDb(dates.at(-1)!) } } })
+  : [];
+const usedBlocks = new Set<string>();
 let blocksNew = 0;
+let blocksChanged = 0;
 let skipped = 0;
-for (const r of blocksCsv) {
-  const d = notionDate(r["Due date"]);
+let habitMarks = 0;
+for (const { r, d } of parsed) {
   if (!d) {
     skipped++;
     continue;
   }
   const externalId = stableId("block", r.Name, d.date, d.start);
-  const exists = await prisma.planBlock.findUnique({ where: { source_externalId: { source: SOURCE, externalId } } });
+  // Mismo bloque: por id de Notion, o mismo nombre el mismo día (si cambiaste la
+  // hora en Notion, o lo copiaste a esta semana desde la app).
+  const existing =
+    allBlocks.find((b) => b.source === SOURCE && b.externalId === externalId && !usedBlocks.has(b.id)) ??
+    allBlocks.find((b) => !usedBlocks.has(b.id) && isoOf(b.date) === d.date && low(b.title) === low(r.Name) && b.startTime === d.start) ??
+    allBlocks.find((b) => !usedBlocks.has(b.id) && isoOf(b.date) === d.date && low(b.title) === low(r.Name));
+  if (!existing && (inTrash.has(`block:${externalId}`) || inTrash.has(`block:${low(r.Name)}|${d.date}`))) {
+    say(`· bloque en la papelera, no se revive: ${r.Name} (${d.date})`);
+    continue;
+  }
+  const habit = habitByName.get(low(r.Name));
   const data = {
     title: r.Name,
-    categoryId: catId.get(r.Category) ?? null,
+    categoryId: catId.get(r.Category) ?? existing?.categoryId ?? null,
     date: toDb(d.date),
     startTime: d.start,
     endTime: d.end,
     priority: fires(r.Priority),
-    done: r.Done === "Yes",
-    place: r.Lugar || null,
-    habitId: habitByName.get(r.Name.toLowerCase()) ?? null,
-    taskId: taskByName.get(r.Name.toLowerCase()) ?? null,
+    // Lo tildado en la app queda tildado.
+    done: r.Done === "Yes" || !!existing?.done,
+    place: r.Lugar || existing?.place || null,
+    habitId: existing?.habitId ?? habit?.id ?? null,
+    taskId: existing?.taskId ?? taskByName.get(low(r.Name)) ?? null,
   };
-  await prisma.planBlock.upsert({
-    where: { source_externalId: { source: SOURCE, externalId } },
-    create: { ...data, source: SOURCE, externalId },
-    update: data,
-  });
-  if (!exists) blocksNew++;
+  const newlyDone = data.done && !existing?.done;
+  if (existing) {
+    usedBlocks.add(existing.id);
+    const changes = diff(existing, data);
+    if (!changes.length) continue;
+    blocksChanged++;
+    say(`~ bloque: ${r.Name} ${d.date}${d.start ? ` ${d.start}` : ""} (${changes.join(", ")})`);
+    if (!DRY) await prisma.planBlock.update({ where: { id: existing.id }, data });
+  } else {
+    blocksNew++;
+    say(`+ bloque: ${r.Name} ${d.date}${d.start ? ` ${d.start}${d.end ? `-${d.end}` : ""}` : ""}${data.done ? " (hecho)" : ""}`);
+    if (!DRY) {
+      const created = await prisma.planBlock.create({ data: { ...data, source: SOURCE, externalId } });
+      allBlocks.push(created);
+      usedBlocks.add(created.id);
+    }
+  }
+  // Como al tildarlo en la app: el hábito vinculado queda hecho ese día.
+  if (newlyDone && data.habitId) {
+    habitMarks++;
+    say(`  ✓ marca el hábito ${habits.find((h) => h.id === data.habitId)?.name ?? ""} el ${d.date}`);
+    if (!DRY) {
+      const target = habits.find((h) => h.id === data.habitId)?.target ?? 1;
+      const key = { habitId_date: { habitId: data.habitId, date: data.date } };
+      const log = await prisma.habitLog.findUnique({ where: key });
+      // No pisa un fallado o salteado puesto a mano.
+      if (!log || log.status === "none") {
+        await prisma.habitLog.upsert({
+          where: key,
+          create: { habitId: data.habitId, date: data.date, status: "done", value: target, source: "app" },
+          update: { status: "done", value: target, source: "app" },
+        });
+      }
+    }
+  }
 }
+const appOnly = allBlocks.filter((b) => !usedBlocks.has(b.id) && b.title.trim() && !/^libre$/i.test(b.title.trim()));
+if (appOnly.length) say(`· en la app y no en Notion (se dejan): ${appOnly.map((b) => `${b.title} ${isoOf(b.date)}`).join(", ")}`);
 
-// Objetivos y resultados clave
+// ─── Objetivos y resultados clave ───────────────────────────────────────────
 const KR: Record<string, string> = { "Sin empezar": "todo", Haciendo: "doing", Completado: "done", Finalizado: "closed" };
 const objectiveCol = Object.keys(krCsv[0] ?? {}).find((k) => k.startsWith("Objetivos")) ?? "Objetivos";
+const allKrs = await prisma.planKeyResult.findMany();
+const usedKrs = new Set<string>();
 let krNew = 0;
+let krChanged = 0;
 for (const r of krCsv) {
   const objTitle = (r[objectiveCol] ?? "").replace(/\s*\(https?:\/\/[^)]*\)\s*$/, "").trim();
   let objectiveId: string | null = null;
   if (objTitle) {
-    const o = await prisma.planObjective.upsert({
-      where: { title: objTitle },
-      create: { title: objTitle, order: await prisma.planObjective.count() },
-      update: {},
-    });
-    objectiveId = o.id;
+    const o = await prisma.planObjective.findUnique({ where: { title: objTitle } });
+    if (o) objectiveId = o.id;
+    else if (DRY) say(`+ objetivo nuevo: ${objTitle}`);
+    else objectiveId = (await prisma.planObjective.create({ data: { title: objTitle, order: await prisma.planObjective.count() } })).id;
   }
   const deadline = notionDate(r.Deadline)?.date ?? null;
   const externalId = stableId("kr", r.Nombre, objTitle);
-  const exists = await prisma.planKeyResult.findUnique({ where: { source_externalId: { source: SOURCE, externalId } } });
+  const existing =
+    allKrs.find((k) => k.source === SOURCE && k.externalId === externalId && !usedKrs.has(k.id)) ??
+    allKrs.find((k) => !usedKrs.has(k.id) && low(k.title) === low(r.Nombre));
+  if (!existing && inTrash.has(`keyResult:${externalId}`)) {
+    say(`· resultado clave en la papelera, no se revive: ${r.Nombre}`);
+    continue;
+  }
   const data = {
     title: r.Nombre,
-    objectiveId,
+    objectiveId: objectiveId ?? existing?.objectiveId ?? null,
     kind: r["Selección"] === "Habito" ? "habit" : "activity",
     status: KR[r.Estado] ?? "todo",
     quarters: (r.Trimestre ?? "").split(",").map((q) => q.trim()).filter((q) => /^Q[1-4]$/.test(q)),
@@ -201,17 +321,24 @@ for (const r of krCsv) {
     progress: num(r["Progreso Actual"]),
     goal: num(r.Meta),
   };
-  await prisma.planKeyResult.upsert({
-    where: { source_externalId: { source: SOURCE, externalId } },
-    create: { ...data, source: SOURCE, externalId },
-    update: data,
-  });
-  if (!exists) krNew++;
+  if (existing) {
+    usedKrs.add(existing.id);
+    const changes = diff(existing, data);
+    if (!changes.length) continue;
+    krChanged++;
+    say(`~ resultado clave: ${r.Nombre} (${changes.join(", ")})`);
+    if (!DRY) await prisma.planKeyResult.update({ where: { id: existing.id }, data });
+  } else {
+    krNew++;
+    say(`+ resultado clave: ${r.Nombre}`);
+    if (!DRY) await prisma.planKeyResult.create({ data: { ...data, source: SOURCE, externalId } });
+  }
 }
 
-const linked = await prisma.planBlock.count({ where: { source: SOURCE, habitId: { not: null } } });
+console.log(report.join("\n"));
 console.log(
-  `Notion: ${tasksCsv.length} tareas (${tasksNew} nuevas), ${blocksCsv.length} bloques (${blocksNew} nuevos${skipped ? `, ${skipped} sin fecha` : ""}, ${linked} vinculados a un hábito),`,
-  `${krCsv.length} resultados clave (${krNew} nuevos) en ${await prisma.planObjective.count()} objetivos, ${catNames.size} categorías.`,
+  `\n${DRY ? "SIMULACIÓN (no se escribió nada)" : "Listo"}: tareas ${tasksNew} nuevas y ${tasksChanged} con cambios (de ${tasksCsv.length}); ` +
+    `bloques ${blocksNew} nuevos y ${blocksChanged} con cambios (de ${blocksCsv.length}${skipped ? `, ${skipped} sin fecha` : ""}); ` +
+    `${habitMarks} marcas de hábitos; resultados clave ${krNew} nuevos y ${krChanged} con cambios (de ${krCsv.length}).`,
 );
 await prisma.$disconnect();

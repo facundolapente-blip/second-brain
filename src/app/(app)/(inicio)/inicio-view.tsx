@@ -1093,7 +1093,7 @@ function Heat({
       </div>
       <div className="grid grid-cols-[1.75rem_1fr] gap-1.5">
         <div className="grid grid-rows-7 gap-[3px] text-[10px] text-muted" aria-hidden>
-          {["L", "", "M", "", "V", "", "D"].map((l, i) => (
+          {["L", "M", "X", "J", "V", "S", "D"].map((l, i) => (
             <span key={i} className="flex items-center leading-none">
               {l}
             </span>
