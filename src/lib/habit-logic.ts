@@ -8,9 +8,11 @@
  *  - partial  hubo algo pero no llegó a la meta
  *  - failed   rojo con borde, fallado
  *  - skipped  amarillo, salteado (no corta la racha, pero tampoco suma)
- *  - missed   rojo suave sin borde: tocaba y quedó sin marcar, o (en semanales)
- *             fallado en una semana que igual llegó a la meta
- *  - pending  hoy, toca y todavía no se marcó
+ *  - unmarked amarillo suave: tocaba, el día ya pasó y quedó sin marcar
+ *  - missed   rojo suave sin borde: (en semanales) fallado en una semana que
+ *             igual llegó a la meta
+ *  - pending  hoy, toca y todavía no está ni hecho ni fallado: blanco hasta que
+ *             termine el día (un salteado de hoy también se ve así)
  *  - idle     no toca, o no hace falta (en "X veces por semana")
  *  - before   antes de que empezara el hábito
  */
@@ -18,7 +20,7 @@ import { addDays, startOfWeek, weekday } from "./dates";
 
 export type Frequency = "daily" | "weekdays" | "weekly";
 export type LogStatus = "done" | "failed" | "skipped";
-export type DayState = "done" | "partial" | "failed" | "skipped" | "missed" | "pending" | "idle" | "before";
+export type DayState = "done" | "partial" | "failed" | "skipped" | "unmarked" | "missed" | "pending" | "idle" | "before";
 
 export type HabitRule = {
   frequency: Frequency;
@@ -116,7 +118,8 @@ export function dayState(h: HabitRule, logs: LogMap, iso: string, today: string)
       if (weekly && weekMet(h, logs, periodStart(h, iso))) return "missed";
       return "failed";
     }
-    if (log.s === "skipped") return "skipped";
+    // Mientras el día no terminó, solo verde o rojo; lo demás queda en blanco.
+    if (log.s === "skipped") return iso < today ? "skipped" : iso === today ? "pending" : "idle";
     if (isDone(h, log)) return "done";
     if (log.v > 0) return "partial";
   }
@@ -126,9 +129,9 @@ export function dayState(h: HabitRule, logs: LogMap, iso: string, today: string)
     if (weekMet(h, logs, first)) return "idle";
     // Un día sin marcar solo cuenta como falla cuando la semana ya terminó.
     if (addDays(first, 6) >= today) return iso === today ? "pending" : "idle";
-    return "missed";
+    return "unmarked";
   }
-  return iso === today ? "pending" : "missed";
+  return iso === today ? "pending" : "unmarked";
 }
 
 // ─── Rachas ─────────────────────────────────────────────────────────────────
@@ -271,11 +274,15 @@ export function streakMilestones(h: Pick<HabitRule, "frequency">): number[] {
   return h.frequency === "weekly" ? [1, 5, 15, 25, 50, 75, 100] : [3, 7, 15, 30, 60, 100, 200, 365];
 }
 
-/** Siguiente estado al tocar un día en la tarjeta: nada → hecho → fallado → salteado → nada. */
-export function nextStatus(current: DayLog | undefined): LogStatus | null {
+/**
+ * Siguiente estado al tocar un día en la tarjeta: nada → hecho → fallado →
+ * salteado → nada. Hoy el salteado no se ve (queda blanco), así que hoy el
+ * ciclo es nada → hecho → fallado → nada.
+ */
+export function nextStatus(current: DayLog | undefined, isToday = false): LogStatus | null {
   if (!current || current.s === "none") return "done";
   if (current.s === "done") return "failed";
-  if (current.s === "failed") return "skipped";
+  if (current.s === "failed") return isToday ? null : "skipped";
   return null;
 }
 

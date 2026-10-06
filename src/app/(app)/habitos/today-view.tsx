@@ -226,6 +226,11 @@ function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => v
       icon: <ArrowBendUpRight size={18} weight="bold" />,
       label: "Salteado",
     },
+    unmarked: {
+      cls: "border-transparent bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
+      icon: null,
+      label: "Sin marcar",
+    },
     partial: {
       cls: "border-dashed border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
       icon: null,

@@ -34,7 +34,7 @@ export type DayMetrics = {
 
 export type HabitRef = { id: string; name: string; icon: string; color: string };
 
-const DUE: DayState[] = ["done", "partial", "failed", "missed", "pending"];
+const DUE: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pending"];
 
 export async function getDailyMetrics(from: string, to: string): Promise<{ days: DayMetrics[]; habits: HabitRef[] }> {
   const range = { gte: toDbDate(from), lte: toDbDate(to) };

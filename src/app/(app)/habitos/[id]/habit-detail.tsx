@@ -509,6 +509,7 @@ const MARKER: Record<string, { icon: React.ReactNode; cls: string } | undefined>
   partial: { icon: <Check size={13} weight="bold" />, cls: "border-dashed border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" },
   failed: { icon: <X size={13} weight="bold" />, cls: "border-[var(--st-fail-line)] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" },
   missed: { icon: <X size={13} weight="bold" />, cls: "border-transparent bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" },
+  unmarked: { icon: null, cls: "border-transparent bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]" },
   skipped: {
     icon: <ArrowBendUpRight size={13} weight="bold" />,
     cls: "border-[var(--st-skip-line)] bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",

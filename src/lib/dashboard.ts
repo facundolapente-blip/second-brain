@@ -15,7 +15,7 @@ import { getCheckin, lastWeight } from "./checkin";
  */
 
 /** Estados que cuentan para el cumplimiento de un día: lo que tocaba hacer. */
-const COUNTS: DayState[] = ["done", "partial", "failed", "missed", "pending"];
+const COUNTS: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pending"];
 const ORDER_TODAY = (s: DayState) => (s === "pending" || s === "partial" ? 0 : s === "done" ? 1 : s === "skipped" ? 3 : 2);
 
 export type DayMix = {

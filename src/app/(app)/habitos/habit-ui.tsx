@@ -13,7 +13,7 @@ import {
   type LogMap,
   type LogStatus,
 } from "@/lib/habit-logic";
-import { addDays, formatLong, monthBounds, shiftMonth, weekday } from "@/lib/dates";
+import { addDays, formatLong, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
@@ -84,7 +84,7 @@ export function useDayTap(
       openDetail(habit, date);
       return;
     }
-    mark(habit.id, date, nextStatus(logs[date]), 1);
+    mark(habit.id, date, nextStatus(logs[date], date === todayISO()), 1);
   };
 }
 
@@ -95,6 +95,7 @@ const STATE_CLASS: Record<DayState, string> = {
   partial: "bg-[var(--st-done-bg)] border-[var(--st-done-line)] border-dashed text-[var(--st-done-fg)]",
   failed: "bg-[var(--st-fail-bg)] border-[var(--st-fail-line)] text-[var(--st-fail-fg)]",
   skipped: "bg-[var(--st-skip-bg)] border-[var(--st-skip-line)] text-[var(--st-skip-fg)]",
+  unmarked: "bg-[var(--st-skip-bg)] border-transparent text-[var(--st-skip-fg)]",
   missed: "bg-[var(--st-fail-bg)] border-transparent text-[var(--st-fail-fg)]",
   pending: "bg-transparent border-fg/75 text-fg",
   idle: "bg-[var(--st-idle-bg)] border-transparent text-[var(--st-idle-fg)]",
@@ -106,7 +107,8 @@ const STATE_LABEL: Record<DayState, string> = {
   partial: "a medias",
   failed: "fallado",
   skipped: "salteado",
-  missed: "sin marcar",
+  unmarked: "sin marcar",
+  missed: "fallado (la semana igual se cumplió)",
   pending: "pendiente",
   idle: "",
   before: "antes de empezar",
