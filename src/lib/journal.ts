@@ -160,6 +160,28 @@ export async function getHome() {
   };
 }
 
+/**
+ * Cifras rápidas para el panel lateral de la computadora (sin leer los textos):
+ * total de entradas, días escritos este mes, mejor racha y los días escritos
+ * de las últimas cinco semanas.
+ */
+export async function getQuickStats() {
+  const today = todayISO();
+  const [days, totalEntries] = await Promise.all([writtenDays(), prisma.journalEntry.count({ where: NOT_EMPTY })]);
+  const month = today.slice(0, 7);
+  const from = addDays(today, -34);
+  return {
+    today,
+    totalEntries,
+    totalDays: days.length,
+    best: bestStreak(days),
+    monthDays: days.filter((d) => d.startsWith(month)).length,
+    recent: days.filter((d) => d >= from),
+  };
+}
+
+export type QuickStatsDTO = Awaited<ReturnType<typeof getQuickStats>>;
+
 /** Entradas de un mes para el calendario. */
 export async function getMonthEntries(month: string) {
   const { from, to } = monthBounds(month);

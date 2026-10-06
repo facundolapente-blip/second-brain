@@ -65,7 +65,7 @@ export function MonthHeatmap({
   };
 
   return (
-    <div className="grid max-w-xl gap-3">
+    <div className="grid max-w-xl gap-3 lg:max-w-none">
       <p className="tabular min-h-5 text-[13px] text-muted first-letter:uppercase" aria-live="polite">
         {focus ? readout(focus) : "Tocá un mes para verlo en el calendario."}
       </p>
@@ -161,16 +161,19 @@ export function MonthColumns({
   values,
   selected,
   basePath,
+  height = 120,
 }: {
   months: string[];
   values: number[];
   selected: string;
   /** Ruta a la que se le agrega ?mes=YYYY-MM. */
   basePath: string;
+  /** Alto del área de columnas en px. */
+  height?: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...values);
-  const H = 120;
+  const H = height;
   const shown = hover ?? months.indexOf(selected);
   const short = (m: string) =>
     new Intl.DateTimeFormat("es-UY", { month: "short", timeZone: "UTC" })
@@ -227,6 +230,25 @@ export function MonthColumns({
           </span>
         ))}
       </div>
+      <details className="text-sm">
+        <summary className="kicker inline-flex min-h-11 cursor-pointer items-center select-none hover:text-fg">Ver como tabla</summary>
+        <table className="mt-1 w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-muted">
+              <th className="py-1.5 font-normal">Mes</th>
+              <th className="py-1.5 text-right font-normal">Entradas</th>
+            </tr>
+          </thead>
+          <tbody className="tabular">
+            {months.map((m, i) => (
+              <tr key={m} className="border-t border-line">
+                <td className="py-1.5 first-letter:uppercase">{formatMonth(m)}</td>
+                <td className="py-1.5 text-right">{nf.format(values[i])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </div>
   );
 }

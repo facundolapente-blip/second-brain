@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CaretLeft, CaretRight, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getMonthEntries } from "@/lib/journal";
-import { addDays, formatLong, formatMonth, isISODate, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
+import { addDays, formatLong, formatMonth, formatShort, isISODate, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { EntryCard, JournalHeader, WriteDayButton } from "../journal-ui";
@@ -39,10 +39,10 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
 
   return (
     <>
-      <JournalHeader title="Calendario" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
+      <JournalHeader title="Calendario" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
-      <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12 lg:px-10 lg:pt-8">
-        <section className="grid content-start gap-4">
+      <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:max-w-6xl lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
+        <section className="grid content-start gap-4 lg:sticky lg:top-36 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]">
           <div className="flex items-center justify-between">
             <Link
               href={href(shiftMonth(month, -1))}
@@ -75,7 +75,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
             </Link>
           </div>
 
-          <div className="grid grid-cols-7 justify-items-center gap-y-1">
+          <div className="grid grid-cols-7 justify-items-center gap-y-1 lg:gap-y-2">
             {WEEK_HEAD.map((w) => (
               <span key={w} aria-hidden className="kicker pb-1">
                 {w}
@@ -96,7 +96,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   aria-current={isSel ? "date" : undefined}
                   style={info ? tone(info.color) : undefined}
                   className={cx(
-                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200 motion-reduce:transition-none",
+                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200 motion-reduce:transition-none lg:size-14 lg:text-[16px]",
                     list
                       ? info
                         ? "bg-tone font-semibold text-tone-fg"
@@ -104,7 +104,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                       : d > today
                         ? "text-faint"
                         : "text-fg hover:bg-surface-2",
-                    isSel && "ring-[1.5px] ring-fg ring-offset-2 ring-offset-bg",
+                    isSel && "ring-[1.5px] ring-fg ring-offset-2 ring-offset-bg lg:ring-offset-surface",
                   )}
                 >
                   {Number(d.slice(8))}
@@ -158,6 +158,31 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
             <p className="border-t border-line py-6 font-serif text-[20px] text-muted">
               Tocá un día para ver lo que escribiste.
             </p>
+          )}
+
+          {/* En la computadora sobra lugar: el resto del mes, renglón por renglón. */}
+          {entries.length > 0 && (
+            <div className="mt-8 hidden gap-1 lg:grid">
+              <h3 className="kicker border-b border-line pb-2">Todo el mes</h3>
+              <ul className="grid">
+                {entries
+                  .filter((e) => e.date !== selected)
+                  .reverse()
+                  .map((e) => (
+                    <li key={e.id}>
+                      <Link
+                        href={href(month, e.date)}
+                        scroll={false}
+                        className="-mx-2 grid min-h-11 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-[6px] px-2 py-2 transition-colors hover:bg-surface-2"
+                      >
+                        <span className="font-mono text-[12px] text-muted tabular">{formatShort(e.date)}</span>
+                        <span className="truncate text-[14.5px]">{e.title || e.excerpt || "Sin texto"}</span>
+                        <span className="font-mono text-[11px] text-muted tabular">{nf.format(e.words)}</span>
+                      </Link>
+                    </li>
+                  ))}
+              </ul>
+            </div>
           )}
         </section>
       </main>

@@ -24,6 +24,10 @@ function daysInMonth(m: string) {
 
 const monthLink = (m: string) => `/journal/estadisticas?mes=${m}`;
 
+/** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
+const CARD =
+  "lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]";
+
 export default async function StatsPage({ searchParams }: PageProps<"/journal/estadisticas">) {
   const sp = await searchParams;
   const today = todayISO();
@@ -39,7 +43,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
   if (s.totalEntries === 0) {
     return (
       <>
-        <JournalHeader title="Estadísticas" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
+        <JournalHeader title="Estadísticas" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
         <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-10">
           <div className="grid justify-items-start gap-2 border-y border-line py-10">
             <h2 className="display text-[30px]">Todavía no hay números</h2>
@@ -54,11 +58,11 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
 
   return (
     <>
-      <JournalHeader title="Estadísticas" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
+      <JournalHeader title="Estadísticas" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
-      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-3 lg:px-10 lg:pt-8">
+      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-3 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-8">
         {/* Lo grande: todo lo escrito. Una sola cifra protagonista. */}
-        <section className="rise grid gap-6">
+        <section className="rise grid gap-6 lg:col-span-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-10 lg:pb-4">
           <div className="grid gap-1">
             <span className="kicker">Entradas escritas</span>
             <span className="figure pt-2 text-[88px] lg:text-[112px]">{nf.format(s.totalEntries)}</span>
@@ -68,7 +72,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             </span>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-line border-y border-line">
+          <div className="grid grid-cols-3 divide-x divide-line border-y border-line lg:self-end">
             <div className="grid content-start gap-1 py-4 pr-3 sm:py-5">
               <span className="kicker flex items-center gap-1">
                 <Fire size={13} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
@@ -91,11 +95,13 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               <span className="text-[13px] text-muted">palabras</span>
             </div>
           </div>
-          {s.streak === 0 && <p className="-mt-3 text-[13px] text-muted">Escribí hoy para arrancar una racha nueva.</p>}
+          {s.streak === 0 && (
+            <p className="-mt-3 text-[13px] text-muted lg:col-start-2 lg:mt-0">Escribí hoy para arrancar una racha nueva.</p>
+          )}
         </section>
 
         {s.firstDate && (
-          <section className="grid gap-3">
+          <section className={`grid content-start gap-3 lg:col-span-7 ${CARD}`}>
             <h2 className="display text-[28px]">Constancia</h2>
             <MonthHeatmap
               firstMonth={s.firstDate.slice(0, 7)}
@@ -107,7 +113,8 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
           </section>
         )}
 
-        <section className="grid gap-5 border-t border-line pt-8">
+        <section className={`grid gap-5 border-t border-line pt-8 lg:col-span-12 lg:row-start-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-x-10 ${CARD}`}>
+          <div className="grid content-start gap-5">
           <div className="flex items-center justify-between">
             <Link
               href={monthLink(shiftMonth(month, -1))}
@@ -132,7 +139,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4 lg:grid-cols-2">
             <Stat label="Entradas" value={<span className="tabular">{s.monthEntries}</span>} />
             <Stat
               label="Días escritos"
@@ -187,18 +194,23 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             </div>
           )}
 
-          <div className="grid gap-1">
+          </div>
+
+          <div className="grid content-start gap-1 lg:border-l lg:border-line lg:pl-10">
             <h3 className="kicker">Entradas por mes</h3>
             <MonthColumns
               months={last12}
               values={last12.map((m) => s.perMonth[m] ?? 0)}
               selected={month}
               basePath="/journal/estadisticas"
+              height={170}
             />
           </div>
         </section>
 
-        <section className="grid gap-8 border-t border-line pt-8 sm:grid-cols-2">
+        <section
+          className={`grid gap-8 border-t border-line pt-8 sm:grid-cols-2 lg:col-span-5 lg:col-start-8 lg:row-start-2 lg:grid-cols-1 lg:content-start lg:gap-7 ${CARD}`}
+        >
           <div className="grid content-start gap-3">
             <h2 className="display text-[24px]">Qué días escribís</h2>
             <WeekdayBars values={s.perWeekday} />

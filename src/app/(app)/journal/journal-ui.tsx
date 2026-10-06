@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
   CaretLeft,
@@ -59,16 +60,19 @@ export function JournalHeader({
   actions,
   tabs,
   children,
+  wide,
 }: {
   title?: string;
   back?: string;
   actions?: React.ReactNode;
   tabs?: React.ReactNode;
   children?: React.ReactNode;
+  /** En la computadora usa el ancho de las pantallas con panel lateral. */
+  wide?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-      <div className="mx-auto max-w-3xl px-4 lg:px-10">
+      <div className={cx("mx-auto max-w-3xl px-4 lg:px-10", wide && "lg:max-w-6xl")}>
         <div className="flex min-h-16 items-center gap-2 lg:min-h-24 lg:items-end lg:pb-4">
           {back ? (
             <Link
@@ -115,17 +119,39 @@ function wordsLabel(n: number) {
  * grande, mes y día de la semana chicos) y el texto en serif a la derecha,
  * como una página de diario.
  */
-export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: number }) {
+export function EntryCard({
+  entry,
+  index = 0,
+  selectHref,
+  selected,
+}: {
+  entry: EntryCardDTO;
+  index?: number;
+  /** En la computadora, tocar la tarjeta la abre en el panel de lectura (esta URL) en lugar del editor. */
+  selectHref?: string;
+  selected?: boolean;
+}) {
+  const router = useRouter();
   const [day, month] = formatShort(entry.date).split(" ");
   const wd = WEEKDAY_SHORT[new Date(`${entry.date}T00:00:00Z`).getUTCDay()];
   return (
     <Link
       href={`/journal/${entry.id}`}
+      aria-current={selected ? "true" : undefined}
+      onClick={(e) => {
+        if (!selectHref || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (!window.matchMedia("(min-width: 1024px)").matches) return;
+        e.preventDefault();
+        router.replace(selectHref, { scroll: false });
+      }}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group -mx-2 grid grid-cols-[3rem_minmax(0,1fr)] gap-x-4 rounded-[6px] border-b border-line px-2 py-5 transition-colors duration-200 last:border-b-0 hover:bg-surface-2/70 active:bg-surface-2 lg:-mx-3 lg:grid-cols-[3.5rem_minmax(0,1fr)] lg:gap-x-6 lg:px-3 lg:py-6"
+      className={cx(
+        "rise group -mx-2 grid grid-cols-[3rem_minmax(0,1fr)] gap-x-4 rounded-[6px] border-b border-line px-2 py-5 transition-colors duration-200 last:border-b-0 hover:bg-surface-2/70 active:bg-surface-2 lg:-mx-3 lg:grid-cols-[3.5rem_minmax(0,1fr)] lg:gap-x-5 lg:rounded-xl lg:px-4 lg:py-5",
+        selected && "lg:border-transparent lg:bg-surface lg:shadow-[var(--card-shadow),0_0_0_1px_var(--card-ring)] lg:hover:bg-surface",
+      )}
     >
       <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
-        <span className="figure text-[38px] lg:text-[44px]">{day.padStart(2, "0")}</span>
+        <span className="figure text-[38px] lg:text-[40px]">{day.padStart(2, "0")}</span>
         <span className="kicker mt-1.5 text-fg!">{month}</span>
         <span className="kicker text-[10px]!">{wd}</span>
       </span>

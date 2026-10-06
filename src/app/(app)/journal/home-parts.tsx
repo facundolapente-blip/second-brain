@@ -79,7 +79,7 @@ export function HomeActions({
 
       {searching && (
         <div className="absolute inset-x-0 top-[env(safe-area-inset-top)] z-10 bg-bg">
-          <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-24 lg:px-10">
+          <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-24 lg:max-w-6xl lg:px-10">
             <MagnifyingGlass size={18} className="shrink-0 text-muted" />
             <input
               autoFocus
