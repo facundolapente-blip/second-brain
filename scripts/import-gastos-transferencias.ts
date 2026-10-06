@@ -15,7 +15,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
-import { calibrarSaldos } from "./gastos-saldos.ts";
+import { calibrarSaldos } from "../src/lib/importers/gastos-saldos.ts";
 
 const SOURCE = "import:gastos-transferencias";
 const file = process.argv[2] ?? "data/transferencias.csv";

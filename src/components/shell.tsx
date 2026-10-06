@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-import { CalendarCheck, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
+import { CalendarCheck, ChartLineUp, ClipboardText, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { cx } from "./ui";
 
@@ -15,6 +15,13 @@ const MODULES: Module[] = [
   { href: "/journal", label: "Journal", icon: Notebook, color: "var(--mod-journal)" },
   { href: "/gastos", label: "Gastos", icon: Wallet, color: "var(--mod-gastos)" },
   { href: "/plan", label: "Plan semanal", icon: CalendarCheck, color: "var(--mod-plan)" },
+];
+
+/** Herramientas que cruzan los módulos. */
+const TOOLS: { href: string; label: string; icon: Icon }[] = [
+  { href: "/semana", label: "Revisión semanal", icon: ClipboardText },
+  { href: "/analisis", label: "Análisis", icon: ChartLineUp },
+  { href: "/datos", label: "Datos", icon: Database },
 ];
 
 const DrawerCtx = createContext<() => void>(() => {});
@@ -56,6 +63,29 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                 <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
                 {m.label}
                 <span aria-hidden className="ml-auto size-2 rounded-full" style={{ background: m.color }} />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-6 mb-1.5 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
+      <ul className="grid gap-1">
+        {TOOLS.map((t) => {
+          const active = pathname.startsWith(t.href);
+          const Ico = t.icon;
+          return (
+            <li key={t.href}>
+              <Link
+                href={t.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cx(
+                  "flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors duration-200",
+                  active ? "bg-side-on-bg font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
+                )}
+              >
+                <Ico size={17} weight={active ? "fill" : "regular"} aria-hidden />
+                {t.label}
               </Link>
             </li>
           );

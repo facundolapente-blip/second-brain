@@ -7,7 +7,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   CalendarCheck,
+  ChartLineUp,
   Check,
+  ClipboardText,
   Flame,
   Medal,
   NotePencil,
@@ -49,7 +51,17 @@ export function InicioView({ d }: { d: Dashboard }) {
 
   return (
     <>
-      <PageHeader title={`${greeting(d.hour)}, Facu`} kicker={formatLong(d.today)} wide />
+      <PageHeader
+        title={`${greeting(d.hour)}, Facu`}
+        kicker={formatLong(d.today)}
+        wide
+        actions={
+          <div className="flex gap-1.5">
+            <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={weekday(d.today) === 0 || weekday(d.today) === 1} />
+            <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
+          </div>
+        }
+      />
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         {/* Resumen del día */}
         <section aria-label="Resumen" className="hero rise relative overflow-hidden rounded-[22px] p-5 lg:col-span-12 lg:p-7">
@@ -105,6 +117,24 @@ export function InicioView({ d }: { d: Dashboard }) {
         <Constancia d={d} />
       </main>
     </>
+  );
+}
+
+/** Acceso en la cabecera; el domingo y el lunes la revisión semanal se destaca. */
+function HeaderLink({ href, label, icon: Ico, highlight }: { href: string; label: string; icon: Icon; highlight?: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      className={cx(
+        "inline-flex h-10 items-center gap-2 rounded-full px-3 text-[13px] font-medium transition-colors",
+        highlight ? "bg-ink text-on-ink hover:opacity-90" : "border border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
+      )}
+    >
+      <Ico size={16} aria-hidden />
+      <span className="hidden sm:inline">{label}</span>
+    </Link>
   );
 }
 
