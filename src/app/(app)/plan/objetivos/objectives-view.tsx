@@ -16,7 +16,7 @@ import {
 } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { ProgressSquares, StatusPill } from "../plan-ui";
+import { ProgressBar, StatusPill } from "../plan-ui";
 import { PlanTabs } from "../plan-nav";
 
 type Quarter = "all" | (typeof QUARTERS)[number];
@@ -170,7 +170,7 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
           {k.deadline && <span className="font-mono text-[11px] text-muted tabular">{formatShort(k.deadline)}</span>}
         </span>
         {pct !== null && (
-          <ProgressSquares
+          <ProgressBar
             pct={pct}
             label={k.goal ? `${fmtNum(k.progress ?? 0)} de ${fmtNum(k.goal)}` : undefined}
           />

@@ -380,6 +380,17 @@ dialog.sheet::backdrop {
 }
 
 /* Lo poco que flota (botón de escribir, botón flotante, tooltips): sombra corta y teñida. */
+/* Etiqueta llena (categoría, estado, prioridad): el tono profundo de la paleta
+   con texto blanco; en oscuro, el tono medio con texto de tinta. */
+.chip-solid {
+  background: color-mix(in oklab, var(--tone-fg) 62%, var(--tone-solid));
+  color: #ffffff;
+}
+:root[data-theme="oscuro"] .chip-solid {
+  background: var(--tone-solid);
+  color: #141413;
+}
+
 .lift {
   box-shadow:
     0 1px 2px rgba(var(--shadow-tint), 0.08),

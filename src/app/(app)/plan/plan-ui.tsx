@@ -1,90 +1,106 @@
 "use client";
 
-import { Fire } from "@phosphor-icons/react";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/plan-logic";
 import { cx } from "@/components/ui";
+
+/**
+ * Etiqueta llena (color de la paleta con texto claro, `.chip-solid` en
+ * globals.css): la usan categoría, estado y prioridad para que se vean igual.
+ */
+function Chip({ toneKey, children, className, title }: { toneKey: string; children: React.ReactNode; className?: string; title?: string }) {
+  return (
+    <span
+      style={tone(toneKey)}
+      title={title}
+      className={cx(
+        "chip-solid inline-flex h-6 items-center rounded-md px-2 text-[12px] leading-none font-medium whitespace-nowrap",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
 
 /** Etiqueta de categoría con su color, como los tags de Notion. */
 export function CategoryTag({ category, className }: { category?: CategoryDTO | null; className?: string }) {
   if (!category) return null;
   return (
-    <span
-      style={tone(category.color)}
-      className={cx(
-        "inline-flex h-[22px] items-center rounded-[3px] bg-tone px-1.5 text-[12px] leading-none font-medium text-tone-fg",
-        className,
-      )}
-    >
+    <Chip toneKey={category.color} className={className}>
       {category.name}
-    </span>
+    </Chip>
   );
 }
 
-/** Pastilla de estado con un tono de la paleta. */
+/** Estado de una tarea, con un punto adelante. */
 export function StatusPill({ label, toneKey }: { label: string; toneKey: string }) {
   return (
-    <span
-      style={tone(toneKey)}
-      className="inline-flex h-[22px] items-center gap-1.5 rounded-full bg-tone px-2 font-mono text-[10.5px] leading-none font-medium tracking-[0.06em] whitespace-nowrap text-tone-fg uppercase"
-    >
+    <Chip toneKey={toneKey} className="gap-1.5 rounded-full pr-2.5 pl-2">
+      <span aria-hidden className="size-1.5 rounded-full bg-current opacity-80" />
       {label}
-    </span>
+    </Chip>
   );
 }
 
-/** Prioridad en fueguitos (0 a 4). */
-export function Fires({ n, size = 13 }: { n: number; size?: number }) {
-  if (n <= 0) return null;
+/** Prioridad 0 a 4 en palabras (antes eran fueguitos, como en Notion). */
+export const PRIORITIES: { value: number; label: string; tone: string }[] = [
+  { value: 1, label: "Baja", tone: "stone" },
+  { value: 2, label: "Media", tone: "blue" },
+  { value: 3, label: "Alta", tone: "orange" },
+  { value: 4, label: "Urgente", tone: "red" },
+];
+
+export function PriorityTag({ n }: { n: number }) {
+  const p = PRIORITIES.find((x) => x.value === n);
+  if (!p) return null;
   return (
-    <span className="inline-flex items-center text-[var(--p-orange-solid)]" aria-label={`Prioridad ${n} de 4`}>
-      {Array.from({ length: n }, (_, i) => (
-        <Fire key={i} size={size} weight="fill" aria-hidden />
-      ))}
-    </span>
+    <Chip toneKey={p.tone} title={`Prioridad ${p.label.toLowerCase()}`}>
+      {p.label}
+    </Chip>
   );
 }
 
-/** Selector de prioridad: tocás el fueguito que querés (tocar el mismo lo baja a 0). */
-export function FirePicker({ value, onChange, name }: { value: number; onChange: (n: number) => void; name?: string }) {
+/** Selector de prioridad: tocar la elegida la saca (queda sin prioridad). */
+export function PriorityPicker({ value, onChange, name }: { value: number; onChange: (n: number) => void; name?: string }) {
   return (
-    <div className="flex h-11 items-center gap-0.5" role="radiogroup" aria-label="Prioridad">
-      {[1, 2, 3, 4].map((p) => (
-        <button
-          key={p}
-          type="button"
-          role="radio"
-          aria-checked={value === p}
-          aria-label={`${p} ${p === 1 ? "fueguito" : "fueguitos"}`}
-          onClick={() => onChange(value === p ? 0 : p)}
-          className={cx(
-            "inline-flex size-11 items-center justify-center rounded-[4px] transition-colors",
-            p <= value ? "text-[var(--p-orange-solid)]" : "text-faint hover:text-muted",
-          )}
-        >
-          <Fire size={20} weight={p <= value ? "fill" : "regular"} />
-        </button>
-      ))}
+    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Prioridad">
+      {PRIORITIES.map((p) => {
+        const on = value === p.value;
+        return (
+          <button
+            key={p.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(on ? 0 : p.value)}
+            style={tone(p.tone)}
+            className={cx(
+              "inline-flex h-10 items-center rounded-full border px-3.5 text-[13px] font-medium transition-colors",
+              on ? "chip-solid border-transparent" : "border-line-strong text-muted hover:text-fg",
+            )}
+          >
+            {p.label}
+          </button>
+        );
+      })}
       {name && <input type="hidden" name={name} value={value} />}
     </div>
   );
 }
 
-/** Avance en 10 cuadraditos, como la fórmula de Notion. */
-export function ProgressSquares({ pct, label }: { pct: number | null; label?: string }) {
+/** Avance como barra fina con el número al lado. */
+export function ProgressBar({ pct, label }: { pct: number | null; label?: string }) {
   if (pct === null) return null;
-  const filled = Math.round(pct / 10);
   return (
-    <span className="inline-flex items-center gap-2" aria-label={`Avance ${pct}%`}>
-      <span className="inline-flex gap-[3px]" aria-hidden>
-        {Array.from({ length: 10 }, (_, i) => (
-          <span
-            key={i}
-            className={cx("h-[10px] w-[7px] rounded-[1px]", i < filled ? "bg-[var(--st-done-line)]" : "bg-line-strong/70")}
-          />
-        ))}
+    <span className="inline-flex min-w-0 flex-1 items-center gap-2.5" aria-label={`Avance ${pct}%`}>
+      <span className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+        <span
+          className={cx("block h-full rounded-full", pct >= 100 ? "bg-[var(--st-done-line)]" : "bg-accent")}
+          style={{ width: `${pct}%` }}
+        />
       </span>
-      {label && <span className="font-mono text-[11px] text-muted tabular">{label}</span>}
+      {label && <span className="shrink-0 font-mono text-[11.5px] text-muted tabular">{label}</span>}
     </span>
   );
 }

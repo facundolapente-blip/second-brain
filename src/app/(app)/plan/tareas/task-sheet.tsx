@@ -6,7 +6,7 @@ import { deleteTask, saveTask } from "@/lib/plan-actions";
 import { TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { FirePicker } from "../plan-ui";
+import { PriorityPicker } from "../plan-ui";
 
 export type TaskSheetHandle = { open: (task?: TaskDTO) => void };
 
@@ -108,7 +108,7 @@ function TaskForm({
       <div className="grid grid-cols-[auto_1fr] items-end gap-4">
         <div className="grid gap-1.5">
           <span className="kicker">Prioridad</span>
-          <FirePicker value={priority} onChange={setPriority} name="priority" />
+          <PriorityPicker value={priority} onChange={setPriority} name="priority" />
         </div>
         <Field label="Deadline">
           <Input type="date" name="deadline" defaultValue={task?.deadline ?? ""} />

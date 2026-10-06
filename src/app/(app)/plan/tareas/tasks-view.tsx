@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CalendarCheck, Minus, Plus } from "@phosphor-icons/react";
+import { Minus, Plus } from "@phosphor-icons/react";
 import { bumpTaskProgress } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
@@ -18,7 +18,7 @@ import {
 import type { LinkableHabit } from "@/lib/plan";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
-import { CategoryTag, categoryMap, Fires, ProgressSquares, StatusPill } from "../plan-ui";
+import { CategoryTag, categoryMap, PriorityTag, ProgressBar, StatusPill } from "../plan-ui";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
 
 const LIMIT = 6;
@@ -153,74 +153,71 @@ function TaskRow({
   onOpen: () => void;
   index: number;
 }) {
-  const [, start] = useTransition();
   const left = daysLeft(t.deadline, today);
   const pct = progressPct(t.progress, t.goal);
   const st = TASK_STATUS[t.status];
-  const urgent = left !== null && left <= 2 && t.status !== "done";
+  const done = t.status === "done";
   return (
-    <li
-      className="rise border-b border-line transition-colors hover:bg-surface-2/50"
-      style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-    >
-      <button type="button" onClick={onOpen} className="grid w-full gap-2 px-1 py-4 text-left">
+    <li className="rise border-b border-line" style={{ "--i": Math.min(index, 8) } as React.CSSProperties}>
+      <button type="button" onClick={onOpen} className="grid w-full gap-2.5 px-1 py-3.5 text-left">
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[16px] leading-snug font-medium", t.status === "done" && "text-muted line-through decoration-faint")}>
-            {t.title}
+          <span className="grid min-w-0 flex-1 gap-0.5">
+            <span className={cx("text-[15.5px] leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
+            {t.scheduled && !done && <span className="text-[12px] text-muted">Agendada en la semana</span>}
           </span>
-          {left !== null && t.status !== "done" && (
-            <span
-              className={cx(
-                "shrink-0 font-mono text-[11px] font-medium tabular",
-                left < 0 ? "text-danger" : urgent ? "text-[var(--p-orange-fg)]" : "text-muted",
-              )}
-            >
-              {daysLeftLabel(left)}
-            </span>
-          )}
+          <Deadline deadline={t.deadline} left={left} done={done} />
         </span>
         <span className="flex flex-wrap items-center gap-1.5">
-          <CategoryTag category={category} />
           <StatusPill label={st.label} toneKey={st.tone} />
-          <Fires n={t.priority} />
-          {t.scheduled && (
-            <span className="inline-flex items-center gap-1 text-[12px] text-accent-fg">
-              <CalendarCheck size={14} weight="fill" aria-hidden /> Agendada
-            </span>
-          )}
-          {t.deadline && (
-            <span className="font-mono text-[11px] text-muted tabular">
-              {formatShort(t.deadline)}
-            </span>
-          )}
+          <CategoryTag category={category} />
+          <PriorityTag n={t.priority} />
         </span>
       </button>
       {pct !== null && (
-        <div className="flex items-center gap-2 border-t border-dashed border-line px-1 py-1.5">
-          <ProgressSquares pct={pct} label={`${t.progress ?? 0} de ${t.goal}`} />
-          {t.status !== "done" && (
-            <span className="ml-auto flex">
-              <button
-                type="button"
-                onClick={() => start(() => bumpTaskProgress(t.id, -1))}
-                aria-label="Restar uno al progreso"
-                className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted hover:bg-surface-2 hover:text-fg"
-              >
-                <Minus size={16} weight="bold" />
-              </button>
-              <button
-                type="button"
-                onClick={() => start(() => bumpTaskProgress(t.id, 1))}
-                aria-label="Sumar uno al progreso"
-                className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted hover:bg-surface-2 hover:text-fg"
-              >
-                <Plus size={16} weight="bold" />
-              </button>
-            </span>
-          )}
+        <div className="flex items-center gap-2 px-1 pb-3">
+          <ProgressBar pct={pct} label={`${t.progress ?? 0} de ${t.goal}`} />
+          {!done && <ProgressButtons task={t} />}
         </div>
       )}
     </li>
+  );
+}
+
+/** Deadline: la fecha y, si está cerca o vencida, una etiqueta suave de color. */
+function Deadline({ deadline, left, done }: { deadline: string | null; left: number | null; done: boolean }) {
+  if (!deadline) return <span className="text-faint" aria-label="Sin deadline">–</span>;
+  const tone =
+    done || left === null || left > 2
+      ? null
+      : left < 0
+        ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]"
+        : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]";
+  return (
+    <span className="grid shrink-0 justify-items-start gap-1">
+      <span className="text-[13.5px] tabular">{formatShort(deadline)}</span>
+      {!done && left !== null && (
+        <span className={cx("rounded-md text-[11.5px] leading-none", tone ? `${tone} px-1.5 py-1 font-medium` : "text-muted")}>
+          {daysLeftLabel(left)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Botones de +1 / −1 del progreso (en la tabla aparecen al pasar el mouse). */
+function ProgressButtons({ task: t, hover }: { task: TaskDTO; hover?: boolean }) {
+  const [, start] = useTransition();
+  const cls =
+    "relative inline-flex size-8 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1.5 hover:bg-surface-3 hover:text-fg";
+  return (
+    <span className={cx("flex shrink-0", hover && "opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100")}>
+      <button type="button" onClick={() => start(() => bumpTaskProgress(t.id, -1))} aria-label={`Restar uno al progreso de ${t.title}`} className={cls}>
+        <Minus size={13} weight="bold" />
+      </button>
+      <button type="button" onClick={() => start(() => bumpTaskProgress(t.id, 1))} aria-label={`Sumar uno al progreso de ${t.title}`} className={cls}>
+        <Plus size={13} weight="bold" />
+      </button>
+    </span>
   );
 }
 
@@ -236,18 +233,17 @@ function TaskTable({
   today: string;
   onOpen: (t: TaskDTO) => void;
 }) {
-  const [, start] = useTransition();
   return (
     <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
       <table className="w-full min-w-[56rem] table-fixed text-left text-[14px]">
         <thead>
-          <tr className="border-b border-line bg-surface-2/60 font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
-            <th className="w-[30%] py-2.5 pr-3 pl-5 font-medium">Tarea</th>
-            <th className="w-[13%] px-3 py-2.5 font-medium">Estado</th>
-            <th className="w-[13%] px-3 py-2.5 font-medium">Categoría</th>
-            <th className="w-[10%] px-3 py-2.5 font-medium">Prioridad</th>
-            <th className="w-[11%] px-3 py-2.5 font-medium">Deadline</th>
-            <th className="py-2.5 pr-5 pl-3 font-medium">Progreso</th>
+          <tr className="border-b border-line text-[12px] text-muted">
+            <th className="w-[31%] py-3 pr-3 pl-5 font-medium">Tarea</th>
+            <th className="w-[14%] px-3 py-3 font-medium">Estado</th>
+            <th className="w-[14%] px-3 py-3 font-medium">Categoría</th>
+            <th className="w-[11%] px-3 py-3 font-medium">Prioridad</th>
+            <th className="w-[12%] px-3 py-3 font-medium">Deadline</th>
+            <th className="py-3 pr-5 pl-3 font-medium">Progreso</th>
           </tr>
         </thead>
         <tbody>
@@ -255,80 +251,39 @@ function TaskTable({
             const left = daysLeft(t.deadline, today);
             const pct = progressPct(t.progress, t.goal);
             const st = TASK_STATUS[t.status];
-            const urgent = left !== null && left <= 2 && t.status !== "done";
+            const done = t.status === "done";
             return (
               <tr
                 key={t.id}
-                className="rise border-b border-line transition-colors last:border-b-0 hover:bg-surface-2/60"
+                className="group rise border-b border-line transition-colors last:border-b-0 hover:bg-surface-2/60"
                 style={{ "--i": Math.min(i, 8) } as React.CSSProperties}
               >
-                <td className="py-1 pr-3 pl-3">
-                  <button type="button" onClick={() => onOpen(t)} className="flex min-h-11 w-full items-center gap-2 rounded-[6px] px-2 text-left">
-                    <span
-                      className={cx(
-                        "min-w-0 flex-1 leading-snug font-medium",
-                        t.status === "done" && "text-muted line-through decoration-faint",
-                      )}
-                    >
-                      {t.title}
-                    </span>
-                    {t.scheduled && <CalendarCheck size={15} weight="fill" className="shrink-0 text-accent-fg" aria-label="Agendada" />}
+                <td className="py-2 pr-3 pl-3">
+                  <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full content-center gap-0.5 rounded-lg px-2 text-left">
+                    <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
+                    {t.scheduled && !done && <span className="text-[12px] text-muted">Agendada en la semana</span>}
                   </button>
                 </td>
-                <td className="px-3 py-1">
+                <td className="px-3 py-2">
                   <StatusPill label={st.label} toneKey={st.tone} />
                 </td>
-                <td className="px-3 py-1">
+                <td className="px-3 py-2">
                   <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
                 </td>
-                <td className="px-3 py-1">
-                  <Fires n={t.priority} />
+                <td className="px-3 py-2">
+                  <PriorityTag n={t.priority} />
                 </td>
-                <td className="px-3 py-1 font-mono text-[12px] whitespace-nowrap tabular">
-                  {t.deadline ? (
-                    <span className="grid">
-                      <span>{formatShort(t.deadline)}</span>
-                      {left !== null && t.status !== "done" && (
-                        <span className={cx("text-[11px]", left < 0 ? "text-danger" : urgent ? "text-[var(--p-orange-fg)]" : "text-muted")}>
-                          {daysLeftLabel(left)}
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-faint" aria-label="Sin deadline">
-                      -
-                    </span>
-                  )}
+                <td className="px-3 py-2">
+                  <Deadline deadline={t.deadline} left={left} done={done} />
                 </td>
-                <td className="py-1 pr-3 pl-3">
+                <td className="py-2 pr-4 pl-3">
                   {pct !== null ? (
-                    <span className="flex items-center gap-1">
-                      <ProgressSquares pct={pct} label={`${t.progress ?? 0}/${t.goal}`} />
-                      {t.status !== "done" && (
-                        <span className="ml-auto flex">
-                          <button
-                            type="button"
-                            onClick={() => start(() => bumpTaskProgress(t.id, -1))}
-                            aria-label={`Restar uno al progreso de ${t.title}`}
-                            className="relative inline-flex size-9 items-center justify-center rounded-full text-muted before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
-                          >
-                            <Minus size={14} weight="bold" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => start(() => bumpTaskProgress(t.id, 1))}
-                            aria-label={`Sumar uno al progreso de ${t.title}`}
-                            className="relative inline-flex size-9 items-center justify-center rounded-full text-muted before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
-                          >
-                            <Plus size={14} weight="bold" />
-                          </button>
-                        </span>
-                      )}
+                    <span className="flex items-center gap-2">
+                      <ProgressBar pct={pct} label={`${t.progress ?? 0}/${t.goal}`} />
+                      {!done && <ProgressButtons task={t} hover />}
                     </span>
                   ) : (
-                    <span className="text-faint" aria-label="Sin progreso">
-                      -
-                    </span>
+                    <span className="text-faint" aria-label="Sin progreso">–</span>
                   )}
                 </td>
               </tr>

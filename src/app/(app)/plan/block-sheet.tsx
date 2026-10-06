@@ -7,7 +7,7 @@ import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
 import type { LinkableHabit } from "@/lib/plan";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
-import { FirePicker } from "./plan-ui";
+import { PriorityPicker } from "./plan-ui";
 
 export type BlockDraft = Partial<BlockDTO> & { date: string };
 export type BlockSheetHandle = { open: (draft: BlockDraft) => void };
@@ -128,7 +128,7 @@ function BlockForm({
 
       <div className="grid gap-1.5">
         <span className="kicker">Prioridad</span>
-        <FirePicker value={priority} onChange={setPriority} name="priority" />
+        <PriorityPicker value={priority} onChange={setPriority} name="priority" />
       </div>
 
       <div className="grid gap-1.5">

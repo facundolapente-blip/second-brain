@@ -31,6 +31,7 @@ import { writeOnDay } from "@/lib/journal-actions";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { CheckinCard } from "./checkin-card";
+import { CategoryTag, PriorityTag } from "../plan/plan-ui";
 
 const WD = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -437,21 +438,11 @@ function PlanToday({ d }: { d: Dashboard }) {
                     {(range || b.category) && (
                       <span className="flex items-center gap-1.5 text-[12px] text-muted">
                         {range && <span className="tabular">{range}</span>}
-                        {b.category && (
-                          <span style={tone(b.category.color)} className="rounded-full bg-tone px-1.5 text-tone-fg">
-                            {b.category.name}
-                          </span>
-                        )}
+                        <CategoryTag category={b.category} />
                       </span>
                     )}
                   </span>
-                  {b.priority > 0 && (
-                    <span className="inline-flex text-[var(--p-orange-solid)]" title={`Prioridad ${b.priority}`}>
-                      {Array.from({ length: b.priority }, (_, k) => (
-                        <Flame key={k} size={12} weight="fill" aria-hidden />
-                      ))}
-                    </span>
-                  )}
+                  <PriorityTag n={b.priority} />
                 </button>
               </li>
             );

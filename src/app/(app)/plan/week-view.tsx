@@ -19,7 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
 import { BlockSheet, type BlockSheetHandle } from "./block-sheet";
-import { CategoryTag, categoryMap, Fires } from "./plan-ui";
+import { CategoryTag, categoryMap, PriorityTag } from "./plan-ui";
 import { PlanTabs } from "./plan-nav";
 
 const SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -346,7 +346,7 @@ function BlockCard({
         </span>
         <span className="flex flex-wrap items-center gap-1.5">
           <CategoryTag category={category} />
-          <Fires n={b.priority} size={12} />
+          <PriorityTag n={b.priority} />
           {habit && (
             <span className="inline-flex items-center gap-0.5 text-[12px] text-accent-fg" title={`Vinculado a ${habit}`}>
               <Medal size={13} weight="fill" aria-hidden />
