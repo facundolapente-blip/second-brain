@@ -286,14 +286,13 @@ export function streakMilestones(h: Pick<HabitRule, "frequency">): number[] {
 }
 
 /**
- * Siguiente estado al tocar un día en la tarjeta: nada → hecho → fallado →
- * salteado → nada. Hoy el salteado no se ve (queda blanco), así que hoy el
- * ciclo es nada → hecho → fallado → nada.
+ * Siguiente estado al tocar un día (en Hoy y en la tarjeta): nada → hecho (tilde
+ * verde) → fallado (cruz roja) → nada. Un día pasado que queda en nada se ve
+ * amarillo. El salteado se elige desde la hoja del día.
  */
-export function nextStatus(current: DayLog | undefined, isToday = false): LogStatus | null {
+export function nextStatus(current: DayLog | undefined): LogStatus | null {
   if (!current || current.s === "none") return "done";
   if (current.s === "done") return "failed";
-  if (current.s === "failed") return isToday ? null : "skipped";
   return null;
 }
 

@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowBendUpRight, Check, Plus, X } from "@phosphor-icons/react";
 import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
-import { dayState, WEEKDAY_SHORT, type PackedLogMap, showsOn } from "@/lib/habit-logic";
-import { HabitIcon } from "@/lib/habit-icons";
-import { tone } from "@/lib/palette";
+import { dayState, WEEKDAY_SHORT, type PackedLogMap, showsOn, nextStatus } from "@/lib/habit-logic";
+import { HabitAvatar } from "@/lib/habit-icons";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, ToneSquare } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { DaySheet, HabitBadge, useHabitLogs, type DaySheetHandle } from "./habit-ui";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
@@ -38,14 +37,10 @@ export function TodayView({
     [today],
   );
 
-  // Como en HabitNow: primero lo que falta marcar, después prioridad y nombre.
-  const settled = (h: HabitDTO) => {
-    const st = dayState(h, logs[h.id] ?? {}, selected, today);
-    return st === "done" || st === "failed" || st === "skipped" ? 1 : 0;
-  };
+  // Orden fijo (prioridad y nombre): al tildar, la fila no cambia de lugar.
   const visible = habits
     .filter((h) => showsOn(h, logs[h.id] ?? {}, selected))
-    .sort((a, b) => settled(a) - settled(b) || b.priority - a.priority || a.name.localeCompare(b.name, "es"));
+    .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name, "es"));
 
   const isFuture = selected > today;
 
@@ -74,22 +69,20 @@ export function TodayView({
             <p className="display py-20 text-center text-[22px] text-muted">No hay hábitos para este día.</p>
           ) : (
             <ul className="divide-y divide-line border-b border-line lg:border-b-0">
-              {visible.map((h, i) => {
+              {visible.map((h) => {
                 const hLogs = logs[h.id] ?? {};
                 const log = hLogs[selected];
                 const state = dayState(h, hLogs, selected, today);
                 const isCount = h.target > 1 || !!h.unit;
                 return (
-                  <li key={h.id} className="rise flex items-center gap-3 py-1.5 lg:gap-4 lg:py-4" style={{ "--i": i } as React.CSSProperties}>
+                  <li key={h.id} className="flex items-center gap-3 py-1.5 lg:gap-4 lg:py-4">
                     <button
                       type="button"
                       onClick={() => daySheet.current?.show(h, selected)}
                       disabled={isFuture}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left lg:gap-4"
                     >
-                      <ToneSquare solid className="size-8 lg:size-[42px]" style={tone(h.color)}>
-                        <HabitIcon name={h.icon} size={17} weight="fill" />
-                      </ToneSquare>
+                      <HabitAvatar icon={h.icon} color={h.color} className="size-8 lg:size-[42px]" />
                       <span className="grid min-w-0 gap-0.5 lg:gap-1">
                         <span className="flex items-baseline gap-2">
                           <span className="truncate text-[15px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
@@ -110,7 +103,8 @@ export function TodayView({
                       disabled={isFuture}
                       onTap={() => {
                         if (isCount) daySheet.current?.show(h, selected);
-                        else mark(h.id, selected, log?.s === "done" ? null : "done", 1);
+                        // Un toque: tilde verde; dos: cruz roja; tres: vuelve a blanco.
+                        else mark(h.id, selected, nextStatus(log), 1);
                       }}
                     />
                   </li>

@@ -17,7 +17,7 @@ import {
   type LogStatus,
   type PackedLogMap,
 } from "@/lib/habit-logic";
-import { addDays, formatLong, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
+import { addDays, formatLong, monthBounds, shiftMonth, weekday } from "@/lib/dates";
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
@@ -117,7 +117,7 @@ export function useDayTap(
       openDetail(habit, date);
       return;
     }
-    mark(habit.id, date, nextStatus(logs[date], date === todayISO()), 1);
+    mark(habit.id, date, nextStatus(logs[date]), 1);
   };
 }
 

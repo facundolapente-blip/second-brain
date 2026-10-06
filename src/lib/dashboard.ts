@@ -19,7 +19,6 @@ import { getCheckin, lastWeight } from "./checkin";
 
 /** Estados que cuentan para el cumplimiento de un día: lo que tocaba hacer. */
 const COUNTS: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pending"];
-const ORDER_TODAY = (s: DayState) => (s === "pending" || s === "partial" ? 0 : s === "done" ? 1 : s === "skipped" ? 3 : 2);
 
 export type DayMix = {
   date: string;
@@ -114,11 +113,8 @@ export async function getDashboard() {
       priority: h.priority,
     }))
     .filter((h) => COUNTS.includes(h.state) || h.state === "skipped")
-    // Primero lo que falta, después lo hecho y al final lo salteado.
-    .sort(
-      (a, b) =>
-        ORDER_TODAY(a.state) - ORDER_TODAY(b.state) || b.priority - a.priority || a.name.localeCompare(b.name, "es"),
-    );
+    // Orden fijo (prioridad y nombre): al tildar desde Inicio la fila no salta.
+    .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name, "es"));
 
   const habitDay = (iso: string) => {
     let done = 0;

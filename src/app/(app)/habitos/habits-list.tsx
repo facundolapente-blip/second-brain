@@ -24,11 +24,11 @@ import {
 import { archiveHabit, deleteHabit, reorderHabits } from "@/lib/habit-actions";
 import { addDays, weekday } from "@/lib/dates";
 import { cleanDays, currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap, type PackedLogMap } from "@/lib/habit-logic";
-import { HabitIcon } from "@/lib/habit-icons";
+import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, IconButton, ToneSquare } from "@/components/ui";
+import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
 import { DayCircle, DaySheet, HabitBadge, useDayTap, useHabitLogs, type DaySheetHandle, type MarkFn } from "./habit-ui";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
@@ -103,9 +103,7 @@ export function HabitsList({
                 ...categories.map((c) => ({
                   label: c.name,
                   icon: (
-                    <ToneSquare size={20} style={tone(c.color)}>
-                      <HabitIcon name={c.icon} size={12} weight="fill" />
-                    </ToneSquare>
+                    <HabitAvatar icon={c.icon} color={c.color} size={20} />
                   ),
                   onSelect: () => setCategory(c.id),
                 })),
@@ -198,9 +196,7 @@ export function HabitsList({
                 return (
                   <li key={id} className="flex items-center gap-3 px-3 py-2">
                     <span className="w-6 text-center font-mono text-[12px] text-muted">{i + 1}</span>
-                    <ToneSquare solid size={30} style={tone(h.color)}>
-                      <HabitIcon name={h.icon} size={16} weight="fill" />
-                    </ToneSquare>
+                    <HabitAvatar icon={h.icon} color={h.color} size={30} />
                     <span className="min-w-0 flex-1 truncate text-[15px]">{h.name}</span>
                     <IconButton label={`Subir ${h.name}`} disabled={i === 0} onClick={() => move(-1)}>
                       <CaretUp size={18} weight="bold" />
@@ -234,10 +230,9 @@ export function HabitsList({
           <p className="display py-16 text-center text-[22px] text-muted">Ningún hábito coincide.</p>
         ) : (
           <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
-          {visible.map((h, i) => (
+          {visible.map((h) => (
             <HabitCard
               key={h.id}
-              index={i}
               habit={h}
               logs={logs[h.id] ?? {}}
               today={today}
@@ -264,7 +259,6 @@ function HabitCard({
   mark,
   onDetail,
   onEdit,
-  index,
 }: {
   habit: HabitDTO;
   logs: LogMap;
@@ -272,7 +266,6 @@ function HabitCard({
   mark: MarkFn;
   onDetail: (h: HabitDTO, d: string) => void;
   onEdit: () => void;
-  index: number;
 }) {
   const [, startTransition] = useTransition();
   const tap = useDayTap(habit, logs, mark, onDetail);
@@ -283,8 +276,7 @@ function HabitCard({
 
   return (
     <article
-      style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise rounded-2xl border border-line bg-surface px-3.5 pt-3.5 pb-1 lg:px-4 lg:pt-4 lg:pb-1.5"
+      className="rounded-2xl border border-line bg-surface px-3.5 pt-3.5 pb-1 lg:px-4 lg:pt-4 lg:pb-1.5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1">
@@ -293,9 +285,7 @@ function HabitCard({
             <HabitBadge habit={habit} />
           </span>
         </div>
-        <ToneSquare solid className="size-8 lg:size-[38px]" style={tone(habit.color)}>
-          <HabitIcon name={habit.icon} size={18} weight="fill" />
-        </ToneSquare>
+        <HabitAvatar icon={habit.icon} color={habit.color} className="size-8 lg:size-[38px]" />
       </div>
 
       <div className="mt-3 grid grid-cols-7 justify-items-center gap-1 lg:mt-4">

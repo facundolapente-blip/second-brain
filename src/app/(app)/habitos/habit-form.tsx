@@ -4,10 +4,10 @@ import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHan
 import { Flag } from "@phosphor-icons/react";
 import { saveHabit } from "@/lib/habit-actions";
 import { WEEKDAY_SHORT, type Frequency } from "@/lib/habit-logic";
-import { HabitIcon } from "@/lib/habit-icons";
+import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
-import { Button, cx, Field, Input, inputClass, Segmented, Sheet, ToneSquare, type SheetHandle } from "@/components/ui";
+import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 
 export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO) => void };
 
@@ -153,9 +153,7 @@ export function HabitFormBody({
                   active ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
                 )}
               >
-                <ToneSquare size={26} style={tone(c.color)}>
-                  <HabitIcon name={c.icon} size={15} weight="fill" />
-                </ToneSquare>
+                <HabitAvatar icon={c.icon} color={c.color} size={26} />
                 {c.name}
               </button>
             );

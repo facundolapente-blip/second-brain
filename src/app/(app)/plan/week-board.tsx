@@ -106,14 +106,16 @@ const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove }: Props) {
   const [over, setOver] = useState<string | null>(null);
   const hours = Array.from({ length: TO - FROM }, (_, i) => FROM + i);
+  const cols = `3.5rem repeat(${days.length}, minmax(${days.length > 1 ? "9.5rem" : "0"}, 1fr))`;
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
       {/* Un solo contenedor con scroll (vertical y horizontal): la cabecera queda fija
           arriba y las columnas de días coinciden siempre con las de la grilla. */}
       <div className="max-h-[75dvh] overflow-auto">
-      <div className="min-w-[70rem]">
+      {/* Con un solo día (celular) la grilla usa todo el ancho; con 7, cada día tiene un mínimo. */}
+      <div className={days.length > 1 ? "min-w-[70rem]" : undefined}>
       {/* Cabecera de días y lo que no tiene hora */}
-      <div className="sticky top-0 z-10 grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))] border-b border-line bg-surface">
+      <div className="sticky top-0 z-10 grid border-b border-line bg-surface" style={{ gridTemplateColumns: cols }}>
         <span />
         {days.map((d) => {
           const untimed = byDay.get(d)!.filter((b) => !b.startTime);
@@ -149,7 +151,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
       </div>
       {/* Grilla de horas */}
       <div>
-        <div className="relative grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))]">
+        <div className="relative grid" style={{ gridTemplateColumns: cols }}>
           <div>
             {hours.map((h) => (
               <div key={h} style={{ height: ROW }} className="pr-2 text-right font-mono text-[10.5px] text-muted">

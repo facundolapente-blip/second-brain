@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { addDays, formatLong, startOfWeek, weekday } from "@/lib/dates";
 import { currentStreak, dayState, habitScore, showsOn, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
-import { HabitIcon } from "@/lib/habit-icons";
-import { tone } from "@/lib/palette";
+import { HabitAvatar } from "@/lib/habit-icons";
 import type { HabitDTO } from "@/lib/habits";
-import { cx, ToneSquare } from "@/components/ui";
+import { cx } from "@/components/ui";
 
 /** Hábitos que tocan un día y cuántos ya están hechos (misma regla que la lista de Hoy). */
 export function dayProgress(habits: HabitDTO[], logs: Record<string, LogMap>, iso: string, today: string) {
@@ -95,9 +94,7 @@ export function TodayPanel({
                   href={`/habitos/${h.id}?tab=estadisticas`}
                   className="-mx-2 flex min-h-12 items-center gap-3 rounded-[6px] px-2 transition-colors hover:bg-surface-2"
                 >
-                  <ToneSquare solid size={28} style={tone(h.color)}>
-                    <HabitIcon name={h.icon} size={15} weight="fill" />
-                  </ToneSquare>
+                  <HabitAvatar icon={h.icon} color={h.color} size={28} />
                   <span className="min-w-0 flex-1 truncate text-[14.5px]">{h.name}</span>
                   <span className="font-mono text-[13px] text-muted tabular">
                     <span className="text-fg">{n}</span> {h.frequency === "weekly" ? "sem" : n === 1 ? "día" : "días"}

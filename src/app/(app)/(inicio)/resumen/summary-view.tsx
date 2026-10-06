@@ -11,7 +11,7 @@ import type { MonthlySummary } from "@/lib/monthly";
 import { formatMonth, formatShort, shiftMonth, weekday } from "@/lib/dates";
 import { formatSleep, formatWeight } from "@/lib/checkin-logic";
 import { moodInfo } from "@/lib/journal-logic";
-import { HabitIcon } from "@/lib/habit-icons";
+import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
 import { moneyCents } from "@/lib/format";
@@ -288,14 +288,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
                     key={h.id}
                     className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1"
                   >
-                    <ToneSquare size={26} style={tone(h.color)}>
-                      <HabitIcon
-                        name={h.icon}
-                        size={14}
-                        weight="fill"
-                        aria-hidden
-                      />
-                    </ToneSquare>
+                    <HabitAvatar icon={h.icon} color={h.color} size={26} />
                     <span className="truncate text-[13.5px]">{h.name}</span>
                     <span className="font-mono text-[12px] text-muted tabular">
                       {h.done}/{h.due} ·{" "}

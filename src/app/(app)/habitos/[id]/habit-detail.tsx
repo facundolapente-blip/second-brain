@@ -31,10 +31,9 @@ import {
   type TrackView,
   type PackedLogs,
 } from "@/lib/habit-logic";
-import { HabitIcon } from "@/lib/habit-icons";
-import { tone } from "@/lib/palette";
+import { HabitAvatar } from "@/lib/habit-icons";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
-import { Button, cx, Segmented, ToneSquare } from "@/components/ui";
+import { Button, cx, Segmented } from "@/components/ui";
 import {
   CalendarMonth,
   DaySheet,
@@ -97,9 +96,7 @@ export function HabitDetail({
             </Link>
             <h1 className="display min-w-0 truncate pb-0.5 text-[26px] lg:text-[38px]">{habit.name}</h1>
             <span className="ml-auto pr-2">
-              <ToneSquare size={36} style={tone(habit.color)}>
-                <HabitIcon name={habit.icon} size={19} weight="fill" />
-              </ToneSquare>
+              <HabitAvatar icon={habit.icon} color={habit.color} size={36} />
             </span>
           </div>
           <div className="grid grid-cols-3 border-b border-line lg:flex lg:gap-8 lg:px-3" role="tablist">

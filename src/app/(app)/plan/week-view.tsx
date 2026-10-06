@@ -212,37 +212,29 @@ export function WeekView({
               );
             })}
           </div>
-          <DayList
-            day={selected}
-            today={today}
-            blocks={byDay.get(selected)!}
-            cats={cats}
-            onToggle={toggle}
-            onEdit={openEdit}
-            onNew={() => openNew(selected)}
-          />
+          <div className="mb-3 flex justify-end">
+            <ViewToggle view={view} onChange={setView} />
+          </div>
+          {view === "lista" ? (
+            <DayList
+              day={selected}
+              today={today}
+              blocks={byDay.get(selected)!}
+              cats={cats}
+              onToggle={toggle}
+              onEdit={openEdit}
+              onNew={() => openNew(selected)}
+            />
+          ) : (
+            // Por horas en el celular: el calendario del día elegido en la tira.
+            <BoardHours {...boardProps} days={[selected]} />
+          )}
         </div>
 
         {/* Escritorio: lista de 7 columnas o calendario por horas; los bloques se arrastran. */}
         <div className="hidden lg:block">
           <div className="mb-3 flex justify-end">
-            <div role="radiogroup" aria-label="Vista" className="inline-flex rounded-full bg-surface-2 p-1">
-              {(["lista", "horas"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="radio"
-                  aria-checked={view === v}
-                  onClick={() => setView(v)}
-                  className={cx(
-                    "h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors",
-                    view === v ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
-                  )}
-                >
-                  {v === "lista" ? "Lista" : "Por horas"}
-                </button>
-              ))}
-            </div>
+            <ViewToggle view={view} onChange={setView} />
           </div>
           {view === "lista" ? (
             <BoardList {...boardProps} />
@@ -393,5 +385,28 @@ export function BlockCard({
         )}
       </button>
     </article>
+  );
+}
+
+/** Lista o Por horas (en el celular y en la compu). */
+function ViewToggle({ view, onChange }: { view: "lista" | "horas"; onChange: (v: "lista" | "horas") => void }) {
+  return (
+    <div role="radiogroup" aria-label="Vista" className="inline-flex rounded-full bg-surface-2 p-1">
+      {(["lista", "horas"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="radio"
+          aria-checked={view === v}
+          onClick={() => onChange(v)}
+          className={cx(
+            "h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors",
+            view === v ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
+          )}
+        >
+          {v === "lista" ? "Lista" : "Por horas"}
+        </button>
+      ))}
+    </div>
   );
 }

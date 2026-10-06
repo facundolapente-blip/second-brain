@@ -6,7 +6,7 @@ import type { WeeklyReview } from "@/lib/review";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import { formatSleep, formatWeight } from "@/lib/checkin-logic";
 import { moodInfo } from "@/lib/journal-logic";
-import { HabitIcon } from "@/lib/habit-icons";
+import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
 import { moneyCents } from "@/lib/format";
@@ -266,9 +266,7 @@ function HabitRow({ h, days }: { h: WeeklyReview["perHabit"][number]; days: Week
   return (
     <>
       <span className="flex min-w-0 items-center gap-2">
-        <ToneSquare size={26} style={tone(h.color)}>
-          <HabitIcon name={h.icon} size={14} weight="fill" aria-hidden />
-        </ToneSquare>
+        <HabitAvatar icon={h.icon} color={h.color} size={26} />
         <span className="min-w-0 truncate" title={h.name}>{h.name}</span>
       </span>
       {days.map((d) => {

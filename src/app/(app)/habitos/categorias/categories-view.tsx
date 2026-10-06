@@ -3,11 +3,11 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { CaretRight, Plus } from "@phosphor-icons/react";
 import { deleteCategory, saveCategory } from "@/lib/habit-actions";
-import { HABIT_ICONS, HabitIcon } from "@/lib/habit-icons";
+import { HABIT_ICONS, HabitAvatar, HabitIcon } from "@/lib/habit-icons";
 import { PALETTE, tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, Field, Input, Sheet, ToneSquare, type SheetHandle } from "@/components/ui";
+import { Button, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { HabitsTabs } from "../habits-nav";
 import { Fab } from "../today-view";
 
@@ -58,9 +58,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                 style={tone(c.color)}
                 className="group flex h-full w-full flex-col items-start gap-8 p-4 text-left transition-colors hover:bg-surface-2 lg:min-h-44 lg:justify-between lg:p-6"
               >
-                <ToneSquare size={42} style={tone(c.color)}>
-                  <HabitIcon name={c.icon} size={23} weight="fill" />
-                </ToneSquare>
+                <HabitAvatar icon={c.icon} color={c.color} size={42} />
                 <span className="flex w-full items-end justify-between gap-2">
                   <span className="grid gap-0.5">
                     <span className="display text-[21px]">{c.name}</span>
@@ -95,9 +93,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           <input type="hidden" name="color" value={draft.color} />
 
           <div className="flex items-end gap-3">
-            <ToneSquare size={40} style={tone(draft.color)}>
-              <HabitIcon name={draft.icon} size={22} weight="fill" />
-            </ToneSquare>
+            <HabitAvatar icon={draft.icon} color={draft.color} size={40} />
             <Field label="Nombre" className="flex-1">
               <Input
                 name="name"

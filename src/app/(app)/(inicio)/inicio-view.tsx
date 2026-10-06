@@ -22,7 +22,7 @@ import {
 import type { Dashboard } from "@/lib/dashboard";
 import { addDays, formatLong, formatMonth, formatShort, shiftMonth, weekday } from "@/lib/dates";
 import { greeting } from "@/lib/journal-logic";
-import { HabitIcon } from "@/lib/habit-icons";
+import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
 import { money, moneyCents } from "@/lib/format";
@@ -321,9 +321,7 @@ function HabitsToday({ d }: { d: Dashboard }) {
             const isDone = h.state === "done";
             const content = (
               <>
-                <ToneSquare size={32} style={tone(h.color)}>
-                  <HabitIcon name={h.icon} size={17} weight="fill" aria-hidden />
-                </ToneSquare>
+                <HabitAvatar icon={h.icon} color={h.color} size={32} />
                 <span
                   className={cx(
                     "min-w-0 flex-1 truncate text-[14px]",
