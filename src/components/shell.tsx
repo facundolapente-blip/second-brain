@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useState } from "react";
-import { CalendarCheck, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
+import { CalendarCheck, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { cx } from "./ui";
 
 type Module = { href: string; label: string; icon: Icon; color: string };
 
 const MODULES: Module[] = [
+  { href: "/", label: "Inicio", icon: House, color: "var(--mod-inicio)" },
   { href: "/habitos", label: "Hábitos", icon: Medal, color: "var(--mod-habitos)" },
   { href: "/journal", label: "Journal", icon: Notebook, color: "var(--mod-journal)" },
   { href: "/gastos", label: "Gastos", icon: Wallet, color: "var(--mod-gastos)" },
@@ -38,7 +39,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label="Módulos">
       <ul className="grid gap-1">
         {MODULES.map((m, i) => {
-          const active = pathname.startsWith(m.href);
+          const active = m.href === "/" ? pathname === "/" : pathname.startsWith(m.href);
           const Ico = m.icon;
           return (
             <li key={m.href}>
@@ -51,7 +52,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   active ? "bg-side-on-bg font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
                 )}
               >
-                <span className="font-mono text-[11px] tabular opacity-60">{String(i + 1).padStart(2, "0")}</span>
+                <span className="font-mono text-[11px] tabular opacity-60">{String(i).padStart(2, "0")}</span>
                 <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
                 {m.label}
                 <span aria-hidden className="ml-auto size-2 rounded-full" style={{ background: m.color }} />

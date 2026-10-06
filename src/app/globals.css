@@ -55,6 +55,12 @@
   --mod-journal: #7a63b0;
   --mod-gastos: #2f7f8f;
   --mod-plan: #c27a35;
+  --mod-inicio: #3f5b7d;
+  /* Color de cada módulo para marcas chicas (puntos, barras) en Inicio. */
+  --c-habitos: var(--mod-habitos);
+  --c-journal: var(--mod-journal);
+  --c-gastos: var(--mod-gastos);
+  --c-plan: var(--mod-plan);
 
   /* Estados de un día de hábito. */
   --st-done-bg: #dcecdf; --st-done-line: #3c855a; --st-done-fg: #22603b;
@@ -116,9 +122,14 @@
 [data-module="journal"] { --mod: var(--mod-journal); }
 [data-module="gastos"] { --mod: var(--mod-gastos); }
 [data-module="plan"] { --mod: var(--mod-plan); }
+[data-module="inicio"] { --mod: var(--mod-inicio); }
 
 /* ── Oscuro: carbón; cada módulo aporta su resplandor y su acento ── */
 :root[data-theme="oscuro"] {
+  --c-habitos: color-mix(in oklab, var(--mod-habitos) 70%, white);
+  --c-journal: color-mix(in oklab, var(--mod-journal) 70%, white);
+  --c-gastos: color-mix(in oklab, var(--mod-gastos) 70%, white);
+  --c-plan: color-mix(in oklab, var(--mod-plan) 75%, white);
   --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
   --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #79756d;
   --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);

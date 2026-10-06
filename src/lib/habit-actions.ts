@@ -11,6 +11,7 @@ export type ActionResult = { ok: true; id?: string } | { ok: false, error: strin
 
 function refrescar() {
   revalidatePath("/habitos", "layout");
+  revalidatePath("/");
 }
 
 const STATUSES: LogStatus[] = ["done", "failed", "skipped"];

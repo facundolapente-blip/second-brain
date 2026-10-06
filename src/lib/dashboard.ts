@@ -1,0 +1,269 @@
+import "server-only";
+import { prisma } from "./prisma";
+import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, toDbDate, todayISO, TZ } from "./dates";
+import { getHabitsWithLogs } from "./habits";
+import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
+import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
+import { getAccounts } from "./finance";
+import { toCents, type CurrencyTotals } from "./finance-logic";
+import { isFreeBlock, sortBlocks, type BlockDTO } from "./plan-logic";
+
+/**
+ * Resumen de los cuatro módulos para Inicio. Todo se calcula acá (servidor) y
+ * viaja como datos planos: los componentes solo dibujan.
+ */
+
+/** Estados que cuentan para el cumplimiento de un día: lo que tocaba hacer. */
+const COUNTS: DayState[] = ["done", "partial", "failed", "missed", "pending"];
+const ORDER_TODAY = (s: DayState) => (s === "pending" || s === "partial" ? 0 : s === "done" ? 1 : s === "skipped" ? 3 : 2);
+
+export type DayMix = {
+  date: string;
+  /** Hábitos hechos / que tocaban ese día (null si no tocaba ninguno). */
+  habitsDone: number;
+  habitsDue: number;
+  wrote: boolean;
+  /** Gasto del día en pesos (centavos). */
+  spentCents: number;
+  blocksDone: number;
+  blocksTotal: number;
+};
+
+function hourNow(): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(new Date()));
+}
+
+export async function getDashboard() {
+  const today = todayISO();
+  const month = today.slice(0, 7);
+  const prevMonth = shiftMonth(month, -1);
+  const monday = startOfWeek(today);
+  const sunday = addDays(monday, 6);
+  // Escritura y hábitos: las últimas 18 semanas (para el mapa de constancia).
+  const heatFrom = addDays(monday, -7 * 17);
+  const dayOfMonth = Number(today.slice(8, 10));
+  const prevSameDay = (() => {
+    const { to } = monthBounds(prevMonth);
+    const last = Number(to.slice(8, 10));
+    return `${prevMonth}-${String(Math.min(dayOfMonth, last)).padStart(2, "0")}`;
+  })();
+
+  const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, tasks] = await Promise.all([
+    getHabitsWithLogs(),
+    prisma.journalEntry.findMany({
+      where: { OR: [{ title: { not: null } }, { body: { not: "" } }] },
+      select: { date: true },
+      distinct: ["date"],
+      orderBy: { date: "asc" },
+    }),
+    prisma.journalEntry.findFirst({
+      where: { OR: [{ title: { not: null } }, { body: { not: "" } }] },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: { id: true, date: true, title: true, body: true, mood: true },
+    }),
+    getAccounts(),
+    prisma.transaction.findMany({
+      where: {
+        kind: { in: ["expense", "income"] },
+        date: { gte: toDbDate(monthBounds(prevMonth).from), lte: toDbDate(monthBounds(month).to) },
+      },
+      select: { date: true, kind: true, amount: true, accountId: true, categoryId: true },
+    }),
+    prisma.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
+    prisma.planBlock.findMany({
+      where: { date: { gte: toDbDate(monday), lte: toDbDate(sunday) } },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+    }),
+    prisma.planTask.findMany({
+      where: { status: { not: "done" } },
+      select: { id: true, title: true, deadline: true, priority: true, status: true, progress: true, goal: true },
+    }),
+  ]);
+
+  // ─── Hábitos ──────────────────────────────────────────────────────────────
+  const { habits, logs } = habitData;
+  const habitsToday = habits
+    .map((h) => ({
+      id: h.id,
+      name: h.name,
+      icon: h.icon,
+      color: h.color,
+      state: dayState(h, logs[h.id], today, today),
+      streak: habitStreak(h, logs[h.id], today),
+      weekly: h.frequency === "weekly",
+      /** De cantidad: se marca desde el detalle, no con un toque. */
+      quantity: h.target > 1 || !!h.unit,
+      priority: h.priority,
+    }))
+    .filter((h) => COUNTS.includes(h.state) || h.state === "skipped")
+    // Primero lo que falta, después lo hecho y al final lo salteado.
+    .sort(
+      (a, b) =>
+        ORDER_TODAY(a.state) - ORDER_TODAY(b.state) || b.priority - a.priority || a.name.localeCompare(b.name, "es"),
+    );
+
+  const habitDay = (iso: string) => {
+    let done = 0;
+    let due = 0;
+    for (const h of habits) {
+      const s = dayState(h, logs[h.id], iso, today);
+      if (!COUNTS.includes(s)) continue;
+      due++;
+      if (s === "done") done++;
+    }
+    return { done, due };
+  };
+  const habitHistory: { date: string; done: number; due: number }[] = [];
+  for (let iso = heatFrom; iso <= today; iso = addDays(iso, 1)) habitHistory.push({ date: iso, ...habitDay(iso) });
+  const bestHabitStreak = [...habitsToday].sort((a, b) => b.streak - a.streak)[0] ?? null;
+
+  // ─── Journal ──────────────────────────────────────────────────────────────
+  const written = journalDays.map((r) => fromDbDate(r.date));
+  const writtenSet = new Set(written);
+  const monthWritten = written.filter((d) => d.startsWith(month)).length;
+
+  // ─── Gastos ───────────────────────────────────────────────────────────────
+  const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
+  const catById = new Map(categories.map((c) => [c.id, c]));
+  const spentByDay = new Map<string, number>();
+  let spentMonth = 0;
+  let spentPrevSame = 0;
+  let spentPrevTotal = 0;
+  let incomeMonth = 0;
+  const byCat = new Map<string | null, number>();
+  for (const t of flows) {
+    if (currencyOf.get(t.accountId) !== "UYU") continue;
+    const iso = fromDbDate(t.date);
+    const cents = toCents(t.amount);
+    if (t.kind === "income") {
+      if (iso.startsWith(month)) incomeMonth += cents;
+      continue;
+    }
+    spentByDay.set(iso, (spentByDay.get(iso) ?? 0) + cents);
+    if (iso.startsWith(month)) {
+      spentMonth += cents;
+      byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + cents);
+    } else {
+      spentPrevTotal += cents;
+      if (iso <= prevSameDay) spentPrevSame += cents;
+    }
+  }
+  // Gasto acumulado día a día: este mes contra el anterior.
+  const cumulative = (m: string, upTo: number) => {
+    const out: number[] = [];
+    let acc = 0;
+    for (let d = 1; d <= upTo; d++) {
+      acc += spentByDay.get(`${m}-${String(d).padStart(2, "0")}`) ?? 0;
+      out.push(acc);
+    }
+    return out;
+  };
+  const prevDays = Number(monthBounds(prevMonth).to.slice(8, 10));
+  const topCategories = [...byCat.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([id, cents]) => {
+      const c = id ? catById.get(id) : undefined;
+      return { id, name: c?.name ?? "Sin clasificar", color: c?.color ?? "stone", icon: c?.icon ?? "Question", cents };
+    });
+  const balances: CurrencyTotals = {};
+  for (const a of accounts) if (!a.archived) balances[a.currency] = (balances[a.currency] ?? 0) + a.balanceCents;
+
+  // ─── Plan ─────────────────────────────────────────────────────────────────
+  const blockDTOs: BlockDTO[] = blocks.map((b) => ({
+    id: b.id,
+    title: b.title,
+    categoryId: b.categoryId,
+    date: fromDbDate(b.date),
+    startTime: b.startTime,
+    endTime: b.endTime,
+    priority: b.priority,
+    done: b.done,
+    place: b.place,
+    notes: b.notes,
+    taskId: b.taskId,
+    habitId: b.habitId,
+  }));
+  const todayBlocks = sortBlocks(blockDTOs.filter((b) => b.date === today));
+  const planCats = new Map(
+    (await prisma.planCategory.findMany({ select: { id: true, name: true, color: true } })).map((c) => [c.id, c]),
+  );
+  const dueTasks = tasks
+    .filter((t) => t.deadline)
+    .map((t) => ({ ...t, deadline: fromDbDate(t.deadline!), left: diffDays(fromDbDate(t.deadline!), today) }))
+    .filter((t) => t.left <= 7)
+    .sort((a, b) => a.left - b.left || b.priority - a.priority)
+    .slice(0, 5);
+
+  // ─── La semana, los cuatro juntos ─────────────────────────────────────────
+  const week: DayMix[] = [];
+  for (let i = 0; i < 7; i++) {
+    const iso = addDays(monday, i);
+    const h = iso <= today ? habitDay(iso) : { done: 0, due: 0 };
+    const dayBlocks = blockDTOs.filter((b) => b.date === iso && !isFreeBlock(b));
+    week.push({
+      date: iso,
+      habitsDone: h.done,
+      habitsDue: h.due,
+      wrote: writtenSet.has(iso),
+      spentCents: spentByDay.get(iso) ?? 0,
+      blocksDone: dayBlocks.filter((b) => b.done).length,
+      blocksTotal: dayBlocks.length,
+    });
+  }
+
+  return {
+    today,
+    hour: hourNow(),
+    habits: {
+      today: habitsToday,
+      doneToday: habitsToday.filter((h) => h.state === "done").length,
+      skippedToday: habitsToday.filter((h) => h.state === "skipped").length,
+      dueToday: habitsToday.filter((h) => h.state !== "skipped").length,
+      history: habitHistory,
+      best: bestHabitStreak && bestHabitStreak.streak > 0 ? bestHabitStreak : null,
+    },
+    journal: {
+      streak: journalStreak(writtenSet, today),
+      wroteToday: writtenSet.has(today),
+      monthWritten,
+      total: written.length,
+      days: written.filter((d) => d >= heatFrom),
+      last: lastEntry
+        ? {
+            id: lastEntry.id,
+            date: fromDbDate(lastEntry.date),
+            title: lastEntry.title,
+            excerpt: excerpt(lastEntry.body, 220),
+            words: wordCount(lastEntry.body),
+            mood: lastEntry.mood,
+          }
+        : null,
+    },
+    gastos: {
+      month,
+      spentMonth,
+      spentPrevSame,
+      spentPrevTotal,
+      incomeMonth,
+      cumThis: cumulative(month, dayOfMonth),
+      cumPrev: cumulative(prevMonth, prevDays),
+      topCategories,
+      balances,
+    },
+    plan: {
+      today: todayBlocks.map((b) => ({ ...b, category: b.categoryId ? (planCats.get(b.categoryId) ?? null) : null })),
+      dueTasks,
+      // Lo que viene en la semana, para cuando hoy no hay nada.
+      upcoming: sortBlocks(blockDTOs.filter((b) => b.date > today && !isFreeBlock(b)))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 4),
+      weekDone: blockDTOs.filter((b) => b.done && !isFreeBlock(b)).length,
+      weekTotal: blockDTOs.filter((b) => !isFreeBlock(b)).length,
+    },
+    week,
+    heatFrom,
+  };
+}
+
+export type Dashboard = Awaited<ReturnType<typeof getDashboard>>;

@@ -12,6 +12,7 @@ export type ActionResult = { ok: true; id?: string } | { ok: false; error: strin
 function refrescar(habitos = false) {
   revalidatePath("/plan", "layout");
   if (habitos) revalidatePath("/habitos", "layout");
+  revalidatePath("/");
 }
 
 function texto(fd: FormData, key: string, max = 200): string {
