@@ -371,7 +371,7 @@ function ChipGroup({
             onClick={() => onChange(o.value)}
             className={cx(
               "h-9 rounded-md border px-3 text-[13px] transition-colors disabled:opacity-40",
-              value === o.value ? "border-fg bg-ink font-semibold text-on-ink" : "border-line-strong hover:bg-surface-2",
+              value === o.value ? "border-accent bg-accent font-bold text-on-accent" : "border-line-strong hover:bg-surface-2",
             )}
           >
             {o.label}

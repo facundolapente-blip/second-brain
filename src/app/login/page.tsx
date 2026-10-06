@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { Button, Field, Input, Segmented } from "@/components/ui";
+import { BrandMark } from "@/components/shell";
 
 function LoginForm() {
   const router = useRouter();
@@ -70,17 +71,20 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-dvh place-items-center px-4">
+    <main className="mod-plan grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2.5">
-          <span className="inline-flex size-8 items-center justify-center rounded-md bg-ink text-sm font-semibold text-on-ink">
-            F
-          </span>
-          <span className="text-base font-semibold tracking-tight">Second Brain</span>
+        <div className="mb-8 grid justify-items-center gap-4 text-center">
+          <BrandMark size={64} />
+          <div className="grid gap-1">
+            <h1 className="text-[32px] leading-none font-black tracking-[-0.02em]">Second Brain</h1>
+            <p className="text-[15px] font-semibold text-muted">Hábitos, journal, gastos y tu semana.</p>
+          </div>
         </div>
-        <Suspense>
-          <LoginForm />
-        </Suspense>
+        <div className="card rounded-[28px] p-5">
+          <Suspense>
+            <LoginForm />
+          </Suspense>
+        </div>
       </div>
     </main>
   );

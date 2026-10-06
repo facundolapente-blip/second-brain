@@ -333,7 +333,7 @@ export const TxSheet = forwardRef<
                 onClick={() => set({ date: o.value })}
                 className={cx(
                   "h-10 rounded-md border px-3.5 text-sm transition-colors",
-                  d.date === o.value ? "border-fg bg-ink text-on-ink" : "border-line-strong text-fg hover:bg-surface-2",
+                  d.date === o.value ? "border-accent bg-accent font-bold text-on-accent" : "border-line-strong text-fg hover:bg-surface-2",
                 )}
               >
                 {o.label}
@@ -475,7 +475,7 @@ function CategoryChip({
       {children}
       <span className="line-clamp-2 text-[11.5px] leading-tight">{label}</span>
       {selected && (
-        <span className="absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-ink text-on-ink">
+        <span className="absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-accent text-on-accent">
           <Check size={10} weight="bold" />
         </span>
       )}

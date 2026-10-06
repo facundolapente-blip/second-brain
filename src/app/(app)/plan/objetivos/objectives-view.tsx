@@ -99,11 +99,11 @@ export function ObjectivesView({
                 <section key={g.id || "loose"} className="rise grid gap-2" style={{ "--i": gi } as React.CSSProperties}>
                   <header className="flex items-end justify-between gap-3 px-1">
                     <h2 className="text-[17px] font-extrabold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
-                    {pct !== null && <span className="tabular text-[13px] font-semibold text-muted">{pct}%</span>}
+                    {pct !== null && <span className="tabular rounded-full bg-[var(--st-done-bg)] px-2.5 py-0.5 text-[13px] font-extrabold text-[var(--st-done-fg)]">{pct}%</span>}
                   </header>
                   {pct !== null && (
-                    <div className="mx-1 h-1.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                      <div className="h-full rounded-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
+                    <div className="mx-1 h-2.5 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                      <div className="h-full rounded-full bg-[var(--st-done-solid)]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
                   <ul className="grid gap-2 pt-1">
@@ -142,10 +142,10 @@ function KrRow({ kr: k, today, onOpen }: { kr: KeyResultDTO; today: string; onOp
       <button
         type="button"
         onClick={onOpen}
-        className="grid w-full gap-2 rounded-card card p-3.5 text-left transition-colors hover:border-line-strong"
+        className="grid w-full gap-2 rounded-card card p-3.5 text-left transition-transform active:scale-[0.99]"
       >
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-semibold", finished && "text-muted")}>
+          <span className={cx("min-w-0 flex-1 text-[16px] leading-snug font-extrabold", finished && "text-muted")}>
             {k.title}
           </span>
           {left !== null && (

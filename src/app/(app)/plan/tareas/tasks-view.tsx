@@ -76,11 +76,11 @@ export function TasksView({
                 onClick={() => setView(v.id)}
                 className={cx(
                   "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
-                  on ? "border-ink bg-ink font-semibold text-on-ink" : "border-line text-muted hover:bg-surface-2 hover:text-fg",
+                  on ? "border-accent bg-accent font-bold text-on-accent" : "border-transparent bg-surface font-semibold text-muted hover:text-fg",
                 )}
               >
                 {v.label}
-                <span className={cx("tabular text-[12px]", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
+                <span className={cx("tabular text-[12px]", on ? "text-on-accent" : "text-muted")}>{n}</span>
               </button>
             );
           })}
@@ -151,12 +151,12 @@ function TaskRow({
   const urgent = left !== null && left <= 2 && t.status !== "done";
   return (
     <li
-      className="rise rounded-card card transition-colors hover:border-line-strong"
+      className="rise rounded-card card transition-transform active:scale-[0.99]"
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
     >
       <button type="button" onClick={onOpen} className="grid w-full gap-2 p-3.5 text-left">
         <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-semibold", t.status === "done" && "text-muted line-through decoration-faint")}>
+          <span className={cx("min-w-0 flex-1 text-[16px] leading-snug font-extrabold", t.status === "done" && "text-muted line-through decoration-faint")}>
             {t.title}
           </span>
           {left !== null && t.status !== "done" && (
@@ -195,7 +195,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, -1))}
                 aria-label="Restar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-10 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
               >
                 <Minus size={16} weight="bold" />
               </button>
@@ -203,7 +203,7 @@ function TaskRow({
                 type="button"
                 onClick={() => start(() => bumpTaskProgress(t.id, 1))}
                 aria-label="Sumar uno al progreso"
-                className="inline-flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+                className="inline-flex size-10 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
               >
                 <Plus size={16} weight="bold" />
               </button>
