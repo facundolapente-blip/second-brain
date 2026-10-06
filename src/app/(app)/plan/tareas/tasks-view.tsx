@@ -52,6 +52,7 @@ export function TasksView({
     <>
       <PageHeader
         title="Tareas"
+        wide
         tabs={<PlanTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
@@ -59,7 +60,8 @@ export function TasksView({
           </Button>
         }
       />
-      <main className="mx-auto max-w-3xl px-4 lg:px-10">
+      <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
+        <TaskSummary tasks={tasks} today={today} />
         <div
           role="tablist"
           aria-label="Vistas"
@@ -96,7 +98,14 @@ export function TasksView({
             </Button>
           </div>
         ) : (
-          <ul className="grid border-t border-line">
+          <>
+          <TaskTable
+            tasks={visible}
+            cats={cats}
+            today={today}
+            onOpen={(t) => sheet.current?.open(t)}
+          />
+          <ul className="grid border-t border-line lg:hidden">
             {visible.map((t, i) => (
               <TaskRow
                 key={t.id}
@@ -108,6 +117,7 @@ export function TasksView({
               />
             ))}
           </ul>
+          </>
         )}
       </main>
 
@@ -212,5 +222,160 @@ function TaskRow({
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Resumen de la computadora arriba de la tabla: cuántas hay sin empezar, en
+ * curso, con deadline en los próximos 7 días (o vencidas) y terminadas.
+ */
+function TaskSummary({ tasks, today }: { tasks: TaskDTO[]; today: string }) {
+  const open = tasks.filter((t) => t.status !== "done");
+  const soon = open.filter((t) => {
+    const l = daysLeft(t.deadline, today);
+    return l !== null && l <= 7;
+  });
+  const overdue = soon.filter((t) => (daysLeft(t.deadline, today) ?? 0) < 0).length;
+  const tiles: { label: string; value: number; hint: string }[] = [
+    { label: "Sin empezar", value: tasks.filter((t) => t.status === "todo").length, hint: "para hacer" },
+    { label: "En curso", value: tasks.filter((t) => t.status === "doing").length, hint: "arrancadas" },
+    {
+      label: "Deadline cerca",
+      value: soon.length,
+      hint: overdue ? `${overdue} ${overdue === 1 ? "vencida" : "vencidas"}` : "en los próximos 7 días",
+    },
+    { label: "Terminadas", value: tasks.filter((t) => t.status === "done").length, hint: `de ${tasks.length} tareas` },
+  ];
+  return (
+    <dl className="hidden grid-cols-4 gap-4 pt-6 lg:grid">
+      {tiles.map((t, i) => (
+        <div
+          key={t.label}
+          className={cx("grid content-start gap-1 rounded-2xl px-5 pt-4 pb-4", i === 0 ? "hero" : "border border-line bg-surface")}
+        >
+          <dt className={cx("font-mono text-[11px] tracking-[0.08em] uppercase", i === 0 ? "hero-sub" : "text-muted")}>
+            {t.label}
+          </dt>
+          <dd className="figure pt-1 text-[36px]">{t.value}</dd>
+          <dd className={cx("text-[12.5px]", i === 0 ? "hero-sub" : "text-muted")}>{t.hint}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** En la computadora, la vista es una tabla ancha como la base de Notion. */
+function TaskTable({
+  tasks,
+  cats,
+  today,
+  onOpen,
+}: {
+  tasks: TaskDTO[];
+  cats: Map<string, CategoryDTO>;
+  today: string;
+  onOpen: (t: TaskDTO) => void;
+}) {
+  const [, start] = useTransition();
+  return (
+    <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
+      <table className="w-full min-w-[56rem] table-fixed text-left text-[14px]">
+        <thead>
+          <tr className="border-b border-line bg-surface-2/60 font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
+            <th className="w-[30%] py-2.5 pr-3 pl-5 font-medium">Tarea</th>
+            <th className="w-[13%] px-3 py-2.5 font-medium">Estado</th>
+            <th className="w-[13%] px-3 py-2.5 font-medium">Categoría</th>
+            <th className="w-[10%] px-3 py-2.5 font-medium">Prioridad</th>
+            <th className="w-[11%] px-3 py-2.5 font-medium">Deadline</th>
+            <th className="py-2.5 pr-5 pl-3 font-medium">Progreso</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((t, i) => {
+            const left = daysLeft(t.deadline, today);
+            const pct = progressPct(t.progress, t.goal);
+            const st = TASK_STATUS[t.status];
+            const urgent = left !== null && left <= 2 && t.status !== "done";
+            return (
+              <tr
+                key={t.id}
+                className="rise border-b border-line transition-colors last:border-b-0 hover:bg-surface-2/60"
+                style={{ "--i": Math.min(i, 8) } as React.CSSProperties}
+              >
+                <td className="py-1 pr-3 pl-3">
+                  <button type="button" onClick={() => onOpen(t)} className="flex min-h-11 w-full items-center gap-2 rounded-[6px] px-2 text-left">
+                    <span
+                      className={cx(
+                        "min-w-0 flex-1 leading-snug font-medium",
+                        t.status === "done" && "text-muted line-through decoration-faint",
+                      )}
+                    >
+                      {t.title}
+                    </span>
+                    {t.scheduled && <CalendarCheck size={15} weight="fill" className="shrink-0 text-accent-fg" aria-label="Agendada" />}
+                  </button>
+                </td>
+                <td className="px-3 py-1">
+                  <StatusPill label={st.label} toneKey={st.tone} />
+                </td>
+                <td className="px-3 py-1">
+                  <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
+                </td>
+                <td className="px-3 py-1">
+                  <Fires n={t.priority} />
+                </td>
+                <td className="px-3 py-1 font-mono text-[12px] whitespace-nowrap tabular">
+                  {t.deadline ? (
+                    <span className="grid">
+                      <span>{formatShort(t.deadline)}</span>
+                      {left !== null && t.status !== "done" && (
+                        <span className={cx("text-[11px]", left < 0 ? "text-danger" : urgent ? "text-[var(--p-orange-fg)]" : "text-muted")}>
+                          {daysLeftLabel(left)}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-faint" aria-label="Sin deadline">
+                      -
+                    </span>
+                  )}
+                </td>
+                <td className="py-1 pr-3 pl-3">
+                  {pct !== null ? (
+                    <span className="flex items-center gap-1">
+                      <ProgressSquares pct={pct} label={`${t.progress ?? 0}/${t.goal}`} />
+                      {t.status !== "done" && (
+                        <span className="ml-auto flex">
+                          <button
+                            type="button"
+                            onClick={() => start(() => bumpTaskProgress(t.id, -1))}
+                            aria-label={`Restar uno al progreso de ${t.title}`}
+                            className="relative inline-flex size-9 items-center justify-center rounded-full text-muted before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
+                          >
+                            <Minus size={14} weight="bold" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => start(() => bumpTaskProgress(t.id, 1))}
+                            aria-label={`Sumar uno al progreso de ${t.title}`}
+                            className="relative inline-flex size-9 items-center justify-center rounded-full text-muted before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
+                          >
+                            <Plus size={14} weight="bold" />
+                          </button>
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-faint" aria-label="Sin progreso">
+                      -
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
