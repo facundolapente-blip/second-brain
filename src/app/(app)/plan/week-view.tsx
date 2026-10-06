@@ -277,7 +277,7 @@ function DayList({
       </h3>
       {blocks.length === 0 ? (
         <div className="grid justify-items-start gap-3 border-t border-line py-8">
-          <p className="display text-[20px] text-muted italic">Nada planeado para este día.</p>
+          <p className="display text-[20px] text-muted">Nada planeado para este día.</p>
           <Button variant="outline" size="sm" onClick={onNew}>
             <Plus size={15} /> Agregar bloque
           </Button>
@@ -334,7 +334,7 @@ function BlockCard({
         <span
           className={cx(
             "text-[14.5px] leading-snug font-medium",
-            free && "font-serif text-[16px] font-normal text-muted italic",
+            free && "font-serif text-[16px] font-normal text-muted",
             b.done && !free && "text-muted line-through decoration-faint",
           )}
         >

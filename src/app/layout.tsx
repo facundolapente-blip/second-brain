@@ -1,17 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Instrument_Sans, Newsreader } from "next/font/google";
+import { cookies } from "next/headers";
+import { Geist, Geist_Mono } from "next/font/google";
+import { THEME_COOKIE, isTheme } from "@/lib/theme";
 import "./globals.css";
 
-// Papel: sans con carácter para la interfaz, serif editorial para títulos, cifras grandes y
-// lectura larga, mono chica para metadatos (fechas, rótulos).
-const sans = Instrument_Sans({ variable: "--font-ui-sans", subsets: ["latin"], display: "swap" });
-const serif = Newsreader({
-  variable: "--font-newsreader",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  axes: ["opsz"],
-  display: "swap",
-});
+// Geist para toda la interfaz y la lectura; Geist Mono para números, fechas y rótulos.
+const sans = Geist({ variable: "--font-ui-sans", subsets: ["latin"], display: "swap" });
 const mono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
@@ -22,15 +16,18 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f4ee" },
-    { media: "(prefers-color-scheme: dark)", color: "#161513" },
+    { media: "(prefers-color-scheme: light)", color: "#e8e1d3" },
+    { media: "(prefers-color-scheme: dark)", color: "#141413" },
   ],
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // El tema se lee del servidor para que la primera pintada ya salga con el color elegido.
+  const saved = (await cookies()).get(THEME_COOKIE)?.value;
+  const theme = isTheme(saved) ? saved : "auto";
   return (
-    <html lang="es" className={`${sans.variable} ${serif.variable} ${mono.variable} antialiased`}>
+    <html lang="es" data-theme={theme} className={`${sans.variable} ${mono.variable} antialiased`}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

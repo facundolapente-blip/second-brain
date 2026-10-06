@@ -244,7 +244,7 @@ export function TxRow({
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted italic")}>{title || "Sin título"}</span>
+        <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted")}>{title || "Sin título"}</span>
         <span className="truncate text-[13px] text-muted">{subtitle}</span>
       </span>
       <span className="grid shrink-0 justify-items-end gap-0.5 font-mono text-[14px] font-medium">

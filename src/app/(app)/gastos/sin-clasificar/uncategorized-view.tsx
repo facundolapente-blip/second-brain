@@ -83,7 +83,7 @@ export function UncategorizedView({
                     >
                       <CategoryAvatar />
                       <span className="grid min-w-0 flex-1 gap-0.5">
-                        <span className={t.title ? "truncate text-[15px] font-medium" : "truncate text-[15px] text-muted italic"}>
+                        <span className={t.title ? "truncate text-[15px] font-medium" : "truncate text-[15px] text-muted"}>
                           {t.title || "Sin título"}
                         </span>
                         <span className="truncate text-[13px] text-muted">

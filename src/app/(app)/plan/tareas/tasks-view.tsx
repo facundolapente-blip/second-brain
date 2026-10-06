@@ -88,7 +88,7 @@ export function TasksView({
 
         {visible.length === 0 ? (
           <div className="mt-2 grid justify-items-start gap-3 border-y border-line py-8">
-            <p className="display text-[20px] text-muted italic">
+            <p className="display text-[20px] text-muted">
               {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
             </p>
             <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>

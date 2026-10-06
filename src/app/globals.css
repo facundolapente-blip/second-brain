@@ -1,48 +1,70 @@
 @import "tailwindcss";
 
 /*
- * Papel: un cuaderno de papel bueno. Fondo crema con un grano casi invisible,
- * tinta casi negra (casi blanca en oscuro), líneas finas en lugar de cajas y
- * casi nada de sombra. El único acento es la tinta azul petróleo de --accent
- * (lo interactivo). El color de verdad aparece solo en pasteles apagados que
- * identifican hábitos, cuentas y categorías, y en los estados de un día.
- * Tipografía: Newsreader (serif) para títulos, cifras grandes y lectura;
- * Instrument Sans para la interfaz; Geist Mono chica para metadatos.
- * Radios: 4px controles, 8px superficies, círculos solo para los días.
+ * Tres temas que Facu elige desde el menú (cookie sb_tema → <html data-theme>):
+ *  - Arena  (base y "auto" de día): fondo arena cálido, menú lateral de tinta,
+ *           tarjetas crema que flotan con sombra teñida.
+ *  - Color  ("modulo"): cada módulo se tiñe con su color ([data-module] en el
+ *           layout de cada uno): Hábitos verde, Journal lavanda, Gastos petróleo,
+ *           Plan ámbar. Fondo con un velo del color arriba.
+ *  - Noche  (y "auto" con el sistema en oscuro): carbón con un resplandor tenue
+ *           del acento, tarjetas en capas.
+ * Tipografía: Geist para todo, Geist Mono para números, fechas y rótulos.
+ * El color de identidad (hábitos, cuentas, categorías) y los estados de un día
+ * (--st-*) son los mismos en todos los temas, con su versión clara u oscura.
  */
 
 :root {
-  --bg: #f6f4ee;
-  --surface: #fbfaf6;
-  --surface-2: #eeebe3;
-  --surface-3: #e5e1d6;
+  --bg: #e8e1d3;
+  --surface: #fbf8f1;
+  --surface-2: #f1ebdf;
+  --surface-3: #e6dfd0;
   /* Lo que se apoya sobre una superficie (segmento elegido, chips). */
-  --raised: #fffefa;
-  --border: #e2ded3;
-  --border-strong: #cdc8bb;
-  --text: #24221e;
-  --muted: #64605a;
-  /* Solo para placeholders, separadores y texto decorativo (3:1). */
-  --faint: #8a857b;
-  --ink: #1c1b18;
-  --on-ink: #f8f6f0;
+  --raised: #fffdf8;
+  --border: #e3dbcc;
+  --border-strong: #cfc6b4;
+  --text: #1f1d1a;
+  --muted: #655e52;
+  /* Solo para placeholders, separadores y texto decorativo. */
+  --faint: #8b8374;
+  --ink: #1f1d1a;
+  --on-ink: #fbf7ee;
   --danger: #a93a33;
   --success: #3a663d;
-  --focus: rgba(28, 27, 24, 0.16);
-  /* Único acento: tinta azul petróleo, como la de una lapicera de pluma. */
-  --accent: #22698a;
-  --accent-soft: #dfeaee;
-  --accent-fg: #1b5873;
+  --focus: rgba(31, 29, 26, 0.18);
+  --accent: #2f6f5e;
+  --accent-soft: #dcebe4;
+  --accent-fg: #235a4b;
   --on-accent: #ffffff;
-  /* Sombras teñidas con el papel, nunca negro puro. */
-  --shadow-tint: 52, 44, 30;
-  --grain-opacity: 0.045;
+  --shadow-tint: 60, 48, 30;
+  --grain-opacity: 0.035;
+
+  /* Menú lateral (en Arena es de tinta). */
+  --side-bg: #1d1c1a;
+  --side-fg: #b3ac9d;
+  --side-on: #fbf7ee;
+  --side-on-bg: rgba(255, 255, 255, 0.08);
+  --side-line: rgba(255, 255, 255, 0.08);
+  /* Bloque destacado (el dato principal de una pantalla). */
+  --hero-bg: #1f1d1a;
+  --hero-fg: #f7f2e8;
+  --hero-sub: #b9b2a3;
+  /* Tarjetas: un aro finito y una sombra larga y teñida. */
+  --card-ring: rgba(60, 48, 30, 0.07);
+  --card-shadow: 0 1px 2px rgba(60, 48, 30, 0.05), 0 14px 32px -16px rgba(60, 48, 30, 0.22);
+  --wash: none;
+
+  /* Colores de cada módulo (puntitos del menú y tema Color). */
+  --mod-habitos: #3f7d45;
+  --mod-journal: #7a63b0;
+  --mod-gastos: #2f7f8f;
+  --mod-plan: #c27a35;
 
   /* Estados de un día de hábito. */
   --st-done-bg: #dcecdf; --st-done-line: #3c855a; --st-done-fg: #22603b;
   --st-fail-bg: #f8e2e0; --st-fail-line: #c4504f; --st-fail-fg: #932c2f;
   --st-skip-bg: #f7eccd; --st-skip-line: #c99b28; --st-skip-fg: #7d5c08;
-  --st-idle-bg: #ebe8e0; --st-idle-fg: #6a665e;
+  --st-idle-bg: #ebe5d8; --st-idle-fg: #6a665e;
 
   --p-stone-bg: #ebe8e0; --p-stone-fg: #5c5952; --p-stone-solid: #8a867d;
   --p-red-bg: #f7e5e2; --p-red-fg: #9a302c; --p-red-solid: #cf6a60;
@@ -57,35 +79,91 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161513;
-    --surface: #1c1b18;
-    --surface-2: #24221f;
-    --surface-3: #2d2b27;
-    --raised: #36342f;
-    --border: #2c2a26;
-    --border-strong: #3d3a34;
-    --text: #ebe6db;
-    --muted: #a39e92;
-    --faint: #7c776c;
-    --ink: #f1ece1;
-    --on-ink: #1a1916;
-    --danger: #e07a70;
-    --success: #93bf93;
-    --focus: rgba(241, 236, 225, 0.2);
-    --accent: #73b4cf;
-    --accent-soft: #1c2c33;
-    --accent-fg: #9acde2;
-    --on-accent: #0f1c22;
-    --shadow-tint: 0, 0, 0;
-    --grain-opacity: 0.06;
+/* ── Color: claro, menú claro, el resto lo tiñe cada módulo ── */
+:root[data-theme="modulo"] {
+  --mod: var(--mod-habitos);
+  --side-bg: #fafaf8;
+  --side-fg: #5f625c;
+  --side-on: #1d201b;
+  --side-on-bg: color-mix(in oklab, var(--mod-habitos) 12%, white);
+  --side-line: #e6e8e3;
+  --grain-opacity: 0;
+}
+:root[data-theme="modulo"],
+:root[data-theme="modulo"] [data-module] {
+  --bg: color-mix(in oklab, var(--mod) 11%, #f4f5f2);
+  --surface: #ffffff;
+  --surface-2: color-mix(in oklab, var(--mod) 6%, #f3f4f1);
+  --surface-3: color-mix(in oklab, var(--mod) 10%, #e9ebe6);
+  --raised: #ffffff;
+  --border: color-mix(in oklab, var(--mod) 10%, #e5e7e2);
+  --border-strong: color-mix(in oklab, var(--mod) 16%, #d0d3cc);
+  --text: #1b1e1a;
+  --muted: #5d625a;
+  --faint: #868b82;
+  --ink: color-mix(in oklab, var(--mod) 88%, black);
+  --on-ink: #ffffff;
+  --accent: var(--mod);
+  --accent-soft: color-mix(in oklab, var(--mod) 14%, white);
+  --accent-fg: color-mix(in oklab, var(--mod) 75%, black);
+  --on-accent: #ffffff;
+  --hero-bg: linear-gradient(140deg, color-mix(in oklab, var(--mod) 92%, white), color-mix(in oklab, var(--mod) 78%, black));
+  --hero-fg: #ffffff;
+  --hero-sub: color-mix(in oklab, var(--mod) 25%, white);
+  --card-ring: color-mix(in oklab, var(--mod) 12%, transparent);
+  --card-shadow: 0 1px 2px rgba(30, 40, 30, 0.05), 0 16px 34px -16px color-mix(in oklab, var(--mod) 35%, transparent);
+  --wash: radial-gradient(1200px 420px at 30% -90px, color-mix(in oklab, var(--mod) 38%, transparent), transparent 72%);
+  --st-idle-bg: #e9ebe6;
+  --st-idle-fg: #6c7068;
+}
+[data-module="habitos"] { --mod: var(--mod-habitos); }
+[data-module="journal"] { --mod: var(--mod-journal); }
+[data-module="gastos"] { --mod: var(--mod-gastos); }
+[data-module="plan"] { --mod: var(--mod-plan); }
 
+/* ── Noche: oscuro (también "auto" con el sistema en oscuro) ── */
+:root[data-theme="noche"] {
+  --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
+  --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #79756d;
+  --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);
+  --accent: #7cc4a0; --accent-soft: #1f2d26; --accent-fg: #a3dbbe; --on-accent: #0f1a14;
+  --shadow-tint: 0, 0, 0; --grain-opacity: 0.04;
+  --side-bg: #0f0f0e; --side-fg: #8f8c85; --side-on: #f2efe8; --side-on-bg: rgba(255, 255, 255, 0.07); --side-line: rgba(255, 255, 255, 0.06);
+  --hero-bg: linear-gradient(150deg, #24342c, #1b211d); --hero-fg: #effaf3; --hero-sub: #a7c2b3;
+  --card-ring: rgba(255, 255, 255, 0.06);
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+  --wash: radial-gradient(900px 420px at 25% -100px, rgba(90, 170, 130, 0.16), transparent 70%);
+  --st-done-bg: #1f3227; --st-done-line: #5fa779; --st-done-fg: #a2d3b1;
+  --st-fail-bg: #382224; --st-fail-line: #d4686c; --st-fail-fg: #efa7a8;
+  --st-skip-bg: #352e18; --st-skip-line: #c6a03c; --st-skip-fg: #e6ca7b;
+  --st-idle-bg: #262624; --st-idle-fg: #8f8a7f;
+  --p-stone-bg: #292825; --p-stone-fg: #bab5aa; --p-stone-solid: #8d887e;
+  --p-red-bg: #382321; --p-red-fg: #eca39b; --p-red-solid: #cf716a;
+  --p-orange-bg: #382a1e; --p-orange-fg: #ebb487; --p-orange-solid: #cf8d57;
+  --p-yellow-bg: #342e1b; --p-yellow-fg: #e5c86f; --p-yellow-solid: #c4a03d;
+  --p-green-bg: #222e20; --p-green-fg: #a6cda6; --p-green-solid: #6f9c70;
+  --p-teal-bg: #1e2e2b; --p-teal-fg: #92ccc3; --p-teal-solid: #569c92;
+  --p-blue-bg: #1d2a35; --p-blue-fg: #a0c6e5; --p-blue-solid: #5f99c4;
+  --p-purple-bg: #2a2535; --p-purple-fg: #c4b6e3; --p-purple-solid: #9282bf;
+  --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
+    --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #79756d;
+    --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);
+    --accent: #7cc4a0; --accent-soft: #1f2d26; --accent-fg: #a3dbbe; --on-accent: #0f1a14;
+    --shadow-tint: 0, 0, 0; --grain-opacity: 0.04;
+    --side-bg: #0f0f0e; --side-fg: #8f8c85; --side-on: #f2efe8; --side-on-bg: rgba(255, 255, 255, 0.07); --side-line: rgba(255, 255, 255, 0.06);
+    --hero-bg: linear-gradient(150deg, #24342c, #1b211d); --hero-fg: #effaf3; --hero-sub: #a7c2b3;
+    --card-ring: rgba(255, 255, 255, 0.06);
+    --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+    --wash: radial-gradient(900px 420px at 25% -100px, rgba(90, 170, 130, 0.16), transparent 70%);
     --st-done-bg: #1f3227; --st-done-line: #5fa779; --st-done-fg: #a2d3b1;
     --st-fail-bg: #382224; --st-fail-line: #d4686c; --st-fail-fg: #efa7a8;
     --st-skip-bg: #352e18; --st-skip-line: #c6a03c; --st-skip-fg: #e6ca7b;
-    --st-idle-bg: #252420; --st-idle-fg: #8f8a7f;
-
+    --st-idle-bg: #262624; --st-idle-fg: #8f8a7f;
     --p-stone-bg: #292825; --p-stone-fg: #bab5aa; --p-stone-solid: #8d887e;
     --p-red-bg: #382321; --p-red-fg: #eca39b; --p-red-solid: #cf716a;
     --p-orange-bg: #382a1e; --p-orange-fg: #ebb487; --p-orange-solid: #cf8d57;
@@ -95,7 +173,6 @@
     --p-blue-bg: #1d2a35; --p-blue-fg: #a0c6e5; --p-blue-solid: #5f99c4;
     --p-purple-bg: #2a2535; --p-purple-fg: #c4b6e3; --p-purple-solid: #9282bf;
     --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
-
     color-scheme: dark;
   }
 }
@@ -122,10 +199,15 @@
   --color-tone: var(--tone-bg);
   --color-tone-fg: var(--tone-fg);
   --color-tone-solid: var(--tone-solid);
+  --color-side: var(--side-bg);
+  --color-side-fg: var(--side-fg);
+  --color-side-on: var(--side-on);
+  --color-side-on-bg: var(--side-on-bg);
+  --color-side-line: var(--side-line);
 
   --font-sans: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-serif: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
@@ -136,11 +218,31 @@ html {
 body {
   position: relative;
   isolation: isolate;
-  background: var(--bg);
+  background: var(--bg) var(--wash) no-repeat;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.55;
+}
+
+/* En Color, cada módulo pinta su fondo y su velo. */
+:root[data-theme="modulo"] [data-module] {
+  background: var(--wash) no-repeat, var(--bg);
+}
+
+/* Tarjetas: toda caja con fondo de superficie y borde flota con un aro y sombra teñida. */
+.bg-surface.border:not(.border-line-strong):not(input, textarea, select) {
+  border-color: var(--card-ring);
+  box-shadow: var(--card-shadow);
+}
+
+/* Bloque destacado (dato principal). */
+.hero {
+  background: var(--hero-bg);
+  color: var(--hero-fg);
+}
+.hero .hero-sub {
+  color: var(--hero-sub);
 }
 
 /* Grano de papel: ruido fijo, detrás de todo, sin capturar toques. */
@@ -173,21 +275,20 @@ h1, h2, h3 {
   font-variant-numeric: tabular-nums;
 }
 
-/* Titular editorial en serif: contraste fuerte, tracking cerrado. */
+/* Titular: Geist con peso y tracking cerrado. */
 .display {
-  font-family: var(--font-newsreader), ui-serif, Georgia, serif;
-  font-optical-sizing: auto;
-  font-weight: 500;
-  letter-spacing: -0.022em;
+  font-family: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 650;
+  letter-spacing: -0.032em;
   line-height: 1.05;
 }
 
-/* Cifra grande en serif (puntaje, saldo, racha). */
+/* Cifra grande (puntaje, saldo, racha). */
 .figure {
-  font-family: var(--font-newsreader), ui-serif, Georgia, serif;
-  font-optical-sizing: auto;
-  font-variant-numeric: lining-nums proportional-nums;
-  letter-spacing: -0.02em;
+  font-family: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
   line-height: 1;
 }
 
@@ -220,7 +321,7 @@ dialog.sheet {
   width: 100%;
   max-width: 100%;
   max-height: 92dvh;
-  border-radius: 12px 12px 0 0;
+  border-radius: 22px 22px 0 0;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border-strong);
@@ -248,7 +349,7 @@ dialog.sheet::backdrop {
   dialog.sheet {
     margin: auto;
     max-width: 30rem;
-    border-radius: 8px;
+    border-radius: 18px;
     border-bottom: 1px solid var(--border-strong);
     box-shadow: 0 24px 60px -28px rgba(var(--shadow-tint), 0.35);
   }
@@ -296,10 +397,9 @@ dialog.sheet::backdrop {
     0 8px 20px -12px rgba(var(--shadow-tint), 0.3);
 }
 
-/* Lectura larga en serif: cortes de línea prolijos y guiones en español. */
+/* Lectura larga: cortes de línea prolijos y guiones en español. */
 .prose-serif {
-  font-family: var(--font-newsreader), ui-serif, Georgia, serif;
+  font-family: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
   text-wrap: pretty;
   hyphens: auto;
-  font-optical-sizing: auto;
 }

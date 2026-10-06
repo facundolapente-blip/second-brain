@@ -68,7 +68,7 @@ export function TodayView({
           {habits.length === 0 ? (
             <EmptyState onCreate={() => form.current?.create()} />
           ) : visible.length === 0 ? (
-            <p className="display py-20 text-center text-[22px] text-muted italic">No hay hábitos para este día.</p>
+            <p className="display py-20 text-center text-[22px] text-muted">No hay hábitos para este día.</p>
           ) : (
             <ul className="divide-y divide-line border-b border-line">
               {visible.map((h, i) => {

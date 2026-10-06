@@ -299,7 +299,7 @@ function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
   return (
     <span className="inline-flex items-baseline gap-2">
       <span className="figure text-[52px]">{value}</span>
-      {unit && <span className="display text-[20px] text-muted italic">{unit}</span>}
+      {unit && <span className="display text-[20px] text-muted">{unit}</span>}
     </span>
   );
 }
@@ -348,7 +348,7 @@ function CalendarTab({
 
       <Panel icon={ChatText} title="Notas">
         {notes.length === 0 ? (
-          <p className="display text-[19px] text-muted italic">No hay notas para el mes.</p>
+          <p className="display text-[19px] text-muted">No hay notas para el mes.</p>
         ) : (
           <ul className="-mx-2 grid divide-y divide-line">
             {notes.map(([d, l]) => (

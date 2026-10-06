@@ -78,7 +78,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-10 grid gap-3 border-b border-fg/80 pb-6">
           <p className="kicker">Cuaderno de Facu</p>
-          <h1 className="display text-[52px] leading-[0.95] italic">Second Brain</h1>
+          <h1 className="display text-[52px] leading-[0.95]">Second Brain</h1>
           <p className="prose-serif text-[17px] leading-snug text-muted">
             Hábitos, journal, gastos y la semana, en un mismo cuaderno.
           </p>

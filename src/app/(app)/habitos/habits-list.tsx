@@ -62,6 +62,7 @@ export function HabitsList({
     <>
       <PageHeader
         title={archived ? "Archivados" : "Hábitos"}
+        wide
         tabs={<HabitsTabs />}
         actions={
           <>
@@ -118,7 +119,7 @@ export function HabitsList({
         }
       />
 
-      <main className="mx-auto grid max-w-3xl px-4 pt-2 lg:px-10 lg:pt-4">
+      <main className="mx-auto grid max-w-3xl px-4 pt-3 lg:max-w-6xl lg:px-10 lg:pt-6">
         {(searching || activeCategory) && (
           <div className="flex flex-wrap items-center gap-2 pb-3">
             {searching && (
@@ -159,9 +160,10 @@ export function HabitsList({
             )}
           </div>
         ) : visible.length === 0 ? (
-          <p className="display py-16 text-center text-[22px] text-muted italic">Ningún hábito coincide.</p>
+          <p className="display py-16 text-center text-[22px] text-muted">Ningún hábito coincide.</p>
         ) : (
-          visible.map((h, i) => (
+          <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+          {visible.map((h, i) => (
             <HabitCard
               key={h.id}
               index={i}
@@ -172,7 +174,8 @@ export function HabitsList({
               onDetail={(habit, date) => daySheet.current?.show(habit, date)}
               onEdit={() => form.current?.edit(h)}
             />
-          ))
+          ))}
+          </div>
         )}
       </main>
 
@@ -209,7 +212,7 @@ function HabitCard({
   return (
     <article
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise border-b border-line pt-5 pb-2 first-of-type:border-t"
+      className="rise rounded-2xl border border-line bg-surface px-4 pt-4 pb-1.5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1">

@@ -69,7 +69,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         {!filtering && (
           <section className="rise grid gap-3 pt-1 lg:pt-0">
             <p className="kicker">{formatLong(home.today)}</p>
-            <p className="display text-[38px] leading-[1.02] text-balance italic lg:text-[52px]">
+            <p className="display text-[38px] leading-[1.02] text-balance lg:text-[52px]">
               {greeting(home.hour)}
               {firstName && `, ${firstName}`}
             </p>

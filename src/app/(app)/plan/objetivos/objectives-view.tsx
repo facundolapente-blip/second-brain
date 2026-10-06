@@ -86,7 +86,7 @@ export function ObjectivesView({
 
         {groups.length === 0 ? (
           <div className="mt-2 grid justify-items-start gap-3 border-y border-line py-8">
-            <p className="display text-[20px] text-muted italic">No hay resultados clave para este filtro.</p>
+            <p className="display text-[20px] text-muted">No hay resultados clave para este filtro.</p>
             <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
               <Plus size={15} /> Nuevo resultado
             </Button>

@@ -91,24 +91,9 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 
 ## Diseño
 
-Monocromo cálido estilo documento, tokens en `globals.css` (claro/oscuro por `prefers-color-scheme`). Un solo acento: azul petróleo (`--accent`). Color solo en pasteles de categoría (`src/lib/palette.ts`) y en los estados de día (`--st-*`). Radios 6px controles / 12-14px superficies. Sin em-dashes en textos visibles. Hojas inferiores con `<dialog>` (`Sheet` en `components/ui.tsx`).
-
-- Texto sobre `bg-accent` siempre `text-on-accent` (blanco en claro, tinta en oscuro): `text-white` sobre el acento claro del modo oscuro no llega a AA. `--muted` es texto secundario AA; `--faint` solo para placeholders, separadores y lo decorativo.
-- Foco visible con el acento (`:focus-visible` global). Áreas táctiles de 44px: `IconButton` agranda su área con un pseudo-elemento sin cambiar el tamaño visible.
-- Utilidades: `.lift` (sombra teñida para lo que flota), `.skeleton` (carga), `.prose-serif` (lectura larga en Newsreader con `text-wrap: pretty` y guiones). Ojo: `@theme inline` no publica `--font-serif` como variable CSS; en CSS propio usar `var(--font-newsreader)`.
-- Borrar con `ConfirmButton` (dos toques, vuelve solo a los 5 s), nunca `window.confirm`.
-- Cada módulo tiene `loading.tsx` con esqueletos de la forma real (`components/skeleton.tsx`) y `error.tsx` con `ErrorState` (en Next 16 la prop es `retry`, no `reset`).
-- Gráficos: un solo eje, leyenda con 2+ series, etiqueta directa solo donde importa, tooltip con puntero y teclado, y siempre "Ver como tabla". Rampas secuenciales con `color-mix` del acento sobre la superficie (se adaptan solas al modo oscuro).
-
-## Diseño (opción A: Papel)
-
-Rediseño editorial: un cuaderno de papel bueno donde el contenido manda. Donde choque con "Diseño", manda esto.
-
-- **Papel y tinta**: fondo crema `#f6f4ee` (noche `#161513`) con grano de ruido fijo casi invisible (`body::before`, `--grain-opacity`). Tinta casi negra; el acento azul petróleo (`--accent`) queda para foco, pestaña activa, marcas del índice y gráficos. Los botones principales son de tinta: `variant="accent"` ahora pinta `bg-ink` (alias de primary).
-- **Tipografía** (`next/font` en `app/layout.tsx`): Newsreader (serif con `opsz`) para títulos, cifras grandes y lectura; Instrument Sans para la interfaz; Geist Mono chica para metadatos. Utilidades en `globals.css`: `.display` (titular serif), `.figure` (cifra serif, figuras proporcionales), `.kicker` (rótulo mono en versalitas; reemplaza los labels de 13px, también en `Field`). Montos de listas y horarios en mono.
-- **Líneas, no cajas**: listas separadas por filetes (`border-line`); los grupos (año del journal, día de gastos, sección de objetivos, día del plan) llevan título serif sobre un filete de tinta (`border-fg/80`). Sin tarjetas con borde salvo el selector de cuentas. Sombras solo en lo que flota (`.lift`, hojas, menús).
-- **Radios**: 4px controles, 6-8px superficies; círculos solo para días de hábitos, ánimo, chips y botones flotantes (de tinta, redondos).
-- **Encabezado**: `PageHeader` con título serif grande y `kicker` opcional (fecha en Hoy). Índice lateral numerado 01 a 04 con barra de acento en el activo. Pestañas subrayadas en tinta; barras inferiores con una rayita de acento sobre el ícono activo, sin pastilla.
-- **Hábitos**: días en círculos de verdad con borde de 1,5px (estados `--st-*`); `ToneSquare` en pastel con ícono en el tono (antes sólido con blanco); tira de días con número serif y el elegido en tinta; detalle con secciones a filete, cifras serif grandes, anillo de puntaje fino y dona con un corte de 4px entre arcos.
-- **Journal**: saludo serif en itálica con la fecha en kicker, recuerdo como cita con filete de acento, entradas como renglones de diario (día serif grande, mes y día mono), editor con título serif de 32 a 40px.
-- **Gastos**: neto del mes como cifra serif, movimientos en filas con montos mono, encabezado de día serif. **Plan**: tablero como agenda impresa (columnas con filete vertical, fecha serif, hoy con un velo de acento), bloques sin caja, "Libre" en serif itálica, casillas cuadradas de 4px.
+- **Temas elegibles** (selector abajo del menú lateral, cookie `sb_tema` que lee el layout raíz → `<html data-theme>`; lógica en `src/lib/theme.ts`): **Auto** (Arena de día, Noche con el sistema en oscuro), **Arena** (fondo arena, menú de tinta, tarjetas crema), **Color** (`modulo`: cada módulo se tiñe con su color vía `data-module` en su layout: Hábitos verde, Journal lavanda, Gastos petróleo, Plan ámbar) y **Noche** (carbón con resplandor del acento). Todos los tokens en `globals.css`; los componentes solo usan tokens (`bg-surface`, `text-fg`, `bg-ink`, `bg-side`...).
+- Tipografía: **Geist** para todo (también títulos y lectura) y **Geist Mono** para números, fechas y rótulos. Sin serif ni itálicas. Las clases `.display`, `.figure` y `.prose-serif` quedaron con nombre viejo pero usan Geist.
+- Tarjetas: cualquier `bg-surface border` (que no sea `border-line-strong` ni un campo) recibe aro + sombra teñida del tema (`--card-ring`, `--card-shadow`). Botones en píldora (`rounded-full`), hojas con radio 22/18px.
+- Computadora: la lista de hábitos ya usa ancho completo (`PageHeader wide`, grilla de 2 columnas). Pendiente: distribuciones de escritorio del resto de las pantallas (paneles laterales en Hoy, Journal y Gastos), según las maquetas de `diseno-tipografias/`.
+- Estados de un día (`--st-*`) y pasteles de identidad (`--p-*`) tienen versión clara y oscura; texto sobre el acento siempre `text-on-accent`. Borrar con `ConfirmButton`, nunca `window.confirm`. Cada módulo tiene `loading.tsx` y `error.tsx` (en Next 16 la prop es `retry`).
+- Gráficos: un solo eje, leyenda con 2+ series, tooltip con puntero y teclado, y siempre "Ver como tabla".

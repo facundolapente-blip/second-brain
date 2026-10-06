@@ -17,8 +17,8 @@ export function Button({ variant = "primary", size = "md", className, ...props }
     <button
       {...props}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-[4px] font-medium whitespace-nowrap transition-[background-color,border-color,color,transform,opacity] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none motion-reduce:active:scale-100",
-        size === "md" ? "h-11 px-4 text-[14px]" : "h-9 px-3 text-[13px]",
+        "inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,transform,opacity] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none motion-reduce:active:scale-100",
+        size === "md" ? "h-11 px-5 text-[14px]" : "h-9 px-3.5 text-[13px]",
         variant === "primary" && "bg-ink text-on-ink hover:opacity-85",
         // En Papel la acción principal se escribe con tinta: "accent" queda como alias de primary.
         variant === "accent" && "bg-ink text-on-ink hover:opacity-85",
@@ -45,7 +45,7 @@ export function IconButton({
       className={cx(
         // El área táctil se agranda 4px por lado sin cambiar el tamaño visible (44px con size-9).
         !/\b(absolute|fixed|sticky)\b/.test(className ?? "") && "relative",
-        "inline-flex size-9 items-center justify-center rounded-[4px] text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-95 motion-reduce:active:scale-100",
+        "inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:scale-95 motion-reduce:active:scale-100",
         className,
       )}
     >

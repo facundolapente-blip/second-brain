@@ -212,7 +212,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               >
                 <span className="figure text-[52px]">{nf.format(s.longest.words)}</span>
                 <span className="kicker">palabras</span>
-                <span className="mt-3 flex items-center gap-2 font-serif text-[18px] italic">
+                <span className="mt-3 flex items-center gap-2 font-serif text-[18px]">
                   <span className="min-w-0 flex-1 truncate first-letter:uppercase">
                     {s.longest.title || formatLong(s.longest.date)}
                     {!s.longest.title && ` de ${s.longest.date.slice(0, 4)}`}

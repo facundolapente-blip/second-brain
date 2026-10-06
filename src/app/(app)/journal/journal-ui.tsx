@@ -140,7 +140,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
             {entry.excerpt ? (
               <span className="prose-serif line-clamp-3 text-[17px] leading-[1.6] text-fg/85">{entry.excerpt}</span>
             ) : (
-              !entry.title && <span className="display text-[17px] text-muted italic">Sin texto</span>
+              !entry.title && <span className="display text-[17px] text-muted">Sin texto</span>
             )}
           </span>
           <MoodBadge mood={entry.mood} size={30} />

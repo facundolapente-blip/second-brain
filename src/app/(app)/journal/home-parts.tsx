@@ -240,7 +240,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
           {showYear(first.date) && ` ${first.date.slice(0, 4)}`}
         </span>
         {first.title && <span className="display text-[22px] leading-snug">{first.title}</span>}
-        <span className="prose-serif line-clamp-3 text-[19px] leading-[1.55] text-fg/90 italic">
+        <span className="prose-serif line-clamp-3 text-[19px] leading-[1.55] text-fg/90">
           {first.excerpt || (!first.title && "Sin texto")}
         </span>
       </Link>

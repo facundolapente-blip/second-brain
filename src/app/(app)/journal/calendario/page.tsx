@@ -141,7 +141,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               </div>
               {selectedEntries.length === 0 ? (
                 <div className="grid justify-items-start gap-4 py-6">
-                  <p className="display text-[20px] text-muted italic">
+                  <p className="display text-[20px] text-muted">
                     {selected > today ? "Este día todavía no llegó." : "Este día no escribiste."}
                   </p>
                   {selected <= today && (
@@ -155,7 +155,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               )}
             </>
           ) : (
-            <p className="border-t border-line py-6 font-serif text-[20px] text-muted italic">
+            <p className="border-t border-line py-6 font-serif text-[20px] text-muted">
               Tocá un día para ver lo que escribiste.
             </p>
           )}

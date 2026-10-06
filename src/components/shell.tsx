@@ -4,15 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useState } from "react";
 import { CalendarCheck, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
+import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { cx } from "./ui";
 
-type Module = { href: string; label: string; icon: Icon; soon?: boolean };
+type Module = { href: string; label: string; icon: Icon; color: string };
 
 const MODULES: Module[] = [
-  { href: "/habitos", label: "Hábitos", icon: Medal },
-  { href: "/journal", label: "Journal", icon: Notebook },
-  { href: "/gastos", label: "Gastos", icon: Wallet },
-  { href: "/plan", label: "Plan semanal", icon: CalendarCheck },
+  { href: "/habitos", label: "Hábitos", icon: Medal, color: "var(--mod-habitos)" },
+  { href: "/journal", label: "Journal", icon: Notebook, color: "var(--mod-journal)" },
+  { href: "/gastos", label: "Gastos", icon: Wallet, color: "var(--mod-gastos)" },
+  { href: "/plan", label: "Plan semanal", icon: CalendarCheck, color: "var(--mod-plan)" },
 ];
 
 const DrawerCtx = createContext<() => void>(() => {});
@@ -24,7 +25,7 @@ export function MenuButton() {
     <button
       onClick={open}
       aria-label="Abrir menú"
-      className="-ml-2.5 inline-flex size-11 items-center justify-center rounded-[4px] text-fg transition-colors hover:bg-surface-2 lg:hidden"
+      className="-ml-2.5 inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 lg:hidden"
     >
       <List size={22} />
     </button>
@@ -35,50 +36,25 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Módulos">
-      <p className="kicker px-3 pb-3">Índice</p>
-      <ul className="border-t border-line">
+      <ul className="grid gap-1">
         {MODULES.map((m, i) => {
           const active = pathname.startsWith(m.href);
           const Ico = m.icon;
-          const num = String(i + 1).padStart(2, "0");
-          if (m.soon) {
-            return (
-              <li key={m.href} className="border-b border-line">
-                <span className="flex h-12 items-center gap-3 px-3 text-[15px] text-faint" aria-disabled>
-                  <span className="font-mono text-[11px]">{num}</span>
-                  {m.label}
-                  <span className="kicker ml-auto">Pronto</span>
-                </span>
-              </li>
-            );
-          }
           return (
-            <li key={m.href} className="border-b border-line">
+            <li key={m.href}>
               <Link
                 href={m.href}
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "group relative flex h-12 items-center gap-3 px-3 text-[15px] transition-colors",
-                  active ? "text-fg" : "text-muted hover:text-fg",
+                  "flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors duration-200",
+                  active ? "bg-side-on-bg font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
                 )}
               >
-                <span
-                  aria-hidden
-                  className={cx(
-                    "absolute inset-y-3 left-0 w-[2px] rounded-full transition-colors",
-                    active ? "bg-accent" : "bg-transparent",
-                  )}
-                />
-                <span className={cx("font-mono text-[11px] tabular", active ? "text-accent-fg" : "text-faint")}>
-                  {num}
-                </span>
-                <span className={cx(active && "font-semibold")}>{m.label}</span>
-                <Ico
-                  size={17}
-                  weight={active ? "fill" : "regular"}
-                  className={cx("ml-auto transition-opacity", active ? "opacity-100" : "opacity-0 group-hover:opacity-60")}
-                />
+                <span className="font-mono text-[11px] tabular opacity-60">{String(i + 1).padStart(2, "0")}</span>
+                <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
+                {m.label}
+                <span aria-hidden className="ml-auto size-2 rounded-full" style={{ background: m.color }} />
               </Link>
             </li>
           );
@@ -90,22 +66,64 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
 
 function Brand() {
   return (
-    <div className="grid gap-1 px-3">
-      <span className="display text-[26px] italic">Second Brain</span>
-      <span className="kicker">Cuaderno de Facu</span>
+    <div className="flex items-center gap-3 px-3">
+      <span className="inline-flex size-8 items-center justify-center rounded-[10px] bg-[var(--mod-habitos)] text-[14px] font-semibold text-white">
+        F
+      </span>
+      <span className="text-[16px] font-semibold tracking-tight text-side-on">Second Brain</span>
     </div>
   );
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
+/** Aplica el tema en la página y lo recuerda un año (la cookie la lee el servidor). */
+function applyTheme(t: Theme) {
+  document.documentElement.dataset.theme = t;
+  document.cookie = `${THEME_COOKIE}=${t}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+}
+
+/** Elegir el tema: se guarda en una cookie (la lee el servidor) y se aplica al instante. */
+function ThemePicker({ initial }: { initial: Theme }) {
+  const [theme, setTheme] = useState<Theme>(initial);
+  function pick(t: Theme) {
+    setTheme(t);
+    applyTheme(t);
+  }
+  return (
+    <div className="grid gap-2 px-1">
+      <span className="px-2 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Tema</span>
+      <div role="radiogroup" aria-label="Tema" className="grid grid-cols-4 gap-1 rounded-full bg-side-on-bg p-1">
+        {THEMES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="radio"
+            aria-checked={theme === t.id}
+            onClick={() => pick(t.id)}
+            className={cx(
+              "h-8 rounded-full text-[12px] font-medium transition-colors duration-200",
+              theme === t.id ? "bg-side-on text-side" : "text-side-fg hover:text-side-on",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
   const [drawer, setDrawer] = useState(false);
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>
-      <div className="lg:grid lg:grid-cols-[248px_1fr]">
-        <aside className="sticky top-0 hidden h-dvh flex-col gap-10 border-r border-line px-4 pt-8 pb-6 lg:flex">
+      <div className="lg:grid lg:grid-cols-[256px_1fr]">
+        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex">
           <Brand />
           <Nav />
+          <div className="mt-auto">
+            <ThemePicker initial={theme} />
+          </div>
         </aside>
 
         {/* Cajón lateral del celular */}
@@ -116,18 +134,21 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div
             onClick={() => setDrawer(false)}
             className={cx(
-              "absolute inset-0 bg-[rgba(30,26,20,0.34)] transition-opacity duration-300 motion-reduce:transition-none",
+              "absolute inset-0 bg-[rgba(20,18,14,0.45)] transition-opacity duration-300 motion-reduce:transition-none",
               drawer ? "opacity-100" : "opacity-0",
             )}
           />
           <aside
             className={cx(
-              "absolute inset-y-0 left-0 flex w-[17.5rem] flex-col gap-10 border-r border-line-strong bg-bg px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-6 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+              "absolute inset-y-0 left-0 flex w-[17.5rem] flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
               drawer ? "translate-x-0" : "-translate-x-full",
             )}
           >
             <Brand />
             <Nav onNavigate={() => setDrawer(false)} />
+            <div className="mt-auto">
+              <ThemePicker initial={theme} />
+            </div>
           </aside>
         </div>
 
