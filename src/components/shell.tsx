@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { createContext, useContext, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useState } from "react";
 import { CalendarCheck, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { cx } from "./ui";
@@ -113,8 +113,31 @@ function ThemePicker({ initial }: { initial: Theme }) {
   );
 }
 
+/**
+ * Al volver a la app (el celular la deja abierta en segundo plano), si pasó un
+ * rato o cambió el día, se piden los datos de nuevo: así no queda mostrando
+ * "hoy" de ayer ni lo que se marcó desde otro dispositivo.
+ */
+function useRefreshOnReturn() {
+  const router = useRouter();
+  useEffect(() => {
+    let hiddenAt = 0;
+    const onChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      const day = (t: number) => new Date(t).toDateString();
+      if (hiddenAt && (Date.now() - hiddenAt > 5 * 60_000 || day(hiddenAt) !== day(Date.now()))) router.refresh();
+    };
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, [router]);
+}
+
 export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
   const [drawer, setDrawer] = useState(false);
+  useRefreshOnReturn();
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>

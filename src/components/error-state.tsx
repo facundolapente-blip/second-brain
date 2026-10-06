@@ -46,13 +46,13 @@ export function ErrorState({
             <button
               type="button"
               onClick={() => retry()}
-              className="inline-flex h-11 items-center gap-2 rounded-[4px] bg-ink px-4 text-sm font-medium text-on-ink transition-opacity hover:opacity-85 active:scale-[0.98]"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-sm font-medium text-on-ink transition-opacity hover:opacity-85 active:scale-[0.98]"
             >
               <ArrowClockwise size={16} weight="bold" aria-hidden /> Reintentar
             </button>
             <Link
               href={back.href}
-              className="inline-flex h-11 items-center rounded-[4px] border border-line-strong px-4 text-sm font-medium transition-colors hover:bg-surface-2"
+              className="inline-flex h-11 items-center rounded-full border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2"
             >
               {back.label}
             </Link>

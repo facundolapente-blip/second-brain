@@ -130,7 +130,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           <>
             <section className="grid gap-3 pt-2 pb-5 lg:pt-6">
               {Object.keys(totals).length > 0 && (
-                <dl className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] border-t border-line">
+                <dl className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] border-t border-line">
                   {Object.keys(totals)
                     .sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
                     .map((c) => {

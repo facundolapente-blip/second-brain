@@ -85,6 +85,9 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     const before = await prisma.planBlock.findUnique({ where: { id } });
     if (!before) return { ok: false, error: "Ese bloque ya no existe." };
     await prisma.planBlock.update({ where: { id }, data });
+    if (data.taskId && data.taskId !== before.taskId) {
+      await prisma.planTask.updateMany({ where: { id: data.taskId }, data: { scheduled: true } });
+    }
     // Si cambió el hábito o el día de un bloque hecho, se mueve la marca.
     if (before.done && (before.habitId !== data.habitId || +before.date !== +data.date)) {
       await syncHabit(before.habitId, before.date, false);
@@ -124,8 +127,17 @@ export async function copyWeekToNext(day: string): Promise<ActionResult> {
     where: { date: { gte: toDbDate(monday), lte: toDbDate(addDays(monday, 6)) } },
   });
   if (blocks.length === 0) return { ok: false, error: "Esta semana no tiene bloques para copiar." };
+  // Si ya se copió (o se armó a mano igual), no se duplica: mismo día, hora y nombre.
+  const next = await prisma.planBlock.findMany({
+    where: { date: { gte: toDbDate(addDays(monday, 7)), lte: toDbDate(addDays(monday, 13)) } },
+    select: { date: true, startTime: true, title: true },
+  });
+  const key = (date: string, start: string | null, title: string) => `${date}|${start ?? ""}|${title.trim().toLowerCase()}`;
+  const taken = new Set(next.map((b) => key(fromDbDate(b.date), b.startTime, b.title)));
+  const fresh = blocks.filter((b) => !taken.has(key(addDays(fromDbDate(b.date), 7), b.startTime, b.title)));
+  if (fresh.length === 0) return { ok: false, error: "La semana que viene ya tiene estos bloques." };
   await prisma.planBlock.createMany({
-    data: blocks.map((b) => ({
+    data: fresh.map((b) => ({
       title: b.title,
       categoryId: b.categoryId,
       date: toDbDate(addDays(fromDbDate(b.date), 7)),
