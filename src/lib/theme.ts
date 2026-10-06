@@ -1,22 +1,18 @@
 /**
- * Temas de la app. Se guardan en una cookie para que el servidor pinte la
- * página ya con el tema elegido (sin un parpadeo del tema por defecto).
- *  - auto:   Arena de día y Noche cuando el sistema está en modo oscuro
- *  - arena:  fondo arena cálido, menú de tinta, tarjetas crema
- *  - modulo: cada módulo con su color (Hábitos verde, Journal lavanda, ...)
- *  - noche:  oscuro, carbón con un resplandor del acento
+ * Temas de la app: Claro (cada módulo con su color) y Oscuro (carbón con un
+ * resplandor del color del módulo). Se guardan en una cookie para que el
+ * servidor pinte la página ya con el tema elegido, sin parpadeos.
  */
 export const THEMES = [
-  { id: "auto", label: "Auto" },
-  { id: "arena", label: "Arena" },
-  { id: "modulo", label: "Color" },
-  { id: "noche", label: "Noche" },
+  { id: "claro", label: "Claro" },
+  { id: "oscuro", label: "Oscuro" },
 ] as const;
 
 export type Theme = (typeof THEMES)[number]["id"];
 
 export const THEME_COOKIE = "sb_tema";
 
-export function isTheme(v: unknown): v is Theme {
-  return typeof v === "string" && THEMES.some((t) => t.id === v);
+/** Lee la cookie; los nombres viejos (noche, modulo, arena, auto) se traducen. */
+export function themeFromCookie(v: string | undefined): Theme {
+  return v === "oscuro" || v === "noche" ? "oscuro" : "claro";
 }

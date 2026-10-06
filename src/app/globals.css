@@ -1,17 +1,13 @@
 @import "tailwindcss";
 
 /*
- * Tres temas que Facu elige desde el menú (cookie sb_tema → <html data-theme>):
- *  - Arena  (base y "auto" de día): fondo arena cálido, menú lateral de tinta,
- *           tarjetas crema que flotan con sombra teñida.
- *  - Color  ("modulo"): cada módulo se tiñe con su color ([data-module] en el
- *           layout de cada uno): Hábitos verde, Journal lavanda, Gastos petróleo,
- *           Plan ámbar. Fondo con un velo del color arriba.
- *  - Noche  (y "auto" con el sistema en oscuro): carbón con un resplandor tenue
- *           del acento, tarjetas en capas.
+ * Dos temas (cookie sb_tema → <html data-theme>):
+ *  - Claro (por defecto): cada módulo se tiñe con su color ([data-module] en su
+ *    layout): Hábitos verde, Journal lavanda, Gastos petróleo, Plan ámbar.
+ *  - Oscuro: carbón con un resplandor tenue del color del módulo.
  * Tipografía: Geist para todo, Geist Mono para números, fechas y rótulos.
- * El color de identidad (hábitos, cuentas, categorías) y los estados de un día
- * (--st-*) son los mismos en todos los temas, con su versión clara u oscura.
+ * Los colores de identidad (--p-*) y los estados de un día (--st-*) tienen
+ * versión clara y oscura.
  */
 
 :root {
@@ -79,8 +75,8 @@
   color-scheme: light;
 }
 
-/* ── Color: claro, menú claro, el resto lo tiñe cada módulo ── */
-:root[data-theme="modulo"] {
+/* ── Claro: menú claro, el resto lo tiñe cada módulo ── */
+:root:not([data-theme="oscuro"]) {
   --mod: var(--mod-habitos);
   --side-bg: #fafaf8;
   --side-fg: #5f625c;
@@ -89,8 +85,8 @@
   --side-line: #e6e8e3;
   --grain-opacity: 0;
 }
-:root[data-theme="modulo"],
-:root[data-theme="modulo"] [data-module] {
+:root:not([data-theme="oscuro"]),
+:root:not([data-theme="oscuro"]) [data-module] {
   --bg: color-mix(in oklab, var(--mod) 11%, #f4f5f2);
   --surface: #ffffff;
   --surface-2: color-mix(in oklab, var(--mod) 6%, #f3f4f1);
@@ -121,8 +117,8 @@
 [data-module="gastos"] { --mod: var(--mod-gastos); }
 [data-module="plan"] { --mod: var(--mod-plan); }
 
-/* ── Noche: oscuro (también "auto" con el sistema en oscuro) ── */
-:root[data-theme="noche"] {
+/* ── Oscuro: carbón; cada módulo aporta su resplandor y su acento ── */
+:root[data-theme="oscuro"] {
   --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
   --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #79756d;
   --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);
@@ -148,35 +144,6 @@
   --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
   color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="auto"] {
-    --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
-    --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #79756d;
-    --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);
-    --accent: #7cc4a0; --accent-soft: #1f2d26; --accent-fg: #a3dbbe; --on-accent: #0f1a14;
-    --shadow-tint: 0, 0, 0; --grain-opacity: 0.04;
-    --side-bg: #0f0f0e; --side-fg: #8f8c85; --side-on: #f2efe8; --side-on-bg: rgba(255, 255, 255, 0.07); --side-line: rgba(255, 255, 255, 0.06);
-    --hero-bg: linear-gradient(150deg, #24342c, #1b211d); --hero-fg: #effaf3; --hero-sub: #a7c2b3;
-    --card-ring: rgba(255, 255, 255, 0.06);
-    --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.8);
-    --wash: radial-gradient(900px 420px at 25% -100px, rgba(90, 170, 130, 0.16), transparent 70%);
-    --st-done-bg: #1f3227; --st-done-line: #5fa779; --st-done-fg: #a2d3b1;
-    --st-fail-bg: #382224; --st-fail-line: #d4686c; --st-fail-fg: #efa7a8;
-    --st-skip-bg: #352e18; --st-skip-line: #c6a03c; --st-skip-fg: #e6ca7b;
-    --st-idle-bg: #262624; --st-idle-fg: #8f8a7f;
-    --p-stone-bg: #292825; --p-stone-fg: #bab5aa; --p-stone-solid: #8d887e;
-    --p-red-bg: #382321; --p-red-fg: #eca39b; --p-red-solid: #cf716a;
-    --p-orange-bg: #382a1e; --p-orange-fg: #ebb487; --p-orange-solid: #cf8d57;
-    --p-yellow-bg: #342e1b; --p-yellow-fg: #e5c86f; --p-yellow-solid: #c4a03d;
-    --p-green-bg: #222e20; --p-green-fg: #a6cda6; --p-green-solid: #6f9c70;
-    --p-teal-bg: #1e2e2b; --p-teal-fg: #92ccc3; --p-teal-solid: #569c92;
-    --p-blue-bg: #1d2a35; --p-blue-fg: #a0c6e5; --p-blue-solid: #5f99c4;
-    --p-purple-bg: #2a2535; --p-purple-fg: #c4b6e3; --p-purple-solid: #9282bf;
-    --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
-    color-scheme: dark;
-  }
-}
-
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -225,8 +192,19 @@ body {
   line-height: 1.55;
 }
 
-/* En Color, cada módulo pinta su fondo y su velo. */
-:root[data-theme="modulo"] [data-module] {
+/* Cada módulo pinta su fondo y su velo con su color. */
+:root:not([data-theme="oscuro"]) [data-module] {
+  background: var(--wash) no-repeat, var(--bg);
+}
+
+/* En oscuro el acento y el resplandor también salen del color del módulo. */
+:root[data-theme="oscuro"] [data-module] {
+  --accent: color-mix(in oklab, var(--mod) 62%, white);
+  --accent-soft: color-mix(in oklab, var(--mod) 20%, #1d1d1b);
+  --accent-fg: color-mix(in oklab, var(--mod) 40%, white);
+  --hero-bg: linear-gradient(150deg, color-mix(in oklab, var(--mod) 35%, #1d1d1b), #1b1b19);
+  --hero-sub: color-mix(in oklab, var(--mod) 35%, #c9c5bc);
+  --wash: radial-gradient(900px 420px at 25% -100px, color-mix(in oklab, var(--mod) 24%, transparent), transparent 70%);
   background: var(--wash) no-repeat, var(--bg);
 }
 

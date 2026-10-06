@@ -91,7 +91,7 @@ function ThemePicker({ initial }: { initial: Theme }) {
   return (
     <div className="grid gap-2 px-1">
       <span className="px-2 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Tema</span>
-      <div role="radiogroup" aria-label="Tema" className="grid grid-cols-4 gap-1 rounded-full bg-side-on-bg p-1">
+      <div role="radiogroup" aria-label="Tema" className="grid grid-cols-2 gap-1 rounded-full bg-side-on-bg p-1">
         {THEMES.map((t) => (
           <button
             key={t.id}
