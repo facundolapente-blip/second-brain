@@ -61,34 +61,34 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
         <section className="rise grid gap-6">
           <div className="grid gap-1">
             <span className="text-[13px] text-muted">Entradas escritas</span>
-            <span className="text-[52px] leading-none font-semibold tracking-[-0.03em]">{nf.format(s.totalEntries)}</span>
+            <span className="text-[56px] leading-none font-black tracking-[-0.03em] text-accent-fg">{nf.format(s.totalEntries)}</span>
             <span className="text-sm text-muted">
               En {days(s.totalDays)}
               {s.firstDate && <>, desde {formatMonth(s.firstDate.slice(0, 7))}</>}. {nf.format(s.totalWords)} palabras en total.
             </span>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-line rounded-card card">
-            <div className="grid content-start gap-1 p-3.5 sm:p-4">
-              <span className="flex items-center gap-1 text-[12.5px] text-muted">
-                <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
+          <div className="grid grid-cols-3 gap-2">
+            <div className="grid content-start gap-1 rounded-card bg-[var(--p-orange-bg)] p-3.5 text-[var(--p-orange-fg)] sm:p-4">
+              <span className="flex items-center gap-1 text-[12.5px] font-bold">
+                <Fire size={14} weight="fill" aria-hidden /> Racha
               </span>
-              <span className="text-[24px] leading-tight font-semibold tracking-tight">{s.streak}</span>
-              <span className="text-[12px] text-muted">{s.streak === 1 ? "día seguido" : "días seguidos"}</span>
+              <span className="text-[26px] leading-tight font-black tracking-tight">{s.streak}</span>
+              <span className="text-[12px] font-semibold">{s.streak === 1 ? "día seguido" : "días seguidos"}</span>
             </div>
-            <div className="grid content-start gap-1 p-3.5 sm:p-4">
-              <span className="flex items-center gap-1 text-[12.5px] text-muted">
-                <Trophy size={14} weight="fill" className="text-[var(--p-yellow-solid)]" aria-hidden /> Récord
+            <div className="grid content-start gap-1 rounded-card bg-[var(--p-yellow-bg)] p-3.5 text-[var(--p-yellow-fg)] sm:p-4">
+              <span className="flex items-center gap-1 text-[12.5px] font-bold">
+                <Trophy size={14} weight="fill" aria-hidden /> Récord
               </span>
-              <span className="text-[24px] leading-tight font-semibold tracking-tight">{s.best}</span>
-              <span className="text-[12px] text-muted">días</span>
+              <span className="text-[26px] leading-tight font-black tracking-tight">{s.best}</span>
+              <span className="text-[12px] font-semibold">días</span>
             </div>
-            <div className="grid content-start gap-1 p-3.5 sm:p-4">
-              <span className="text-[12.5px] text-muted">Por entrada</span>
-              <span className="text-[24px] leading-tight font-semibold tracking-tight">
+            <div className="grid content-start gap-1 rounded-card bg-accent-soft p-3.5 text-accent-fg sm:p-4">
+              <span className="text-[12.5px] font-bold">Por entrada</span>
+              <span className="text-[26px] leading-tight font-black tracking-tight">
                 {nf.format(Math.round(s.totalWords / s.totalEntries))}
               </span>
-              <span className="text-[12px] text-muted">palabras</span>
+              <span className="text-[12px] font-semibold">palabras</span>
             </div>
           </div>
           {s.streak === 0 && <p className="-mt-3 text-[13px] text-muted">Escribí hoy para arrancar una racha nueva.</p>}
@@ -96,7 +96,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
 
         {s.firstDate && (
           <section className="grid gap-3">
-            <h2 className="text-[17px] font-semibold tracking-tight">Constancia</h2>
+            <h2 className="text-[17px] font-extrabold tracking-tight">Constancia</h2>
             <MonthHeatmap
               firstMonth={s.firstDate.slice(0, 7)}
               currentMonth={current}
@@ -113,17 +113,17 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               href={monthLink(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
-            <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
+            <h2 className="text-[17px] font-extrabold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
             {month < current ? (
               <Link
                 href={monthLink(shiftMonth(month, 1))}
                 scroll={false}
                 aria-label="Mes siguiente"
-                className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+                className="inline-flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
               >
                 <CaretRight size={18} weight="bold" />
               </Link>
@@ -200,17 +200,17 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
 
         <section className="grid gap-8 border-t border-line pt-8 sm:grid-cols-2">
           <div className="grid content-start gap-3">
-            <h2 className="text-[17px] font-semibold tracking-tight">Qué días escribís</h2>
+            <h2 className="text-[17px] font-extrabold tracking-tight">Qué días escribís</h2>
             <WeekdayBars values={s.perWeekday} />
           </div>
           {s.longest && (
             <div className="grid content-start gap-3">
-              <h2 className="text-[17px] font-semibold tracking-tight">La entrada más larga</h2>
+              <h2 className="text-[17px] font-extrabold tracking-tight">La entrada más larga</h2>
               <Link
                 href={`/journal/${s.longest.id}`}
                 className="group grid gap-1 rounded-card card p-4 transition-colors hover:border-line-strong"
               >
-                <span className="text-[34px] leading-none font-semibold tracking-tight">{nf.format(s.longest.words)}</span>
+                <span className="text-[34px] leading-none font-extrabold tracking-tight">{nf.format(s.longest.words)}</span>
                 <span className="text-[13px] text-muted">palabras</span>
                 <span className="mt-2 flex items-center gap-2 font-serif text-[16px]">
                   <span className="min-w-0 flex-1 truncate first-letter:uppercase">

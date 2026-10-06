@@ -42,18 +42,18 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
       <JournalHeader title="Calendario" back="/journal" tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
       <main className="mx-auto grid max-w-3xl gap-6 px-4 pt-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10 lg:px-8 lg:pt-6">
-        <section className="grid content-start gap-4">
+        <section className="card grid content-start gap-4 rounded-card p-3 sm:p-4">
           <div className="flex items-center justify-between">
             <Link
               href={href(shiftMonth(month, -1))}
               scroll={false}
               aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
             >
               <CaretLeft size={18} weight="bold" />
             </Link>
             <div className="grid justify-items-center gap-0.5 text-center leading-tight">
-              <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
+              <h2 className="text-[17px] font-extrabold tracking-tight first-letter:uppercase">{formatMonth(month)}</h2>
               <span className="tabular text-[13px] text-muted">
                 {byDay.size === 0
                   ? "Sin entradas"
@@ -69,7 +69,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               href={href(shiftMonth(month, 1))}
               scroll={false}
               aria-label="Mes siguiente"
-              className="inline-flex size-11 items-center justify-center rounded-md text-accent transition-colors hover:bg-surface-2"
+              className="inline-flex size-11 items-center justify-center rounded-full bg-accent-soft text-accent-fg transition-transform active:scale-90"
             >
               <CaretRight size={18} weight="bold" />
             </Link>
@@ -96,32 +96,32 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   aria-current={isSel ? "date" : undefined}
                   style={info ? tone(info.color) : undefined}
                   className={cx(
-                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200",
+                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow,transform] duration-200 active:scale-90",
                     list
                       ? info
-                        ? "bg-tone font-semibold text-tone-fg"
-                        : "bg-accent-soft font-semibold text-accent-fg"
+                        ? "bg-tone-solid font-extrabold text-tone-on"
+                        : "bg-accent font-extrabold text-on-accent"
                       : d > today
                         ? "text-faint"
-                        : "text-fg hover:bg-surface-2",
-                    isSel && "ring-2 ring-accent ring-offset-2 ring-offset-bg",
+                        : "font-semibold text-fg hover:bg-surface-2",
+                    isSel && "ring-[2.5px] ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 >
                   {Number(d.slice(8))}
-                  {d === today && <span className="absolute bottom-1 h-[3px] w-3.5 rounded-full bg-accent" />}
+                  {d === today && <span className="absolute -bottom-0.5 size-1.5 rounded-full bg-accent ring-2 ring-surface" />}
                 </Link>
               );
             })}
           </div>
 
-          <ul className="flex flex-wrap gap-x-3.5 gap-y-1.5 pt-1 text-[12px] text-muted" aria-label="Referencias de color">
+          <ul className="flex flex-wrap gap-x-3.5 gap-y-1.5 px-1 pt-1 text-[12px] font-semibold text-muted" aria-label="Referencias de color">
             <li className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-full bg-accent-soft ring-1 ring-accent/30" />
+              <span className="size-3 rounded-full bg-accent" />
               Escrito
             </li>
             {MOODS.map((m) => (
               <li key={m.value} className="inline-flex items-center gap-1.5">
-                <span style={tone(m.color)} className="size-3 rounded-full bg-tone ring-1 ring-[var(--tone-solid)]/40" />
+                <span style={tone(m.color)} className="size-3 rounded-full bg-tone-solid" />
                 {m.label}
               </li>
             ))}
@@ -132,7 +132,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
           {selected ? (
             <>
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[17px] font-semibold tracking-tight first-letter:uppercase">{formatLong(selected)}</h2>
+                <h2 className="text-[17px] font-extrabold tracking-tight first-letter:uppercase">{formatLong(selected)}</h2>
                 {selectedEntries.length > 0 && (
                   <WriteDayButton date={selected} nueva variant="outline">
                     <Plus size={16} weight="bold" /> Otra

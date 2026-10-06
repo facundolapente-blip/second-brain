@@ -210,7 +210,7 @@ export const TxSheet = forwardRef<
               placeholder="0"
               required
               aria-describedby={state && !state.ok ? "tx-error" : undefined}
-              className="h-full w-0 min-w-0 flex-1 bg-transparent text-[32px] font-semibold tracking-[-0.02em] outline-none placeholder:text-faint"
+              className="h-full w-0 min-w-0 flex-1 bg-transparent text-[32px] font-extrabold tracking-[-0.02em] outline-none placeholder:text-faint"
             />
             {d.kind !== "transfer" && (
               <span

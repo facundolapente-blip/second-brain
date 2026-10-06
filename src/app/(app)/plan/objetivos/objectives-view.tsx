@@ -98,7 +98,7 @@ export function ObjectivesView({
               return (
                 <section key={g.id || "loose"} className="rise grid gap-2" style={{ "--i": gi } as React.CSSProperties}>
                   <header className="flex items-end justify-between gap-3 px-1">
-                    <h2 className="text-[17px] font-semibold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
+                    <h2 className="text-[17px] font-extrabold tracking-tight">{g.title.replace(/^\d+\s+/, "")}</h2>
                     {pct !== null && <span className="tabular text-[13px] font-semibold text-muted">{pct}%</span>}
                   </header>
                   {pct !== null && (

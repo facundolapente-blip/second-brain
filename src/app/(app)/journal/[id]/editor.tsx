@@ -135,16 +135,16 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[42rem] items-center gap-1 px-2 lg:h-16 lg:px-4">
-          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 text-accent">
+      <header className="frost-bg sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-16 max-w-[42rem] items-center gap-2 px-3 lg:h-20 lg:px-4">
+          <IconButton label="Volver a entradas" onClick={goBack} disabled={leaving} className="size-10 bg-surface text-accent-fg shadow-[0_1px_3px_rgba(var(--shadow-tint),0.1)]">
             <CaretLeft size={22} weight="bold" />
           </IconButton>
 
           {/* La fecha se cambia con el selector nativo del sistema. */}
-          <label className="relative inline-flex h-9 min-w-0 cursor-pointer items-center gap-1 rounded-md px-2 hover:bg-surface-2">
-            <span className="truncate text-[15px] font-semibold first-letter:uppercase">{formatRelative(date, today)}</span>
-            <CaretDown size={14} weight="bold" className="shrink-0 text-muted" />
+          <label className="relative inline-flex h-10 min-w-0 cursor-pointer items-center gap-1.5 rounded-full bg-accent-soft px-4 text-accent-fg">
+            <span className="truncate text-[15px] font-extrabold first-letter:uppercase">{formatRelative(date, today)}</span>
+            <CaretDown size={14} weight="bold" className="shrink-0" />
             <input
               ref={dateRef}
               type="date"
@@ -241,7 +241,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
                 write(date, true);
               });
             }}
-            className="flex h-11 items-center gap-3 rounded-md px-2 text-left text-[15px] hover:bg-surface-2"
+            className="flex h-12 items-center gap-3 rounded-[14px] px-3 text-left text-[15px] font-semibold hover:bg-surface-2"
           >
             <Plus size={20} className="text-muted" /> Otra entrada para este día
           </button>
@@ -251,7 +251,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
               moreSheet.current?.close();
               confirmSheet.current?.open();
             }}
-            className="flex h-11 items-center gap-3 rounded-md px-2 text-left text-[15px] text-danger hover:bg-[var(--st-fail-bg)]"
+            className="flex h-12 items-center gap-3 rounded-[14px] px-3 text-left text-[15px] font-semibold text-danger hover:bg-[var(--st-fail-bg)]"
           >
             <Trash size={20} /> Borrar entrada
           </button>
@@ -288,7 +288,7 @@ function SaveStatus({ status }: { status: Status }) {
     <span
       aria-live="polite"
       className={cx(
-        "ml-auto inline-flex items-center gap-1.5 px-2 text-[12px] transition-opacity duration-300",
+        "ml-auto inline-flex items-center gap-1.5 px-2 text-[12px] font-bold transition-opacity duration-300",
         status === "error" ? "text-danger" : "text-muted",
         status === "idle" && "opacity-0",
       )}
@@ -321,15 +321,15 @@ function MoodPicker({ value, onChange }: { value: number | null; onChange: (m: n
             onClick={() => onChange(on ? null : m.value)}
             style={tone(m.color)}
             className={cx(
-              "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-90",
-              on ? "bg-tone text-tone-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
+              "inline-flex size-11 items-center justify-center rounded-full transition-[background-color,color,transform,opacity] duration-200 active:scale-90",
+              on ? "scale-110 bg-tone-solid text-tone-on" : "bg-tone text-tone-fg opacity-75 hover:opacity-100",
             )}
           >
-            <MoodIcon mood={m.value} size={on ? 28 : 26} weight={on ? "duotone" : "regular"} />
+            <MoodIcon mood={m.value} size={26} weight={on ? "fill" : "duotone"} />
           </button>
         );
       })}
-      <span className="ml-2 text-[13px] text-muted">
+      <span className="ml-2 text-[13px] font-bold text-muted">
         {value ? MOODS.find((m) => m.value === value)!.label : "Ánimo"}
       </span>
     </div>
@@ -361,7 +361,7 @@ function TagEditor({
     <div className="grid gap-2.5 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-2 pr-1 pl-3 text-[13px]">
+          <span key={t} className="inline-flex h-8 items-center gap-1 rounded-full bg-accent-soft pr-1 pl-3 text-[13px] font-bold text-accent-fg">
             #{t}
             <button
               type="button"
@@ -409,7 +409,7 @@ function TagEditor({
               // mousedown para que no se pierda el foco antes del click
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => add(t)}
-              className="h-7 rounded-full border border-dashed border-line-strong px-2.5 text-[12px] text-muted hover:border-solid hover:text-fg"
+              className="h-8 rounded-full bg-surface-2 px-3 text-[12px] font-semibold text-muted hover:text-fg"
             >
               #{t}
             </button>

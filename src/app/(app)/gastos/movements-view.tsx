@@ -132,7 +132,7 @@ export function MovementsView({
                   <span className="text-[13px] text-muted">{isCurrent ? "Neto del mes en curso" : "Neto del mes"}</span>
                   <NetHero cents={net[mainCur] ?? 0} currency={mainCur} />
                   {netCurrencies.slice(1).map((c) => (
-                    <Amount key={c} cents={net[c]} currency={c} className="text-[17px] font-semibold text-fg" />
+                    <Amount key={c} cents={net[c]} currency={c} className="text-[17px] font-extrabold text-fg" />
                   ))}
                 </div>
                 <dl className="grid grid-cols-2 gap-2">
@@ -218,7 +218,7 @@ export function MovementsView({
  */
 function NetHero({ cents, currency }: { cents: number; currency: string }) {
   return (
-    <span className="text-[40px] leading-none font-semibold tracking-[-0.025em] lg:text-[44px]">
+    <span className="text-[40px] leading-none font-extrabold tracking-[-0.025em] lg:text-[44px]">
       <Amount cents={cents} currency={currency} hero className={cx(cents > 0 && "text-fg!")} />
     </span>
   );

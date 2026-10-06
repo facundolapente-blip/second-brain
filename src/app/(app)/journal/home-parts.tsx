@@ -79,7 +79,7 @@ export function HomeActions({
 
       {searching && (
         <div className="absolute inset-x-0 top-[env(safe-area-inset-top)] z-10 bg-bg">
-          <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4 lg:h-16 lg:px-8">
+          <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-20 lg:px-8">
             <MagnifyingGlass size={18} className="shrink-0 text-muted" />
             <input
               autoFocus
@@ -216,15 +216,15 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
   return (
     <section
       aria-label={title}
-      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 rounded-card card-2/60 p-4 lg:p-5"
+      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-3 rounded-card bg-accent-soft p-4 lg:p-5"
       style={{ "--i": 1 } as React.CSSProperties}
     >
       <div className="flex items-start gap-2.5 pr-10">
-        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-accent-fg">
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-accent text-on-accent">
           <ClockCounterClockwise size={18} weight="bold" aria-hidden />
         </span>
         <div className="grid min-w-0">
-          <h2 className="text-[15px] leading-tight font-semibold">{title}</h2>
+          <h2 className="text-[17px] leading-tight font-extrabold">{title}</h2>
           <p className="text-[13px] text-muted">{line}</p>
         </div>
       </div>
@@ -234,7 +234,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
       <Link
         href={`/journal/${first.id}`}
-        className="group grid gap-1.5 rounded-[12px] border-l-2 border-accent/40 py-1 pr-2 pl-3.5 transition-colors hover:border-accent"
+        className="group grid gap-1.5 rounded-[16px] bg-surface p-3.5 shadow-[0_1px_3px_rgba(var(--shadow-tint),0.08)] transition-transform active:scale-[0.99]"
       >
         <span className="text-[12.5px] text-muted">
           {memory.kind === "years" ? `${yearsAgo(first.date, today)}, ` : ""}
@@ -248,12 +248,12 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
       </Link>
 
       {rest.length > 0 && (
-        <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5 border-t border-line pt-2">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
           {rest.slice(0, 3).map((e) => (
             <li key={e.id}>
               <Link
                 href={`/journal/${e.id}`}
-                className="flex min-h-11 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-3 active:bg-surface-3"
+                className="flex min-h-11 items-center gap-3 rounded-[14px] px-2 py-2 transition-colors hover:bg-surface/70 active:bg-surface/70"
               >
                 <span className="tabular min-w-[78px] shrink-0 text-[13px] text-muted">
                   {formatShort(e.date)}
@@ -280,10 +280,10 @@ export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
     <div className="grid justify-items-start gap-3 rounded-card card p-8">
-      <span className="inline-flex size-10 items-center justify-center rounded-[12px] bg-accent-soft text-accent-fg">
+      <span className="inline-flex size-12 items-center justify-center rounded-[15px] bg-accent text-on-accent">
         <PenNib size={22} aria-hidden />
       </span>
-      <h2 className="font-serif text-[22px] leading-tight font-semibold tracking-tight">Todavía no escribiste nada</h2>
+      <h2 className="text-[22px] leading-tight font-black tracking-tight">Todavía no escribiste nada</h2>
       <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
         Una entrada por día alcanza. Contá qué pasó, cómo te sentiste y qué te quedó dando vueltas. Se guarda sola mientras escribís.
       </p>

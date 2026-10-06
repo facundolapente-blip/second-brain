@@ -145,7 +145,7 @@ export function ReportsView({
 
             <section className="grid gap-3">
               <div className="grid gap-0.5">
-                <h2 className="text-[17px] font-semibold tracking-tight">Ritmo del mes</h2>
+                <h2 className="text-[17px] font-extrabold tracking-tight">Ritmo del mes</h2>
                 <p className="text-[13px] text-muted">Gasto acumulado día a día contra {monthName(prevMonth)}.</p>
               </div>
               <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} />
@@ -153,7 +153,7 @@ export function ReportsView({
 
             <section className="grid gap-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[17px] font-semibold tracking-tight">Por categoría</h2>
+                <h2 className="text-[17px] font-extrabold tracking-tight">Por categoría</h2>
                 <div className="w-48">
                   <Segmented
                     value={kind}
@@ -184,7 +184,7 @@ export function ReportsView({
             </section>
 
             <section className="grid gap-3">
-              <h2 className="text-[17px] font-semibold tracking-tight">Últimos {months.length} meses</h2>
+              <h2 className="text-[17px] font-extrabold tracking-tight">Últimos {months.length} meses</h2>
               <MonthlyColumns data={evolution} current={month} currency={currency} />
             </section>
           </>

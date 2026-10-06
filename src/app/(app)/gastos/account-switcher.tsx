@@ -63,7 +63,7 @@ export function AccountSwitcher({
         </span>
         <span className="grid gap-0.5">
           <span className="text-[12px] text-muted">Saldo actual</span>
-          <TotalsInline totals={balance} align="start" balance className="text-[18px] font-semibold tracking-tight" />
+          <TotalsInline totals={balance} align="start" balance className="text-[18px] font-extrabold tracking-tight" />
         </span>
       </button>
 

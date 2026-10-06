@@ -67,22 +67,22 @@ export function JournalHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="frost-bg sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-2 lg:h-16">
+        <div className="flex h-16 items-center gap-3 lg:h-20">
           {back ? (
             <Link
               href={back}
               aria-label="Volver"
-              className="-ml-2 inline-flex size-10 items-center justify-center rounded-md text-accent lg:hidden"
+              className="-ml-1.5 inline-flex size-10 items-center justify-center rounded-full bg-surface text-accent-fg shadow-[0_1px_3px_rgba(var(--shadow-tint),0.1)] transition-transform active:scale-90 lg:hidden"
             >
-              <CaretLeft size={22} weight="bold" />
+              <CaretLeft size={20} weight="bold" />
             </Link>
           ) : (
             <MenuButton />
           )}
-          {title && <h1 className="text-[22px] font-extrabold tracking-tight lg:text-2xl">{title}</h1>}
-          <div className="ml-auto flex items-center gap-0.5">{actions}</div>
+          {title && <h1 className="truncate text-[28px] leading-none font-black tracking-[-0.02em] lg:text-[32px]">{title}</h1>}
+          <div className="ml-auto flex items-center gap-1">{actions}</div>
         </div>
         {children}
         {tabs}
@@ -122,12 +122,11 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
     <Link
       href={`/journal/${entry.id}`}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise group grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-3.5 rounded-card card py-4 pr-4 pl-3 transition-[border-color,box-shadow,background-color] duration-200 hover:border-line-strong hover:shadow-[0_2px_10px_-6px_rgba(var(--shadow-tint),0.18)] active:bg-surface-2 lg:gap-x-5 lg:py-5 lg:pr-5 lg:pl-4"
+      className="rise group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3.5 rounded-card card p-3.5 transition-transform duration-200 ease-[cubic-bezier(0.2,1.2,0.4,1)] hover:-translate-y-0.5 active:scale-[0.985] lg:gap-x-5 lg:p-4"
     >
-      <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
-        <span className="tabular text-[26px] leading-none font-semibold tracking-tight">{day.padStart(2, "0")}</span>
-        <span className="text-[12px] leading-tight text-muted">{month}</span>
-        <span className="text-[11px] leading-tight text-muted">{wd}</span>
+      <span className="grid h-[4.25rem] content-center justify-items-center gap-0.5 rounded-[16px] bg-accent-soft text-center text-accent-fg" aria-hidden>
+        <span className="tabular text-[26px] leading-none font-extrabold tracking-tight">{day.padStart(2, "0")}</span>
+        <span className="text-[12px] leading-tight font-bold">{month} {wd}</span>
       </span>
 
       <span className="grid min-w-0 content-start gap-1.5">
@@ -147,7 +146,7 @@ export function EntryCard({ entry, index = 0 }: { entry: EntryCardDTO; index?: n
         </span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-[12px] text-muted">
           {entry.tags.slice(0, 3).map((t) => (
-            <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5">
+            <span key={t} className="rounded-full bg-accent-soft px-2 py-0.5 font-bold text-accent-fg">
               #{t}
             </span>
           ))}
@@ -178,8 +177,8 @@ export function WriteDayButton({
       onClick={() => write(date, nueva)}
       disabled={pending}
       className={cx(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-semibold whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
-        variant === "accent" ? "bg-accent text-on-accent hover:opacity-90" : "border border-line-strong text-fg hover:bg-surface-2",
+        "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-[15px] font-bold whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.96] disabled:opacity-60",
+        variant === "accent" ? "bg-accent text-on-accent hover:brightness-110" : "bg-accent-soft text-accent-fg",
       )}
     >
       {children}
@@ -201,8 +200,8 @@ export function Stat({
 }) {
   return (
     <div className={cx("grid content-start gap-1", className)}>
-      <span className="text-[13px] text-muted">{label}</span>
-      <span className="text-[26px] leading-tight font-semibold tracking-tight">{value}</span>
+      <span className="text-[13px] font-semibold text-muted">{label}</span>
+      <span className="text-[28px] leading-tight font-black tracking-tight">{value}</span>
       {hint && <span className="text-[12.5px] text-muted">{hint}</span>}
     </div>
   );

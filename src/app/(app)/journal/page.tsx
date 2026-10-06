@@ -68,14 +68,14 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 pt-3 lg:px-8 lg:pt-6">
         {!filtering && (
           <section className="rise grid gap-1.5 pt-1 lg:pt-0">
-            <p className="font-serif text-[30px] leading-[1.1] tracking-[-0.015em] text-balance lg:text-[36px]">
+            <p className="text-[30px] leading-[1.1] font-black tracking-[-0.02em] text-balance lg:text-[36px]">
               {greeting(home.hour)}
               {firstName && `, ${firstName}`}
             </p>
             <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted">
               <span className="first-letter:uppercase">{formatLong(home.today)}</span>
               {home.streak > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 py-0.5 pr-2.5 pl-2 text-[13px] text-fg">
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--p-orange-bg)] py-1 pr-2.5 pl-2 text-[13px] font-extrabold text-[var(--p-orange-fg)]">
                   <Fire size={14} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden />
                   <span className="tabular">{home.streak === 1 ? "1 día seguido" : `${home.streak} días seguidos`}</span>
                 </span>
@@ -106,7 +106,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           <div className="grid gap-6">
             {years.map((g) => (
               <section key={g.year} className="grid gap-3">
-                <h2 className="tabular z-10 -mx-4 bg-bg/90 px-4 py-1.5 text-[15px] font-semibold tracking-tight backdrop-blur-md max-lg:sticky max-lg:top-[calc(3.5rem+env(safe-area-inset-top))]">
+                <h2 className="tabular frost-bg z-10 -mx-4 px-4 py-1.5 text-[22px] font-black tracking-tight max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))]">
                   {g.year}
                 </h2>
                 <div className="grid gap-3">
@@ -120,7 +120,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <Link
                 href={`/journal?${more}`}
                 scroll={false}
-                className="mx-auto inline-flex h-11 items-center rounded-full bg-accent-soft text-accent-fg px-5 text-sm font-semibold transition-colors hover:bg-surface-2 active:scale-[0.98]"
+                className="mx-auto inline-flex h-12 items-center rounded-full bg-accent-soft px-6 text-[15px] font-bold text-accent-fg transition-transform active:scale-[0.96]"
               >
                 Ver más entradas
               </Link>
@@ -150,7 +150,7 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="flex items-center gap-3 rounded-[16px] bg-surface-2 px-4 py-3 text-sm">
+    <div className="flex items-center gap-3 rounded-[16px] bg-accent-soft px-4 py-3 text-sm">
       <span className="min-w-0 flex-1">
         <span className="font-semibold">
           {count}

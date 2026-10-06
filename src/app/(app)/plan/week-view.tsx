@@ -160,7 +160,7 @@ export function WeekView({
                   <span className={cx("text-[11px]", active ? "text-on-accent/85" : "text-muted")}>
                     {SHORT[weekday(d)]}
                   </span>
-                  <span className="tabular text-[17px] font-semibold">{Number(d.slice(8))}</span>
+                  <span className="tabular text-[17px] font-extrabold">{Number(d.slice(8))}</span>
                   <span
                     className={cx(
                       "mt-0.5 h-1.5 w-1.5 rounded-full",
