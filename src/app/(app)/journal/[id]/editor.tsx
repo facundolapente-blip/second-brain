@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { PhotoStrip } from "@/components/photos";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CaretDown, CaretLeft, Check, DotsThreeVertical, Plus, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui";
@@ -103,6 +104,11 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   const [body, setBody] = useState(entry.body);
   const [mood, setMood] = useState<number | null>(entry.mood);
   const [tags, setTags] = useState<string[]>(entry.tags);
+  // Con fotos la entrada no está vacía aunque no tenga texto.
+  const photoCount = useRef(entry.photos.length);
+  const onPhotos = useCallback((n: number) => {
+    photoCount.current = n;
+  }, []);
   const { data, update, flush, status, error } = useAutosave(entry.id, {
     date: entry.date,
     title: entry.title ?? "",
@@ -126,7 +132,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   function goBack() {
     startLeaving(async () => {
       await flush();
-      if (isEmptyEntry({ ...data.current, title: data.current.title || null })) await discardIfEmpty(entry.id);
+      if (isEmptyEntry({ ...data.current, title: data.current.title || null }) && photoCount.current === 0) await discardIfEmpty(entry.id);
       router.push("/journal");
     });
   }
@@ -215,6 +221,8 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             className="prose-serif autogrow min-h-[50dvh] w-full resize-none bg-transparent text-[19px] leading-[1.75] text-fg outline-none! placeholder:text-faint lg:text-[21px]"
           />
         </div>
+
+        <PhotoStrip photos={entry.photos} owner={{ journalEntryId: entry.id }} onCountChange={onPhotos} />
 
         <TagEditor
           tags={tags}

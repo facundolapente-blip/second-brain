@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { ArrowsDownUp, Check } from "@phosphor-icons/react";
+import { ArrowsDownUp, Check, Camera, X } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
 import { deleteTransaction, saveTransaction, suggestCategory } from "@/lib/finance-actions";
@@ -19,6 +19,7 @@ import {
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { AccountAvatar, CategoryAvatar } from "./shared";
 import { useProjects } from "./projects";
+import { PhotoStrip, sendPhoto, type Photo } from "@/components/photos";
 
 type Draft = {
   id?: string;
@@ -34,6 +35,8 @@ type Draft = {
   projectId: string | null;
   /** La categoría la eligió a mano (la sugerencia ya no la pisa). */
   byHand?: boolean;
+  /** Comprobantes ya guardados (al editar). */
+  photos?: Photo[];
 };
 
 export type TxSheetHandle = {
@@ -87,6 +90,9 @@ export const TxSheet = forwardRef<
     };
   };
   const [d, setD] = useState<Draft>(blank);
+  // Comprobantes elegidos antes de guardar un movimiento nuevo: se suben al guardarlo.
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const photoInput = useRef<HTMLInputElement>(null);
   // Categoría sugerida a partir del título (lo que ya clasificaste antes).
   const [suggested, setSuggested] = useState<string | null>(null);
   const [byHand, setByHand] = useState(false);
@@ -94,6 +100,7 @@ export const TxSheet = forwardRef<
 
   function open(next: Draft) {
     setD({ ...next, byHand: !!next.categoryId });
+    setPendingPhotos([]);
     setByHand(!!next.categoryId);
     setSuggested(null);
     setFormKey((k) => k + 1);
@@ -123,12 +130,27 @@ export const TxSheet = forwardRef<
         date: tx.date,
         note: tx.note ?? "",
         projectId: tx.projectId,
+        photos: tx.photos,
       }),
     fromTemplate: (t) => open(applyTemplate(blank(), t)),
   }));
 
+  // Las fotos pendientes se leen al guardar, sin que elegir una dispare el efecto.
+  const pendingRef = useRef<File[]>([]);
   useEffect(() => {
-    if (state?.ok) sheet.current?.close();
+    pendingRef.current = pendingPhotos;
+  }, [pendingPhotos]);
+
+  useEffect(() => {
+    if (!state?.ok) return;
+    sheet.current?.close();
+    // Los comprobantes de un movimiento nuevo se suben ahora que tiene id.
+    const files = pendingRef.current;
+    if (state.id && files.length) {
+      pendingRef.current = [];
+      const owner = { transactionId: state.id };
+      void Promise.all(files.map((f) => sendPhoto(f, owner).catch(() => null)));
+    }
   }, [state]);
 
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
@@ -436,6 +458,52 @@ export const TxSheet = forwardRef<
             placeholder="Opcional"
             className={cx(inputClass, "autogrow h-auto min-h-16 py-2 leading-relaxed")}
           />
+        </Field>
+
+        <Field label="Comprobante">
+          {d.id ? (
+            <PhotoStrip key={d.id} photos={d.photos ?? []} owner={{ transactionId: d.id }} label="Agregar comprobante" />
+          ) : (
+            <div className="grid gap-2">
+              {pendingPhotos.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5">
+                  {pendingPhotos.map((f, i) => (
+                    <li key={i} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-2 pr-1 pl-3 text-[13px]">
+                      <Camera size={14} aria-hidden />
+                      Foto {i + 1}
+                      <button
+                        type="button"
+                        aria-label={`Sacar foto ${i + 1}`}
+                        onClick={() => setPendingPhotos((x) => x.filter((_, j) => j !== i))}
+                        className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-3 hover:text-fg"
+                      >
+                        <X size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => photoInput.current?.click()}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              >
+                <Camera size={18} aria-hidden /> Agregar comprobante
+              </button>
+              <input
+                ref={photoInput}
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])];
+                  setPendingPhotos((x) => [...x, ...files].slice(0, 10));
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          )}
         </Field>
 
         {!d.id && (

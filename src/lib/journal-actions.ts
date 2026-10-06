@@ -23,7 +23,7 @@ function validId(id: unknown): id is string {
  */
 async function limpiarVacias() {
   const empty = await prisma.journalEntry.findMany({
-    where: { title: null, body: "", tags: { isEmpty: true }, updatedAt: { lt: new Date(Date.now() - 3_600_000) } },
+    where: { title: null, body: "", tags: { isEmpty: true }, attachments: { none: {} }, updatedAt: { lt: new Date(Date.now() - 3_600_000) } },
     select: { id: true, date: true, mood: true },
   });
   if (!empty.length) return;
@@ -114,12 +114,40 @@ async function syncCheckinMood(date: string, prev: number | null, mood: number |
   revalidatePath("/");
 }
 
+/**
+ * Lo compartido desde otra app va a la entrada de hoy (al final del texto) o a
+ * una nueva si hoy todavía no hay. Devuelve la entrada para subirle fotos.
+ */
+export async function shareToJournal(text: string): Promise<{ id: string }> {
+  await exigirSesion();
+  const day = todayISO();
+  const clean = String(text ?? "").trim().slice(0, 5000);
+  const existing = await prisma.journalEntry.findFirst({ where: { date: toDbDate(day) }, orderBy: { createdAt: "asc" } });
+  if (existing) {
+    if (clean) {
+      const body = existing.body.trim() ? `${existing.body.trimEnd()}
+
+${clean}` : clean;
+      await prisma.journalEntry.update({ where: { id: existing.id }, data: { body: body.slice(0, BODY_MAX) } });
+    }
+    refrescar();
+    return { id: existing.id };
+  }
+  const checkin = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(day) }, select: { mood: true } });
+  const created = await prisma.journalEntry.create({
+    data: { date: toDbDate(day), body: clean, mood: isMood(checkin?.mood) ? checkin.mood : null },
+  });
+  await logActivity("created", "journal", created.id, `Entrada del ${day} (compartido)`);
+  refrescar();
+  return { id: created.id };
+}
+
 /** Al salir del editor sin haber escrito nada, la entrada no queda guardada. */
 export async function discardIfEmpty(id: string) {
   await exigirSesion();
   if (!validId(id)) return;
-  const e = await prisma.journalEntry.findUnique({ where: { id } });
-  if (e && isEmptyEntry(e)) {
+  const e = await prisma.journalEntry.findUnique({ where: { id }, include: { _count: { select: { attachments: true } } } });
+  if (e && isEmptyEntry(e) && e._count.attachments === 0) {
     await prisma.journalEntry.delete({ where: { id } });
     refrescar();
   }

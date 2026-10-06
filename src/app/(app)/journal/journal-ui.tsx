@@ -3,17 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import {
-  CaretLeft,
-  Smiley,
-  SmileyBlank,
-  SmileyMeh,
-  SmileyNervous,
-  SmileySad,
-  SmileyWink,
-  type Icon,
-  type IconWeight,
-} from "@phosphor-icons/react";
+import { Camera, CaretLeft, Smiley, SmileyBlank, SmileyMeh, SmileyNervous, SmileySad, SmileyWink, type Icon, type IconWeight } from "@phosphor-icons/react";
 import { MenuButton } from "@/components/shell";
 import { cx } from "@/components/ui";
 import { formatLong, formatShort } from "@/lib/dates";
@@ -178,6 +168,13 @@ export function EntryCard({
             </span>
           ))}
           {entry.tags.length > 3 && <span>+{entry.tags.length - 3}</span>}
+          {entry.photos > 0 && (
+            <span className="inline-flex items-center gap-1" title={entry.photos === 1 ? "1 foto" : `${entry.photos} fotos`}>
+              <Camera size={13} aria-hidden />
+              <span className="font-mono text-[11px] tabular">{entry.photos}</span>
+              <span className="sr-only">{entry.photos === 1 ? "foto" : "fotos"}</span>
+            </span>
+          )}
           {entry.words > 0 && <span className="ml-auto font-mono text-[11px] tabular">{wordsLabel(entry.words)}</span>}
         </span>
       </span>

@@ -62,6 +62,7 @@ const txSelect = {
   toAmount: true,
   note: true,
   projectId: true,
+  attachments: { select: { id: true, width: true, height: true }, orderBy: { createdAt: "asc" } },
 } satisfies Prisma.TransactionSelect;
 
 type TxRow = Prisma.TransactionGetPayload<{ select: typeof txSelect }>;
@@ -79,6 +80,7 @@ function toTxDTO(t: TxRow): TxDTO {
     toAmountCents: t.toAmount === null ? null : toCents(t.toAmount),
     note: t.note,
     projectId: t.projectId,
+    photos: t.attachments,
   };
 }
 

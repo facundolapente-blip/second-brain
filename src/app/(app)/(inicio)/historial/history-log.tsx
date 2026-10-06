@@ -34,6 +34,7 @@ const KIND: Record<string, string> = {
   block: "Bloque del plan",
   task: "Tarea",
   keyResult: "Resultado clave",
+  photo: "Foto",
   import: "Importación",
   trash: "Papelera",
 };

@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { toPhotoDTO, type PhotoDTO } from "./photos";
 import { addDays, fromDbDate, isISODate, monthBounds, toDbDate, todayISO, TZ } from "./dates";
 import { bestStreak, currentStreak, excerpt, wordCount } from "./journal-logic";
 
@@ -13,6 +14,7 @@ export type EntryCardDTO = {
   tags: string[];
   /** Palabras de título + texto, para la tarjeta. */
   words: number;
+  photos: number;
 };
 
 export type EntryDTO = {
@@ -23,16 +25,33 @@ export type EntryDTO = {
   mood: number | null;
   tags: string[];
   updatedAt: string;
+  photos: PhotoDTO[];
 };
 
 /** Las entradas recién creadas y abandonadas sin escribir nada no se listan. */
 const NOT_EMPTY: Prisma.JournalEntryWhereInput = {
-  OR: [{ title: { not: null } }, { body: { not: "" } }, { tags: { isEmpty: false } }],
+  OR: [{ title: { not: null } }, { body: { not: "" } }, { tags: { isEmpty: false } }, { attachments: { some: {} } }],
 };
 
-const CARD_SELECT = { id: true, date: true, title: true, body: true, mood: true, tags: true } as const;
+const CARD_SELECT = {
+  id: true,
+  date: true,
+  title: true,
+  body: true,
+  mood: true,
+  tags: true,
+  _count: { select: { attachments: true } },
+} as const;
 
-type CardRow = { id: string; date: Date; title: string | null; body: string; mood: number | null; tags: string[] };
+type CardRow = {
+  id: string;
+  date: Date;
+  title: string | null;
+  body: string;
+  mood: number | null;
+  tags: string[];
+  _count?: { attachments: number };
+};
 
 function toCard(e: CardRow, max = 280): EntryCardDTO {
   return {
@@ -43,6 +62,7 @@ function toCard(e: CardRow, max = 280): EntryCardDTO {
     mood: e.mood,
     tags: e.tags,
     words: wordCount(e.body) + wordCount(e.title ?? ""),
+    photos: e._count?.attachments ?? 0,
   };
 }
 
@@ -78,7 +98,10 @@ export async function getEntries({ q, tag, mood, limit = 60 }: EntryFilters) {
 }
 
 export async function getEntry(id: string): Promise<EntryDTO | null> {
-  const e = await prisma.journalEntry.findUnique({ where: { id } });
+  const e = await prisma.journalEntry.findUnique({
+    where: { id },
+    include: { attachments: { orderBy: { createdAt: "asc" } } },
+  });
   if (!e) return null;
   return {
     id: e.id,
@@ -88,6 +111,7 @@ export async function getEntry(id: string): Promise<EntryDTO | null> {
     mood: e.mood,
     tags: e.tags,
     updatedAt: e.updatedAt.toISOString(),
+    photos: e.attachments.map(toPhotoDTO),
   };
 }
 

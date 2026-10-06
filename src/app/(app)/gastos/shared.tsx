@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, CaretLeft, CaretRight, Plus } from "@phosphor-icons/react";
+import { ArrowRight, CaretLeft, CaretRight, Plus, Camera } from "@phosphor-icons/react";
 import { formatMonth, shiftMonth } from "@/lib/dates";
 import { moneyCents, moneySigned } from "@/lib/format";
 import { tone } from "@/lib/palette";
@@ -244,7 +244,10 @@ export function TxRow({
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted")}>{title || "Sin título"}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted")}>{title || "Sin título"}</span>
+          {tx.photos.length > 0 && <Camera size={14} className="shrink-0 text-muted" aria-label="Con comprobante" />}
+        </span>
         <span className="truncate text-[13px] text-muted">{subtitle}</span>
       </span>
       <span className="grid shrink-0 justify-items-end gap-0.5 font-mono text-[14px] font-medium">

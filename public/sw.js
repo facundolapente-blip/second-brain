@@ -8,6 +8,8 @@ const VERSION = "sb-v2";
 /** Cuántas pantallas guardadas como máximo (las más viejas se van). */
 const MAX_PAGES = 80;
 const STATIC = `static-${VERSION}`;
+/** Fotos que llegan por "Compartir" hasta que /compartir las sube (sin versión: la lee la página). */
+const SHARE = "compartido";
 const PAGES = `pages-${VERSION}`;
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -15,7 +17,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      for (const k of await caches.keys()) if (!k.endsWith(VERSION)) await caches.delete(k);
+      for (const k of await caches.keys()) if (!k.endsWith(VERSION) && k !== SHARE) await caches.delete(k);
       await self.clients.claim();
     })(),
   );
@@ -27,9 +29,14 @@ const OFFLINE_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // "Compartir" desde otra app (share_target del manifiesto).
+  if (req.method === "POST" && url.pathname === "/compartir") {
+    event.respondWith(receiveShare(req));
+    return;
+  }
+  if (req.method !== "GET") return;
   if (url.pathname.startsWith("/api") || url.pathname.startsWith("/login")) return;
 
   if (url.pathname.startsWith("/_next/static/") || /^\/(icon|apple-icon)/.test(url.pathname)) {
@@ -76,4 +83,27 @@ self.addEventListener("fetch", (event) => {
 async function trim(cache) {
   const keys = await cache.keys();
   for (let i = 0; i < keys.length - MAX_PAGES; i++) await cache.delete(keys[i]);
+}
+
+/** Guarda las fotos compartidas y abre /compartir con el texto en la URL. */
+async function receiveShare(req) {
+  const fd = await req.formData();
+  const params = new URLSearchParams();
+  for (const k of ["title", "text", "url"]) {
+    const v = fd.get(k);
+    if (typeof v === "string" && v.trim()) params.set(k, v.slice(0, 5000));
+  }
+  const files = fd
+    .getAll("fotos")
+    .filter((f) => f && typeof f === "object" && f.size > 0)
+    .slice(0, 10);
+  if (files.length) {
+    const id = String(Date.now());
+    const cache = await caches.open(SHARE);
+    await Promise.all(
+      files.map((f, i) => cache.put(`/compartido/${id}/${i}`, new Response(f, { headers: { "Content-Type": f.type || "image/jpeg" } }))),
+    );
+    params.set("fotos", `${id}:${files.length}`);
+  }
+  return Response.redirect(new URL(`/compartir?${params}`, self.location.origin).href, 303);
 }

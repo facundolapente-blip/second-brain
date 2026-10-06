@@ -33,6 +33,8 @@ model JournalEntry {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  attachments Attachment[]
+
   @@unique([source, externalId])
   @@index([date])
 }
@@ -240,6 +242,8 @@ model Transaction {
   updatedAt   DateTime              @default(now()) @updatedAt
 
   @@unique([source, externalId])
+  attachments Attachment[]
+
   @@index([date])
   @@index([accountId])
   @@index([toAccountId])
@@ -596,4 +600,25 @@ model PlanKeyResult {
   updatedAt   DateTime       @updatedAt
 
   @@unique([source, externalId])
+}
+
+// ─── Fotos ──────────────────────────────────────────────────────────────────
+
+/// Foto de una entrada del journal o comprobante de un movimiento. El archivo
+/// vive en Vercel Blob privado (`pathname`); se sirve por /api/foto/[id].
+model Attachment {
+  id             String        @id @default(cuid())
+  pathname       String        @unique
+  contentType    String
+  size           Int
+  width          Int?
+  height         Int?
+  journalEntryId String?
+  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  transactionId  String?
+  transaction    Transaction?  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@index([journalEntryId])
+  @@index([transactionId])
 }

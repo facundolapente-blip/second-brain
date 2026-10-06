@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { fromDbDate, formatShort } from "./dates";
 import { moneyCents } from "./format";
 import { toCents } from "./finance-logic";
+import { deletePhotoFiles } from "./photos";
 
 /**
  * Papelera de toda la app. Antes de borrar algo se guarda su foto completa
@@ -26,7 +27,8 @@ export type TrashKind =
   | "journal"
   | "block"
   | "task"
-  | "keyResult";
+  | "keyResult"
+  | "photo";
 
 export type Module = "gastos" | "habitos" | "journal" | "plan";
 
@@ -45,6 +47,7 @@ const MODULE: Record<TrashKind, Module> = {
   block: "plan",
   task: "plan",
   keyResult: "plan",
+  photo: "journal",
 };
 
 export const KIND_LABEL: Record<TrashKind, string> = {
@@ -62,6 +65,7 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   block: "Bloque del plan",
   task: "Tarea",
   keyResult: "Resultado clave",
+  photo: "Foto",
 };
 
 // ─── Actividad ──────────────────────────────────────────────────────────────
@@ -74,19 +78,20 @@ export async function logActivity(action: string, kind: TrashKind | "import" | "
 // ─── Fotos ──────────────────────────────────────────────────────────────────
 
 type Snap = { row: Record<string, unknown>; [k: string]: unknown };
+type Snapshot = { label: string; data: Snap; module?: Module };
 
 const kindName: Record<string, string> = { expense: "Gasto", income: "Ingreso", transfer: "Transferencia" };
 
 /** Junta la foto y una etiqueta legible. Null si ya no existe. */
-async function snapshot(kind: TrashKind, id: string): Promise<{ label: string; data: Snap } | null> {
+async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
   switch (kind) {
     case "transaction": {
-      const t = await prisma.transaction.findUnique({ where: { id }, include: { account: true } });
+      const t = await prisma.transaction.findUnique({ where: { id }, include: { account: true, attachments: true } });
       if (!t) return null;
-      const { account, ...row } = t;
+      const { account, attachments, ...row } = t;
       return {
         label: `${kindName[t.kind] ?? "Movimiento"} ${moneyCents(toCents(t.amount), account.currency)}${t.title ? ` · ${t.title}` : ""} (${account.name}, ${formatShort(fromDbDate(t.date))})`,
-        data: { row },
+        data: { row, attachments },
       };
     }
     case "account": {
@@ -151,10 +156,30 @@ async function snapshot(kind: TrashKind, id: string): Promise<{ label: string; d
       return { label: c.name, data: { row: c, habitIds: habitIds.map((x) => x.id) } };
     }
     case "journal": {
-      const e = await prisma.journalEntry.findUnique({ where: { id } });
+      const e = await prisma.journalEntry.findUnique({ where: { id }, include: { attachments: true } });
       if (!e) return null;
-      const start = (e.title || e.body.trim().split(/\s+/).slice(0, 8).join(" ")) || "sin texto";
-      return { label: `${formatShort(fromDbDate(e.date))}: ${start}${!e.title && e.body.length > 50 ? "…" : ""}`, data: { row: e } };
+      const { attachments, ...row } = e;
+      const start = (e.title || e.body.trim().split(/\s+/).slice(0, 8).join(" ")) || (attachments.length ? "fotos" : "sin texto");
+      return {
+        label: `${formatShort(fromDbDate(e.date))}: ${start}${!e.title && e.body.length > 50 ? "…" : ""}`,
+        data: { row, attachments },
+      };
+    }
+    case "photo": {
+      const a = await prisma.attachment.findUnique({
+        where: { id },
+        include: { journalEntry: { select: { date: true, title: true } }, transaction: { select: { title: true, date: true } } },
+      });
+      if (!a) return null;
+      const { journalEntry, transaction, ...row } = a;
+      if (journalEntry) {
+        return { label: `Foto del journal (${formatShort(fromDbDate(journalEntry.date))}${journalEntry.title ? ` · ${journalEntry.title}` : ""})`, data: { row }, module: "journal" };
+      }
+      return {
+        label: `Comprobante${transaction?.title ? ` de ${transaction.title}` : ""}${transaction ? ` (${formatShort(fromDbDate(transaction.date))})` : ""}`,
+        data: { row },
+        module: "gastos",
+      };
     }
     case "block": {
       const b = await prisma.planBlock.findUnique({ where: { id } });
@@ -190,6 +215,7 @@ async function remove(kind: TrashKind, id: string) {
     block: () => prisma.planBlock.deleteMany({ where: { id } }),
     task: () => prisma.planTask.deleteMany({ where: { id } }),
     keyResult: () => prisma.planKeyResult.deleteMany({ where: { id } }),
+    photo: () => prisma.attachment.deleteMany({ where: { id } }),
   };
   await del[kind]();
 }
@@ -199,7 +225,7 @@ export async function trashAndDelete(kind: TrashKind, id: string): Promise<boole
   const snap = await snapshot(kind, id);
   if (!snap) return false;
   await prisma.trashItem.create({
-    data: { kind, entityId: id, label: snap.label, module: MODULE[kind], data: snap.data as unknown as Prisma.InputJsonValue },
+    data: { kind, entityId: id, label: snap.label, module: snap.module ?? MODULE[kind], data: snap.data as unknown as Prisma.InputJsonValue },
   });
   await remove(kind, id);
   await logActivity("deleted", kind, id, snap.label);
@@ -255,6 +281,7 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
           scheduleId: await orNull(exists.schedule, row.scheduleId),
         },
       });
+      await restoreAttachments(data);
       return null;
     }
     case "account":
@@ -315,7 +342,18 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
       return null;
     case "journal":
       await prisma.journalEntry.create({ data: row });
+      await restoreAttachments(data);
       return null;
+    case "photo": {
+      if (row.journalEntryId && !(await prisma.journalEntry.findUnique({ where: { id: row.journalEntryId }, select: { id: true } }))) {
+        return "La entrada de esa foto ya no existe: restaurá primero la entrada.";
+      }
+      if (row.transactionId && !(await prisma.transaction.findUnique({ where: { id: row.transactionId }, select: { id: true } }))) {
+        return "El movimiento de ese comprobante ya no existe: restaurá primero el movimiento.";
+      }
+      await prisma.attachment.create({ data: row });
+      return null;
+    }
     case "block": {
       const b = await prisma.planBlock.create({
         data: {
@@ -349,7 +387,29 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
   }
 }
 
+/** Las fotos de una entrada o un movimiento vuelven con él. */
+async function restoreAttachments(data: Snap) {
+  const list = Array.isArray(data.attachments) ? (data.attachments as never[]) : [];
+  if (list.length) await prisma.attachment.createMany({ data: list, skipDuplicates: true });
+}
+
+/** Los archivos de fotos que guarda un elemento de la papelera. */
+function filesOf(kind: string, data: unknown): string[] {
+  const d = (data ?? {}) as Snap;
+  const files = Array.isArray(d.attachments) ? (d.attachments as { pathname?: string }[]).map((a) => a.pathname ?? "") : [];
+  if (kind === "photo" && typeof d.row?.pathname === "string") files.push(d.row.pathname);
+  return files.filter(Boolean);
+}
+
+/** Borra para siempre elementos de la papelera, con sus archivos de fotos. */
+export async function purgeTrash(where: Prisma.TrashItemWhereInput) {
+  const items = await prisma.trashItem.findMany({ where, select: { id: true, kind: true, data: true } });
+  await deletePhotoFiles(items.flatMap((i) => filesOf(i.kind, i.data)));
+  await prisma.trashItem.deleteMany({ where: { id: { in: items.map((i) => i.id) } } });
+  return items.length;
+}
+
 /** Lo que lleva más de 30 días en la papelera se borra para siempre. */
 export async function purgeOldTrash() {
-  await prisma.trashItem.deleteMany({ where: { deletedAt: { lt: new Date(Date.now() - 30 * 86_400_000) } } });
+  await purgeTrash({ deletedAt: { lt: new Date(Date.now() - 30 * 86_400_000) } });
 }

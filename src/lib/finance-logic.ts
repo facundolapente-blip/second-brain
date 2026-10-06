@@ -51,6 +51,8 @@ export type TxDTO = {
   note: string | null;
   /** Presupuesto puntual al que está asignado. */
   projectId: string | null;
+  /** Comprobantes (fotos). */
+  photos: { id: string; width: number | null; height: number | null }[];
 };
 
 export type TemplateDTO = {

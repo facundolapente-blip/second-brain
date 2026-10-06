@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
-import { logActivity, restoreSnapshot, type TrashKind } from "./trash";
+import { logActivity, purgeTrash, restoreSnapshot, type TrashKind } from "./trash";
 
 export type TrashResult = { ok: true } | { ok: false; error: string };
 
@@ -31,7 +31,7 @@ export async function purgeItem(id: string) {
   await exigirSesion();
   const item = await prisma.trashItem.findUnique({ where: { id } });
   if (!item) return;
-  await prisma.trashItem.delete({ where: { id } });
+  await purgeTrash({ id });
   await logActivity("purged", item.kind as TrashKind, item.entityId, item.label);
   revalidatePath("/historial");
 }
@@ -39,8 +39,7 @@ export async function purgeItem(id: string) {
 /** Vacía toda la papelera. */
 export async function emptyTrash() {
   await exigirSesion();
-  const n = await prisma.trashItem.count();
-  await prisma.trashItem.deleteMany({});
+  const n = await purgeTrash({});
   if (n) await prisma.activity.create({ data: { action: "purged", kind: "trash", label: `Papelera vaciada (${n})`, module: "datos" } });
   revalidatePath("/historial");
 }

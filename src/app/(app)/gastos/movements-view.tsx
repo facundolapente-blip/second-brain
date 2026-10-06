@@ -70,6 +70,16 @@ export function MovementsView({
   const hasAccounts = accounts.some((a) => !a.archived);
   useNewShortcut(() => hasAccounts && form.current?.create());
 
+  // ?nuevo=1 (atajo del ícono de la app o "Compartir"): abre la hoja directo; ?titulo= la precarga.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (!p.has("nuevo") || !hasAccounts) return;
+    form.current?.create(p.get("titulo") ? { title: p.get("titulo")!.slice(0, 120) } : undefined);
+    p.delete("nuevo");
+    p.delete("titulo");
+    window.history.replaceState(null, "", `${window.location.pathname}${p.size ? `?${p}` : ""}`);
+  }, [hasAccounts]);
+
   const visible = useMemo(() => txs.filter((t) => touchesSelection(t, selection)), [txs, selection]);
   const groups = useMemo(() => groupByDay(visible, selection, lk.currencyOf), [visible, selection, lk]);
   const net = useMemo(() => netByCurrency(visible, selection, lk.currencyOf), [visible, selection, lk]);

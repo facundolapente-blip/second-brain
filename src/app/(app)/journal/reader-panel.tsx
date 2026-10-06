@@ -1,3 +1,4 @@
+import { PhotoStrip } from "@/components/photos";
 import Link from "next/link";
 import { ArrowSquareOut, Fire, PencilSimple, X } from "@phosphor-icons/react/dist/ssr";
 import { addDays, formatLong, startOfWeek } from "@/lib/dates";
@@ -68,6 +69,8 @@ export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: 
               ))}
             </div>
           )}
+
+          <PhotoStrip photos={entry.photos} />
 
           {entry.tags.length > 0 && (
             <ul className="flex flex-wrap gap-1.5 pt-2" aria-label="Etiquetas">
