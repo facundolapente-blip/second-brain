@@ -22,6 +22,7 @@ const MODULES: Module[] = [
 /** Herramientas que cruzan los módulos. */
 const TOOLS: { href: string; label: string; icon: Icon }[] = [
   { href: "/semana", label: "Revisión semanal", icon: ClipboardText },
+  { href: "/resumen", label: "Resumen del mes", icon: CalendarCheck },
   { href: "/analisis", label: "Análisis", icon: ChartLineUp },
   { href: "/historial", label: "Historial y papelera", icon: ClockCounterClockwise },
   { href: "/datos", label: "Datos", icon: Database },
@@ -36,7 +37,7 @@ export function MenuButton() {
     <button
       onClick={open}
       aria-label="Abrir menú"
-      className="-ml-2.5 inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 lg:hidden"
+      className="-ml-2.5 inline-flex size-11 items-center justify-center rounded-full text-fg transition-colors hover:bg-surface-2 lg:hidden print:hidden"
     >
       <List size={22} />
     </button>
@@ -204,8 +205,8 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>
-      <div className="lg:grid lg:grid-cols-[256px_1fr]">
-        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex">
+      <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
+        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex print:hidden">
           <Brand />
           <Nav />
           <div className="mt-auto">
@@ -215,7 +216,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
 
         {/* Cajón lateral del celular */}
         <div
-          className={cx("fixed inset-0 z-40 lg:hidden", drawer ? "pointer-events-auto" : "pointer-events-none")}
+          className={cx("fixed inset-0 z-40 lg:hidden print:hidden", drawer ? "pointer-events-auto" : "pointer-events-none")}
           aria-hidden={!drawer}
         >
           <div
@@ -241,7 +242,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
 
         <div className="min-w-0">
           {offline && (
-            <p role="status" className="sticky top-0 z-40 bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
+            <p role="status" className="sticky top-0 z-40 print:hidden bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
               Sin conexión: estás viendo lo último guardado. Lo que marques en Hábitos se guarda cuando vuelva la señal.
             </p>
           )}

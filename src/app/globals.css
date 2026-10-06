@@ -403,3 +403,21 @@ dialog.sheet::backdrop {
   text-wrap: pretty;
   hyphens: auto;
 }
+
+/* Imprimir / guardar como PDF (Resumen del mes): sin menú ni botones, con los colores tal cual. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  html,
+  body {
+    background: var(--bg) !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .rise {
+    animation: none !important;
+  }
+}

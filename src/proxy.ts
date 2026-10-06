@@ -11,6 +11,8 @@ export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (pathname === "/login" || pathname.startsWith("/api/auth")) return NextResponse.next();
+  // Los cron de Vercel no tienen sesión: la ruta valida CRON_SECRET.
+  if (pathname.startsWith("/api/cron/")) return NextResponse.next();
   if (mailSinLogin()) return NextResponse.next();
 
   if (getSessionCookie(request, { cookiePrefix: "sb" })) return NextResponse.next();

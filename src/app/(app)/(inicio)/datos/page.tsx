@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { fromDbDate } from "@/lib/dates";
+import { backupsEnabled, getBackupStatus, listBackups, type BackupInfo } from "@/lib/backup";
 import { DataView } from "./data-view";
+import { Backups } from "./backups";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Datos" };
@@ -18,6 +20,14 @@ export default async function DatosPage() {
     prisma.planBlock.count(),
   ]);
   const d = (x: { date: Date } | null) => (x ? fromDbDate(x.date) : null);
+  const enabled = backupsEnabled();
+  let backups: BackupInfo[] = [];
+  try {
+    backups = await listBackups();
+  } catch {
+    // si el almacén no responde, la pantalla igual se ve
+  }
+  const status = await getBackupStatus();
   return (
     <div data-module="inicio" className="min-h-dvh">
       <DataView
@@ -32,6 +42,7 @@ export default async function DatosPage() {
           checkins,
           blocks,
         }}
+        backups={<Backups enabled={enabled} backups={backups} status={status} />}
       />
     </div>
   );

@@ -126,6 +126,12 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Un bloque llamado "Libre" se ve tenue y no cuenta en "N de M hechos".
 - Importador: `node --env-file=.env scripts/import-notion-plan.ts <export.zip>` (export Markdown & CSV de Notion; usa los CSV `_all` de Daily Planning, Para hacer y Resultados Clave; fechas "28 de septiembre de 2026 9:00 (GMT-3) → 12:00"; vincula bloques con hábitos y tareas del mismo nombre; ids estables, no duplica).
 
+## Herramientas (Inicio)
+
+- **Ánimo unificado**: uno solo por día. `saveCheckin` lo pasa a las entradas del journal de ese día (solo si no tenían o tenían el mismo); `saveEntry` lo pasa al check-in (`syncCheckinMood`); una entrada nueva arranca con el del check-in. La migración `20261008090000_animo_unificado` emparejó lo viejo.
+- **Resumen del mes** (`/resumen?mes=YYYY-MM`, `lib/monthly.ts`): los cuatro módulos más el check-in, comparado con el mes anterior (en el mes en curso, hasta el mismo día). "Descargar PDF" imprime en tema claro (`printLight`); el CSS de impresión está al final de `globals.css` y el menú/botones llevan `print:hidden`. Tarjetas compartidas con la revisión semanal en `(inicio)/summary-ui.tsx`.
+- **Respaldo automático** (`lib/backup.ts`): todas las tablas menos las del login, JSON comprimido. Cron de Vercel los lunes 09:00 UTC (`vercel.json` → `/api/cron/respaldo`, valida `CRON_SECRET`; el proxy deja pasar `/api/cron/`). Se guarda en Vercel Blob privado `second-brain-respaldos` (gru1), quedan los últimos 12; solo corre en producción (`VERCEL_ENV`). Datos lista los respaldos, los descarga por `/api/respaldo?archivo=` y tiene "Hacer uno ahora". El JSON de Exportar es el mismo respaldo (`{ app, version: 2, exportado, tablas }`).
+
 ## Diseño
 
 - **Dos temas** (selector abajo del menú lateral, cookie `sb_tema` que lee el layout raíz → `<html data-theme>`; lógica en `src/lib/theme.ts`, los nombres viejos se traducen): **Claro** (cada módulo se tiñe con su color vía `data-module` en su layout: Hábitos verde, Journal lavanda, Gastos petróleo, Plan ámbar, Inicio azul pizarra) y **Oscuro** (carbón con el resplandor y el acento del color del módulo). Los tokens base de `:root` son solo respaldo. Todos los tokens en `globals.css`; los componentes solo usan tokens (`bg-surface`, `text-fg`, `bg-ink`, `bg-side`...).

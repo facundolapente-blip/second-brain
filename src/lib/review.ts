@@ -12,7 +12,7 @@ function avg(xs: (number | null)[]) {
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
-function summarize(days: DayMetrics[]) {
+export function summarize(days: DayMetrics[]) {
   const done = days.reduce((n, d) => n + d.habitsDone, 0);
   const due = days.reduce((n, d) => n + d.habitsDue, 0);
   return {

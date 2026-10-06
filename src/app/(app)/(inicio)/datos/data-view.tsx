@@ -21,7 +21,7 @@ type Stats = {
 
 const nf = new Intl.NumberFormat("es-UY");
 
-export function DataView({ stats }: { stats: Stats }) {
+export function DataView({ stats, backups }: { stats: Stats; backups: React.ReactNode }) {
   return (
     <>
       <PageHeader title="Datos" kicker="Backups y exportación" wide />
@@ -77,6 +77,7 @@ export function DataView({ stats }: { stats: Stats }) {
             <Download href="/api/exportar?formato=journal" title="Journal (Markdown)" sub="Todas las entradas en un archivo" />
           </div>
         </section>
+        {backups}
       </main>
     </>
   );

@@ -1,5 +1,5 @@
-import { gzipSync } from "node:zlib";
 import { prisma } from "@/lib/prisma";
+import { buildBackup } from "@/lib/backup";
 import { getUsuario } from "@/lib/session";
 import { fromDbDate, todayISO } from "@/lib/dates";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Descarga de los datos propios:
- *   ?formato=json     todo (respaldo completo, sin las tablas de login), comprimido:
+ *   ?formato=json     todo (el mismo respaldo completo que el automático), comprimido:
  *                     sin comprimir pasa el límite de 4,5 MB de respuesta de Vercel
  *   ?formato=gastos   movimientos en CSV (se abre en Excel o Sheets)
  *   ?formato=journal  el journal en Markdown
@@ -59,50 +59,7 @@ export async function GET(req: Request) {
     return download(`# Journal\n\n${md}`, `journal-${stamp}.md`, "text/markdown; charset=utf-8");
   }
 
-  const [
-    habitCategories,
-    habits,
-    habitTracks,
-    habitLogs,
-    journal,
-    accounts,
-    categories,
-    transactions,
-    templates,
-    schedules,
-    checkins,
-    planCategories,
-    planTasks,
-    planBlocks,
-    planObjectives,
-    planKeyResults,
-  ] = await Promise.all([
-    prisma.habitCategory.findMany(),
-    prisma.habit.findMany(),
-    prisma.habitTrack.findMany(),
-    prisma.habitLog.findMany(),
-    prisma.journalEntry.findMany(),
-    prisma.account.findMany(),
-    prisma.category.findMany(),
-    prisma.transaction.findMany(),
-    prisma.txTemplate.findMany(),
-    prisma.scheduledTransaction.findMany(),
-    prisma.dailyCheckin.findMany(),
-    prisma.planCategory.findMany(),
-    prisma.planTask.findMany(),
-    prisma.planBlock.findMany(),
-    prisma.planObjective.findMany(),
-    prisma.planKeyResult.findMany(),
-  ]);
-  const data = {
-    exportado: new Date().toISOString(),
-    habitos: { categorias: habitCategories, habitos: habits, pistas: habitTracks, marcas: habitLogs },
-    journal,
-    gastos: { cuentas: accounts, categorias: categories, movimientos: transactions, plantillas: templates, recurrentes: schedules },
-    checkins,
-    plan: { categorias: planCategories, tareas: planTasks, bloques: planBlocks, objetivos: planObjectives, resultadosClave: planKeyResults },
-  };
-  return download(gzipSync(JSON.stringify(data)), `second-brain-${stamp}.json.gz`, "application/gzip");
+  return download(new Uint8Array(await buildBackup()), `second-brain-${stamp}.json.gz`, "application/gzip");
 }
 
 function download(body: string | Uint8Array<ArrayBuffer>, name: string, type: string) {

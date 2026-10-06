@@ -99,8 +99,8 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                     "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200 motion-reduce:transition-none lg:size-14 lg:text-[16px]",
                     list
                       ? info
-                        ? "bg-tone font-semibold text-tone-fg"
-                        : "bg-accent-soft font-semibold text-accent-fg"
+                        ? "bg-tone font-semibold text-tone-fg ring-2 ring-inset ring-[var(--tone-solid)]"
+                        : "bg-accent font-semibold text-on-accent"
                       : d > today
                         ? "text-faint"
                         : "text-fg hover:bg-surface-2",
@@ -108,7 +108,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   )}
                 >
                   {Number(d.slice(8))}
-                  {d === today && <span aria-hidden className="absolute bottom-1 size-1 rounded-full bg-accent" />}
+                  {d === today && <span aria-hidden className={cx("absolute bottom-1 size-1 rounded-full", list && !info ? "bg-on-accent" : "bg-accent")} />}
                 </Link>
               );
             })}
@@ -116,12 +116,12 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
 
           <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[12.5px] text-muted" aria-label="Referencias de color">
             <li className="inline-flex items-center gap-1.5">
-              <span className="size-3 rounded-full bg-accent-soft ring-1 ring-accent/30" />
+              <span className="size-3 rounded-full bg-accent" />
               Escrito
             </li>
             {MOODS.map((m) => (
               <li key={m.value} className="inline-flex items-center gap-1.5">
-                <span style={tone(m.color)} className="size-3 rounded-full bg-tone ring-1 ring-[var(--tone-solid)]/40" />
+                <span style={tone(m.color)} className="size-3 rounded-full bg-tone ring-[1.5px] ring-inset ring-[var(--tone-solid)]" />
                 {m.label}
               </li>
             ))}

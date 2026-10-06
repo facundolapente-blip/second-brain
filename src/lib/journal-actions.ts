@@ -46,7 +46,12 @@ export async function writeOnDay(date?: string, nueva = false) {
     if (existing) redirect(`/journal/${existing.id}`);
   }
   await limpiarVacias();
-  const created = await prisma.journalEntry.create({ data: { date: toDbDate(day) }, select: { id: true } });
+  // Si ese día ya hay ánimo en el check-in, la entrada arranca con ese.
+  const checkin = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(day) }, select: { mood: true } });
+  const created = await prisma.journalEntry.create({
+    data: { date: toDbDate(day), mood: isMood(checkin?.mood) ? checkin.mood : null },
+    select: { id: true },
+  });
   await logActivity("created", "journal", created.id, `Entrada del ${day}`);
   redirect(`/journal/${created.id}`);
 }
@@ -73,17 +78,34 @@ export async function saveEntry(id: string, input: EntryInput): Promise<SaveResu
   const title = typeof input.title === "string" ? input.title.trim().slice(0, TITLE_MAX) || null : null;
   const mood = isMood(input.mood) ? input.mood : null;
   try {
+    const prev = await prisma.journalEntry.findUnique({ where: { id }, select: { mood: true } });
     const e = await prisma.journalEntry.update({
       where: { id },
       data: { date: toDbDate(input.date), title, body: input.body, mood, tags: normalizeTags(input.tags) },
       select: { updatedAt: true },
     });
+    if (prev && prev.mood !== mood) await syncCheckinMood(input.date, prev.mood, mood);
     refrescar();
     return { ok: true, savedAt: e.updatedAt.toISOString() };
   } catch (e) {
     if ((e as { code?: string }).code === "P2025") return { ok: false, error: "Esta entrada ya no existe." };
     throw e;
   }
+}
+
+/**
+ * El ánimo elegido en el journal pasa al check-in de ese día (uno solo por día).
+ * Si se saca, se borra del check-in solo si era el mismo.
+ */
+async function syncCheckinMood(date: string, prev: number | null, mood: number | null) {
+  if (date > todayISO()) return;
+  const d = toDbDate(date);
+  if (mood === null) {
+    if (prev !== null) await prisma.dailyCheckin.updateMany({ where: { date: d, mood: prev }, data: { mood: null } });
+  } else {
+    await prisma.dailyCheckin.upsert({ where: { date: d }, create: { date: d, mood }, update: { mood } });
+  }
+  revalidatePath("/");
 }
 
 /** Al salir del editor sin haber escrito nada, la entrada no queda guardada. */
