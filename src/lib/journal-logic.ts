@@ -68,8 +68,12 @@ export function excerpt(body: string, max = 280): string {
 }
 
 /** Una entrada cuenta como vacía si no tiene nada escrito ni elegido. */
-export function isEmptyEntry(e: { title: string | null; body: string; mood: number | null; tags: string[] }) {
-  return !e.title?.trim() && !e.body.trim() && e.mood === null && e.tags.length === 0;
+/**
+ * Sin título, texto ni etiquetas. El ánimo solo no cuenta: vive también en el
+ * check-in del día (ánimo unificado), así que no se pierde al descartarla.
+ */
+export function isEmptyEntry(e: { title: string | null; body: string; tags: string[] }) {
+  return !e.title?.trim() && !e.body.trim() && e.tags.length === 0;
 }
 
 /**

@@ -10,7 +10,7 @@ import { prisma } from "./prisma";
  * de Vercel Blob, fuera de la base: si la base se rompe, el respaldo sigue ahí.
  */
 
-const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification"]);
+const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit"]);
 const PREFIX = "respaldos/";
 /** Cuántos se guardan (los más viejos se borran). */
 const KEEP = 12;
@@ -91,4 +91,14 @@ export async function getBackupStatus(): Promise<BackupStatus> {
   } catch {
     return null;
   }
+}
+
+/** Aviso para Inicio si el respaldo semanal falló o hace más de 8 días que no corre. */
+export async function backupWarning(): Promise<string | null> {
+  if (!backupsEnabled()) return null;
+  const s = await getBackupStatus();
+  if (!s) return "Todavía no se guardó ningún respaldo.";
+  if (!s.ok) return "El último respaldo automático falló.";
+  if (Date.now() - Date.parse(s.at) > 8 * 86_400_000) return "Hace más de una semana que no se guarda un respaldo.";
+  return null;
 }

@@ -64,6 +64,9 @@ export const auth = betterAuth({
 
   rateLimit: {
     enabled: true,
+    // En la base: en memoria cada instancia de Vercel contaría por su lado.
+    storage: "database",
+    modelName: "AuthRateLimit",
     window: 60,
     max: 20,
     customRules: {

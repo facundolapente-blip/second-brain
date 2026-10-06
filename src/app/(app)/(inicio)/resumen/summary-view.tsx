@@ -226,7 +226,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
 
         {/* Gastos */}
         <Card title="Gastos" color="var(--c-gastos)" href={`/gastos/informes?mes=${s.month}`} className="lg:col-span-7 print:col-span-1 print:break-inside-avoid">
-          <dl className="grid grid-cols-3 gap-2">
+          <dl className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-3 print:grid-cols-3">
             <Mini label="Gastado" value={moneyCents(now.spentCents)} />
             <Mini label="Ingresos" value={moneyCents(now.incomeCents)} />
             <Mini label="Neto" value={`${net < 0 ? "−" : "+"}${moneyCents(Math.abs(net))}`} />

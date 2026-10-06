@@ -316,8 +316,8 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
     case "journal":
       await prisma.journalEntry.create({ data: row });
       return null;
-    case "block":
-      await prisma.planBlock.create({
+    case "block": {
+      const b = await prisma.planBlock.create({
         data: {
           ...row,
           categoryId: await orNull(exists.planCategory, row.categoryId),
@@ -325,7 +325,18 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
           habitId: await orNull(exists.habit, row.habitId),
         },
       });
+      // Al borrarlo se le sacó la marca al hábito vinculado: vuelve con el bloque.
+      if (b.done && b.habitId) {
+        const h = await prisma.habit.findUnique({ where: { id: b.habitId }, select: { target: true } });
+        const key = { habitId_date: { habitId: b.habitId, date: b.date } };
+        await prisma.habitLog.upsert({
+          where: key,
+          create: { habitId: b.habitId, date: b.date, status: "done", value: h?.target ?? 1, source: "app" },
+          update: { status: "done", value: h?.target ?? 1, source: "app" },
+        });
+      }
       return null;
+    }
     case "task":
       await prisma.planTask.create({ data: { ...row, categoryId: await orNull(exists.planCategory, row.categoryId) } });
       const subtasks = (data.subtasks as never[]) ?? [];

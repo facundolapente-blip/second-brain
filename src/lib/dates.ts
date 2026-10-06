@@ -18,6 +18,11 @@ export function todayISO(): string {
   return isoFmt.format(new Date());
 }
 
+/** El día (en Montevideo) de un instante guardado con hora. */
+export function dayOfInstant(d: Date): string {
+  return isoFmt.format(d);
+}
+
 export function isISODate(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
 }

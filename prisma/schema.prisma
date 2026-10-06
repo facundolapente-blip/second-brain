@@ -405,6 +405,15 @@ model DailyCheckin {
 
 // ─── Login (Better Auth) ────────────────────────────────────────────────────
 
+/// Intentos de login por IP (límite de Better Auth). En la base y no en memoria:
+/// en Vercel cada instancia tendría su propio contador.
+model AuthRateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
 model AuthUser {
   id            String        @id
   name          String

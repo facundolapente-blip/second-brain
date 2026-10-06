@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
+import { backupWarning } from "./backup";
 import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
@@ -53,11 +54,12 @@ export async function getDashboard() {
 
   await runSchedules();
   const rates = await getRates();
-  const [checkToday, checkYesterday, weight, { budgets }] = await Promise.all([
+  const [checkToday, checkYesterday, weight, { budgets }, backup] = await Promise.all([
     getCheckin(today),
     getCheckin(addDays(today, -1)),
     lastWeight(),
     getCategoryBudgets(today.slice(0, 7)),
+    backupWarning(),
   ]);
   const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, tasks] = await Promise.all([
     getHabitsWithLogs(),
@@ -233,6 +235,7 @@ export async function getDashboard() {
   return {
     today,
     hour: hourNow(),
+    backup,
     checkin: { today: checkToday, yesterday: checkYesterday, lastWeightG: weight },
     habits: {
       today: habitsToday,

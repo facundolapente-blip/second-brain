@@ -4,7 +4,9 @@
  * - Páginas y datos de la app: primero la red; si no hay señal, la última copia.
  * Nunca guarda nada de /api ni de /login.
  */
-const VERSION = "sb-v1";
+const VERSION = "sb-v2";
+/** Cuántas pantallas guardadas como máximo (las más viejas se van). */
+const MAX_PAGES = 80;
 const STATIC = `static-${VERSION}`;
 const PAGES = `pages-${VERSION}`;
 
@@ -53,7 +55,9 @@ self.addEventListener("fetch", (event) => {
       try {
         const res = await fetch(req);
         // Solo se guardan respuestas buenas que no terminaron en el login.
-        if (res.ok && !res.redirected) cache.put(req, res.clone());
+        if (res.ok && !res.redirected) {
+          event.waitUntil(cache.put(req, res.clone()).then(() => trim(cache)));
+        }
         return res;
       } catch {
         const hit = await cache.match(req, { ignoreSearch: isData ? false : true });
@@ -68,3 +72,8 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+
+async function trim(cache) {
+  const keys = await cache.keys();
+  for (let i = 0; i < keys.length - MAX_PAGES; i++) await cache.delete(keys[i]);
+}

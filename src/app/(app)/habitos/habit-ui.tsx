@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { enqueue, flushQueue, pendingOps } from "@/lib/offline-queue";
+import { enqueue, flushQueue, isNetworkError, pendingOps } from "@/lib/offline-queue";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
 import { setHabitLog } from "@/lib/habit-actions";
 import {
@@ -90,9 +90,10 @@ export function useHabitLogs(packed: PackedLogMap) {
       apply(m);
       try {
         await setHabitLog(habitId, date, status, value, note);
-      } catch {
-        // Se cortó la señal en el medio: queda en la cola.
-        keep();
+      } catch (e) {
+        // Se cortó la señal en el medio: queda en la cola. Otro error no se reintenta.
+        if (isNetworkError(e)) keep();
+        else router.refresh();
       }
     });
   };

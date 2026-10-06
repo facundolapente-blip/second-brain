@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { addDays, fromDbDate, monthBounds, shiftMonth, toDbDate, todayISO } from "./dates";
+import { addDays, dayOfInstant, fromDbDate, monthBounds, shiftMonth, todayISO, toDbDate } from "./dates";
 import { buildClassifier, normTitle } from "./smart-logic";
 import {
   isFrequency,
@@ -249,6 +249,9 @@ export async function runSchedules() {
   const due = await prisma.scheduledTransaction.findMany({
     where: { active: true, autoConfirm: true, nextDate: { lte: toDbDate(today) } },
   });
+  const archived = new Set(
+    (await prisma.account.findMany({ where: { archivedAt: { not: null } }, select: { id: true } })).map((a) => a.id),
+  );
   for (const s of due) {
     const rule = {
       startDate: fromDbDate(s.startDate),
@@ -257,7 +260,9 @@ export async function runSchedules() {
       endDate: s.endDate ? fromDbDate(s.endDate) : null,
     };
     const dates = occurrencesBetween(rule, fromDbDate(s.nextDate!), today);
-    if (dates.length) {
+    // Con la cuenta archivada se saltean (la fecha sigue corriendo).
+    const paused = archived.has(s.accountId) || (s.toAccountId !== null && archived.has(s.toAccountId));
+    if (dates.length && !paused) {
       await prisma.transaction.createMany({
         data: dates.map((d) => ({
           kind: s.kind,
@@ -480,7 +485,7 @@ export async function getDebts(): Promise<DebtDTO[]> {
     currency: d.currency,
     date: fromDbDate(d.date),
     note: d.note,
-    settledAt: d.settledAt ? d.settledAt.toISOString().slice(0, 10) : null,
+    settledAt: d.settledAt ? dayOfInstant(d.settledAt) : null,
   }));
 }
 

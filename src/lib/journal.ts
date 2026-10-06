@@ -27,7 +27,7 @@ export type EntryDTO = {
 
 /** Las entradas recién creadas y abandonadas sin escribir nada no se listan. */
 const NOT_EMPTY: Prisma.JournalEntryWhereInput = {
-  OR: [{ title: { not: null } }, { body: { not: "" } }, { mood: { not: null } }, { tags: { isEmpty: false } }],
+  OR: [{ title: { not: null } }, { body: { not: "" } }, { tags: { isEmpty: false } }],
 };
 
 const CARD_SELECT = { id: true, date: true, title: true, body: true, mood: true, tags: true } as const;

@@ -186,14 +186,17 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
   };
   if (id) {
     const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true } });
-    if (status === "done" && before?.status !== "done") await spawnNext(id);
+    if (!before) return { ok: false, error: "Esa tarea ya no existe." };
     await prisma.planTask.update({
       where: { id },
       data: {
         ...data,
-        completedAt: status === "done" ? (before?.status === "done" ? undefined : new Date()) : null,
+        completedAt: status === "done" ? (before.status === "done" ? undefined : new Date()) : null,
       },
     });
+    // Después de guardar, así la siguiente sale con la repetición recién elegida
+    // y la terminada queda sin repetirse.
+    if (status === "done" && before.status !== "done") await spawnNext(id);
     refrescar();
     return { ok: true, id };
   }
@@ -219,11 +222,12 @@ export async function setTaskStatus(id: string, status: TaskStatus) {
   await exigirSesion();
   if (!TASK_STATUSES.includes(status)) throw new Error("Estado inválido");
   const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true } });
-  if (status === "done" && before?.status !== "done") await spawnNext(id);
+  if (!before || before.status === status) return;
   const t = await prisma.planTask.update({
     where: { id },
     data: { status, completedAt: status === "done" ? new Date() : null },
   });
+  if (status === "done") await spawnNext(id);
   if (status === "done") await logActivity("done", "task", id, `Terminada: ${t.title}`);
   refrescar();
 }
@@ -364,8 +368,11 @@ function shiftDate(iso: string, repeat: string, every: number): string {
 async function spawnNext(id: string) {
   const t = await prisma.planTask.findUnique({ where: { id }, include: { subtasks: { orderBy: { order: "asc" } } } });
   if (!t?.repeat) return;
-  const base = t.deadline ? fromDbDate(t.deadline) : todayISO();
-  const next = shiftDate(base, t.repeat, t.repeatEvery);
+  const today = todayISO();
+  const base = t.deadline ? fromDbDate(t.deadline) : today;
+  // Si estaba vencida, la siguiente se corre hasta hoy o después (nunca nace vencida).
+  let next = shiftDate(base, t.repeat, t.repeatEvery);
+  for (let i = 0; next < today && i < 1000; i++) next = shiftDate(next, t.repeat, t.repeatEvery);
   const created = await prisma.planTask.create({
     data: {
       title: t.title,

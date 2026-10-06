@@ -17,17 +17,23 @@ function validId(id: unknown): id is string {
   return typeof id === "string" && /^[a-z0-9]{10,40}$/i.test(id);
 }
 
-/** Borra entradas que se crearon y quedaron sin nada escrito hace más de una hora. */
+/**
+ * Borra entradas que se crearon y quedaron sin nada escrito hace más de una hora.
+ * Las que solo tienen ánimo se borran si ese ánimo ya está en el check-in del día.
+ */
 async function limpiarVacias() {
-  await prisma.journalEntry.deleteMany({
-    where: {
-      title: null,
-      body: "",
-      mood: null,
-      tags: { isEmpty: true },
-      updatedAt: { lt: new Date(Date.now() - 3_600_000) },
-    },
+  const empty = await prisma.journalEntry.findMany({
+    where: { title: null, body: "", tags: { isEmpty: true }, updatedAt: { lt: new Date(Date.now() - 3_600_000) } },
+    select: { id: true, date: true, mood: true },
   });
+  if (!empty.length) return;
+  const withMood = empty.filter((e) => e.mood !== null);
+  const checkins = withMood.length
+    ? await prisma.dailyCheckin.findMany({ where: { date: { in: withMood.map((e) => e.date) } }, select: { date: true, mood: true } })
+    : [];
+  const moodOf = new Map(checkins.map((c) => [+c.date, c.mood]));
+  const ids = empty.filter((e) => e.mood === null || moodOf.get(+e.date) === e.mood).map((e) => e.id);
+  if (ids.length) await prisma.journalEntry.deleteMany({ where: { id: { in: ids } } });
 }
 
 /**
