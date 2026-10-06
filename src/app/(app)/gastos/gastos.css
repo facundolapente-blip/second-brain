@@ -10,8 +10,16 @@
   --fin-income-text: #2f6b3f;
 }
 
+/* Oscuro: sigue al tema elegido (no al del sistema), igual que globals.css. */
+:root[data-theme="oscuro"],
+:root[data-theme="noche"] {
+  --fin-in: #3d9bd4;
+  --fin-out: #d0773a;
+  --fin-grid: #2c2a26;
+  --fin-income-text: #8fcf9b;
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root[data-theme="auto"] {
     --fin-in: #3d9bd4;
     --fin-out: #d0773a;
     --fin-grid: #2c2a26;

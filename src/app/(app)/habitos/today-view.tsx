@@ -122,7 +122,7 @@ export function TodayView({
         </section>
 
         {habits.length > 0 && (
-          <div className="hidden lg:sticky lg:top-32 lg:block">
+          <div className="hidden lg:block">
             <TodayPanel habits={habits} logs={logs} selected={selected} today={today} />
           </div>
         )}

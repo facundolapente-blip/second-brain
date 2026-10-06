@@ -41,6 +41,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
     <>
       <PageHeader
         title="Categorías"
+        wide
         tabs={<GastosTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => create()}>
@@ -49,11 +50,14 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         }
       />
 
-      <main className="mx-auto grid max-w-3xl gap-10 px-4 pt-2 lg:px-10 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl gap-10 px-4 pt-2 lg:max-w-6xl lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:px-10 lg:pt-6">
         {sections.map((s) => {
           const list = categories.filter((c) => c.kind === s.kind);
           return (
-            <section key={s.kind} className="grid gap-1">
+            <section
+              key={s.kind}
+              className="grid gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:px-6 lg:pt-4 lg:pb-3 lg:shadow-[var(--card-shadow)]"
+            >
               <div className="flex items-baseline justify-between border-b border-fg/80 pb-2">
                 <h2 className="display text-[26px]">{s.title}</h2>
                 <button
@@ -64,7 +68,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   Agregar
                 </button>
               </div>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-8">
+              <ul className={cx("grid grid-cols-1 sm:grid-cols-2 sm:gap-x-8", s.kind === "income" && "lg:grid-cols-1")}>
                 {list.map((c, i) => (
                   <li key={c.id} className="rise border-b border-line" style={{ "--i": i } as React.CSSProperties}>
                     <button

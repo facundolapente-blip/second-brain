@@ -23,6 +23,7 @@ import { AccountSwitcher } from "./account-switcher";
 import { useSelection } from "./selection";
 import { Amount, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
 import { TxSheet, type TxSheetHandle } from "./tx-sheet";
+import { CategorySpend, SideBalances } from "./month-side";
 
 /** Atajo de teclado "N" para cargar un movimiento, salvo que se esté escribiendo o haya una hoja abierta. */
 function useNewShortcut(onNew: () => void) {
@@ -92,6 +93,7 @@ export function MovementsView({
     <>
       <PageHeader
         title="Movimientos"
+        wide
         tabs={<GastosTabs />}
         actions={
           <Button
@@ -107,7 +109,7 @@ export function MovementsView({
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 lg:px-10">
+      <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         {!hasAccounts ? (
           <EmptyBlock title="Empezá por tus cuentas" icon={<Bank size={22} aria-hidden />}>
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
@@ -122,8 +124,8 @@ export function MovementsView({
             </Link>
           </EmptyBlock>
         ) : (
-          <>
-            <section className="grid gap-5 pt-1 pb-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)] lg:items-end lg:gap-10 lg:pt-6">
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-x-10">
+            <section className="grid gap-5 pt-1 pb-5 lg:col-start-1 lg:row-start-1 lg:pt-6">
               <div className="grid gap-3">
                 <div className="-ml-3">
                   <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
@@ -135,11 +137,15 @@ export function MovementsView({
                     <Amount key={c} cents={net[c]} currency={c} className="figure text-[24px] text-fg" />
                   ))}
                 </div>
-                <dl className="grid grid-cols-2 divide-x divide-line border-y border-line">
+                <dl className="grid grid-cols-2 divide-x divide-line border-y border-line lg:max-w-xl">
                   <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
                   <FlowTile label="Gastos" totals={flows.exp} kind="out" />
                 </dl>
               </div>
+            </section>
+
+            {/* Celular: debajo del resumen. Computadora: panel lateral fijo con saldos y gasto por categoría. */}
+            <aside className="grid content-start gap-4 pb-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-6 lg:pb-0">
               <div className="grid gap-2">
                 <AccountSwitcher accounts={accounts} selection={selection} onChange={setSelection} />
                 <div className="flex flex-wrap gap-2">
@@ -153,10 +159,14 @@ export function MovementsView({
                   <QuickLink href="/gastos/plantillas" label="Plantillas" icon={<Copy size={14} aria-hidden />} />
                 </div>
               </div>
-            </section>
+              <div className="hidden gap-4 lg:grid">
+                <SideBalances accounts={accounts} selection={selection} onChange={setSelection} />
+                <CategorySpend txs={visible} lk={lk} month={month} />
+              </div>
+            </aside>
 
             {groups.length === 0 ? (
-              <div className="grid justify-items-center gap-2 border-t border-line py-16 text-center">
+              <div className="grid justify-items-center gap-2 border-t border-line py-16 text-center lg:col-start-1 lg:row-start-2">
                 <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
                   <Receipt size={20} aria-hidden />
                 </span>
@@ -166,7 +176,7 @@ export function MovementsView({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-6 pt-2">
+              <div className="grid gap-6 pt-2 lg:col-start-1 lg:row-start-2">
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -202,7 +212,7 @@ export function MovementsView({
                 })}
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
 

@@ -42,7 +42,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
       <JournalHeader title="Calendario" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
       <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:max-w-6xl lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
-        <section className="grid content-start gap-4 lg:sticky lg:top-36 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]">
+        <section className="grid content-start gap-4 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]">
           <div className="flex items-center justify-between">
             <Link
               href={href(shiftMonth(month, -1))}
