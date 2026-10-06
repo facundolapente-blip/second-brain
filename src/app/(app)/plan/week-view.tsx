@@ -201,7 +201,7 @@ export function WeekView({
                 key={d}
                 aria-label={WEEKDAY_LONG[weekday(d)]}
                 className={cx(
-                  "grid min-h-[60dvh] content-start border-r border-line px-2 pb-6 first:pl-0 last:border-r-0 last:pr-0",
+                  "grid min-h-[60dvh] min-w-0 content-start border-r border-line px-2.5 pb-6 first:pl-0 last:border-r-0 last:pr-0",
                   d === today && "bg-[color-mix(in_oklab,var(--accent)_4%,transparent)]",
                 )}
               >
@@ -226,7 +226,7 @@ export function WeekView({
                 <button
                   type="button"
                   onClick={() => openNew(d)}
-                  className="mt-1 flex h-10 items-center gap-1.5 rounded-[4px] px-1 text-[13px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+                  className="mt-1 flex h-11 items-center gap-1.5 rounded-[4px] px-1 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
                 >
                   <Plus size={14} /> Nuevo
                 </button>
@@ -288,7 +288,7 @@ function DayList({
             <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-3 border-b border-line">
               <span className="pt-3.5 text-right font-mono text-[11.5px] leading-tight text-muted tabular">
                 {b.startTime ? b.startTime.replace(/^0/, "") : "Todo el día"}
-                {b.endTime && <span className="block text-faint">{b.endTime.replace(/^0/, "")}</span>}
+                {b.endTime && <span className="block text-muted/80">{b.endTime.replace(/^0/, "")}</span>}
               </span>
               <BlockCard
                 block={b}
@@ -365,7 +365,7 @@ function BlockCard({
           aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
           className={cx(
             "inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] active:scale-90",
-            compact && "-m-1.5 size-10",
+            compact && "-my-1.5 -mr-1.5 size-9",
           )}
         >
           <span

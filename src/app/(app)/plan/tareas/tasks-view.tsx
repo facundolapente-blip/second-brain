@@ -180,7 +180,7 @@ function TaskRow({
             </span>
           )}
           {t.deadline && (
-            <span className="tabular text-[12px] text-faint">
+            <span className="font-mono text-[11px] text-muted tabular">
               {formatShort(t.deadline)}
             </span>
           )}

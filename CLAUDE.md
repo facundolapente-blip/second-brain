@@ -60,7 +60,7 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 - Escribir = server action `writeOnDay(fecha?, nueva?)`: abre la primera entrada de ese día o crea una y redirige. Las vacías no se listan, se borran al volver con la flecha (`discardIfEmpty`) y las abandonadas se limpian al crear otra (más de una hora). No borrar en el desmontaje: el modo estricto de React lo dispara al montar.
 - Editor: estado local, autoguardado con debounce de 900 ms en fila (nunca dos guardados a la vez, siempre manda lo último), guarda también al ocultar la pestaña y al salir. `saveEntry` revalida `/journal` (layout); el editor ignora las props nuevas a propósito para no pisar lo que se está escribiendo.
 - Ánimo 1 a 5 con caras Phosphor y colores de la paleta (`MOODS` en `src/lib/journal-logic.ts`). Etiquetas normalizadas en minúsculas sin `#`.
-- Serif Newsreader cargada solo en `journal/layout.tsx` (token `--font-serif`). Reglas puras en `journal-logic.ts`, consultas en `journal.ts`, acciones en `journal-actions.ts`.
+- Serif Newsreader cargada en el layout raíz (token `--font-serif`; con Papel la usa toda la app). Reglas puras en `journal-logic.ts`, consultas en `journal.ts`, acciones en `journal-actions.ts`.
 - Importador de **My Diary**: `node --env-file=.env scripts/import-mydiary.ts <MyDiary_all_*.docx> [--drop-demo]`. Lee el .docx con fflate (fecha / vacío / título / cuerpo / "Powered by MyDiary" / guiones). `source = "mydiary"`, `externalId = fecha#n` contando desde la más vieja del día, así reimportar actualiza sin duplicar y no pisa ánimo ni etiquetas. El export no trae ánimo, etiquetas, hora ni fotos.
 - Lo que confirmó Facu (2026-10-02): casi siempre 1 entrada por día, a veces 2 (por eso el + abre la del día y el editor tiene "Otra entrada para este día"); usa título y etiquetas; no quiere candado ni recordatorios; estadísticas se definen más adelante.
 - La búsqueda es `ILIKE` (no ignora tildes).
@@ -99,3 +99,16 @@ Monocromo cálido estilo documento, tokens en `globals.css` (claro/oscuro por `p
 - Borrar con `ConfirmButton` (dos toques, vuelve solo a los 5 s), nunca `window.confirm`.
 - Cada módulo tiene `loading.tsx` con esqueletos de la forma real (`components/skeleton.tsx`) y `error.tsx` con `ErrorState` (en Next 16 la prop es `retry`, no `reset`).
 - Gráficos: un solo eje, leyenda con 2+ series, etiqueta directa solo donde importa, tooltip con puntero y teclado, y siempre "Ver como tabla". Rampas secuenciales con `color-mix` del acento sobre la superficie (se adaptan solas al modo oscuro).
+
+## Diseño (opción A: Papel)
+
+Rediseño editorial: un cuaderno de papel bueno donde el contenido manda. Donde choque con "Diseño", manda esto.
+
+- **Papel y tinta**: fondo crema `#f6f4ee` (noche `#161513`) con grano de ruido fijo casi invisible (`body::before`, `--grain-opacity`). Tinta casi negra; el acento azul petróleo (`--accent`) queda para foco, pestaña activa, marcas del índice y gráficos. Los botones principales son de tinta: `variant="accent"` ahora pinta `bg-ink` (alias de primary).
+- **Tipografía** (`next/font` en `app/layout.tsx`): Newsreader (serif con `opsz`) para títulos, cifras grandes y lectura; Instrument Sans para la interfaz; Geist Mono chica para metadatos. Utilidades en `globals.css`: `.display` (titular serif), `.figure` (cifra serif, figuras proporcionales), `.kicker` (rótulo mono en versalitas; reemplaza los labels de 13px, también en `Field`). Montos de listas y horarios en mono.
+- **Líneas, no cajas**: listas separadas por filetes (`border-line`); los grupos (año del journal, día de gastos, sección de objetivos, día del plan) llevan título serif sobre un filete de tinta (`border-fg/80`). Sin tarjetas con borde salvo el selector de cuentas. Sombras solo en lo que flota (`.lift`, hojas, menús).
+- **Radios**: 4px controles, 6-8px superficies; círculos solo para días de hábitos, ánimo, chips y botones flotantes (de tinta, redondos).
+- **Encabezado**: `PageHeader` con título serif grande y `kicker` opcional (fecha en Hoy). Índice lateral numerado 01 a 04 con barra de acento en el activo. Pestañas subrayadas en tinta; barras inferiores con una rayita de acento sobre el ícono activo, sin pastilla.
+- **Hábitos**: días en círculos de verdad con borde de 1,5px (estados `--st-*`); `ToneSquare` en pastel con ícono en el tono (antes sólido con blanco); tira de días con número serif y el elegido en tinta; detalle con secciones a filete, cifras serif grandes, anillo de puntaje fino y dona con un corte de 4px entre arcos.
+- **Journal**: saludo serif en itálica con la fecha en kicker, recuerdo como cita con filete de acento, entradas como renglones de diario (día serif grande, mes y día mono), editor con título serif de 32 a 40px.
+- **Gastos**: neto del mes como cifra serif, movimientos en filas con montos mono, encabezado de día serif. **Plan**: tablero como agenda impresa (columnas con filete vertical, fecha serif, hoy con un velo de acento), bloques sin caja, "Libre" en serif itálica, casillas cuadradas de 4px.

@@ -64,7 +64,7 @@ export function GastosNav() {
 export function GastosTabs() {
   const pathname = usePathname();
   return (
-    <div className="hidden gap-6 overflow-x-auto border-b border-line lg:flex">
+    <div className="hidden gap-6 overflow-x-auto border-b border-line [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
       {TABS.map((t) => {
         const active = isActive(pathname, t.href);
         return (
