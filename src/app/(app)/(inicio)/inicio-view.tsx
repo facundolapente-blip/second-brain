@@ -501,7 +501,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                 >
                   {daysLeftLabel(t.left)}
                 </span>
-                <Link href="/plan/tareas" className="min-w-0 truncate hover:underline">
+                <Link href="/plan#tareas" className="min-w-0 truncate hover:underline">
                   {t.title}
                 </Link>
               </li>

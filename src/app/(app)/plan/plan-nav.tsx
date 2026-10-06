@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDots, CheckSquareOffset, Target, type Icon } from "@phosphor-icons/react";
+import { CalendarDots, Target, type Icon } from "@phosphor-icons/react";
 import { cx } from "@/components/ui";
 
 const TABS: { href: string; label: string; icon: Icon }[] = [
-  { href: "/plan", label: "Semana", icon: CalendarDots },
-  { href: "/plan/tareas", label: "Tareas", icon: CheckSquareOffset },
+  { href: "/plan", label: "Semana y tareas", icon: CalendarDots },
   { href: "/plan/objetivos", label: "Objetivos", icon: Target },
 ];
 
@@ -20,7 +19,7 @@ export function PlanNav() {
   const pathname = usePathname();
   return (
     <nav aria-label="Plan" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-3">
+      <div className="mx-auto grid max-w-md grid-cols-2">
         {TABS.map((t) => {
           const active = isActive(pathname, t.href);
           const Ico = t.icon;

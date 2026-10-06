@@ -31,7 +31,10 @@ export function WeekView({
   categories,
   habits,
   tasks,
+  top,
 }: {
+  /** Lo que va arriba del calendario: las tareas. */
+  top?: React.ReactNode;
   monday: string;
   today: string;
   blocks: BlockDTO[];
@@ -70,7 +73,7 @@ export function WeekView({
   return (
     <>
       <PageHeader
-        title="Semana"
+        title="Plan semanal"
         wide
         tabs={<PlanTabs />}
         actions={
@@ -101,6 +104,7 @@ export function WeekView({
       />
 
       <main className="mx-auto max-w-6xl px-4 lg:px-10">
+        {top}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 lg:pt-5">
           <div className="flex items-center gap-1">
             <Link

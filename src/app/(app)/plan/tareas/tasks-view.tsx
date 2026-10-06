@@ -16,14 +16,19 @@ import {
   type TaskView,
 } from "@/lib/plan-logic";
 import type { LinkableHabit } from "@/lib/plan";
-import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, Fires, ProgressSquares, StatusPill } from "../plan-ui";
-import { PlanTabs } from "../plan-nav";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
 
-export function TasksView({
+const LIMIT = 6;
+
+/**
+ * Tareas arriba de la semana, en la misma página (como el Plan Semanal de
+ * Notion): vistas guardadas, tabla en la computadora y lista en el celular.
+ * Muestra las primeras 6 y el resto con "Ver todas".
+ */
+export function TasksBoard({
   tasks,
   categories,
   habits,
@@ -35,10 +40,13 @@ export function TasksView({
   today: string;
 }) {
   const [view, setView] = useState<TaskView>("todo");
+  const [all, setAll] = useState(false);
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
-  const visible = applyTaskView(tasks, view);
+  const matching = applyTaskView(tasks, view);
+  const visible = all ? matching : matching.slice(0, LIMIT);
+  const hidden = matching.length - visible.length;
   const schedule = (t: TaskDTO) =>
     blockSheet.current?.open({
       date: today,
@@ -49,62 +57,54 @@ export function TasksView({
     });
 
   return (
-    <>
-      <PageHeader
-        title="Tareas"
-        wide
-        tabs={<PlanTabs />}
-        actions={
-          <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
-            <Plus size={16} weight="bold" /> Nueva tarea
-          </Button>
-        }
-      />
-      <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
-        <TaskSummary tasks={tasks} today={today} />
-        <div
-          role="tablist"
-          aria-label="Vistas"
-          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-5 [&::-webkit-scrollbar]:hidden"
-        >
-          {TASK_VIEWS.map((v) => {
-            const n = applyTaskView(tasks, v.id).length;
-            const on = v.id === view;
-            return (
-              <button
-                key={v.id}
-                role="tab"
-                aria-selected={on}
-                onClick={() => setView(v.id)}
-                className={cx(
-                  "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
-                  on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
-                )}
-              >
-                {v.label}
-                <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
-              </button>
-            );
-          })}
-        </div>
+    <section id="tareas" aria-label="Tareas" className="scroll-mt-24 pt-3 lg:pt-5">
+      <div className="flex items-center gap-2">
+        <h2 className="display text-[22px] lg:text-[26px]">Tareas</h2>
+        <span className="font-mono text-[12px] text-muted tabular">
+          {tasks.filter((t) => t.status !== "done").length} abiertas
+        </span>
+        <Button variant="outline" size="sm" className="ml-auto" onClick={() => sheet.current?.open()}>
+          <Plus size={15} weight="bold" /> Nueva tarea
+        </Button>
+      </div>
+      <div
+        role="tablist"
+        aria-label="Vistas"
+        className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden"
+      >
+        {TASK_VIEWS.map((v) => {
+          const n = applyTaskView(tasks, v.id).length;
+          const on = v.id === view;
+          return (
+            <button
+              key={v.id}
+              role="tab"
+              aria-selected={on}
+              onClick={() => {
+                setView(v.id);
+                setAll(false);
+              }}
+              className={cx(
+                "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
+                on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
+              )}
+            >
+              {v.label}
+              <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
 
-        {visible.length === 0 ? (
-          <div className="mt-2 grid justify-items-start gap-3 border-y border-line py-8">
-            <p className="display text-[20px] text-muted">
-              {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
-            </p>
-            <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
-              <Plus size={15} /> Nueva tarea
-            </Button>
-          </div>
-        ) : (
-          <>
-          <TaskTable
-            tasks={visible}
-            cats={cats}
-            today={today}
-            onOpen={(t) => sheet.current?.open(t)}
-          />
+      {visible.length === 0 ? (
+        <div className="grid justify-items-start gap-3 border-y border-line py-6">
+          <p className="text-[15px] text-muted">
+            {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
+          </p>
+        </div>
+      ) : (
+        <>
+          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} />
           <ul className="grid border-t border-line lg:hidden">
             {visible.map((t, i) => (
               <TaskRow
@@ -117,18 +117,17 @@ export function TasksView({
               />
             ))}
           </ul>
-          </>
-        )}
-      </main>
-
-      <button
-        type="button"
-        onClick={() => sheet.current?.open()}
-        aria-label="Nueva tarea"
-        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
-      >
-        <Plus size={24} />
-      </button>
+        </>
+      )}
+      {(hidden > 0 || (all && matching.length > LIMIT)) && (
+        <button
+          type="button"
+          onClick={() => setAll((a) => !a)}
+          className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-[13.5px] font-medium text-accent-fg hover:bg-surface-2"
+        >
+          {all ? "Ver menos" : `Ver todas (${hidden} más)`}
+        </button>
+      )}
 
       <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} />
       <BlockSheet
@@ -137,7 +136,7 @@ export function TasksView({
         habits={habits}
         tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))}
       />
-    </>
+    </section>
   );
 }
 
@@ -222,45 +221,6 @@ function TaskRow({
         </div>
       )}
     </li>
-  );
-}
-
-/**
- * Resumen de la computadora arriba de la tabla: cuántas hay sin empezar, en
- * curso, con deadline en los próximos 7 días (o vencidas) y terminadas.
- */
-function TaskSummary({ tasks, today }: { tasks: TaskDTO[]; today: string }) {
-  const open = tasks.filter((t) => t.status !== "done");
-  const soon = open.filter((t) => {
-    const l = daysLeft(t.deadline, today);
-    return l !== null && l <= 7;
-  });
-  const overdue = soon.filter((t) => (daysLeft(t.deadline, today) ?? 0) < 0).length;
-  const tiles: { label: string; value: number; hint: string }[] = [
-    { label: "Sin empezar", value: tasks.filter((t) => t.status === "todo").length, hint: "para hacer" },
-    { label: "En curso", value: tasks.filter((t) => t.status === "doing").length, hint: "arrancadas" },
-    {
-      label: "Deadline cerca",
-      value: soon.length,
-      hint: overdue ? `${overdue} ${overdue === 1 ? "vencida" : "vencidas"}` : "en los próximos 7 días",
-    },
-    { label: "Terminadas", value: tasks.filter((t) => t.status === "done").length, hint: `de ${tasks.length} tareas` },
-  ];
-  return (
-    <dl className="hidden grid-cols-4 gap-4 pt-6 lg:grid">
-      {tiles.map((t, i) => (
-        <div
-          key={t.label}
-          className={cx("grid content-start gap-1 rounded-2xl px-5 pt-4 pb-4", i === 0 ? "hero" : "border border-line bg-surface")}
-        >
-          <dt className={cx("font-mono text-[11px] tracking-[0.08em] uppercase", i === 0 ? "hero-sub" : "text-muted")}>
-            {t.label}
-          </dt>
-          <dd className="figure pt-1 text-[36px]">{t.value}</dd>
-          <dd className={cx("text-[12.5px]", i === 0 ? "hero-sub" : "text-muted")}>{t.hint}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
