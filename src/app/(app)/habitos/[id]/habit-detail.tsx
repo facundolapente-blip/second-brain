@@ -84,7 +84,7 @@ export function HabitDetail({
   return (
     <>
       <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto max-w-3xl px-2 lg:px-8">
+        <div className="mx-auto max-w-3xl px-2 lg:max-w-6xl lg:px-10">
           <div className="flex min-h-16 items-center gap-1 lg:min-h-24 lg:items-end lg:pb-3">
             <Link
               href={habit.archived ? "/habitos/archivados" : "/habitos/lista"}
@@ -125,19 +125,25 @@ export function HabitDetail({
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-3xl px-4 pt-2 lg:px-10">
+      <main className="mx-auto grid max-w-3xl px-4 pt-2 lg:max-w-6xl lg:px-10 lg:pt-6">
         {tab !== "editar" && habit.tracks.length > 0 && (
           <TrackPicker habit={habit} view={view} onChange={setView} />
         )}
         {tab === "calendario" && (
-          <CalendarTab habit={habit} logs={logs} stats={stats} today={today} openDay={openDay} />
+          <div className="grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
+            <CalendarTab habit={habit} logs={logs} stats={stats} today={today} openDay={openDay} />
+          </div>
         )}
-        {tab === "estadisticas" && <StatsTab habit={habit} stats={stats} view={view} today={today} />}
+        {tab === "estadisticas" && (
+          <div className="grid lg:grid-cols-3 lg:gap-5">
+            <StatsTab habit={habit} stats={stats} view={view} today={today} />
+          </div>
+        )}
         {tab === "editar" && (
-          <>
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
             <EditTab habit={habit} categories={categories} onSaved={() => changeTab("calendario")} />
             <TracksPanel habit={habit} today={today} />
-          </>
+          </div>
         )}
       </main>
 
@@ -163,7 +169,7 @@ function TrackPicker({
   onChange: (v: TrackView) => void;
 }) {
   return (
-    <label className="rise flex min-h-12 items-center justify-between gap-3 border-b border-line">
+    <label className="rise flex min-h-12 items-center justify-between gap-3 border-b border-line lg:mb-5 lg:rounded-xl lg:border lg:border-line lg:bg-surface-2 lg:px-4">
       <span className="kicker">Mostrando</span>
       <select
         value={String(view)}
@@ -278,7 +284,14 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={cx("rise border-b border-line py-7 last:border-b-0", className)}>
+    <section
+      className={cx(
+        "rise min-w-0 border-b border-line py-7 last:border-b-0",
+        // En la computadora cada panel es una tarjeta con el aro y la sombra del tema.
+        "lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:px-6 lg:py-6 lg:shadow-[var(--card-shadow)] lg:last:border-b",
+        className,
+      )}
+    >
       {title && (
         <h2 className="kicker mb-5 flex items-center gap-2">
           {Ico && <Ico size={15} weight="bold" className="text-accent" aria-hidden />}
@@ -327,7 +340,7 @@ function CalendarTab({
 
   return (
     <>
-      <Panel>
+      <Panel className="lg:row-span-2">
         <CalendarMonth
           habit={habit}
           logs={logs}
@@ -434,11 +447,11 @@ function StatsTab({
         </dl>
       </Panel>
 
-      <Panel>
+      <Panel className="lg:col-span-3">
         <MonthTimeline stateOf={stats.stateOf} today={today} />
       </Panel>
 
-      <Panel>
+      <Panel className="lg:col-span-2">
         <DoneBars habit={habit} logs={logs} from={stats.from} today={today} />
       </Panel>
 
@@ -446,7 +459,7 @@ function StatsTab({
         <Donut achieved={periods.achieved} missed={periods.missed} labels={periodWords} />
       </Panel>
 
-      <Panel icon={Medal} title="Desafío de racha">
+      <Panel icon={Medal} title="Desafío de racha" className="lg:col-span-3">
         <StreakChallenge habit={habit} best={best} />
       </Panel>
     </>
@@ -529,12 +542,12 @@ function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState;
         ref={scroller}
         className="relative overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="relative flex w-max">
+        <div className="relative flex w-max lg:w-full">
           <span className="absolute inset-x-4 top-[39px] h-px bg-line-strong" />
           {days.map((d) => {
             const m = d <= today ? MARKER[stateOf(d)] : undefined;
             return (
-              <div key={d} data-day={d} className="relative grid w-10 justify-items-center gap-2">
+              <div key={d} data-day={d} className="relative grid w-10 justify-items-center gap-2 lg:w-auto lg:min-w-8 lg:flex-1">
                 <span className="flex h-7 items-end">
                   {m && (
                     <span className={cx("inline-flex size-6 items-center justify-center rounded-full border", m.cls)}>
@@ -676,7 +689,7 @@ function Donut({ achieved, missed, labels }: { achieved: number; missed: number;
   const part = total === 0 ? 0 : (achieved / total) * c;
   const gap = 4;
   return (
-    <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
+    <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr] lg:grid-cols-1">
       <div className="relative mx-auto size-44">
         <svg viewBox="0 0 160 160" className="size-full -rotate-90" aria-hidden>
           {total === 0 && <circle cx="80" cy="80" r={r} fill="none" stroke="var(--border-strong)" strokeWidth="2" />}
@@ -782,14 +795,14 @@ function EditTab({
   const [pending, startTransition] = useTransition();
   return (
     <>
-      <Panel>
+      <Panel className="lg:row-span-2">
         <div className="mb-5 flex items-center gap-3">
           <HabitBadge habit={habit} />
         </div>
         <HabitFormBody initial={fromHabit(habit)} categories={categories} onSaved={onSaved} />
       </Panel>
       <Panel>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
           <Button
             variant="outline"
             disabled={pending}

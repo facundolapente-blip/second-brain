@@ -8,10 +8,10 @@ export function Bone({ className = "", style }: { className?: string; style?: Re
 }
 
 /** Cabecera de pantalla con título y, en escritorio, la línea de pestañas. */
-export function HeaderSkeleton({ title, tabs = 3 }: { title: string; tabs?: number }) {
+export function HeaderSkeleton({ title, tabs = 3, wide }: { title: string; tabs?: number; wide?: boolean }) {
   return (
     <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-      <div className="mx-auto max-w-3xl px-4 lg:px-10">
+      <div className={`mx-auto px-4 lg:px-10 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
         <div className="flex min-h-16 items-center gap-2 lg:min-h-24 lg:items-end lg:pb-4">
           <span className="size-9 lg:hidden" />
           <h1 className="display pb-0.5 text-[28px] lg:text-[40px]">{title}</h1>

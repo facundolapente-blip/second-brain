@@ -4,8 +4,8 @@ import { ReportsView } from "./reports-view";
 
 export const metadata = { title: "Informes · Gastos" };
 
-/** Cuántos meses muestra la evolución. */
-const SPAN = 6;
+/** Cuántos meses trae la evolución (el celular muestra los últimos 6, la computadora los 12). */
+const SPAN = 12;
 
 export default async function InformesPage({ searchParams }: PageProps<"/gastos/informes">) {
   const { mes } = await searchParams;

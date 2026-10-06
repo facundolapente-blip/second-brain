@@ -10,13 +10,12 @@
   --fin-income-text: #2f6b3f;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fin-in: #3d9bd4;
-    --fin-out: #d0773a;
-    --fin-grid: #2c2a26;
-    --fin-income-text: #8fcf9b;
-  }
+/* Oscuro: sigue al tema elegido (no al del sistema), igual que globals.css. */
+:root[data-theme="oscuro"] {
+  --fin-in: #3d9bd4;
+  --fin-out: #d0773a;
+  --fin-grid: #2c2a26;
+  --fin-income-text: #8fcf9b;
 }
 
 /* Los montos de ingreso van en verde (texto, no marca de gráfico). */

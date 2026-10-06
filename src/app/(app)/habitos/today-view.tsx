@@ -12,6 +12,7 @@ import { Button, cx, ToneSquare } from "@/components/ui";
 import { DaySheet, HabitBadge, useHabitLogs, type DaySheetHandle } from "./habit-ui";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
+import { TodayPanel } from "./today-panel";
 
 const PAST = 30;
 const FUTURE = 7;
@@ -53,6 +54,7 @@ export function TodayView({
       <PageHeader
         title={selected === today ? "Hoy" : relativeTitle(selected, today)}
         kicker={formatLong(selected)}
+        wide
         tabs={<HabitsTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => form.current?.create()}>
@@ -61,16 +63,17 @@ export function TodayView({
         }
       />
 
-      <main className="mx-auto max-w-3xl">
+      <main className="mx-auto max-w-3xl lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:px-10 lg:pt-6">
+        <section className="min-w-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]">
         <DateStrip days={days} selected={selected} today={today} onSelect={setSelected} />
 
-        <div className="px-4 lg:px-8">
+        <div className="px-4 lg:px-6">
           {habits.length === 0 ? (
             <EmptyState onCreate={() => form.current?.create()} />
           ) : visible.length === 0 ? (
             <p className="display py-20 text-center text-[22px] text-muted">No hay hábitos para este día.</p>
           ) : (
-            <ul className="divide-y divide-line border-b border-line">
+            <ul className="divide-y divide-line border-b border-line lg:border-b-0">
               {visible.map((h, i) => {
                 const hLogs = logs[h.id] ?? {};
                 const log = hLogs[selected];
@@ -116,6 +119,13 @@ export function TodayView({
             </ul>
           )}
         </div>
+        </section>
+
+        {habits.length > 0 && (
+          <div className="hidden lg:block">
+            <TodayPanel habits={habits} logs={logs} selected={selected} today={today} />
+          </div>
+        )}
       </main>
 
       <Fab onClick={() => form.current?.create()} />
@@ -160,7 +170,7 @@ function DateStrip({
   return (
     <div
       ref={scroller}
-      className="relative flex snap-x gap-1 overflow-x-auto border-b border-line px-3 pt-1 pb-3 [scrollbar-width:none] lg:px-8 lg:pt-4 [&::-webkit-scrollbar]:hidden"
+      className="relative flex snap-x gap-1 overflow-x-auto border-b border-line px-3 pt-1 pb-3 [scrollbar-width:none] lg:px-5 lg:pt-4 [&::-webkit-scrollbar]:hidden"
     >
       {days.map((d) => {
         const active = d === selected;

@@ -101,6 +101,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
     <>
       <PageHeader
         title="Cuentas"
+        wide
         tabs={<GastosTabs />}
         actions={
           <>
@@ -116,7 +117,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 lg:px-8">
+      <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         {active.length === 0 ? (
           <EmptyBlock title="Todavía no hay cuentas" icon={<Bank size={22} aria-hidden />}>
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
@@ -130,13 +131,22 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
           <>
             <section className="grid gap-3 pt-2 pb-5 lg:pt-6">
               {Object.keys(totals).length > 0 && (
-                <dl className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] border-t border-line">
+                <dl className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] border-t border-line lg:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] lg:gap-4 lg:border-t-0">
                   {Object.keys(totals)
                     .sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
-                    .map((c) => {
+                    .map((c, i) => {
                       const n = active.filter((a) => a.currency === c).length;
                       return (
-                        <div key={c} className="grid gap-1.5 border-b border-line py-4 pr-4">
+                        <div
+                          key={c}
+                          className={cx(
+                            "grid gap-1.5 border-b border-line py-4 pr-4 lg:rounded-2xl lg:border-b-0 lg:px-6 lg:py-5",
+                            // En la computadora el total principal va en el bloque destacado del tema.
+                            i === 0
+                              ? "lg:[background:var(--hero-bg)] lg:text-[var(--hero-fg)] lg:[&_.kicker]:text-[var(--hero-sub)]! lg:[&_dd:last-child]:text-[var(--hero-sub)] lg:[&_dt_span]:border-[var(--hero-sub)]"
+                              : "lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]",
+                          )}
+                        >
                           <dt className="kicker flex items-center justify-between gap-2">
                             Total en {CURRENCY_NAME[c] ?? c}
                             <span className="rounded-[3px] border border-line-strong px-1.5 py-px font-mono text-[10.5px] tracking-normal">{c}</span>
@@ -152,13 +162,17 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
               )}
             </section>
 
-            <ul className="grid divide-y divide-line border-y border-line">
+            <ul className="grid divide-y divide-line border-y border-line lg:grid-cols-3 lg:gap-4 lg:divide-y-0 lg:border-y-0">
               {sorted.map((a, i) => (
-                <li key={a.id} className="rise flex items-center gap-1" style={{ "--i": i } as React.CSSProperties}>
+                <li
+                  key={a.id}
+                  className="rise flex items-center gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:pr-2 lg:shadow-[var(--card-shadow)]"
+                  style={{ "--i": i } as React.CSSProperties}
+                >
                   <button
                     type="button"
                     onClick={() => (sorting ? undefined : edit(a))}
-                    className="flex min-h-16 min-w-0 flex-1 items-center gap-3.5 px-1 py-3 text-left transition-colors hover:bg-surface-2/70"
+                    className="flex min-h-16 min-w-0 flex-1 items-center gap-3.5 px-1 py-3 text-left transition-colors hover:bg-surface-2/70 lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-x-3 lg:gap-y-6 lg:rounded-2xl lg:p-5"
                   >
                     <AccountAvatar account={a} size={40} />
                     <span className="grid min-w-0 flex-1 gap-0.5">
@@ -167,8 +181,17 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
                         {ACCOUNT_TYPES[a.type] ?? a.type} · {a.currency}
                       </span>
                     </span>
-                    <Balance cents={a.balanceCents} currency={a.currency} className="font-mono text-[14px] font-medium" />
-                    {!sorting && <CaretRight size={14} className="text-muted" aria-hidden />}
+                    <span className="lg:col-span-2 lg:flex lg:items-baseline lg:justify-between lg:gap-3">
+                      <Balance
+                        cents={a.balanceCents}
+                        currency={a.currency}
+                        className="font-mono text-[14px] font-medium lg:font-sans lg:text-[28px] lg:font-semibold lg:tracking-[-0.035em]"
+                      />
+                      <span className="hidden font-mono text-[11.5px] text-muted tabular lg:inline">
+                        {a.txCount === 1 ? "1 movimiento" : `${a.txCount.toLocaleString("es-UY")} movimientos`}
+                      </span>
+                    </span>
+                    {!sorting && <CaretRight size={14} className="text-muted lg:hidden" aria-hidden />}
                   </button>
                   {sorting && (
                     <span className="flex">

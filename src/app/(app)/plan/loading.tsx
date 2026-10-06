@@ -4,8 +4,8 @@ import { Bone, HeaderSkeleton, LoadingRegion } from "@/components/skeleton";
 export default function Loading() {
   return (
     <>
-      <HeaderSkeleton title="Semana" tabs={3} />
-      <LoadingRegion label="Cargando la semana" className="mx-auto max-w-6xl px-4 lg:px-8">
+      <HeaderSkeleton title="Semana" tabs={3} wide />
+      <LoadingRegion label="Cargando la semana" className="mx-auto max-w-6xl px-4 lg:px-10">
         <div className="flex items-center justify-between py-3">
           <Bone className="h-6 w-44" />
           <Bone className="h-6 w-24" />

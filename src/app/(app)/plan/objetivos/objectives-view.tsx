@@ -57,6 +57,7 @@ export function ObjectivesView({
     <>
       <PageHeader
         title="Objetivos"
+        wide
         tabs={<PlanTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
@@ -64,7 +65,8 @@ export function ObjectivesView({
           </Button>
         }
       />
-      <main className="mx-auto max-w-3xl px-4 lg:px-10">
+      <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
+        <ObjectivesSummary krs={groups.flatMap((g) => g.keyResults)} today={today} />
         <div className="flex flex-wrap items-center gap-3 py-3 lg:pt-5">
           <div className="w-full max-w-sm">
             <Segmented
@@ -92,13 +94,17 @@ export function ObjectivesView({
             </Button>
           </div>
         ) : (
-          <div className="grid gap-12 pt-2 pb-4">
+          <div className="grid gap-12 pt-2 pb-4 lg:grid-cols-2 lg:items-start lg:gap-5">
             {groups.map((g, gi) => {
               const pct = objectivePct(g);
               return (
-                <section key={g.id || "loose"} className="rise grid gap-3" style={{ "--i": gi } as React.CSSProperties}>
+                <section
+                  key={g.id || "loose"}
+                  className="rise grid gap-3 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:px-6 lg:pt-5 lg:pb-2 lg:shadow-[var(--card-shadow)]"
+                  style={{ "--i": gi } as React.CSSProperties}
+                >
                   <header className="flex items-end justify-between gap-3">
-                    <h2 className="display text-[28px]">{g.title.replace(/^\d+\s+/, "")}</h2>
+                    <h2 className="display text-[28px] lg:text-[24px]">{g.title.replace(/^\d+\s+/, "")}</h2>
                     {pct !== null && <span className="figure pb-1 text-[26px] text-muted">{pct}%</span>}
                   </header>
                   {pct !== null && (
@@ -106,7 +112,7 @@ export function ObjectivesView({
                       <div className="h-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
-                  <ul className="grid border-t border-line">
+                  <ul className="grid border-t border-line lg:[&>li:last-child>button]:border-b-0">
                     {g.keyResults.map((k) => (
                       <KrRow key={k.id} kr={k} today={today} onOpen={() => sheet.current?.open(k)} />
                     ))}
@@ -308,5 +314,41 @@ function KrForm({ kr, objectives, onDone }: { kr?: KeyResultDTO; objectives: Obj
         )}
       </div>
     </form>
+  );
+}
+
+/**
+ * Resumen de la computadora (sobre lo filtrado): avance promedio en el bloque
+ * destacado, terminados, en curso y vencidos.
+ */
+function ObjectivesSummary({ krs, today }: { krs: KeyResultDTO[]; today: string }) {
+  if (krs.length === 0) return null;
+  const pcts = krs.map(krPct).filter((p): p is number => p !== null);
+  const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
+  const done = krs.filter((k) => k.status === "done").length;
+  const doing = krs.filter((k) => k.status === "doing").length;
+  const late = krs.filter((k) => (k.status === "todo" || k.status === "doing") && (daysLeft(k.deadline, today) ?? 0) < 0).length;
+  const tiles = [
+    { label: "Terminados", value: String(done), hint: `de ${krs.length} resultados clave` },
+    { label: "En curso", value: String(doing), hint: "arrancados" },
+    { label: "Vencidos", value: String(late), hint: late ? "con el deadline pasado" : "nada atrasado" },
+  ];
+  return (
+    <dl className="hidden grid-cols-4 gap-4 pt-6 pb-2 lg:grid">
+      <div className="hero grid content-start gap-1 rounded-2xl px-5 pt-4 pb-4">
+        <dt className="hero-sub font-mono text-[11px] tracking-[0.08em] uppercase">Avance promedio</dt>
+        <dd className="figure pt-1 text-[36px]">{avg}%</dd>
+        <dd className="mt-1 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--hero-fg)_18%,transparent)]" aria-hidden>
+          <span className="block h-full rounded-full bg-[var(--hero-fg)]" style={{ width: `${avg}%` }} />
+        </dd>
+      </div>
+      {tiles.map((t) => (
+        <div key={t.label} className="grid content-start gap-1 rounded-2xl border border-line bg-surface px-5 pt-4 pb-4">
+          <dt className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">{t.label}</dt>
+          <dd className="figure pt-1 text-[36px]">{t.value}</dd>
+          <dd className="text-[12.5px] text-muted">{t.hint}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Fire, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
-import { getAllTags, getEntries, getHome } from "@/lib/journal";
+import { getAllTags, getEntries, getEntry, getHome, getQuickStats } from "@/lib/journal";
 import { getUsuario } from "@/lib/session";
 import { formatLong } from "@/lib/dates";
 import { greeting, isMood, MEMORY_COOKIE, moodInfo, normalizeTag } from "@/lib/journal-logic";
 import { EntryCard, JournalHeader } from "./journal-ui";
 import { JournalTabs, WriteTodayButton } from "./journal-nav";
 import { EmptyJournal, HomeActions, MemoryCard } from "./home-parts";
+import { EntryReader, QuickStatsCard } from "./reader-panel";
 
 export const metadata = { title: "Journal" };
 
@@ -23,13 +24,16 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   const mood = isMood(moodN) ? moodN : undefined;
   const limit = Math.min(2000, Math.max(60, Number(one(sp.n)) || 60));
   const filtering = !!(q || tag || mood);
+  const ver = one(sp.ver).slice(0, 64);
 
-  const [home, { entries, hasMore }, tags, user, jar] = await Promise.all([
+  const [home, { entries, hasMore }, tags, user, jar, reading, quick] = await Promise.all([
     getHome(),
     getEntries({ q, tag, mood, limit }),
     getAllTags(),
     getUsuario(),
     cookies(),
+    ver ? getEntry(ver) : null,
+    getQuickStats(),
   ]);
   const memoryDismissed = jar.get(MEMORY_COOKIE)?.value === home.today;
 
@@ -45,6 +49,16 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   if (q) more.set("q", q);
   if (tag) more.set("etiqueta", tag);
   if (mood) more.set("animo", String(mood));
+  // Lo mismo que se está viendo (búsqueda, filtros, cantidad), con o sin la entrada abierta en el panel.
+  const base = new URLSearchParams(more);
+  if (limit > 60) base.set("n", String(limit));
+  const withVer = (id: string) => {
+    const p = new URLSearchParams(base);
+    p.set("ver", id);
+    return `/journal?${p}`;
+  };
+  const closeHref = base.toString() ? `/journal?${base}` : "/journal";
+  if (reading) more.set("ver", reading.id);
   more.set("n", String(limit + 120));
 
   const firstName = user?.name?.split(" ")[0] ?? "";
@@ -54,6 +68,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
     <>
       <JournalHeader
         title="Journal"
+        wide
         tabs={<JournalTabs />}
         actions={
           <>
@@ -65,11 +80,12 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         }
       />
 
-      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-8 px-4 pt-3 lg:px-10 lg:pt-8">
+      <main className="mx-auto max-w-3xl px-4 pt-3 lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8">
         {!filtering && (
           <section className="rise grid gap-3 pt-1 lg:pt-0">
             <p className="kicker">{formatLong(home.today)}</p>
-            <p className="display text-[38px] leading-[1.02] text-balance lg:text-[52px]">
+            <p className="display text-[38px] leading-[1.02] text-balance lg:text-[44px]">
               {greeting(home.hour)}
               {firstName && `, ${firstName}`}
             </p>
@@ -84,7 +100,11 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           </section>
         )}
 
-        {!filtering && home.memory && !memoryDismissed && <MemoryCard memory={home.memory} today={home.today} />}
+        {!filtering && home.memory && !memoryDismissed && (
+          <div className="lg:hidden">
+            <MemoryCard memory={home.memory} today={home.today} />
+          </div>
+        )}
 
         {filtering && (
           <FilterSummary count={entries.length} hasMore={hasMore} q={q} tag={tag} mood={mood} />
@@ -111,7 +131,13 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
                 </h2>
                 <div className="grid">
                   {g.items.map((e) => (
-                    <EntryCard key={e.id} entry={e} index={i++} />
+                    <EntryCard
+                      key={e.id}
+                      entry={e}
+                      index={i++}
+                      selectHref={withVer(e.id)}
+                      selected={reading?.id === e.id}
+                    />
                   ))}
                 </div>
               </section>
@@ -127,6 +153,23 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
             )}
           </div>
         )}
+      </div>
+
+      {/* Panel de la computadora: la entrada elegida, o el recuerdo y un resumen. */}
+      <div className="hidden lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]">
+        {reading ? (
+          <EntryReader key={reading.id} entry={reading} closeHref={closeHref} />
+        ) : (
+          <>
+            {home.memory && !memoryDismissed && (
+              <div className="rounded-2xl border border-line bg-surface px-6 pb-1 [&>section]:border-y-0">
+                <MemoryCard memory={home.memory} today={home.today} />
+              </div>
+            )}
+            <QuickStatsCard stats={quick} />
+          </>
+        )}
+      </div>
       </main>
     </>
   );

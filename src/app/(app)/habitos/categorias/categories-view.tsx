@@ -35,6 +35,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
     <>
       <PageHeader
         title="Categorías"
+        wide
         tabs={<HabitsTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={create}>
@@ -43,15 +44,19 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 pt-4 lg:px-10 lg:pt-6">
-        <ul className="grid grid-cols-2 border-t border-l border-line sm:grid-cols-3">
+      <main className="mx-auto max-w-3xl px-4 pt-4 lg:max-w-6xl lg:px-10 lg:pt-6">
+        <ul className="grid grid-cols-2 border-t border-l border-line sm:grid-cols-3 lg:grid-cols-4 lg:gap-4 lg:border-0">
           {categories.map((c, i) => (
-            <li key={c.id} className="rise border-r border-b border-line" style={{ "--i": i } as React.CSSProperties}>
+            <li
+              key={c.id}
+              className="rise border-r border-b border-line lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]"
+              style={{ "--i": i } as React.CSSProperties}
+            >
               <button
                 type="button"
                 onClick={() => open({ id: c.id, name: c.name, icon: c.icon, color: c.color })}
                 style={tone(c.color)}
-                className="group flex h-full w-full flex-col items-start gap-8 p-4 text-left transition-colors hover:bg-surface-2 lg:p-5"
+                className="group flex h-full w-full flex-col items-start gap-8 p-4 text-left transition-colors hover:bg-surface-2 lg:min-h-44 lg:justify-between lg:p-6"
               >
                 <ToneSquare size={42} style={tone(c.color)}>
                   <HabitIcon name={c.icon} size={23} weight="fill" />
@@ -68,6 +73,16 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
               </button>
             </li>
           ))}
+          <li className="hidden lg:block">
+            <button
+              type="button"
+              onClick={create}
+              className="flex h-full min-h-44 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line-strong text-[14px] text-muted transition-colors hover:border-fg/40 hover:bg-surface-2 hover:text-fg"
+            >
+              <Plus size={20} />
+              Nueva categoría
+            </button>
+          </li>
         </ul>
       </main>
 
