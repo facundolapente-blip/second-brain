@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowBendUpRight, Check, Plus, X } from "@phosphor-icons/react";
 import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
-import { dayState, isScheduled, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
+import { dayState, isScheduled, WEEKDAY_SHORT, type PackedLogMap } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
@@ -24,7 +24,7 @@ export function TodayView({
   today,
 }: {
   habits: HabitDTO[];
-  logs: Record<string, LogMap>;
+  logs: PackedLogMap;
   categories: CategoryDTO[];
   today: string;
 }) {

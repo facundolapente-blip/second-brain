@@ -50,19 +50,24 @@ const ORDER: Prisma.JournalEntryOrderByWithRelationInput[] = [{ date: "desc" }, 
 
 export type EntryFilters = { q?: string; tag?: string; mood?: number; limit?: number };
 
+/** Sin tildes ni mayúsculas: "Día" y "dia" son lo mismo al buscar. */
+export function fold(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 export async function getEntries({ q, tag, mood, limit = 60 }: EntryFilters) {
   const and: Prisma.JournalEntryWhereInput[] = [NOT_EMPTY];
-  if (q) {
-    and.push({
-      OR: [
-        { body: { contains: q, mode: "insensitive" } },
-        { title: { contains: q, mode: "insensitive" } },
-        { tags: { has: q.toLowerCase() } },
-      ],
-    });
-  }
   if (tag) and.push({ tags: { has: tag } });
   if (mood) and.push({ mood });
+  if (q) {
+    // Postgres no ignora tildes sin una extensión: se filtra acá (son pocas miles).
+    const needle = fold(q.trim());
+    const rows = await prisma.journalEntry.findMany({ where: { AND: and }, select: CARD_SELECT, orderBy: ORDER });
+    const hits = rows.filter(
+      (r) => fold(r.body).includes(needle) || fold(r.title ?? "").includes(needle) || r.tags.some((t) => fold(t).includes(needle)),
+    );
+    return { entries: hits.slice(0, limit).map((r) => toCard(r)), hasMore: hits.length > limit };
+  }
   const rows = await prisma.journalEntry.findMany({
     where: { AND: and },
     select: CARD_SELECT,

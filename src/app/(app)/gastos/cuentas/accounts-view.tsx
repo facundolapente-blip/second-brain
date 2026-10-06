@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
+import { BalanceAdjuster } from "./balance-adjuster";
 import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
 
 type Draft = {
@@ -272,7 +273,7 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
             hint={draft.id && draft.txCount > 0 ? "No se cambia en una cuenta con movimientos." : undefined}
           />
 
-          <Field label="Saldo inicial" hint="Lo que tenía la cuenta antes del primer movimiento que cargues. Puede ser negativo.">
+          <Field label="Saldo inicial" hint="Lo que tenía la cuenta antes del primer movimiento. Para corregir el saldo de hoy (o de un día pasado) usá Ajustar saldo, abajo.">
             <span className="flex h-10 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
               <span className="text-sm text-muted">{currencySymbol(draft.currency)}</span>
               <input
@@ -356,6 +357,17 @@ export function AccountsView({ accounts, openNew }: { accounts: AccountDTO[]; op
             )}
           </div>
         </form>
+        {draft.id && (
+          <div className="mt-4 border-t border-line pt-4">
+            <BalanceAdjuster
+              key={`adj-${formKey}`}
+              accountId={draft.id}
+              currency={draft.currency}
+              balanceCents={accounts.find((a) => a.id === draft.id)?.balanceCents ?? 0}
+              onDone={() => sheet.current?.close()}
+            />
+          </div>
+        )}
       </Sheet>
     </>
   );

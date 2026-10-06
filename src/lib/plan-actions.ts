@@ -40,8 +40,8 @@ async function syncHabit(habitId: string | null, date: Date, done: boolean) {
   if (done) {
     await prisma.habitLog.upsert({
       where: key,
-      create: { habitId, date, status: "done", value: habit.target },
-      update: { status: "done", value: habit.target },
+      create: { habitId, date, status: "done", value: habit.target, source: "app" },
+      update: { status: "done", value: habit.target, source: "app" },
     });
   } else {
     // Solo se desmarca si la marca era "hecho": no se pisa un fallado o salteado.
@@ -111,8 +111,12 @@ export async function setBlockDone(id: string, done: boolean) {
 
 export async function deleteBlock(id: string) {
   await exigirSesion();
+  const block = await prisma.planBlock.findUnique({ where: { id } });
+  if (!block) return;
   await prisma.planBlock.delete({ where: { id } });
-  refrescar();
+  // Si estaba hecho y vinculado a un hábito, la marca se va con él.
+  if (block.done) await syncHabit(block.habitId, block.date, false);
+  refrescar(block.done && !!block.habitId);
 }
 
 /**

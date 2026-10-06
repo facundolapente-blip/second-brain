@@ -6,6 +6,7 @@ import { moneyCents } from "@/lib/format";
 import { tone } from "@/lib/palette";
 import {
   balanceByCurrency,
+  flowOf,
   isSelected,
   sortedCurrencies,
   type AccountDTO,
@@ -99,10 +100,11 @@ export function CategorySpend({
 }) {
   const byCur: Record<string, Map<string | null, number>> = {};
   for (const t of txs) {
-    if (t.kind !== "expense") continue;
+    const f = flowOf(t, lk.category);
+    if (!f || f.kind !== "expense") continue;
     const c = lk.currencyOf(t.accountId);
     const m = (byCur[c] ??= new Map());
-    m.set(t.categoryId, (m.get(t.categoryId) ?? 0) + t.amountCents);
+    m.set(t.categoryId, (m.get(t.categoryId) ?? 0) + f.cents);
   }
   const curs = Object.keys(byCur).sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)));
   const cur = curs[0];

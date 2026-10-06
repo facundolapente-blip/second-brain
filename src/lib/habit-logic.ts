@@ -393,3 +393,63 @@ export function trackStats(
     from: tracks[0]?.startDate ?? h.startDate,
   };
 }
+
+// ─── Marcas compactas (para mandar al navegador) ────────────────────────────
+
+/**
+ * Las marcas de un hábito en una cadena de un carácter por día desde `from`
+ * ("." sin marca, d hecho, f fallado, s salteado, o solo nota) más los valores
+ * que no son 1 y las notas. Pasa de ~50 bytes por marca a ~1: Hábitos carga
+ * mucho más rápido en el celular.
+ */
+export type PackedLogs = { from: string; s: string; v?: Record<number, number>; n?: Record<number, string> };
+export type PackedLogMap = Record<string, PackedLogs | null>;
+
+const CODE: Record<string, string> = { done: "d", failed: "f", skipped: "s", none: "o" };
+const DECODE: Record<string, DayLog["s"]> = { d: "done", f: "failed", s: "skipped", o: "none" };
+
+export function packLogs(m: LogMap): PackedLogs | null {
+  const dates = Object.keys(m).sort();
+  if (dates.length === 0) return null;
+  const from = dates[0];
+  const len = diffDaysUtc(dates.at(-1)!, from) + 1;
+  const chars = Array<string>(len).fill(".");
+  const v: Record<number, number> = {};
+  const n: Record<number, string> = {};
+  for (const d of dates) {
+    const i = diffDaysUtc(d, from);
+    const log = m[d];
+    chars[i] = CODE[log.s] ?? ".";
+    if (log.v !== 1) v[i] = log.v;
+    if (log.n) n[i] = log.n;
+  }
+  const out: PackedLogs = { from, s: chars.join("") };
+  if (Object.keys(v).length) out.v = v;
+  if (Object.keys(n).length) out.n = n;
+  return out;
+}
+
+export function unpackLogs(p: PackedLogs | null | undefined): LogMap {
+  const out: LogMap = {};
+  if (!p) return out;
+  for (let i = 0; i < p.s.length; i++) {
+    const c = p.s[i];
+    if (c === ".") continue;
+    const log: DayLog = { s: DECODE[c] ?? "done", v: p.v?.[i] ?? 1 };
+    if (p.n?.[i]) log.n = p.n[i];
+    out[addDays(p.from, i)] = log;
+  }
+  return out;
+}
+
+export function packAll(logs: Record<string, LogMap>): PackedLogMap {
+  return Object.fromEntries(Object.entries(logs).map(([id, m]) => [id, packLogs(m)]));
+}
+
+export function unpackAll(p: PackedLogMap): Record<string, LogMap> {
+  return Object.fromEntries(Object.entries(p).map(([id, m]) => [id, unpackLogs(m)]));
+}
+
+function diffDaysUtc(a: string, b: string) {
+  return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
+}

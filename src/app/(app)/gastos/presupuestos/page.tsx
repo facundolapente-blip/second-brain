@@ -15,7 +15,7 @@ export default async function PresupuestosPage({ searchParams }: PageProps<"/gas
     <BudgetsView
       month={month}
       today={todayISO()}
-      categories={categories.filter((c) => c.kind === "expense")}
+      categories={categories.filter((c) => c.kind === "expense" && !c.adjustment)}
       budgets={budgets}
       unbudgeted={unbudgeted}
       projects={projects}

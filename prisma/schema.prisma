@@ -111,6 +111,9 @@ model HabitLog {
   value   Int      @default(1)
   /// Nota del día ("hoy fumé uno después de cenar").
   note    String?
+  /// De dónde vino la marca: "app" (marcada acá) o null/"habitnow" (importada).
+  /// Reimportar HabitNow nunca pisa una marca de la app.
+  source  String?
 
   @@unique([habitId, date])
   @@index([date])
@@ -159,6 +162,8 @@ model Category {
   color        String                 @default("stone")
   order        Int                    @default(0)
   archivedAt   DateTime?
+  /// "Ajuste de saldo": corrige el saldo de una cuenta sin contar como gasto ni ingreso.
+  isAdjustment Boolean                @default(false)
   transactions Transaction[]
   templates    TxTemplate[]
   schedules    ScheduledTransaction[]
@@ -291,6 +296,15 @@ model ScheduledTransaction {
   transactions Transaction[]
 
   @@index([nextDate])
+}
+
+// ─── Ajustes de la app ───────────────────────────────────────────────────────
+
+/// Valores sueltos que guarda la app (por ejemplo, la última cotización del dólar).
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Check-in diario ────────────────────────────────────────────────────────

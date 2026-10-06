@@ -3,6 +3,8 @@ import { prisma } from "./prisma";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { getDailyMetrics, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
+import { NOT_ADJUSTMENT } from "./finance";
+import { getRates, toUyu } from "./fx";
 import { REVIEW_TAG } from "./review-logic";
 
 function avg(xs: (number | null)[]) {
@@ -40,8 +42,8 @@ export async function getWeeklyReview(day: string) {
   const [{ days: all, habits }, txs, categories, tasksDone, tasksNext, review] = await Promise.all([
     getDailyMetrics(prevMonday, sunday),
     prisma.transaction.findMany({
-      where: { kind: "expense", date: { gte: toDbDate(monday), lte: toDbDate(sunday) }, account: { currency: "UYU" } },
-      select: { title: true, amount: true, categoryId: true, date: true },
+      where: { kind: "expense", date: { gte: toDbDate(monday), lte: toDbDate(sunday) }, ...NOT_ADJUSTMENT },
+      select: { title: true, amount: true, categoryId: true, date: true, account: { select: { currency: true } } },
     }),
     prisma.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
     prisma.planTask.findMany({
@@ -80,8 +82,9 @@ export async function getWeeklyReview(day: string) {
   const catById = new Map(categories.map((c) => [c.id, c]));
   const byCat = new Map<string | null, number>();
   let biggest: { title: string | null; cents: number; date: string } | null = null;
+  const rates = await getRates();
   for (const t of txs) {
-    const c = toCents(t.amount);
+    const c = toUyu(toCents(t.amount), t.account.currency, rates);
     byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + c);
     if (!biggest || c > biggest.cents) biggest = { title: t.title, cents: c, date: fromDbDate(t.date) };
   }

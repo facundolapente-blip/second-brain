@@ -8,6 +8,7 @@ import { dayLabel, type AccountDTO, type CategoryDTO, type TxDTO } from "@/lib/f
 import { PageHeader } from "@/components/page-header";
 import { Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
+import { AdjustAssistant } from "./adjust-assistant";
 import { Amount, CategoryAvatar, useLookups } from "../shared";
 
 /**
@@ -28,7 +29,11 @@ export function UncategorizedView({
   const lk = useLookups(accounts, categories);
   const sheet = useRef<SheetHandle>(null);
   const [current, setCurrent] = useState<TxDTO | null>(null);
-  const [list, removeOptimistic] = useOptimistic(txs, (state, id: string) => state.filter((t) => t.id !== id));
+  const [list, removeOptimistic] = useOptimistic(txs, (state, ids: string | string[]) =>
+    state.filter((t) => !(Array.isArray(ids) ? ids : [ids]).includes(t.id)),
+  );
+  const untitled = list.filter((t) => !t.title);
+  const titled = list.filter((t) => t.title);
   const [, startTransition] = useTransition();
 
   function assign(categoryId: string) {
@@ -41,7 +46,7 @@ export function UncategorizedView({
     });
   }
 
-  const options = current ? categories.filter((c) => c.kind === current.kind) : [];
+  const options = current ? categories.filter((c) => c.kind === current.kind && !c.adjustment) : [];
 
   return (
     <>
@@ -58,14 +63,15 @@ export function UncategorizedView({
           </div>
         ) : (
           <>
+            <AdjustAssistant txs={untitled} accounts={accounts} lk={lk} onDone={(ids) => removeOptimistic(ids)} />
             <p className="pb-4 text-[15px] text-muted">
-              {list.length === 1 ? "1 movimiento" : `${list.length} movimientos`} sin categoría. Tocá uno para clasificarlo.
+              {titled.length === 1 ? "1 movimiento" : `${titled.length} movimientos`} con título y sin categoría. Tocá uno para clasificarlo.
             </p>
             <ul className="grid">
-              {list.map((t, i) => {
+              {titled.map((t, i) => {
                 const acc = lk.account(t.accountId);
                 // Separador de mes cuando cambia (la lista viene de la más nueva a la más vieja).
-                const newMonth = i === 0 || list[i - 1].date.slice(0, 7) !== t.date.slice(0, 7);
+                const newMonth = i === 0 || titled[i - 1].date.slice(0, 7) !== t.date.slice(0, 7);
                 return (
                   <li key={t.id}>
                     {newMonth && (

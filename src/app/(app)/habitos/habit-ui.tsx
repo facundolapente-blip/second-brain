@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useOptimistic, useRef, useState, useTransition } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
 import { setHabitLog } from "@/lib/habit-actions";
 import {
@@ -8,10 +8,12 @@ import {
   frequencyLabel,
   isDone,
   nextStatus,
+  unpackAll,
   type DayLog,
   type DayState,
   type LogMap,
   type LogStatus,
+  type PackedLogMap,
 } from "@/lib/habit-logic";
 import { addDays, formatLong, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
 import { tone } from "@/lib/palette";
@@ -48,7 +50,9 @@ function applyMark(prev: DayLog | undefined, m: Mark): DayLog | null {
  * Las marcas se ven al instante y la server action confirma por detrás. Cuando
  * vuelve, la página se revalida y los datos reales reemplazan a los optimistas.
  */
-export function useHabitLogs(initial: Record<string, LogMap>) {
+export function useHabitLogs(packed: PackedLogMap) {
+  // Llegan compactas (ver packLogs); se abren una vez por cada versión del servidor.
+  const initial = useMemo(() => unpackAll(packed), [packed]);
   const [logs, apply] = useOptimistic(initial, (state, m: Mark) => {
     const next = { ...(state[m.habitId] ?? {}) };
     const log = applyMark(next[m.date], m);

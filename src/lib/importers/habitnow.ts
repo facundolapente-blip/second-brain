@@ -254,7 +254,7 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
       ? (
           await prisma.habitLog.findMany({
             where: { habitId: { in: [...new Set(rows.map((r) => r.habitId))] } },
-            select: { id: true, habitId: true, date: true, status: true, value: true },
+            select: { id: true, habitId: true, date: true, status: true, value: true, source: true },
           })
         ).map((l) => [`${l.habitId}|${l.date.toISOString().slice(0, 10)}`, l])
       : [],
@@ -262,10 +262,14 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
   const fresh = rows.filter((r) => !have.has(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`));
   const changed = rows.flatMap((r) => {
     const l = have.get(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`);
-    return l && (l.status !== r.status || l.value !== r.value) ? [{ id: l.id, status: r.status, value: r.value }] : [];
+    // Lo que se marcó en la app manda: HabitNow no lo pisa.
+    return l && l.source !== "app" && (l.status !== r.status || l.value !== r.value)
+      ? [{ id: l.id, status: r.status, value: r.value }]
+      : [];
   });
+  const kept = rows.filter((r) => have.get(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`)?.source === "app").length;
   for (let i = 0; i < fresh.length; i += 1000) {
-    await prisma.habitLog.createMany({ data: fresh.slice(i, i + 1000) });
+    await prisma.habitLog.createMany({ data: fresh.slice(i, i + 1000).map((r) => ({ ...r, source: "habitnow" })) });
   }
   for (const c of changed) {
     await prisma.habitLog.update({ where: { id: c.id }, data: { status: c.status, value: c.value } });
@@ -274,7 +278,7 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
   const summary = [
     `Importados: ${await prisma.habit.count()} hábitos (${await prisma.habit.count({ where: { archivedAt: { not: null } } })} archivados),`,
     `${await prisma.habitCategory.count()} categorías, ${rows.length} marcas en el backup.`,
-    update ? `Hábitos nuevos: ${created}, actualizados: ${updated}. Marcas nuevas: ${fresh.length}, cambiadas: ${changed.length}.` : "",
+    update ? `Hábitos nuevos: ${created}, actualizados: ${updated}. Marcas nuevas: ${fresh.length}, cambiadas: ${changed.length}${kept ? `, respetadas de la app: ${kept}` : ""}.` : "",
     skipped ? `Ignoradas: ${skipped}.` : "",
   ].filter(Boolean).join(" ");
   return summary;

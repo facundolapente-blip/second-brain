@@ -19,7 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { archiveHabit, deleteHabit } from "@/lib/habit-actions";
 import { addDays, weekday } from "@/lib/dates";
-import { currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
+import { currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap, type PackedLogMap } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
@@ -39,7 +39,7 @@ export function HabitsList({
   archived = false,
 }: {
   habits: HabitDTO[];
-  logs: Record<string, LogMap>;
+  logs: PackedLogMap;
   categories: CategoryDTO[];
   today: string;
   archived?: boolean;

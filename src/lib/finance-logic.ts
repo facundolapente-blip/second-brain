@@ -34,6 +34,8 @@ export type CategoryDTO = {
   color: string;
   order: number;
   txCount: number;
+  /** "Ajuste de saldo": no cuenta como gasto ni ingreso. */
+  adjustment?: boolean;
 };
 
 export type TxDTO = {
@@ -249,6 +251,22 @@ export type FlowRow = {
   categoryId: string | null;
   cents: number;
 };
+
+/**
+ * Cómo cuenta un movimiento en gastos e ingresos: las transferencias y los
+ * ajustes de saldo no cuentan; un ingreso con categoría de gasto es un
+ * reintegro y resta de ese gasto (cents negativos).
+ */
+export function flowOf(
+  tx: Pick<TxDTO, "kind" | "amountCents" | "categoryId">,
+  categoryOf: (id: string | null) => Pick<CategoryDTO, "kind" | "adjustment"> | undefined,
+): { kind: "expense" | "income"; cents: number } | null {
+  if (tx.kind === "transfer") return null;
+  const c = categoryOf(tx.categoryId);
+  if (c?.adjustment) return null;
+  if (tx.kind === "income" && c?.kind === "expense") return { kind: "expense", cents: -tx.amountCents };
+  return { kind: tx.kind, cents: tx.amountCents };
+}
 
 export function toFlowRows(txs: TxDTO[]): FlowRow[] {
   const rows: FlowRow[] = [];

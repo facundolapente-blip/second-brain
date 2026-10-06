@@ -1,12 +1,12 @@
 import "./gastos.css";
-import { getActiveProjects, getSelection, runSchedules } from "@/lib/finance";
+import { getProjectOptions, getSelection, runSchedules } from "@/lib/finance";
 import { ProjectsProvider } from "./projects";
 import { GastosNav } from "./gastos-nav";
 import { SelectionProvider } from "./selection";
 
 export default async function GastosLayout({ children }: LayoutProps<"/gastos">) {
   // Los recurrentes que ya tocaban se cargan antes de mostrar nada.
-  const [selection, , projects] = await Promise.all([getSelection(), runSchedules(), getActiveProjects()]);
+  const [selection, , projects] = await Promise.all([getSelection(), runSchedules(), getProjectOptions()]);
   return (
     <SelectionProvider initial={selection}>
       <ProjectsProvider projects={projects}>

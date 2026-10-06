@@ -5,6 +5,8 @@ import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { addDays, fromDbDate, isISODate, todayISO, toDbDate } from "./dates";
 import { isFrequency, nextOnOrAfter } from "./schedule-logic";
+import { ensureAdjustmentCategories } from "./importers/adjustments";
+import { calibrarSaldos } from "./importers/gastos-saldos";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
@@ -71,7 +73,9 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
     categoryId = texto(fd, "categoryId", 40) || null;
     if (categoryId) {
       const cat = await prisma.category.findUnique({ where: { id: categoryId } });
-      if (!cat || cat.kind !== kind) categoryId = null;
+      // Un ingreso puede llevar una categoría de gasto: es un reintegro.
+      const refund = kind === "income" && cat?.kind === "expense" && !cat.isAdjustment;
+      if (!cat || (cat.kind !== kind && !refund)) categoryId = null;
     }
   }
 
@@ -128,7 +132,8 @@ export async function setTransactionCategory(id: string, categoryId: string | nu
   if (!tx || tx.kind === "transfer") return;
   if (categoryId) {
     const cat = await prisma.category.findUnique({ where: { id: categoryId } });
-    if (!cat || cat.kind !== tx.kind) throw new Error("Esa categoría no corresponde a este movimiento.");
+    const refund = tx.kind === "income" && cat?.kind === "expense";
+    if (!cat || (cat.kind !== tx.kind && !refund)) throw new Error("Esa categoría no corresponde a este movimiento.");
   }
   await prisma.transaction.update({ where: { id }, data: { categoryId } });
   refrescar();
@@ -444,4 +449,85 @@ export async function setTransactionsProject(ids: string[], projectId: string | 
   if (projectId && !(await prisma.budgetProject.findUnique({ where: { id: projectId }, select: { id: true } }))) return;
   await prisma.transaction.updateMany({ where: { id: { in: ids.map(String) } }, data: { projectId } });
   refrescar();
+}
+
+// ─── Ajustes de saldo y transferencias ──────────────────────────────────────
+
+/** Marca movimientos como "Ajuste de saldo": siguen moviendo el saldo pero no cuentan como gasto ni ingreso. */
+export async function markAsAdjustment(ids: string[]) {
+  await exigirSesion();
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) return;
+  const adj = await ensureAdjustmentCategories(prisma);
+  const txs = await prisma.transaction.findMany({ where: { id: { in: ids.map(String) } }, select: { id: true, kind: true } });
+  for (const kind of ["income", "expense"] as const) {
+    const these = txs.filter((t) => t.kind === kind).map((t) => t.id);
+    if (these.length) await prisma.transaction.updateMany({ where: { id: { in: these } }, data: { categoryId: adj[kind] } });
+  }
+  refrescar();
+}
+
+/**
+ * Convierte un ingreso o gasto suelto en una transferencia con otra cuenta de
+ * la misma moneda (un ingreso "llegó desde" la otra; un gasto "fue hacia").
+ * Después se recalibran los saldos para que el 2 de octubre siga cerrando.
+ */
+export async function convertToTransfer(id: string, otherAccountId: string): Promise<ActionResult> {
+  await exigirSesion();
+  const tx = await prisma.transaction.findUnique({ where: { id }, include: { account: true } });
+  if (!tx || tx.kind === "transfer") return { ok: false, error: "Ese movimiento ya no existe." };
+  const other = await prisma.account.findUnique({ where: { id: otherAccountId } });
+  if (!other || other.id === tx.accountId) return { ok: false, error: "Elegí otra cuenta." };
+  if (other.currency !== tx.account.currency) return { ok: false, error: "Tiene que ser una cuenta de la misma moneda." };
+  const [from, to] = tx.kind === "income" ? [other.id, tx.accountId] : [tx.accountId, other.id];
+  await prisma.transaction.update({
+    where: { id },
+    data: { kind: "transfer", accountId: from, toAccountId: to, toAmount: tx.amount, categoryId: null, projectId: null },
+  });
+  await calibrarSaldos(prisma);
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Cuadra el saldo de una cuenta: con el saldo real de un día (hoy u otro), crea
+ * un "Ajuste de saldo" por la diferencia. No cuenta como gasto ni ingreso.
+ */
+export async function adjustBalance(accountId: string, realRaw: string, date: string): Promise<ActionResult> {
+  await exigirSesion();
+  const acc = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!acc) return { ok: false, error: "Esa cuenta ya no existe." };
+  const s = realRaw.trim();
+  const neg = /^[-−]/.test(s);
+  const abs = s.replace(/^[-−]/, "") === "0" ? 0 : parseAmount(s.replace(/^[-−]/, ""));
+  if (abs === null) return { ok: false, error: "Escribí el saldo real (puede ser 0)." };
+  const real = neg ? -abs : abs;
+  const day = isISODate(date) && date <= todayISO() ? date : todayISO();
+  const txs = await prisma.transaction.findMany({
+    where: { OR: [{ accountId }, { toAccountId: accountId }], date: { lte: toDbDate(day) } },
+    select: { kind: true, amount: true, toAmount: true, accountId: true },
+  });
+  let balance = Math.round(Number(acc.initialBalance) * 100);
+  for (const t of txs) {
+    const amt = Math.round(Number(t.amount) * 100);
+    if (t.kind === "income") balance += amt;
+    else if (t.kind === "expense") balance -= amt;
+    else if (t.accountId === accountId) balance -= amt;
+    else balance += Math.round(Number(t.toAmount ?? t.amount) * 100);
+  }
+  const diff = real - balance;
+  if (diff === 0) return { ok: true };
+  const adj = await ensureAdjustmentCategories(prisma);
+  await prisma.transaction.create({
+    data: {
+      kind: diff > 0 ? "income" : "expense",
+      date: toDbDate(day),
+      title: "Ajuste de saldo",
+      amount: centsToDecimalString(Math.abs(diff)),
+      accountId,
+      categoryId: adj[diff > 0 ? "income" : "expense"],
+      note: `Saldo real ese día: ${centsToDecimalString(real)}`,
+    },
+  });
+  refrescar();
+  return { ok: true };
 }

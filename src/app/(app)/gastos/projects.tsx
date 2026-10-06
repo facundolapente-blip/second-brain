@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-export type ProjectOption = { id: string; name: string };
+export type ProjectOption = { id: string; name: string; archived: boolean };
 
 const ProjectsCtx = createContext<ProjectOption[]>([]);
 

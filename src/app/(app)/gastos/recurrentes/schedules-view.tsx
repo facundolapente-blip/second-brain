@@ -190,7 +190,7 @@ function ScheduleForm({
 
   const from = accounts.find((a) => a.id === accountId);
   const to = accounts.find((a) => a.id === toAccountId);
-  const cats = categories.filter((c) => c.kind === kind);
+  const cats = categories.filter((c) => c.kind === kind && !c.adjustment);
 
   return (
     <form action={action} className="grid gap-4">

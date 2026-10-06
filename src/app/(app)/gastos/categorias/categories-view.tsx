@@ -52,7 +52,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
 
       <main className="mx-auto grid max-w-3xl gap-10 px-4 pt-2 lg:max-w-6xl lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:px-10 lg:pt-6">
         {sections.map((s) => {
-          const list = categories.filter((c) => c.kind === s.kind);
+          const list = categories.filter((c) => c.kind === s.kind && !c.adjustment);
           return (
             <section
               key={s.kind}

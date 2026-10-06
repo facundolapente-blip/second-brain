@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Archive,
   ArrowBendUpRight,
@@ -29,6 +29,7 @@ import {
   type LogMap,
   type TrackStats,
   type TrackView,
+  type PackedLogs,
 } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
@@ -61,12 +62,13 @@ export function HabitDetail({
   initialTab,
 }: {
   habit: HabitDTO;
-  logs: LogMap;
+  logs: PackedLogs | null;
   today: string;
   categories: CategoryDTO[];
   initialTab: DetailTab;
 }) {
-  const { logs: all, mark } = useHabitLogs({ [habit.id]: initialLogs });
+  const packed = useMemo(() => ({ [habit.id]: initialLogs }), [habit.id, initialLogs]);
+  const { logs: all, mark } = useHabitLogs(packed);
   const logs = all[habit.id] ?? {};
   const [tab, setTab] = useState<DetailTab>(initialTab);
   const [view, setView] = useState<TrackView>("current");

@@ -655,7 +655,7 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
     <Card title="Gastos del mes" href="/gastos/informes" hrefLabel="Informes" color="var(--c-gastos)" className="lg:col-span-7" i={4}>
       <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
         <div>
-          <p className="kicker">Gastado en {monthName}</p>
+          <p className="kicker">Gastado en {monthName} (en pesos)</p>
           <p className="figure mt-1 text-[34px]">{moneyCents(g.spentMonth)}</p>
         </div>
         {delta !== null && (
@@ -706,6 +706,12 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
                 {money(Math.abs(cents) / 100, cur)}
               </p>
             ))}
+          {Object.keys(g.balances).length > 1 && (
+            <p className="text-[12.5px] text-muted">
+              Todo junto: <span className="tabular font-medium text-fg">{moneyCents(g.netWorth)}</span>
+              {g.usdRate ? ` (US$ 1 = ${moneyCents(Math.round(g.usdRate * 100))})` : ""}
+            </p>
+          )}
           <Link href="/gastos/cuentas" className="text-[13px] text-muted hover:text-fg hover:underline">
             Ver cuentas
           </Link>

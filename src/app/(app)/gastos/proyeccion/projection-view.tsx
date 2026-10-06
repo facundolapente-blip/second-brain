@@ -37,10 +37,12 @@ export function ProjectionView({
   p,
   balance,
   categories,
+  usdRate,
 }: {
   p: Projection;
   balance: number;
   categories: CategoryDTO[];
+  usdRate: number | null;
 }) {
   const cat = new Map(categories.map((c) => [c.id, c]));
   const vsAvg = pct(p.projected, p.avgMonth);
@@ -70,7 +72,7 @@ export function ProjectionView({
             <Tile label="Proyección al cierre" value={moneyCents(p.projected)} sub={`falta gastar ~${moneyCents(remaining)}`} />
             <Tile label="Promedio de 3 meses" value={moneyCents(p.avgMonth)} sub={`${monthName(p.hist.at(-1)?.month ?? p.month)}: ${moneyCents(p.lastMonth)}`} />
             <Tile
-              label="Saldo en pesos a fin de mes"
+              label="Saldo total a fin de mes"
               value={`${endBalance < 0 ? "−" : ""}${moneyCents(Math.abs(endBalance))}`}
               sub={`hoy ${moneyCents(balance)} · entran ~${moneyCents(incomeLeft)}, salen ~${moneyCents(Math.max(remaining, p.upcoming.expense))}`}
             />
@@ -164,7 +166,7 @@ export function ProjectionView({
             </div>
           )}
           <p className="text-[12px] text-muted">
-            Solo gastos en pesos. La proyección mezcla tu ritmo de este mes con tu promedio: cuanto más avanza el mes, más
+            Todo en pesos{usdRate ? ` (los dólares a ${moneyCents(Math.round(usdRate * 100))} por US$ 1)` : ""}; los ajustes de saldo no cuentan y los reintegros restan. La proyección mezcla tu ritmo de este mes con tu promedio: cuanto más avanza el mes, más
             pesa lo de este mes. Es una estimación, no una predicción.
           </p>
         </Card>

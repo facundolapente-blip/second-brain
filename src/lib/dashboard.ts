@@ -4,7 +4,8 @@ import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, to
 import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
-import { getAccounts, runSchedules } from "./finance";
+import { getAccounts, NOT_ADJUSTMENT, runSchedules } from "./finance";
+import { getRates, toUyu } from "./fx";
 import { toCents, type CurrencyTotals } from "./finance-logic";
 import { isFreeBlock, sortBlocks, type BlockDTO } from "./plan-logic";
 import { getCheckin, lastWeight } from "./checkin";
@@ -50,6 +51,7 @@ export async function getDashboard() {
   })();
 
   await runSchedules();
+  const rates = await getRates();
   const [checkToday, checkYesterday, weight] = await Promise.all([
     getCheckin(today),
     getCheckin(addDays(today, -1)),
@@ -73,8 +75,9 @@ export async function getDashboard() {
       where: {
         kind: { in: ["expense", "income"] },
         date: { gte: toDbDate(monthBounds(prevMonth).from), lte: toDbDate(monthBounds(month).to) },
+        ...NOT_ADJUSTMENT,
       },
-      select: { date: true, kind: true, amount: true, accountId: true, categoryId: true },
+      select: { date: true, kind: true, amount: true, accountId: true, categoryId: true, category: { select: { kind: true } } },
     }),
     prisma.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
     prisma.planBlock.findMany({
@@ -139,10 +142,11 @@ export async function getDashboard() {
   let incomeMonth = 0;
   const byCat = new Map<string | null, number>();
   for (const t of flows) {
-    if (currencyOf.get(t.accountId) !== "UYU") continue;
+    // Todo en pesos: los dólares con la cotización del día; un reintegro resta del gasto.
     const iso = fromDbDate(t.date);
-    const cents = toCents(t.amount);
-    if (t.kind === "income") {
+    const refund = t.kind === "income" && t.category?.kind === "expense";
+    const cents = toUyu(toCents(t.amount), currencyOf.get(t.accountId) ?? "UYU", rates) * (refund ? -1 : 1);
+    if (t.kind === "income" && !refund) {
       if (iso.startsWith(month)) incomeMonth += cents;
       continue;
     }
@@ -174,7 +178,12 @@ export async function getDashboard() {
       return { id, name: c?.name ?? "Sin clasificar", color: c?.color ?? "stone", icon: c?.icon ?? "Question", cents };
     });
   const balances: CurrencyTotals = {};
-  for (const a of accounts) if (!a.archived) balances[a.currency] = (balances[a.currency] ?? 0) + a.balanceCents;
+  let netWorth = 0;
+  for (const a of accounts) {
+    if (a.archived) continue;
+    balances[a.currency] = (balances[a.currency] ?? 0) + a.balanceCents;
+    netWorth += toUyu(a.balanceCents, a.currency, rates);
+  }
 
   // ─── Plan ─────────────────────────────────────────────────────────────────
   const blockDTOs: BlockDTO[] = blocks.map((b) => ({
@@ -258,6 +267,8 @@ export async function getDashboard() {
       cumPrev: cumulative(prevMonth, prevDays),
       topCategories,
       balances,
+      netWorth,
+      usdRate: rates.toUyu.USD ?? null,
     },
     plan: {
       today: todayBlocks.map((b) => ({ ...b, category: b.categoryId ? (planCats.get(b.categoryId) ?? null) : null })),

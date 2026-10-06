@@ -7,6 +7,7 @@ import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
   balanceByCurrency,
+  flowOf,
   dayLabel,
   groupByDay,
   netByCurrency,
@@ -77,10 +78,12 @@ export function MovementsView({
     const inc: Record<string, number> = {};
     const exp: Record<string, number> = {};
     for (const t of visible) {
-      if (t.kind === "transfer") continue;
+      // Transferencias y ajustes no cuentan; un reintegro resta del gasto.
+      const f = flowOf(t, lk.category);
+      if (!f) continue;
       const c = lk.currencyOf(t.accountId);
-      const target = t.kind === "income" ? inc : exp;
-      target[c] = (target[c] ?? 0) + t.amountCents;
+      const target = f.kind === "income" ? inc : exp;
+      target[c] = (target[c] ?? 0) + f.cents;
     }
     return { inc, exp };
   }, [visible, lk]);

@@ -383,7 +383,7 @@ dialog.sheet::backdrop {
 /* Etiqueta llena (categoría, estado, prioridad): el tono profundo de la paleta
    con texto blanco; en oscuro, el tono medio con texto de tinta. */
 .chip-solid {
-  background: color-mix(in oklab, var(--tone-fg) 62%, var(--tone-solid));
+  background: color-mix(in oklab, var(--tone-fg) 78%, var(--tone-solid));
   color: #ffffff;
 }
 :root[data-theme="oscuro"] .chip-solid {

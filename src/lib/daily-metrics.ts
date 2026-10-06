@@ -5,6 +5,8 @@ import { getHabitsWithLogs } from "./habits";
 import { dayState, type DayState } from "./habit-logic";
 import { wordCount } from "./journal-logic";
 import { toCents } from "./finance-logic";
+import { NOT_ADJUSTMENT } from "./finance";
+import { getRates, toUyu } from "./fx";
 import { isFreeBlock } from "./plan-logic";
 
 /**
@@ -25,7 +27,7 @@ export type DayMetrics = {
   weightG: number | null;
   wrote: boolean;
   words: number;
-  /** Solo pesos uruguayos (no se mezclan monedas). */
+  /** En pesos uruguayos (los dólares, con la cotización del día). */
   spentCents: number;
   incomeCents: number;
   blocksDone: number;
@@ -44,13 +46,14 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     prisma.journalEntry.findMany({ where: { date: range }, select: { date: true, title: true, body: true, mood: true } }),
     prisma.account.findMany({ select: { id: true, currency: true } }),
     prisma.transaction.findMany({
-      where: { date: range, kind: { in: ["expense", "income"] } },
-      select: { date: true, kind: true, amount: true, accountId: true },
+      where: { date: range, kind: { in: ["expense", "income"] }, ...NOT_ADJUSTMENT },
+      select: { date: true, kind: true, amount: true, accountId: true, category: { select: { kind: true } } },
     }),
     prisma.planBlock.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),
   ]);
+  const rates = await getRates();
 
-  const uyu = new Set(accounts.filter((a) => a.currency === "UYU").map((a) => a.id));
+  const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
   const byDate = new Map<string, DayMetrics>();
   for (let d = from; d <= to; d = addDays(d, 1)) {
     const m: DayMetrics = {
@@ -103,9 +106,11 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
   }
   for (const t of txs) {
     const m = byDate.get(fromDbDate(t.date));
-    if (!m || !uyu.has(t.accountId)) continue;
-    if (t.kind === "expense") m.spentCents += toCents(t.amount);
-    else m.incomeCents += toCents(t.amount);
+    if (!m) continue;
+    const cents = toUyu(toCents(t.amount), currencyOf.get(t.accountId) ?? "UYU", rates);
+    if (t.kind === "expense") m.spentCents += cents;
+    else if (t.category?.kind === "expense") m.spentCents -= cents; // reintegro
+    else m.incomeCents += cents;
   }
   for (const b of blocks) {
     const m = byDate.get(fromDbDate(b.date));

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCategories, getHabit } from "@/lib/habits";
+import { packLogs } from "@/lib/habit-logic";
 import { HabitDetail, type DetailTab } from "./habit-detail";
 
 const TABS: DetailTab[] = ["calendario", "estadisticas", "editar"];
@@ -19,7 +20,7 @@ export default async function HabitPage({ params, searchParams }: PageProps<"/ha
     <HabitDetail
       key={id}
       habit={data.habit}
-      logs={data.logs}
+      logs={packLogs(data.logs)}
       today={data.today}
       categories={categories}
       initialTab={initialTab}

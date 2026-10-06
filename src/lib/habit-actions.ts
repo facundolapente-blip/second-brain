@@ -55,8 +55,8 @@ export async function setHabitLog(
   }
   await prisma.habitLog.upsert({
     where: { habitId_date: key },
-    create: { ...key, status: s, value: v, note: finalNote },
-    update: { status: s, value: v, note: finalNote },
+    create: { ...key, status: s, value: v, note: finalNote, source: "app" },
+    update: { status: s, value: v, note: finalNote, source: "app" },
   });
   refrescar();
 }
