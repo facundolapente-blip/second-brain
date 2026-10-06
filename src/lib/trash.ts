@@ -28,6 +28,7 @@ export type TrashKind =
   | "block"
   | "task"
   | "keyResult"
+  | "objective"
   | "photo";
 
 export type Module = "gastos" | "habitos" | "journal" | "plan";
@@ -47,6 +48,7 @@ const MODULE: Record<TrashKind, Module> = {
   block: "plan",
   task: "plan",
   keyResult: "plan",
+  objective: "plan",
   photo: "journal",
 };
 
@@ -65,6 +67,7 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   block: "Bloque del plan",
   task: "Tarea",
   keyResult: "Resultado clave",
+  objective: "Objetivo",
   photo: "Foto",
 };
 
@@ -196,6 +199,12 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
       const k = await prisma.planKeyResult.findUnique({ where: { id } });
       return k ? { label: k.title, data: { row: k } } : null;
     }
+    case "objective": {
+      const o = await prisma.planObjective.findUnique({ where: { id }, include: { keyResults: true } });
+      if (!o) return null;
+      const { keyResults, ...row } = o;
+      return { label: `${o.title} (${o.year}, ${keyResults.length} resultados clave)`, data: { row, keyResults } };
+    }
   }
 }
 
@@ -216,6 +225,10 @@ async function remove(kind: TrashKind, id: string) {
     task: () => prisma.planTask.deleteMany({ where: { id } }),
     keyResult: () => prisma.planKeyResult.deleteMany({ where: { id } }),
     photo: () => prisma.attachment.deleteMany({ where: { id } }),
+    objective: async () => {
+      await prisma.planKeyResult.deleteMany({ where: { objectiveId: id } });
+      await prisma.planObjective.deleteMany({ where: { id } });
+    },
   };
   await del[kind]();
 }
@@ -384,6 +397,12 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
     case "keyResult":
       await prisma.planKeyResult.create({ data: { ...row, objectiveId: await orNull(exists.objective, row.objectiveId) } });
       return null;
+    case "objective": {
+      await prisma.planObjective.create({ data: row });
+      const krs = (data.keyResults as never[]) ?? [];
+      if (krs.length) await prisma.planKeyResult.createMany({ data: krs, skipDuplicates: true });
+      return null;
+    }
   }
 }
 

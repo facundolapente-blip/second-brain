@@ -80,19 +80,19 @@ export function TodayView({
                 const state = dayState(h, hLogs, selected, today);
                 const isCount = h.target > 1 || !!h.unit;
                 return (
-                  <li key={h.id} className="rise flex items-center gap-4 py-4" style={{ "--i": i } as React.CSSProperties}>
+                  <li key={h.id} className="rise flex items-center gap-3 py-3 lg:gap-4 lg:py-4" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
                       onClick={() => daySheet.current?.show(h, selected)}
                       disabled={isFuture}
-                      className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left lg:gap-4"
                     >
-                      <ToneSquare size={42} style={tone(h.color)}>
-                        <HabitIcon name={h.icon} size={22} weight="fill" />
+                      <ToneSquare solid className="size-9 lg:size-[42px]" style={tone(h.color)}>
+                        <HabitIcon name={h.icon} size={19} weight="fill" />
                       </ToneSquare>
                       <span className="grid min-w-0 gap-1">
                         <span className="flex items-baseline gap-2">
-                          <span className="truncate text-[16.5px] font-medium tracking-[-0.01em]">{h.name}</span>
+                          <span className="truncate text-[15.5px] font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
                           {isCount && (
                             <span className="tabular shrink-0 text-sm text-muted">
                               {log?.s === "done" ? log.v : 0}
@@ -245,7 +245,7 @@ function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => v
       disabled={disabled}
       aria-label={s.label}
       className={cx(
-        "inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:opacity-40 motion-reduce:transition-none motion-reduce:active:scale-100",
+        "inline-flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-[transform,background-color,border-color] duration-200 active:scale-90 lg:size-11 disabled:opacity-40 motion-reduce:transition-none motion-reduce:active:scale-100",
         s.cls,
       )}
     >

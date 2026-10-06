@@ -198,7 +198,7 @@ export function HabitsList({
                 return (
                   <li key={id} className="flex items-center gap-3 px-3 py-2">
                     <span className="w-6 text-center font-mono text-[12px] text-muted">{i + 1}</span>
-                    <ToneSquare size={30} style={tone(h.color)}>
+                    <ToneSquare solid size={30} style={tone(h.color)}>
                       <HabitIcon name={h.icon} size={16} weight="fill" />
                     </ToneSquare>
                     <span className="min-w-0 flex-1 truncate text-[15px]">{h.name}</span>
@@ -284,21 +284,21 @@ function HabitCard({
   return (
     <article
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      className="rise rounded-2xl border border-line bg-surface px-4 pt-4 pb-1.5"
+      className="rise rounded-2xl border border-line bg-surface px-3.5 pt-3.5 pb-1 lg:px-4 lg:pt-4 lg:pb-1.5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1">
-          <h2 className="display truncate text-[22px]">{habit.name}</h2>
+          <h2 className="display truncate text-[19px] lg:text-[22px]">{habit.name}</h2>
           <span>
             <HabitBadge habit={habit} />
           </span>
         </div>
-        <ToneSquare size={38} style={tone(habit.color)}>
-          <HabitIcon name={habit.icon} size={20} weight="fill" />
+        <ToneSquare solid className="size-8 lg:size-[38px]" style={tone(habit.color)}>
+          <HabitIcon name={habit.icon} size={18} weight="fill" />
         </ToneSquare>
       </div>
 
-      <div className="mt-4 grid grid-cols-7 justify-items-center gap-1">
+      <div className="mt-3 grid grid-cols-7 justify-items-center gap-1 lg:mt-4">
         {days.map((d) => (
           <div key={d} className="grid justify-items-center gap-1.5">
             <span className={cx("font-mono text-[10.5px] tracking-[0.08em] uppercase", d === today ? "font-semibold text-fg" : "text-muted")}>

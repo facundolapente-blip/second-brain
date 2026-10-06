@@ -268,17 +268,23 @@ export async function saveKeyResult(_prev: ActionResult | null, fd: FormData): P
   const title = texto(fd, "title", 160);
   if (!title) return { ok: false, error: "Ponele un nombre." };
 
-  // El objetivo se elige de la lista o se escribe uno nuevo.
+  // El objetivo se elige de la lista o se escribe uno nuevo (en el año que se está viendo).
+  let year = entero(fd, "year", 2000, 2100) ?? Number(todayISO().slice(0, 4));
   let objectiveId = texto(fd, "objectiveId", 40) || null;
   if (objectiveId === "__new") objectiveId = null;
   const newObjective = texto(fd, "newObjective", 120);
   if (newObjective) {
     const o = await prisma.planObjective.upsert({
-      where: { title: newObjective },
-      create: { title: newObjective, order: await prisma.planObjective.count() },
+      where: { title_year: { title: newObjective, year } },
+      create: { title: newObjective, year, order: await prisma.planObjective.count({ where: { year } }) },
       update: {},
     });
     objectiveId = o.id;
+  } else if (objectiveId) {
+    // El resultado clave va en el año de su objetivo.
+    const o = await prisma.planObjective.findUnique({ where: { id: objectiveId }, select: { year: true } });
+    if (o) year = o.year;
+    else objectiveId = null;
   }
   const statusRaw = texto(fd, "status") as KrStatus;
   const deadline = fecha(fd, "deadline");
@@ -291,6 +297,7 @@ export async function saveKeyResult(_prev: ActionResult | null, fd: FormData): P
     deadline: deadline ? toDbDate(deadline) : null,
     progress: decimal(fd, "progress"),
     goal: decimal(fd, "goal"),
+    year,
     ...linkOf(texto(fd, "link", 60)),
   };
   if (id) await prisma.planKeyResult.update({ where: { id }, data });
@@ -418,4 +425,94 @@ export async function deleteSubtask(id: string) {
 function linkOf(raw: string): { linkType: string | null; linkId: string | null } {
   const m = raw.match(/^(habit|account|goal):([a-z0-9]{10,40})$/i);
   return m ? { linkType: m[1], linkId: m[2] } : { linkType: null, linkId: null };
+}
+
+// ─── Objetivos por año ──────────────────────────────────────────────────────
+
+/** Crea o renombra un objetivo. */
+export async function saveObjective(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await exigirSesion();
+  const id = texto(fd, "id", 40) || null;
+  const title = texto(fd, "title", 120);
+  if (!title) return { ok: false, error: "Ponele un nombre." };
+  const year = entero(fd, "year", 2000, 2100) ?? Number(todayISO().slice(0, 4));
+  try {
+    if (id) {
+      await prisma.planObjective.update({ where: { id }, data: { title } });
+      await logActivity("updated", "objective", id, title);
+    } else {
+      const o = await prisma.planObjective.create({ data: { title, year, order: await prisma.planObjective.count({ where: { year } }) } });
+      await logActivity("created", "objective", o.id, `${title} (${year})`);
+    }
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") return { ok: false, error: "Ya hay un objetivo con ese nombre en ese año." };
+    throw e;
+  }
+  refrescar();
+  return { ok: true };
+}
+
+/** Borra un objetivo con sus resultados clave (va a la papelera, se puede restaurar). */
+export async function deleteObjective(id: string) {
+  await exigirSesion();
+  await trashAndDelete("objective", id);
+  refrescar();
+}
+
+/** Corre una fecha un año (el 29/2 cae el 28/2). */
+function nextYearDate(d: Date | null, years: number): Date | null {
+  if (!d) return null;
+  const iso = fromDbDate(d);
+  const y = Number(iso.slice(0, 4)) + years;
+  const md = iso.slice(5) === "02-29" ? "02-28" : iso.slice(5);
+  return toDbDate(`${y}-${md}`);
+}
+
+/**
+ * Arranca otro año copiando lo elegido (como duplicar la hoja de Notion): los
+ * objetivos y resultados clave quedan iguales pero sin empezar, sin progreso y
+ * con la fecha límite corrida al año nuevo. Después se editan como cualquier otro.
+ */
+export async function copyToYear(input: { to: number; objectiveIds: string[]; krIds: string[] }): Promise<ActionResult> {
+  await exigirSesion();
+  const to = Math.round(Number(input?.to));
+  if (!Number.isInteger(to) || to < 2000 || to > 2100) return { ok: false, error: "Año inválido." };
+  const objIds = (Array.isArray(input.objectiveIds) ? input.objectiveIds : []).map(String).slice(0, 200);
+  const krIds = (Array.isArray(input.krIds) ? input.krIds : []).map(String).slice(0, 500);
+  if (!objIds.length && !krIds.length) return { ok: false, error: "Elegí qué copiar." };
+
+  const krs = await prisma.planKeyResult.findMany({ where: { id: { in: krIds } }, orderBy: { createdAt: "asc" } });
+  // Un resultado clave elegido trae su objetivo aunque no se haya marcado.
+  const wanted = new Set([...objIds, ...krs.map((k) => k.objectiveId).filter((x): x is string => !!x)]);
+  const objs = await prisma.planObjective.findMany({ where: { id: { in: [...wanted] } }, orderBy: { order: "asc" } });
+  const newId = new Map<string, string>();
+  let order = await prisma.planObjective.count({ where: { year: to } });
+  for (const o of objs) {
+    const copy = await prisma.planObjective.upsert({
+      where: { title_year: { title: o.title, year: to } },
+      create: { title: o.title, year: to, order: order++ },
+      update: {},
+    });
+    newId.set(o.id, copy.id);
+  }
+  for (const k of krs) {
+    await prisma.planKeyResult.create({
+      data: {
+        title: k.title,
+        objectiveId: k.objectiveId ? (newId.get(k.objectiveId) ?? null) : null,
+        kind: k.kind,
+        status: "todo",
+        quarters: k.quarters,
+        deadline: nextYearDate(k.deadline, to - k.year),
+        progress: k.goal !== null ? 0 : null,
+        goal: k.goal,
+        linkType: k.linkType,
+        linkId: k.linkId,
+        year: to,
+      },
+    });
+  }
+  await logActivity("created", "objective", null, `Plan ${to}: ${objs.length} objetivos y ${krs.length} resultados clave copiados`);
+  refrescar();
+  return { ok: true };
 }

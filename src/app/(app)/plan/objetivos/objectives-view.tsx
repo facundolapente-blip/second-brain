@@ -1,8 +1,10 @@
 "use client";
 
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { ArrowsClockwise, Lightning, Plus } from "@phosphor-icons/react";
-import { deleteKeyResult, saveKeyResult } from "@/lib/plan-actions";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowsClockwise, CalendarPlus, Lightning, PencilSimple, Plus } from "@phosphor-icons/react";
+import { copyToYear, deleteKeyResult, deleteObjective, saveKeyResult, saveObjective } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
   daysLeft,
@@ -40,21 +42,36 @@ export function ObjectivesView({
   loose,
   links,
   today,
+  year,
+  years,
 }: {
   objectives: ObjectiveDTO[];
   loose: KeyResultDTO[];
   links: KrLinkOption[];
   today: string;
+  year: number;
+  years: number[];
 }) {
   const [quarter, setQuarter] = useState<Quarter>("all");
   const [showClosed, setShowClosed] = useState(true);
   const sheet = useRef<KrSheetHandle>(null);
+  const objSheet = useRef<SheetHandle>(null);
+  const planSheet = useRef<SheetHandle>(null);
+  const [editingObj, setEditingObj] = useState<ObjectiveDTO | null>(null);
+  const [objKey, setObjKey] = useState(0);
+  const nextYear = Math.max(...years) + 1;
   const match = (k: KeyResultDTO) =>
     (quarter === "all" || k.quarters.includes(quarter)) && (showClosed || (k.status !== "done" && k.status !== "closed"));
   const groups = [
-    ...objectives.map((o) => ({ ...o, keyResults: o.keyResults.filter(match) })),
-    ...(loose.length ? [{ id: "", title: "Sin objetivo", keyResults: loose.filter(match) }] : []),
-  ].filter((g) => g.keyResults.length > 0);
+    ...objectives.map((o) => ({ ...o, keyResults: o.keyResults.filter(match), empty: o.keyResults.length === 0 })),
+    ...(loose.length ? [{ id: "", title: "Sin objetivo", year, keyResults: loose.filter(match), empty: false }] : []),
+  ].filter((g) => g.keyResults.length > 0 || (g.empty && quarter === "all"));
+
+  function openObjective(o: ObjectiveDTO | null) {
+    setEditingObj(o);
+    setObjKey((k) => k + 1);
+    objSheet.current?.open();
+  }
 
   return (
     <>
@@ -63,12 +80,40 @@ export function ObjectivesView({
         wide
         tabs={<PlanTabs />}
         actions={
-          <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
-            <Plus size={16} weight="bold" /> Nuevo resultado
-          </Button>
+          <>
+            <Button variant="ghost" size="sm" onClick={() => openObjective(null)}>
+              <Plus size={16} weight="bold" /> Objetivo
+            </Button>
+            <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
+              <Plus size={16} weight="bold" /> Nuevo resultado
+            </Button>
+          </>
         }
       />
       <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
+        {/* Un año por pestaña, como las hojas de Notion. */}
+        <nav aria-label="Año" className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pt-3 pb-1">
+          {years.map((y) => (
+            <Link
+              key={y}
+              href={`/plan/objetivos?anio=${y}`}
+              aria-current={y === year ? "page" : undefined}
+              className={cx(
+                "inline-flex h-9 shrink-0 items-center rounded-full px-4 font-mono text-[13px] transition-colors",
+                y === year ? "bg-ink text-on-ink" : "text-muted hover:bg-surface-2 hover:text-fg",
+              )}
+            >
+              {y}
+            </Link>
+          ))}
+          <button
+            type="button"
+            onClick={() => planSheet.current?.open()}
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-dashed border-line-strong px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+          >
+            <CalendarPlus size={15} aria-hidden /> Planificar {nextYear}
+          </button>
+        </nav>
         <ObjectivesSummary krs={groups.flatMap((g) => g.keyResults)} today={today} />
         <div className="flex flex-wrap items-center gap-3 py-3 lg:pt-5">
           <div className="w-full max-w-sm">
@@ -91,10 +136,19 @@ export function ObjectivesView({
 
         {groups.length === 0 ? (
           <div className="mt-2 grid justify-items-start gap-3 border-y border-line py-8">
-            <p className="display text-[20px] text-muted">No hay resultados clave para este filtro.</p>
-            <Button variant="outline" size="sm" onClick={() => sheet.current?.open()}>
-              <Plus size={15} /> Nuevo resultado
-            </Button>
+            <p className="display text-[20px] text-muted">
+              {objectives.length || loose.length ? "No hay resultados clave para este filtro." : `Todavía no hay objetivos para ${year}.`}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
+                <Plus size={15} /> Nuevo objetivo
+              </Button>
+              {!objectives.length && !loose.length && years.some((y) => y < year) && (
+                <Button variant="outline" size="sm" onClick={() => planSheet.current?.open()}>
+                  <CalendarPlus size={15} /> Traer de {Math.max(...years.filter((y) => y < year))}
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid gap-12 pt-2 pb-4 lg:grid-cols-2 lg:items-start lg:gap-5">
@@ -107,9 +161,30 @@ export function ObjectivesView({
                   style={{ "--i": gi } as React.CSSProperties}
                 >
                   <header className="flex items-end justify-between gap-3">
-                    <h2 className="display text-[28px] lg:text-[24px]">{g.title.replace(/^\d+\s+/, "")}</h2>
-                    {pct !== null && <span className="figure pb-1 text-[26px] text-muted">{pct}%</span>}
+                    <h2 className="display min-w-0 text-[28px] lg:text-[24px]">{g.title.replace(/^\d+\s+/, "")}</h2>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {pct !== null && <span className="figure pb-1 text-[26px] text-muted">{pct}%</span>}
+                      {g.id && (
+                        <button
+                          type="button"
+                          onClick={() => openObjective(objectives.find((o) => o.id === g.id) ?? null)}
+                          aria-label={`Editar ${g.title}`}
+                          className="inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                        >
+                          <PencilSimple size={17} />
+                        </button>
+                      )}
+                    </span>
                   </header>
+                  {g.empty && (
+                    <button
+                      type="button"
+                      onClick={() => sheet.current?.open()}
+                      className="flex h-11 items-center gap-1.5 border-t border-line text-[13.5px] text-muted hover:text-fg"
+                    >
+                      <Plus size={14} /> Agregar un resultado clave
+                    </button>
+                  )}
                   {pct !== null && (
                     <div className="h-[3px] overflow-hidden bg-line" aria-hidden>
                       <div className="h-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
@@ -136,8 +211,154 @@ export function ObjectivesView({
         <Plus size={24} />
       </button>
 
-      <KrSheet ref={sheet} objectives={objectives} links={links} />
+      <KrSheet ref={sheet} objectives={objectives} links={links} year={year} />
+
+      <Sheet ref={objSheet} title={editingObj ? "Editar objetivo" : `Nuevo objetivo ${year}`}>
+        <ObjectiveForm key={objKey} objective={editingObj} year={year} onDone={() => objSheet.current?.close()} />
+      </Sheet>
+
+      <Sheet ref={planSheet} title={`Planificar ${nextYear}`}>
+        <PlanYearForm objectives={objectives} loose={loose} from={year} to={nextYear} onDone={() => planSheet.current?.close()} />
+      </Sheet>
     </>
+  );
+}
+
+/** Crear o renombrar un objetivo; borrarlo manda también sus resultados clave a la papelera. */
+function ObjectiveForm({ objective, year, onDone }: { objective: ObjectiveDTO | null; year: number; onDone: () => void }) {
+  const [state, action, pending] = useActionState(saveObjective, null);
+  const [, startDelete] = useTransition();
+  const notify = useEffectEvent(onDone);
+  useEffect(() => {
+    if (state?.ok) notify();
+  }, [state]);
+  return (
+    <form action={action} className="grid gap-5">
+      {objective && <input type="hidden" name="id" value={objective.id} />}
+      <input type="hidden" name="year" value={objective?.year ?? year} />
+      <Field label="Objetivo">
+        <Input name="title" defaultValue={objective?.title} required maxLength={120} autoFocus placeholder="Salud, Carrera, Finanzas…" />
+      </Field>
+      {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
+      <Button type="submit" variant="accent" disabled={pending} className="h-11">
+        {pending ? "Guardando…" : objective ? "Guardar" : "Crear objetivo"}
+      </Button>
+      {objective && (
+        <ConfirmButton
+          onConfirm={() => {
+            startDelete(() => deleteObjective(objective.id));
+            onDone();
+          }}
+        >
+          Borrar el objetivo{objective.keyResults.length ? ` y sus ${objective.keyResults.length} resultados clave` : ""}
+        </ConfirmButton>
+      )}
+    </form>
+  );
+}
+
+/**
+ * "Planificar el año que viene": se eligen los objetivos y resultados clave que se
+ * repiten y se copian sin empezar, con la fecha corrida un año. Después se editan.
+ */
+function PlanYearForm({
+  objectives,
+  loose,
+  from,
+  to,
+  onDone,
+}: {
+  objectives: ObjectiveDTO[];
+  loose: KeyResultDTO[];
+  from: number;
+  to: number;
+  onDone: () => void;
+}) {
+  const router = useRouter();
+  const [objs, setObjs] = useState<Set<string>>(new Set());
+  const [krs, setKrs] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const toggle = (set: Set<string>, id: string) => {
+    const n = new Set(set);
+    if (n.has(id)) n.delete(id);
+    else n.add(id);
+    return n;
+  };
+  const toggleObjective = (o: ObjectiveDTO) => {
+    const on = !objs.has(o.id);
+    setObjs((s) => toggle(s, o.id));
+    // Marcar el objetivo marca sus resultados clave (después se pueden sacar).
+    setKrs((s) => {
+      const n = new Set(s);
+      for (const k of o.keyResults) {
+        if (on) n.add(k.id);
+        else n.delete(k.id);
+      }
+      return n;
+    });
+  };
+  const groups = [...objectives, ...(loose.length ? [{ id: "", title: "Sin objetivo", year: from, keyResults: loose }] : [])];
+  const count = objs.size + krs.size;
+
+  return (
+    <div className="grid gap-4">
+      <p className="text-[13.5px] leading-relaxed text-muted">
+        Elegí qué de {from} querés repetir en {to}. Se copia sin empezar y sin progreso, con las fechas corridas un año, y después lo
+        editás. {from} queda como está.
+      </p>
+      {groups.length === 0 ? (
+        <p className="rounded-xl bg-surface-2 p-3 text-[13px] text-muted">
+          {from} no tiene objetivos. Podés arrancar {to} de cero con &quot;Objetivo&quot;.
+        </p>
+      ) : (
+        <ul className="grid max-h-[55dvh] gap-3 overflow-y-auto">
+          {groups.map((o) => (
+            <li key={o.id || "loose"} className="grid gap-1 rounded-xl border border-line p-2">
+              {o.id ? (
+                <label className="flex min-h-10 cursor-pointer items-center gap-2.5 px-1 font-medium">
+                  <input type="checkbox" checked={objs.has(o.id)} onChange={() => toggleObjective(o)} className="size-4 accent-[var(--accent)]" />
+                  {o.title}
+                </label>
+              ) : (
+                <span className="kicker px-1 pt-1">Sin objetivo</span>
+              )}
+              {o.keyResults.map((k) => (
+                <label key={k.id} className="flex min-h-9 cursor-pointer items-center gap-2.5 pl-7 text-[13.5px] text-muted">
+                  <input type="checkbox" checked={krs.has(k.id)} onChange={() => setKrs((s) => toggle(s, k.id))} className="size-4 accent-[var(--accent)]" />
+                  <span className="min-w-0 truncate">{k.title}</span>
+                  {k.quarters.length > 0 && <span className="ml-auto shrink-0 font-mono text-[11px]">{k.quarters.join(", ")}</span>}
+                </label>
+              ))}
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="grid gap-2">
+        <Button
+          variant="accent"
+          className="h-11"
+          disabled={pending || count === 0}
+          onClick={() =>
+            start(async () => {
+              const r = await copyToYear({ to, objectiveIds: [...objs], krIds: [...krs] });
+              if (!r.ok) return setError(r.error);
+              onDone();
+              router.push(`/plan/objetivos?anio=${to}`);
+            })
+          }
+        >
+          {pending ? "Copiando…" : count ? `Copiar a ${to}` : "Elegí qué copiar"}
+        </Button>
+        <Button variant="ghost" className="h-11" onClick={() => {
+          onDone();
+          router.push(`/plan/objetivos?anio=${to}`);
+        }}>
+          Empezar {to} de cero
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -188,7 +409,7 @@ function KrRow({ kr: raw, today, onOpen }: { kr: KeyResultDTO; today: string; on
 
 type KrSheetHandle = { open: (kr?: KeyResultDTO) => void };
 
-const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[]; links: KrLinkOption[] }>(function KrSheet({ objectives, links }, ref) {
+const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[]; links: KrLinkOption[]; year: number }>(function KrSheet({ objectives, links, year }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [kr, setKr] = useState<KeyResultDTO | undefined>();
   const [key, setKey] = useState(0);
@@ -201,12 +422,24 @@ const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[]; links: K
   }));
   return (
     <Sheet ref={sheet} title={kr ? "Editar resultado clave" : "Nuevo resultado clave"}>
-      <KrForm key={key} kr={kr} objectives={objectives} links={links} onDone={() => sheet.current?.close()} />
+      <KrForm key={key} kr={kr} objectives={objectives} links={links} year={year} onDone={() => sheet.current?.close()} />
     </Sheet>
   );
 });
 
-function KrForm({ kr, objectives, links, onDone }: { kr?: KeyResultDTO; objectives: ObjectiveDTO[]; links: KrLinkOption[]; onDone: () => void }) {
+function KrForm({
+  kr,
+  objectives,
+  links,
+  year,
+  onDone,
+}: {
+  kr?: KeyResultDTO;
+  objectives: ObjectiveDTO[];
+  links: KrLinkOption[];
+  year: number;
+  onDone: () => void;
+}) {
   const [state, action, pending] = useActionState(saveKeyResult, null);
   const [kind, setKind] = useState<"activity" | "habit">(kr?.kind ?? "activity");
   const [status, setStatus] = useState<KrStatus>(kr?.status ?? "todo");
@@ -220,6 +453,7 @@ function KrForm({ kr, objectives, links, onDone }: { kr?: KeyResultDTO; objectiv
   return (
     <form action={action} className="grid gap-5">
       {kr && <input type="hidden" name="id" value={kr.id} />}
+      <input type="hidden" name="year" value={year} />
       <Field label="Nombre">
         <Input name="title" defaultValue={kr?.title} required maxLength={160} autoFocus={!kr} placeholder="Producir 3 tracks, Leer 3 por semana..." />
       </Field>

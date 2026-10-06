@@ -88,7 +88,7 @@ export type KeyResultDTO = {
 /** Opciones para vincular un resultado clave. */
 export type KrLinkOption = { value: string; label: string; group: "Hábitos" | "Cuentas" | "Metas de ahorro" };
 
-export type ObjectiveDTO = { id: string; title: string; keyResults: KeyResultDTO[] };
+export type ObjectiveDTO = { id: string; title: string; year: number; keyResults: KeyResultDTO[] };
 
 // ─── Fechas y horarios ──────────────────────────────────────────────────────
 

@@ -580,11 +580,15 @@ model PlanBlock {
 }
 
 /// Un objetivo grande ("Mejorar mi salud", "Cursar 7 materias").
+/// Objetivo anual (como las hojas por año de Notion): se divide en resultados clave por trimestre.
 model PlanObjective {
   id         String          @id @default(cuid())
-  title      String          @unique
+  title      String
+  year       Int             @default(2026)
   order      Int             @default(0)
   keyResults PlanKeyResult[]
+
+  @@unique([title, year])
 }
 
 /// Resultado clave de un objetivo, con progreso hacia una meta.
@@ -608,6 +612,8 @@ model PlanKeyResult {
   linkId      String?
   source      String?
   externalId  String?
+  /// Año del plan (el de su objetivo; los sueltos lo llevan igual).
+  year        Int            @default(2026)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 

@@ -289,7 +289,9 @@ if (appOnly.length) say(`· en la app y no en Notion (se dejan): ${appOnly.map((
 // ─── Objetivos y resultados clave ───────────────────────────────────────────
 const KR: Record<string, string> = { "Sin empezar": "todo", Haciendo: "doing", Completado: "done", Finalizado: "closed" };
 const objectiveCol = Object.keys(krCsv[0] ?? {}).find((k) => k.startsWith("Objetivos")) ?? "Objetivos";
-const allKrs = await prisma.planKeyResult.findMany();
+// Lo de Notion es el plan del año en curso.
+const YEAR = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Montevideo" }).format(new Date()).slice(0, 4));
+const allKrs = await prisma.planKeyResult.findMany({ where: { year: YEAR } });
 const usedKrs = new Set<string>();
 let krNew = 0;
 let krChanged = 0;
@@ -297,10 +299,10 @@ for (const r of krCsv) {
   const objTitle = (r[objectiveCol] ?? "").replace(/\s*\(https?:\/\/[^)]*\)\s*$/, "").trim();
   let objectiveId: string | null = null;
   if (objTitle) {
-    const o = await prisma.planObjective.findUnique({ where: { title: objTitle } });
+    const o = await prisma.planObjective.findUnique({ where: { title_year: { title: objTitle, year: YEAR } } });
     if (o) objectiveId = o.id;
     else if (DRY) say(`+ objetivo nuevo: ${objTitle}`);
-    else objectiveId = (await prisma.planObjective.create({ data: { title: objTitle, order: await prisma.planObjective.count() } })).id;
+    else objectiveId = (await prisma.planObjective.create({ data: { title: objTitle, year: YEAR, order: await prisma.planObjective.count({ where: { year: YEAR } }) } })).id;
   }
   const deadline = notionDate(r.Deadline)?.date ?? null;
   const externalId = stableId("kr", r.Nombre, objTitle);
@@ -331,7 +333,7 @@ for (const r of krCsv) {
   } else {
     krNew++;
     say(`+ resultado clave: ${r.Nombre}`);
-    if (!DRY) await prisma.planKeyResult.create({ data: { ...data, source: SOURCE, externalId } });
+    if (!DRY) await prisma.planKeyResult.create({ data: { ...data, year: YEAR, source: SOURCE, externalId } });
   }
 }
 

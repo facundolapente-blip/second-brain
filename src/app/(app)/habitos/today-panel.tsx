@@ -95,7 +95,7 @@ export function TodayPanel({
                   href={`/habitos/${h.id}?tab=estadisticas`}
                   className="-mx-2 flex min-h-12 items-center gap-3 rounded-[6px] px-2 transition-colors hover:bg-surface-2"
                 >
-                  <ToneSquare size={28} style={tone(h.color)}>
+                  <ToneSquare solid size={28} style={tone(h.color)}>
                     <HabitIcon name={h.icon} size={15} weight="fill" />
                   </ToneSquare>
                   <span className="min-w-0 flex-1 truncate text-[14.5px]">{h.name}</span>

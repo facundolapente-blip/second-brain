@@ -172,7 +172,7 @@ export function DayCircle({
       className={cx(
         "tabular relative inline-flex items-center justify-center rounded-full border-[1.5px] font-medium transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:active:scale-100 motion-reduce:transition-none motion-reduce:active:scale-100",
         size === "md"
-          ? "size-10 text-[15px] sm:size-11"
+          ? "size-9 text-[14px] sm:size-11 sm:text-[15px]"
           : "size-9 text-sm sm:size-10",
         future ? "border-line border-dotted bg-transparent text-fg/70" : STATE_CLASS[state],
       )}

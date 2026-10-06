@@ -103,13 +103,18 @@ export async function getTasks(): Promise<TaskDTO[]> {
   }));
 }
 
-export async function getObjectives(): Promise<{ objectives: ObjectiveDTO[]; loose: KeyResultDTO[] }> {
-  const [objs, krs, { habits, logs, today }, accounts, goals] = await Promise.all([
-    prisma.planObjective.findMany({ orderBy: [{ order: "asc" }, { title: "asc" }] }),
-    prisma.planKeyResult.findMany({ orderBy: [{ createdAt: "asc" }] }),
+/** Los objetivos de un año (cada año es como una hoja de Notion). */
+export async function getObjectives(
+  year: number,
+): Promise<{ objectives: ObjectiveDTO[]; loose: KeyResultDTO[]; years: number[] }> {
+  const [objs, krs, { habits, logs, today }, accounts, goals, objYears, krYears] = await Promise.all([
+    prisma.planObjective.findMany({ where: { year }, orderBy: [{ order: "asc" }, { title: "asc" }] }),
+    prisma.planKeyResult.findMany({ where: { year }, orderBy: [{ createdAt: "asc" }] }),
     getHabitsWithLogs(),
     getAccounts(),
     getGoals(),
+    prisma.planObjective.findMany({ distinct: ["year"], select: { year: true } }),
+    prisma.planKeyResult.findMany({ distinct: ["year"], select: { year: true } }),
   ]);
   // Lo que se mide solo: cumplimiento de un hábito, saldo de una cuenta, avance de una meta.
   const autoOf = (k: (typeof krs)[number]): KeyResultDTO["auto"] => {
@@ -145,9 +150,11 @@ export async function getObjectives(): Promise<{ objectives: ObjectiveDTO[]; loo
     objectives: objs.map((o) => ({
       id: o.id,
       title: o.title,
+      year: o.year,
       keyResults: krs.filter((k) => k.objectiveId === o.id).map(dto),
     })),
     loose: krs.filter((k) => !k.objectiveId).map(dto),
+    years: [...new Set([...objYears, ...krYears].map((y) => y.year).concat(Number(today.slice(0, 4)), year))].sort(),
   };
 }
 

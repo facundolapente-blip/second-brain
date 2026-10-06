@@ -161,17 +161,28 @@ export const Sheet = forwardRef<
 /** Cuadrado de color con el ícono de la categoría, como en HabitNow (en Papel: pastel con tinta). */
 export function ToneSquare({
   children,
-  size = 40,
+  size,
   style,
+  solid,
+  className,
 }: {
   children: React.ReactNode;
+  /** En px; si no se pasa, el tamaño va por `className` (puede cambiar con la pantalla). */
   size?: number;
   style?: React.CSSProperties;
+  /** Lleno (tono profundo con ícono blanco): más contraste que el pastel. */
+  solid?: boolean;
+  className?: string;
 }) {
+  const px = size ?? (className ? undefined : 40);
   return (
     <span
-      style={{ ...style, width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[8px] bg-tone text-tone-fg"
+      style={{ ...style, ...(px ? { width: px, height: px } : {}) }}
+      className={cx(
+        "inline-flex shrink-0 items-center justify-center rounded-[8px]",
+        solid ? "chip-solid" : "bg-tone text-tone-fg",
+        className,
+      )}
     >
       {children}
     </span>
