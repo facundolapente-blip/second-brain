@@ -50,7 +50,7 @@ export function InicioView({ d }: { d: Dashboard }) {
   return (
     <>
       <PageHeader title={`${greeting(d.hour)}, Facu`} kicker={formatLong(d.today)} wide />
-      <main className="mx-auto grid max-w-6xl gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         {/* Resumen del día */}
         <section aria-label="Resumen" className="hero rise relative overflow-hidden rounded-[22px] p-5 lg:col-span-12 lg:p-7">
           <p className="hero-sub max-w-2xl text-[15px] leading-relaxed lg:text-[17px]">

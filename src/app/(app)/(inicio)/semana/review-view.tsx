@@ -73,7 +73,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
           </>
         }
       />
-      <main className="mx-auto grid max-w-6xl gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         <section aria-label="Resumen de la semana" className="hero rise rounded-[22px] p-5 lg:col-span-12 lg:p-7">
           <p className="hero-sub text-[13px]">{r.isCurrent ? "Semana en curso, hasta hoy" : "Comparado con la semana anterior"}</p>
           <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
