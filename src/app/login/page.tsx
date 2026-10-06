@@ -60,7 +60,11 @@ function LoginForm() {
           required
         />
       </Field>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="border-l-4 border-danger pl-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
       <Button type="submit" variant="accent" disabled={pending}>
         {pending ? "Un segundo..." : mode === "in" ? "Entrar" : "Crear contraseña"}
       </Button>
@@ -68,19 +72,39 @@ function LoginForm() {
   );
 }
 
+const MODULES = ["Hábitos", "Journal", "Gastos", "Plan semanal"];
+
 export default function LoginPage() {
   return (
-    <main className="grid min-h-dvh place-items-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2.5">
-          <span className="inline-flex size-8 items-center justify-center rounded-md bg-ink text-sm font-semibold text-on-ink">
-            F
-          </span>
-          <span className="text-base font-semibold tracking-tight">Second Brain</span>
+    <main className="grid min-h-dvh place-items-center px-4 py-10">
+      <div className="w-full max-w-sm border border-rule bg-surface shadow-[6px_6px_0_rgba(var(--shadow-tint),0.18)]">
+        <header className="grid gap-4 border-b border-rule p-5">
+          <div className="flex items-center justify-between">
+            <span className="relative inline-flex size-9 items-center justify-center bg-ink text-[15px] font-extrabold text-on-ink">
+              F
+              <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2.5 bg-accent" />
+            </span>
+            <span className="label-mono text-muted">Acceso</span>
+          </div>
+          <h1 className="display text-[38px] uppercase">
+            Second
+            <br />
+            Brain
+          </h1>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-muted" aria-label="Módulos">
+            {MODULES.map((m, i) => (
+              <li key={m} className="flex gap-2">
+                <span className="text-accent-fg">0{i + 1}</span>
+                {m}
+              </li>
+            ))}
+          </ul>
+        </header>
+        <div className="p-5">
+          <Suspense>
+            <LoginForm />
+          </Suspense>
         </div>
-        <Suspense>
-          <LoginForm />
-        </Suspense>
       </div>
     </main>
   );

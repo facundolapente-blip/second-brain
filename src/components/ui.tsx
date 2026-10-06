@@ -18,7 +18,7 @@ export function Button({ variant = "primary", size = "md", className, ...props }
       {...props}
       className={cx(
         "inline-flex items-center justify-center gap-2 rounded-md font-mono font-medium tracking-[0.05em] uppercase whitespace-nowrap transition-[background-color,color,transform,opacity,box-shadow] duration-150 active:translate-y-px disabled:opacity-50 disabled:pointer-events-none",
-        size === "md" ? "h-11 px-4 text-[12.5px]" : "h-10 px-3 text-[11.5px]",
+        size === "md" ? "h-11 px-4 text-[12.5px]" : "h-11 px-3 text-[11.5px] lg:h-10",
         variant === "primary" && "bg-ink text-on-ink hover:bg-ink/85",
         variant === "accent" &&
           "border border-rule bg-accent text-on-accent shadow-[2px_2px_0_var(--rule)] hover:shadow-[1px_1px_0_var(--rule)] active:shadow-none",
@@ -105,7 +105,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            "h-10 px-2 text-[13px] font-medium transition-colors",
+            "h-11 px-2 text-[13px] font-medium transition-colors",
             value === o.value ? "bg-ink text-on-ink" : "bg-surface text-muted hover:bg-surface-2 hover:text-fg",
           )}
         >

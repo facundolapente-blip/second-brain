@@ -162,7 +162,7 @@ function TrackPicker({
   onChange: (v: TrackView) => void;
 }) {
   return (
-    <label className="rise flex min-h-11 items-center justify-between gap-3 border border-line-strong bg-surface px-4 py-2">
+    <label className="rise flex min-h-11 items-center justify-between gap-3 border border-line-strong bg-surface px-4 py-2 focus-within:border-rule focus-within:ring-2 focus-within:ring-[var(--focus)]">
       <span className="label-mono text-muted">Mostrando</span>
       <select
         value={String(view)}

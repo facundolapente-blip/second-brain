@@ -354,7 +354,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                       value={value}
                       min={0}
                       onChange={(e) => setValue(Math.max(0, Number(e.target.value) || 0))}
-                      className="tabular w-24 bg-transparent text-center text-[44px] leading-none font-semibold tracking-tight outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                      className="tabular w-24 bg-transparent text-center text-[44px] leading-none font-semibold tracking-tight underline-offset-8 outline-none focus:underline focus:decoration-accent focus:decoration-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       aria-label="Cantidad"
                     />
                     <p className="text-xs text-muted">

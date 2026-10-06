@@ -217,6 +217,20 @@ body {
   }
 }
 
+/* Con movimiento reducido: sin desplazamientos ni escalas al tocar, transiciones instantáneas. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  :active {
+    scale: none !important;
+    translate: none !important;
+  }
+}
+
 /* <dialog> como hoja inferior en el celular y panel centrado en pantalla grande. */
 dialog.sheet {
   margin: auto auto 0;

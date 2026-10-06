@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Hábitos, journal, gastos y plan semanal.",
     start_url: "/habitos",
     display: "standalone",
-    background_color: "#fbfbfa",
-    theme_color: "#fbfbfa",
+    background_color: "#efeee9",
+    theme_color: "#efeee9",
     lang: "es-UY",
     icons: [
       { src: "/icon-192", sizes: "192x192", type: "image/png" },

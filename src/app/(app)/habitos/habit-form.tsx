@@ -329,7 +329,7 @@ function Stepper({
         min={min}
         max={max}
         onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
-        className="tabular h-full w-14 bg-transparent text-center text-[15px] font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className="tabular h-full w-14 bg-transparent text-center text-[15px] font-semibold outline-none focus:bg-surface-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
         type="button"
