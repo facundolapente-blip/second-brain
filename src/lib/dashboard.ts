@@ -61,7 +61,7 @@ export async function getDashboard() {
     getCategoryBudgets(today.slice(0, 7)),
     backupWarning(),
   ]);
-  const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, tasks] = await Promise.all([
+  const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, blockLogs, tasks] = await Promise.all([
     getHabitsWithLogs(),
     prisma.journalEntry.findMany({
       where: { OR: [{ title: { not: null } }, { body: { not: "" } }] },
@@ -87,6 +87,10 @@ export async function getDashboard() {
     prisma.planBlock.findMany({
       where: { date: { gte: toDbDate(monday), lte: toDbDate(sunday) } },
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
+    }),
+    prisma.planBlockLog.findMany({
+      where: { date: { gte: toDbDate(monday), lte: toDbDate(sunday) } },
+      select: { date: true, title: true, done: true },
     }),
     prisma.planTask.findMany({
       where: { status: { not: "done" } },
@@ -202,8 +206,8 @@ export async function getDashboard() {
     place: b.place,
     notes: b.notes,
     taskId: b.taskId,
-    habitId: b.habitId,
   }));
+  const pastLogs = blockLogs.map((l) => ({ date: fromDbDate(l.date), title: l.title, done: l.done }));
   const todayBlocks = sortBlocks(blockDTOs.filter((b) => b.date === today));
   const planCats = new Map(
     (await prisma.planCategory.findMany({ select: { id: true, name: true, color: true } })).map((c) => [c.id, c]),
@@ -220,7 +224,8 @@ export async function getDashboard() {
   for (let i = 0; i < 7; i++) {
     const iso = addDays(monday, i);
     const h = iso <= today ? habitDay(iso) : { done: 0, due: 0 };
-    const dayBlocks = blockDTOs.filter((b) => b.date === iso && !isFreeBlock(b));
+    // Más las tarjetas que se pasaron a otra semana desde ese día.
+    const dayBlocks = [...blockDTOs, ...pastLogs].filter((b) => b.date === iso && !isFreeBlock(b));
     week.push({
       date: iso,
       habitsDone: h.done,
@@ -305,8 +310,8 @@ export async function getDashboard() {
       upcoming: sortBlocks(blockDTOs.filter((b) => b.date > today && !isFreeBlock(b)))
         .sort((a, b) => a.date.localeCompare(b.date))
         .slice(0, 4),
-      weekDone: blockDTOs.filter((b) => b.done && !isFreeBlock(b)).length,
-      weekTotal: blockDTOs.filter((b) => !isFreeBlock(b)).length,
+      weekDone: [...blockDTOs, ...pastLogs].filter((b) => b.done && !isFreeBlock(b)).length,
+      weekTotal: [...blockDTOs, ...pastLogs].filter((b) => !isFreeBlock(b)).length,
     },
     week,
     heatFrom,

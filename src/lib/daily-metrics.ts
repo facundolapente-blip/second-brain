@@ -41,7 +41,7 @@ const DUE: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pen
 
 export async function getDailyMetrics(from: string, to: string): Promise<{ days: DayMetrics[]; habits: HabitRef[] }> {
   const range = { gte: toDbDate(from), lte: toDbDate(to) };
-  const [{ habits, logs, today }, checkins, entries, accounts, txs, blocks] = await Promise.all([
+  const [{ habits, logs, today }, checkins, entries, accounts, txs, blocks, blockLogs] = await Promise.all([
     getHabitsWithLogs(),
     prisma.dailyCheckin.findMany({ where: { date: range } }),
     prisma.journalEntry.findMany({ where: { date: range }, select: { date: true, title: true, body: true, mood: true } }),
@@ -51,6 +51,8 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       select: { date: true, kind: true, amount: true, accountId: true, category: { select: { kind: true } } },
     }),
     prisma.planBlock.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),
+    // Tarjetas que se pasaron a otra semana: cuentan en el día donde estaban.
+    prisma.planBlockLog.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),
   ]);
   const rates = await getRates();
 
@@ -115,7 +117,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     else if (t.category?.kind === "expense") m.spentCents -= cents; // reintegro
     else m.incomeCents += cents;
   }
-  for (const b of blocks) {
+  for (const b of [...blocks, ...blockLogs]) {
     const m = byDate.get(fromDbDate(b.date));
     if (!m || isFreeBlock(b)) continue;
     m.blocksTotal++;

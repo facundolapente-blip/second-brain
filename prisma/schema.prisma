@@ -551,6 +551,22 @@ model PlanSubtask {
 }
 
 /// Un bloque de la semana ("Daily Planning"): algo para hacer un día, con horario opcional.
+/// Cómo estaba una tarjeta del Plan el día que se fue a otra semana (Facu mueve la
+/// misma tarjeta semana a semana en vez de crear otra). No se muestra en el Plan:
+/// solo sostiene los números de semanas pasadas (revisión, análisis, resúmenes).
+model PlanBlockLog {
+  id         String   @id @default(cuid())
+  blockId    String?
+  date       DateTime @db.Date
+  title      String
+  categoryId String?
+  done       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([date])
+  @@index([blockId])
+}
+
 model PlanBlock {
   id         String        @id @default(cuid())
   title      String

@@ -16,7 +16,6 @@ import {
   type TaskDTO,
   type TaskView,
 } from "@/lib/plan-logic";
-import type { LinkableHabit } from "@/lib/plan";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, ProgressBar, StatusPill } from "../plan-ui";
@@ -32,12 +31,10 @@ const LIMIT = 6;
 export function TasksBoard({
   tasks,
   categories,
-  habits,
   today,
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
-  habits: LinkableHabit[];
   today: string;
 }) {
   const [view, setView] = useState<TaskView>("todo");
@@ -134,7 +131,6 @@ export function TasksBoard({
       <BlockSheet
         ref={blockSheet}
         categories={categories}
-        habits={habits}
         tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))}
       />
     </section>

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
-import { CaretLeft, CaretRight, Check, Copy, DotsThreeVertical, MapPin, Medal, Plus } from "@phosphor-icons/react";
-import { copyWeekToNext, moveBlock, setBlockDone } from "@/lib/plan-actions";
+import { ArrowArcRight, CaretLeft, CaretRight, Check, Copy, DotsThreeVertical, MapPin, Plus } from "@phosphor-icons/react";
+import { copyWeekToNext, moveBlock, passWeek, setBlockDone } from "@/lib/plan-actions";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
@@ -14,7 +14,6 @@ import {
   type CategoryDTO,
   type TaskDTO,
 } from "@/lib/plan-logic";
-import type { LinkableHabit } from "@/lib/plan";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
@@ -30,7 +29,6 @@ export function WeekView({
   today,
   blocks: initialBlocks,
   categories,
-  habits,
   tasks,
   top,
 }: {
@@ -40,7 +38,6 @@ export function WeekView({
   today: string;
   blocks: BlockDTO[];
   categories: CategoryDTO[];
-  habits: LinkableHabit[];
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
@@ -55,7 +52,6 @@ export function WeekView({
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const sheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
-  const habitName = new Map(habits.map((h) => [h.id, h.name]));
 
   const byDay = new Map(days.map((d) => [d, sortBlocks(blocks.filter((b) => b.date === d))]));
   const work = blocks.filter((b) => !isFreeBlock(b));
@@ -78,7 +74,7 @@ export function WeekView({
   }
   const openEdit = (b: BlockDTO) => sheet.current?.open(b);
 
-  const boardProps = { days, today, byDay, cats, habitName, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move };
+  const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move };
 
   const prev = addDays(monday, -7);
   const next = addDays(monday, 7);
@@ -98,6 +94,20 @@ export function WeekView({
                 </IconButton>
               )}
               items={[
+                {
+                  // La misma tarjeta pasa a la semana siguiente (no se duplica).
+                  label: "Pasar toda la semana a la siguiente",
+                  icon: <ArrowArcRight size={16} />,
+                  onSelect: () =>
+                    startTransition(async () => {
+                      const r = await passWeek(monday);
+                      setCopyMsg(
+                        r.ok
+                          ? `Listo: ${r.count} ${r.count === 1 ? "tarjeta pasó" : "tarjetas pasaron"} a la semana que viene, sin tildar. Ajustá las que cambien de día.`
+                          : r.error,
+                      );
+                    }),
+                },
                 {
                   label: "Copiar a la semana que viene",
                   icon: <Copy size={16} />,
@@ -151,7 +161,12 @@ export function WeekView({
         </div>
         {copyMsg && (
           <p role="status" className="mb-3 border-l-[1.5px] border-accent py-1 pl-3 text-[14px] text-accent-fg">
-            {copyMsg}
+            {copyMsg}{" "}
+            {copyMsg.startsWith("Listo") && (
+              <Link href={`/plan?semana=${addDays(monday, 7)}`} className="font-medium underline underline-offset-4">
+                Ir a esa semana
+              </Link>
+            )}
           </p>
         )}
 
@@ -202,7 +217,6 @@ export function WeekView({
             today={today}
             blocks={byDay.get(selected)!}
             cats={cats}
-            habitName={habitName}
             onToggle={toggle}
             onEdit={openEdit}
             onNew={() => openNew(selected)}
@@ -247,7 +261,7 @@ export function WeekView({
         <Plus size={24} />
       </button>
 
-      <BlockSheet ref={sheet} categories={categories} habits={habits} tasks={tasks} />
+      <BlockSheet ref={sheet} categories={categories} tasks={tasks} />
     </>
   );
 }
@@ -257,7 +271,6 @@ function DayList({
   today,
   blocks,
   cats,
-  habitName,
   onToggle,
   onEdit,
   onNew,
@@ -266,7 +279,6 @@ function DayList({
   today: string;
   blocks: BlockDTO[];
   cats: Map<string, CategoryDTO>;
-  habitName: Map<string, string>;
   onToggle: (b: BlockDTO) => void;
   onEdit: (b: BlockDTO) => void;
   onNew: () => void;
@@ -295,7 +307,6 @@ function DayList({
               <BlockCard
                 block={b}
                 category={b.categoryId ? cats.get(b.categoryId) : null}
-                habit={b.habitId ? habitName.get(b.habitId) : undefined}
                 onToggle={() => onToggle(b)}
                 onEdit={() => onEdit(b)}
               />
@@ -310,14 +321,12 @@ function DayList({
 export function BlockCard({
   block: b,
   category,
-  habit,
   onToggle,
   onEdit,
   compact,
 }: {
   block: BlockDTO;
   category?: CategoryDTO | null;
-  habit?: string;
   onToggle: () => void;
   onEdit: () => void;
   compact?: boolean;
@@ -375,12 +384,6 @@ export function BlockCard({
         <span className="flex flex-wrap items-center gap-1.5">
           <CategoryTag category={category} />
           <PriorityTag n={b.priority} />
-          {habit && (
-            <span className="inline-flex items-center gap-0.5 text-[12px] text-accent-fg" title={`Vinculado a ${habit}`}>
-              <Medal size={13} weight="fill" aria-hidden />
-              <span className="sr-only">Vinculado al hábito {habit}</span>
-            </span>
-          )}
         </span>
         {compact && range && <span className="font-mono text-[11px] text-muted tabular">{range}</span>}
         {b.place && (

@@ -41,16 +41,6 @@ export async function getPlanCategories(): Promise<CategoryDTO[]> {
   return rows.map((c) => ({ id: c.id, name: c.name, color: c.color }));
 }
 
-/** Hábitos activos, para vincular bloques. */
-export async function getLinkableHabits() {
-  const rows = await prisma.habit.findMany({
-    where: { archivedAt: null },
-    select: { id: true, name: true, category: { select: { icon: true, color: true } } },
-    orderBy: [{ priority: "desc" }, { name: "asc" }],
-  });
-  return rows.map((h) => ({ id: h.id, name: h.name, icon: h.category?.icon ?? "Circle", color: h.category?.color ?? "stone" }));
-}
-export type LinkableHabit = Awaited<ReturnType<typeof getLinkableHabits>>[number];
 
 type BlockRow = Awaited<ReturnType<typeof prisma.planBlock.findMany>>[number];
 function blockDTO(b: BlockRow): BlockDTO {
@@ -66,7 +56,6 @@ function blockDTO(b: BlockRow): BlockDTO {
     place: b.place,
     notes: b.notes,
     taskId: b.taskId,
-    habitId: b.habitId,
   };
 }
 

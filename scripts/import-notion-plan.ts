@@ -203,9 +203,7 @@ for (const r of tasksCsv) {
   }
 }
 
-// ─── Bloques (vinculados a hábitos y tareas por nombre) ─────────────────────
-const habits = await prisma.habit.findMany({ where: { archivedAt: null }, select: { id: true, name: true, target: true } });
-const habitByName = new Map(habits.map((h) => [low(h.name), h]));
+// ─── Bloques (vinculados a tareas por nombre; los hábitos no se tocan) ──────
 const taskByName = new Map((await prisma.planTask.findMany({ select: { id: true, title: true } })).map((t) => [low(t.title), t.id]));
 const parsed = blocksCsv.map((r) => ({ r, d: notionDate(r["Due date"]) }));
 const dates = parsed.map((p) => p.d?.date).filter((x): x is string => !!x).sort();
@@ -216,7 +214,6 @@ const usedBlocks = new Set<string>();
 let blocksNew = 0;
 let blocksChanged = 0;
 let skipped = 0;
-let habitMarks = 0;
 for (const { r, d } of parsed) {
   if (!d) {
     skipped++;
@@ -233,7 +230,6 @@ for (const { r, d } of parsed) {
     say(`· bloque en la papelera, no se revive: ${r.Name} (${d.date})`);
     continue;
   }
-  const habit = habitByName.get(low(r.Name));
   const data = {
     title: r.Name,
     categoryId: catId.get(r.Category) ?? existing?.categoryId ?? null,
@@ -244,10 +240,8 @@ for (const { r, d } of parsed) {
     // Lo tildado en la app queda tildado.
     done: r.Done === "Yes" || !!existing?.done,
     place: r.Lugar || existing?.place || null,
-    habitId: existing?.habitId ?? habit?.id ?? null,
     taskId: existing?.taskId ?? taskByName.get(low(r.Name)) ?? null,
   };
-  const newlyDone = data.done && !existing?.done;
   if (existing) {
     usedBlocks.add(existing.id);
     const changes = diff(existing, data);
@@ -262,24 +256,6 @@ for (const { r, d } of parsed) {
       const created = await prisma.planBlock.create({ data: { ...data, source: SOURCE, externalId } });
       allBlocks.push(created);
       usedBlocks.add(created.id);
-    }
-  }
-  // Como al tildarlo en la app: el hábito vinculado queda hecho ese día.
-  if (newlyDone && data.habitId) {
-    habitMarks++;
-    say(`  ✓ marca el hábito ${habits.find((h) => h.id === data.habitId)?.name ?? ""} el ${d.date}`);
-    if (!DRY) {
-      const target = habits.find((h) => h.id === data.habitId)?.target ?? 1;
-      const key = { habitId_date: { habitId: data.habitId, date: data.date } };
-      const log = await prisma.habitLog.findUnique({ where: key });
-      // No pisa un fallado o salteado puesto a mano.
-      if (!log || log.status === "none") {
-        await prisma.habitLog.upsert({
-          where: key,
-          create: { habitId: data.habitId, date: data.date, status: "done", value: target, source: "app" },
-          update: { status: "done", value: target, source: "app" },
-        });
-      }
     }
   }
 }
@@ -341,6 +317,6 @@ console.log(report.join("\n"));
 console.log(
   `\n${DRY ? "SIMULACIÓN (no se escribió nada)" : "Listo"}: tareas ${tasksNew} nuevas y ${tasksChanged} con cambios (de ${tasksCsv.length}); ` +
     `bloques ${blocksNew} nuevos y ${blocksChanged} con cambios (de ${blocksCsv.length}${skipped ? `, ${skipped} sin fecha` : ""}); ` +
-    `${habitMarks} marcas de hábitos; resultados clave ${krNew} nuevos y ${krChanged} con cambios (de ${krCsv.length}).`,
+    `resultados clave ${krNew} nuevos y ${krChanged} con cambios (de ${krCsv.length}).`,
 );
 await prisma.$disconnect();

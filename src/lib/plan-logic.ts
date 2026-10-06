@@ -66,7 +66,6 @@ export type BlockDTO = {
   place: string | null;
   notes: string | null;
   taskId: string | null;
-  habitId: string | null;
 };
 
 export type KeyResultDTO = {

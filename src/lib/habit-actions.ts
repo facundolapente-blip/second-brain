@@ -49,7 +49,6 @@ export async function setHabitLog(
   if (s === null) {
     if (!finalNote) {
       await prisma.habitLog.deleteMany({ where: key });
-      await syncBlocks(habitId, key.date, false);
       refrescar();
       return;
     }
@@ -61,15 +60,7 @@ export async function setHabitLog(
     create: { ...key, status: s, value: v, note: finalNote, source: "app" },
     update: { status: s, value: v, note: finalNote, source: "app" },
   });
-  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { target: true } });
-  await syncBlocks(habitId, key.date, s === "done" && v >= (habit?.target ?? 1));
   refrescar();
-}
-
-/** Los bloques del Plan vinculados a este hábito ese día quedan igual que la marca. */
-async function syncBlocks(habitId: string, date: Date, done: boolean) {
-  const n = await prisma.planBlock.updateMany({ where: { habitId, date, done: !done }, data: { done } });
-  if (n.count) revalidatePath("/plan", "layout");
 }
 
 /** Hábitos cuya frecuencia se configuró en la app (HabitNow no la pisa). */

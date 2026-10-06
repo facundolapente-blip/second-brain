@@ -10,9 +10,8 @@ import { isTime, QUARTERS, type KrStatus, type TaskStatus } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
-function refrescar(habitos = false) {
+function refrescar() {
   revalidatePath("/plan", "layout");
-  if (habitos) revalidatePath("/habitos", "layout");
   revalidatePath("/");
 }
 
@@ -30,31 +29,25 @@ function fecha(fd: FormData, key: string): string | null {
   return isISODate(v) ? v : null;
 }
 
-// ─── Hábitos vinculados ─────────────────────────────────────────────────────
-
-/** Deja la marca del hábito igual que el bloque: hecho si está hecho, sin marcar si no. */
-async function syncHabit(habitId: string | null, date: Date, done: boolean) {
-  if (!habitId) return;
-  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { target: true } });
-  if (!habit) return;
-  const key = { habitId_date: { habitId, date } };
-  if (done) {
-    await prisma.habitLog.upsert({
-      where: key,
-      create: { habitId, date, status: "done", value: habit.target, source: "app" },
-      update: { status: "done", value: habit.target, source: "app" },
-    });
-  } else {
-    // Solo se desmarca si la marca era "hecho": no se pisa un fallado o salteado.
-    const log = await prisma.habitLog.findUnique({ where: key });
-    if (log?.status === "done") {
-      if (log.note) await prisma.habitLog.update({ where: key, data: { status: "none", value: 0 } });
-      else await prisma.habitLog.delete({ where: key });
-    }
-  }
-}
-
 // ─── Bloques ────────────────────────────────────────────────────────────────
+
+/**
+ * La tarjeta es la misma semana a semana (se le cambia la fecha). Cuando deja una
+ * semana que ya empezó, queda registro de cómo estaba ese día, así los números de
+ * esa semana no se pierden; y si va a una semana posterior, llega sin tildar.
+ * Devuelve el "hecho" con el que queda.
+ */
+async function changeWeek(b: { id: string; date: Date; title: string; categoryId: string | null; done: boolean }, to: Date) {
+  const from = fromDbDate(b.date);
+  const dest = fromDbDate(to);
+  // Si vuelve a un día que tenía registro, el registro sobra: la tarjeta está ahí.
+  await prisma.planBlockLog.deleteMany({ where: { blockId: b.id, date: to } });
+  if (startOfWeek(from) === startOfWeek(dest)) return b.done;
+  if (from <= todayISO()) {
+    await prisma.planBlockLog.create({ data: { blockId: b.id, date: b.date, title: b.title, categoryId: b.categoryId, done: b.done } });
+  }
+  return startOfWeek(dest) > startOfWeek(from) ? false : b.done;
+}
 
 export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await exigirSesion();
@@ -79,22 +72,17 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     place: texto(fd, "place", 120) || null,
     notes: texto(fd, "notes", 2000) || null,
     taskId: texto(fd, "taskId", 40) || null,
-    habitId: texto(fd, "habitId", 40) || null,
   };
 
   if (id) {
     const before = await prisma.planBlock.findUnique({ where: { id } });
     if (!before) return { ok: false, error: "Ese bloque ya no existe." };
-    await prisma.planBlock.update({ where: { id }, data });
+    const done = +before.date === +data.date ? before.done : await changeWeek(before, data.date);
+    await prisma.planBlock.update({ where: { id }, data: { ...data, done } });
     if (data.taskId && data.taskId !== before.taskId) {
       await prisma.planTask.updateMany({ where: { id: data.taskId }, data: { scheduled: true } });
     }
-    // Si cambió el hábito o el día de un bloque hecho, se mueve la marca.
-    if (before.done && (before.habitId !== data.habitId || +before.date !== +data.date)) {
-      await syncHabit(before.habitId, before.date, false);
-      await syncHabit(data.habitId, data.date, true);
-    }
-    refrescar(before.done);
+    refrescar();
     return { ok: true, id };
   }
   const created = await prisma.planBlock.create({ data });
@@ -106,9 +94,8 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
 
 export async function setBlockDone(id: string, done: boolean) {
   await exigirSesion();
-  const block = await prisma.planBlock.update({ where: { id }, data: { done } });
-  await syncHabit(block.habitId, block.date, done);
-  refrescar(!!block.habitId);
+  await prisma.planBlock.update({ where: { id }, data: { done } });
+  refrescar();
 }
 
 export async function deleteBlock(id: string) {
@@ -116,9 +103,41 @@ export async function deleteBlock(id: string) {
   const block = await prisma.planBlock.findUnique({ where: { id } });
   if (!block) return;
   await trashAndDelete("block", id);
-  // Si estaba hecho y vinculado a un hábito, la marca se va con él.
-  if (block.done) await syncHabit(block.habitId, block.date, false);
-  refrescar(block.done && !!block.habitId);
+  refrescar();
+}
+
+/** "Pasar a la semana que viene": la misma tarjeta, el mismo día de la semana, sin tildar. */
+export async function passToNextWeek(id: string): Promise<ActionResult> {
+  await exigirSesion();
+  const b = await prisma.planBlock.findUnique({ where: { id } });
+  if (!b) return { ok: false, error: "Ese bloque ya no existe." };
+  const to = toDbDate(addDays(fromDbDate(b.date), 7));
+  const done = await changeWeek(b, to);
+  await prisma.planBlock.update({ where: { id }, data: { date: to, done } });
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * "Pasar toda la semana": todas las tarjetas de la semana van a la siguiente (mismo
+ * día, sin tildar). Después se ajusta la que cambie de día.
+ */
+export async function passWeek(day: string): Promise<ActionResult & { count?: number }> {
+  await exigirSesion();
+  if (!isISODate(day)) return { ok: false, error: "Fecha inválida." };
+  const monday = startOfWeek(day);
+  const blocks = await prisma.planBlock.findMany({
+    where: { date: { gte: toDbDate(monday), lte: toDbDate(addDays(monday, 6)) } },
+  });
+  if (!blocks.length) return { ok: false, error: "Esta semana no tiene tarjetas para pasar." };
+  for (const b of blocks) {
+    const to = toDbDate(addDays(fromDbDate(b.date), 7));
+    const done = await changeWeek(b, to);
+    await prisma.planBlock.update({ where: { id: b.id }, data: { date: to, done } });
+  }
+  await logActivity("updated", "block", null, `${blocks.length} tarjetas pasadas a la semana del ${addDays(monday, 7)}`);
+  refrescar();
+  return { ok: true, count: blocks.length };
 }
 
 /**
@@ -152,7 +171,6 @@ export async function copyWeekToNext(day: string): Promise<ActionResult> {
       priority: b.priority,
       place: b.place,
       notes: b.notes,
-      habitId: b.habitId,
     })),
   });
   refrescar();
@@ -332,7 +350,7 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
 
 /**
  * Mueve un bloque a otro día (y opcionalmente a otra hora, conservando la
- * duración). Si estaba hecho y vinculado a un hábito, la marca se muda con él.
+ * duración). Es la misma tarjeta: no se crea otra.
  */
 export async function moveBlock(id: string, date: string, startTime?: string | null) {
   await exigirSesion();
@@ -351,12 +369,9 @@ export async function moveBlock(id: string, date: string, startTime?: string | n
     start = startTime;
   }
   const to = toDbDate(date);
-  await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end } });
-  if (b.done && +b.date !== +to) {
-    await syncHabit(b.habitId, b.date, false);
-    await syncHabit(b.habitId, to, true);
-  }
-  refrescar(b.done && !!b.habitId);
+  const done = +b.date === +to ? b.done : await changeWeek(b, to);
+  await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end, done } });
+  refrescar();
 }
 
 // ─── Tareas que se repiten y pasos ──────────────────────────────────────────

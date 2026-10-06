@@ -149,8 +149,7 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
       const h = await prisma.habit.findUnique({ where: { id }, include: { tracks: true, logs: true } });
       if (!h) return null;
       const { tracks, logs, ...row } = h;
-      const blockIds = await prisma.planBlock.findMany({ where: { habitId: id }, select: { id: true } });
-      return { label: `${h.name} (${logs.length} marcas)`, data: { row, tracks, logs, blockIds: blockIds.map((x) => x.id) } };
+      return { label: `${h.name} (${logs.length} marcas)`, data: { row, tracks, logs } };
     }
     case "habitCategory": {
       const c = await prisma.habitCategory.findUnique({ where: { id } });
@@ -346,7 +345,6 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
       if (tracks.length) await prisma.habitTrack.createMany({ data: tracks });
       const logs = (data.logs as never[]) ?? [];
       for (let i = 0; i < logs.length; i += 1000) await prisma.habitLog.createMany({ data: logs.slice(i, i + 1000), skipDuplicates: true });
-      await prisma.planBlock.updateMany({ where: { id: { in: ids(data.blockIds) } }, data: { habitId: row.id } });
       return null;
     }
     case "habitCategory":
@@ -368,24 +366,15 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
       return null;
     }
     case "block": {
-      const b = await prisma.planBlock.create({
+      await prisma.planBlock.create({
         data: {
           ...row,
           categoryId: await orNull(exists.planCategory, row.categoryId),
           taskId: await orNull(exists.task, row.taskId),
-          habitId: await orNull(exists.habit, row.habitId),
+          // Los bloques ya no se vinculan con hábitos.
+          habitId: null,
         },
       });
-      // Al borrarlo se le sacó la marca al hábito vinculado: vuelve con el bloque.
-      if (b.done && b.habitId) {
-        const h = await prisma.habit.findUnique({ where: { id: b.habitId }, select: { target: true } });
-        const key = { habitId_date: { habitId: b.habitId, date: b.date } };
-        await prisma.habitLog.upsert({
-          where: key,
-          create: { habitId: b.habitId, date: b.date, status: "done", value: h?.target ?? 1, source: "app" },
-          update: { status: "done", value: h?.target ?? 1, source: "app" },
-        });
-      }
       return null;
     }
     case "task":

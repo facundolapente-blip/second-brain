@@ -1,10 +1,9 @@
 "use client";
 
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { Medal } from "@phosphor-icons/react";
-import { deleteBlock, saveBlock } from "@/lib/plan-actions";
+import { deleteBlock, passToNextWeek, saveBlock } from "@/lib/plan-actions";
+import { ArrowArcRight } from "@phosphor-icons/react";
 import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
-import type { LinkableHabit } from "@/lib/plan";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { PriorityPicker } from "./plan-ui";
@@ -15,8 +14,8 @@ export type BlockSheetHandle = { open: (draft: BlockDraft) => void };
 /** Hoja para crear o editar un bloque de la semana. */
 export const BlockSheet = forwardRef<
   BlockSheetHandle,
-  { categories: CategoryDTO[]; habits: LinkableHabit[]; tasks: Pick<TaskDTO, "id" | "title" | "status">[] }
->(function BlockSheet({ categories, habits, tasks }, ref) {
+  { categories: CategoryDTO[]; tasks: Pick<TaskDTO, "id" | "title" | "status">[] }
+>(function BlockSheet({ categories, tasks }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<BlockDraft>({ date: "" });
   const [key, setKey] = useState(0);
@@ -35,7 +34,6 @@ export const BlockSheet = forwardRef<
         key={key}
         initial={draft}
         categories={categories}
-        habits={habits}
         tasks={tasks}
         onDone={() => sheet.current?.close()}
       />
@@ -46,13 +44,11 @@ export const BlockSheet = forwardRef<
 function BlockForm({
   initial,
   categories,
-  habits,
   tasks,
   onDone,
 }: {
   initial: BlockDraft;
   categories: CategoryDTO[];
-  habits: LinkableHabit[];
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
   onDone: () => void;
 }) {
@@ -60,22 +56,18 @@ function BlockForm({
   const [title, setTitle] = useState(initial.title ?? "");
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
   const [priority, setPriority] = useState(initial.priority ?? 0);
-  const [habitId, setHabitId] = useState(initial.habitId ?? "");
   const [deleting, startDelete] = useTransition();
   const notify = useEffectEvent(onDone);
   useEffect(() => {
     if (state?.ok) notify();
   }, [state]);
 
-  // Si el nombre coincide con un hábito (Gym), se sugiere vincularlo.
-  const suggested = !habitId && habits.find((h) => h.name.toLowerCase() === title.trim().toLowerCase());
   const openTasks = tasks.filter((t) => t.status !== "done" || t.id === initial.taskId);
 
   return (
     <form action={action} className="grid gap-5">
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="categoryId" value={categoryId} />
-      <input type="hidden" name="habitId" value={habitId} />
 
       <Field label="Nombre">
         <Input
@@ -131,33 +123,6 @@ function BlockForm({
         <PriorityPicker value={priority} onChange={setPriority} name="priority" />
       </div>
 
-      <div className="grid gap-1.5">
-        <span className="kicker">Hábito vinculado</span>
-        <select
-          value={habitId}
-          onChange={(e) => setHabitId(e.target.value)}
-          className={cx(inputClass, "pr-8")}
-          aria-label="Hábito vinculado"
-        >
-          <option value="">Ninguno</option>
-          {habits.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.name}
-            </option>
-          ))}
-        </select>
-        {suggested ? (
-          <button
-            type="button"
-            onClick={() => setHabitId(suggested.id)}
-            className="inline-flex items-center gap-1.5 justify-self-start rounded-[4px] text-[13px] font-medium text-accent-fg hover:underline"
-          >
-            <Medal size={15} weight="fill" /> Vincular con el hábito {suggested.name}
-          </button>
-        ) : (
-          <span className="text-xs text-muted">Al marcar el bloque como hecho, se marca el hábito ese día.</span>
-        )}
-      </div>
 
       {openTasks.length > 0 && (
         <Field label="Tarea (opcional)">
@@ -191,6 +156,22 @@ function BlockForm({
         <Button type="submit" variant="accent" disabled={pending}>
           {pending ? "Guardando..." : initial.id ? "Guardar cambios" : "Crear bloque"}
         </Button>
+        {initial.id && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={deleting}
+            className="h-11"
+            onClick={() =>
+              startDelete(async () => {
+                await passToNextWeek(initial.id!);
+                onDone();
+              })
+            }
+          >
+            <ArrowArcRight size={16} /> Pasar a la semana que viene
+          </Button>
+        )}
         {initial.id && (
           <ConfirmButton
             disabled={deleting}

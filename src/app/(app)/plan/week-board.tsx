@@ -14,7 +14,6 @@ type Props = {
   today: string;
   byDay: Map<string, BlockDTO[]>;
   cats: Map<string, CategoryDTO>;
-  habitName: Map<string, string>;
   onToggle: (b: BlockDTO) => void;
   onEdit: (b: BlockDTO) => void;
   onNew: (date: string, startTime?: string) => void;
@@ -24,7 +23,7 @@ type Props = {
 const DRAG = "text/x-bloque";
 
 /** Escritorio, vista lista: 7 columnas; los bloques se arrastran de un día a otro. */
-export function BoardList({ days, today, byDay, cats, habitName, onToggle, onEdit, onNew, onMove }: Props) {
+export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove }: Props) {
   const [over, setOver] = useState<string | null>(null);
   return (
     // Cada día con un ancho mínimo cómodo: si no entran los 7, se corre de costado.
@@ -75,7 +74,6 @@ export function BoardList({ days, today, byDay, cats, habitName, onToggle, onEdi
                   block={b}
                   compact
                   category={b.categoryId ? cats.get(b.categoryId) : null}
-                  habit={b.habitId ? habitName.get(b.habitId) : undefined}
                   onToggle={() => onToggle(b)}
                   onEdit={() => onEdit(b)}
                 />
