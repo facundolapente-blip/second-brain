@@ -7,6 +7,7 @@ import { logActivity, trashAndDelete } from "./trash";
 import { isISODate, todayISO, toDbDate } from "./dates";
 import { isPaletteKey } from "./palette";
 import type { LogStatus } from "./habit-logic";
+import { HABIT_CONFIG_LOCKED } from "./importers/habitnow";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false, error: string };
 
@@ -71,6 +72,20 @@ async function syncBlocks(habitId: string, date: Date, done: boolean) {
   if (n.count) revalidatePath("/plan", "layout");
 }
 
+/** Hábitos cuya frecuencia se configuró en la app (HabitNow no la pisa). */
+async function lockHabitConfig(id: string) {
+  const row = await prisma.appSetting.findUnique({ where: { key: HABIT_CONFIG_LOCKED } });
+  let ids: string[] = [];
+  try {
+    ids = JSON.parse(row?.value ?? "[]");
+  } catch {
+    ids = [];
+  }
+  if (ids.includes(id)) return;
+  const value = JSON.stringify([...ids, id]);
+  await prisma.appSetting.upsert({ where: { key: HABIT_CONFIG_LOCKED }, create: { key: HABIT_CONFIG_LOCKED, value }, update: { value } });
+}
+
 function texto(fd: FormData, key: string, max = 200): string {
   return String(fd.get(key) ?? "").trim().slice(0, max);
 }
@@ -126,7 +141,19 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     if (last && data.startDate <= last.endDate) {
       return { ok: false, error: "La fecha de inicio tiene que ser posterior a la pista anterior." };
     }
+    const before = await prisma.habit.findUnique({ where: { id } });
     await prisma.habit.update({ where: { id }, data });
+    // Si se cambió cuándo toca, la configuración pasa a ser de la app: los backups
+    // de HabitNow ya no la pisan (las marcas sí se siguen importando).
+    if (
+      before &&
+      (before.frequency !== data.frequency ||
+        before.weekdays.join() !== data.weekdays.join() ||
+        before.timesPerWeek !== data.timesPerWeek ||
+        before.target !== data.target)
+    ) {
+      await lockHabitConfig(id);
+    }
     refrescar();
     return { ok: true, id };
   }

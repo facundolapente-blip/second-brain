@@ -110,10 +110,12 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
   const hours = Array.from({ length: TO - FROM }, (_, i) => FROM + i);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="overflow-x-auto">
+      {/* Un solo contenedor con scroll (vertical y horizontal): la cabecera queda fija
+          arriba y las columnas de días coinciden siempre con las de la grilla. */}
+      <div className="max-h-[75dvh] overflow-auto">
       <div className="min-w-[70rem]">
       {/* Cabecera de días y lo que no tiene hora */}
-      <div className="grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))] border-b border-line">
+      <div className="sticky top-0 z-10 grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))] border-b border-line bg-surface">
         <span />
         {days.map((d) => {
           const untimed = byDay.get(d)!.filter((b) => !b.startTime);
@@ -148,7 +150,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
         })}
       </div>
       {/* Grilla de horas */}
-      <div className="max-h-[70dvh] overflow-y-auto">
+      <div>
         <div className="relative grid grid-cols-[3.5rem_repeat(7,minmax(9.5rem,1fr))]">
           <div>
             {hours.map((h) => (

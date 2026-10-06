@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowBendUpRight, Check, Plus, X } from "@phosphor-icons/react";
 import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
-import { dayState, isScheduled, WEEKDAY_SHORT, type PackedLogMap } from "@/lib/habit-logic";
+import { dayState, WEEKDAY_SHORT, type PackedLogMap, showsOn } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
@@ -44,7 +44,7 @@ export function TodayView({
     return st === "done" || st === "failed" || st === "skipped" ? 1 : 0;
   };
   const visible = habits
-    .filter((h) => isScheduled(h, selected))
+    .filter((h) => showsOn(h, logs[h.id] ?? {}, selected))
     .sort((a, b) => settled(a) - settled(b) || b.priority - a.priority || a.name.localeCompare(b.name, "es"));
 
   const isFuture = selected > today;

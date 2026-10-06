@@ -105,6 +105,17 @@ function* weeks(h: HabitRule, today: string) {
   }
 }
 
+/**
+ * ¿Aparece en la lista de ese día? Lo que toca, salvo un "X veces por semana" que
+ * ya llegó a la meta con marcas de otros días: el resto de la semana no se muestra
+ * (como en HabitNow). El día en que se marcó sigue apareciendo, como hecho.
+ */
+export function showsOn(h: HabitRule, logs: LogMap, iso: string): boolean {
+  if (!isScheduled(h, iso)) return false;
+  if (h.frequency !== "weekly" || logs[iso]) return true;
+  return !weekMet(h, logs, periodStart(h, iso));
+}
+
 // ─── Estado de un día ───────────────────────────────────────────────────────
 
 export function dayState(h: HabitRule, logs: LogMap, iso: string, today: string): DayState {

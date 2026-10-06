@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { addDays, formatLong, startOfWeek, weekday } from "@/lib/dates";
-import { currentStreak, dayState, habitScore, isScheduled, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
+import { currentStreak, dayState, habitScore, showsOn, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
 import { HabitIcon } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
@@ -11,7 +11,7 @@ import { cx, ToneSquare } from "@/components/ui";
 
 /** Hábitos que tocan un día y cuántos ya están hechos (misma regla que la lista de Hoy). */
 export function dayProgress(habits: HabitDTO[], logs: Record<string, LogMap>, iso: string, today: string) {
-  const due = habits.filter((h) => iso >= h.startDate && isScheduled(h, iso));
+  const due = habits.filter((h) => iso >= h.startDate && showsOn(h, logs[h.id] ?? {}, iso));
   const done = due.filter((h) => dayState(h, logs[h.id] ?? {}, iso, today) === "done").length;
   return { done, total: due.length };
 }

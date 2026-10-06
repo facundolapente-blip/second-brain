@@ -83,6 +83,9 @@ type Track = {
 export type HabitNowMode = "replace" | "update" | "fresh";
 
 /** Importa el texto de un backup .hn. Devuelve un resumen para mostrar. */
+/** AppSetting con los ids de hábitos cuya frecuencia se cambió en la app. */
+export const HABIT_CONFIG_LOCKED = "habitos_config_app";
+
 export async function importHabitNow(prisma: PrismaClient, raw: string, mode: HabitNowMode): Promise<string> {
   const replace = mode === "replace";
   const update = mode === "update";
@@ -170,6 +173,13 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
     ]),
   );
   let habitOrder = Math.max(-1, ...[...known.values()].map((h) => h.order)) + 1;
+  const lockedRow = await prisma.appSetting.findUnique({ where: { key: HABIT_CONFIG_LOCKED } });
+  let lockedIds = new Set<string>();
+  try {
+    lockedIds = new Set(JSON.parse(lockedRow?.value ?? "[]") as string[]);
+  } catch {
+    // lista rota: se ignora
+  }
   let created = 0;
   let updated = 0;
   for (const ts of groupBy(tracks, (t) => t.group).values()) {
@@ -211,10 +221,13 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
       archivedAt: archived ? toDb(lastEnd || cur.start) : null,
     };
     const prev = update ? known.get(cur.name.trim().toLowerCase()) : undefined;
+    // Si la frecuencia se configuró en la app, esa manda (no se pisa ni se tocan las pistas).
+    const { frequency: _f, weekdays: _w, timesPerWeek: _t, weekStart: _s, target: _g, ...keepConfig } = fromHabitNow;
+    void [_f, _w, _t, _s, _g];
     const habit = prev
       ? await prisma.habit.update({
           where: { id: prev.id },
-          data: { ...fromHabitNow, tracks: { deleteMany: {}, create: pastTracks } },
+          data: lockedIds.has(prev.id) ? keepConfig : { ...fromHabitNow, tracks: { deleteMany: {}, create: pastTracks } },
         })
       : await prisma.habit.create({
           data: {
