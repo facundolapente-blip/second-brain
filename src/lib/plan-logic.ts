@@ -102,6 +102,9 @@ export function parseTaskColumns(raw: string | null | undefined): TaskColumnWidt
   return out;
 }
 
+/** Cookie con los pendientes sin hora plegados en la vista por horas. */
+export const HOURS_TODO_FOLD_COOKIE = "plan_pendientes_plegados";
+
 /** Cookie con las tareas plegadas en el celular (se recuerda entre visitas). */
 export const TASKS_FOLD_COOKIE = "plan_tareas_plegadas";
 

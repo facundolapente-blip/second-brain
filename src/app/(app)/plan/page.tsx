@@ -3,7 +3,7 @@ import { isISODate, todayISO } from "@/lib/dates";
 import { getPlanCategories, getTasks, getWeek } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { WeekView } from "./week-view";
-import { parseTaskColumns, TASKS_FOLD_COOKIE } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, parseTaskColumns, TASKS_FOLD_COOKIE } from "@/lib/plan-logic";
 import { TasksBoard } from "./tareas/tasks-view";
 
 export const metadata = { title: "Plan semanal" };
@@ -27,6 +27,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
       blocks={blocks}
       categories={categories}
       tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))}
+      todoFolded={jar.get(HOURS_TODO_FOLD_COOKIE)?.value === "1"}
       top={<TasksBoard tasks={tasks} categories={categories} today={todayISO()} manualOrder={!!manual} folded={jar.get(TASKS_FOLD_COOKIE)?.value === "1"} columns={parseTaskColumns(columns?.value)} />}
     />
   );

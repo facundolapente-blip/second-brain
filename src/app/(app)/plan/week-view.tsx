@@ -32,9 +32,12 @@ export function WeekView({
   categories,
   tasks,
   top,
+  todoFolded = false,
 }: {
   /** Lo que va arriba del calendario: las tareas. */
   top?: React.ReactNode;
+  /** Pendientes sin hora plegados en la vista por horas (cookie). */
+  todoFolded?: boolean;
   monday: string;
   today: string;
   blocks: BlockDTO[];
@@ -231,7 +234,7 @@ export function WeekView({
             />
           ) : (
             // Por horas en el celular: el calendario del día elegido en la tira.
-            <BoardHours {...boardProps} days={[selected]} />
+            <BoardHours {...boardProps} days={[selected]} todoFolded={todoFolded} />
           )}
         </div>
 
@@ -243,7 +246,7 @@ export function WeekView({
           {view === "lista" ? (
             <BoardList {...boardProps} />
           ) : (
-            <BoardHours {...boardProps} />
+            <BoardHours {...boardProps} todoFolded={todoFolded} />
           )}
         </div>
       </main>

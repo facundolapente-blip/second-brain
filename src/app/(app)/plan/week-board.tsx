@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Plus } from "@phosphor-icons/react";
+import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
-import { isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
 import { PRIORITIES, PriorityDots } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -161,8 +161,15 @@ const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
  * Escritorio, vista por horas: como un calendario. Arriba lo que no tiene
  * hora; tocar un hueco crea un bloque a esa hora; arrastrar mueve día y hora.
  */
-export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove }: Props) {
+export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, todoFolded = false }: Props & { todoFolded?: boolean }) {
   const [over, setOver] = useState<string | null>(null);
+  // Los bloques sin hora son pendientes del día: lista corta arriba que se pliega (cookie: se recuerda entre visitas).
+  const [folded, setFolded] = useState(todoFolded);
+  function toggleFold() {
+    const next = !folded;
+    setFolded(next);
+    document.cookie = `${HOURS_TODO_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+  }
   const hours = Array.from({ length: TO - FROM }, (_, i) => FROM + i);
   const cols = `3.5rem repeat(${days.length}, minmax(${days.length > 1 ? "9.5rem" : "0"}, 1fr))`;
   return (
@@ -172,11 +179,23 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
       <div className="max-h-[75dvh] overflow-auto">
       {/* Con un solo día (celular) la grilla usa todo el ancho; con 7, cada día tiene un mínimo. */}
       <div className={days.length > 1 ? "min-w-[70rem]" : undefined}>
-      {/* Cabecera de días y lo que no tiene hora */}
+      {/* Cabecera de días y los pendientes sin hora */}
       <div className="sticky top-0 z-10 grid border-b border-line bg-surface" style={{ gridTemplateColumns: cols }}>
-        <span />
+        <button
+          type="button"
+          onClick={toggleFold}
+          aria-expanded={!folded}
+          title={folded ? "Mostrar los pendientes sin hora" : "Plegar los pendientes sin hora"}
+          className="flex items-start justify-center pt-2.5 text-muted hover:text-fg"
+        >
+          <CaretDown size={14} weight="bold" aria-hidden className={cx("transition-transform duration-200", folded && "-rotate-90")} />
+          <span className="sr-only">{folded ? "Mostrar pendientes" : "Plegar pendientes"}</span>
+        </button>
         {days.map((d) => {
+          // Pendientes del día: primero los que faltan, después los hechos.
           const untimed = byDay.get(d)!.filter((b) => !b.startTime);
+          const todo = [...untimed.filter((b) => !b.done), ...untimed.filter((b) => b.done)];
+          const left = untimed.filter((b) => !b.done && !isFreeBlock(b)).length;
           return (
             <div
               key={d}
@@ -192,17 +211,28 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                 if (id) onMove(id, d, null);
               }}
               className={cx(
-                "grid min-h-16 content-start gap-1 border-l border-line p-1.5",
+                "grid content-start gap-0.5 border-l border-line p-1.5",
                 d === today && "bg-[color-mix(in_oklab,var(--accent)_5%,transparent)]",
                 over === `${d}|` && "bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]",
               )}
             >
-              <span className={cx("px-1 text-[12px] font-medium", d === today ? "text-accent-fg" : "text-muted")}>
-                {WEEKDAY_LONG[weekday(d)].slice(0, 3)} {Number(d.slice(8))}
-              </span>
-              {untimed.map((b) => (
-                <Chip key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} />
-              ))}
+              <button type="button" onClick={toggleFold} className="flex items-baseline gap-1.5 px-1 text-left">
+                <span className={cx("text-[12px] font-medium", d === today ? "text-accent-fg" : "text-muted")}>
+                  {WEEKDAY_LONG[weekday(d)].slice(0, 3)} {Number(d.slice(8))}
+                </span>
+                {untimed.length > 0 && (
+                  <span className="text-[11.5px] text-muted tabular">
+                    · {left === 0 ? "pendientes hechos" : left === 1 ? "1 para hacer" : `${left} para hacer`}
+                  </span>
+                )}
+              </button>
+              {!folded && todo.length > 0 && (
+                <ul className="grid">
+                  {todo.map((b) => (
+                    <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} />
+                  ))}
+                </ul>
+              )}
             </div>
           );
         })}
@@ -300,6 +330,63 @@ function lanesOf(blocks: BlockDTO[]) {
   }
   close();
   return items;
+}
+
+/**
+ * Un pendiente sin hora en la vista por horas: una línea con casilla, punto del
+ * color de la categoría y título (como una lista de cosas para hacer). Se puede
+ * arrastrar a una hora para agendarlo.
+ */
+function TodoRow({
+  b,
+  cats,
+  onEdit,
+  onToggle,
+}: {
+  b: BlockDTO;
+  cats: Map<string, CategoryDTO>;
+  onEdit: (b: BlockDTO) => void;
+  onToggle: (b: BlockDTO) => void;
+}) {
+  const c = b.categoryId ? cats.get(b.categoryId) : null;
+  const free = isFreeBlock(b);
+  return (
+    <li
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG, b.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className="flex min-h-9 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2"
+      title="Arrastralo a una hora para agendarlo"
+    >
+      {free ? (
+        <span className="w-8 shrink-0" />
+      ) : (
+        <button
+          type="button"
+          onClick={() => onToggle(b)}
+          aria-pressed={b.done}
+          aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
+          className="inline-flex size-8 shrink-0 items-center justify-center"
+        >
+          <span
+            className={cx(
+              "inline-flex size-[18px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
+              b.done ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent" : "border-fg/45",
+            )}
+          >
+            {b.done && <Check size={12} weight="bold" />}
+          </span>
+        </button>
+      )}
+      <button type="button" onClick={() => onEdit(b)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+        {c && <span aria-hidden style={tone(c.color)} className="chip-solid size-2 shrink-0 rounded-full" />}
+        <span className={cx("truncate text-[13.5px]", (b.done || free) && "text-muted", b.done && "line-through decoration-faint")}>{b.title}</span>
+        {c && <span className="sr-only">, {c.name}</span>}
+      </button>
+    </li>
+  );
 }
 
 function Chip({
