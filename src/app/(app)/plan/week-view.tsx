@@ -14,10 +14,12 @@ import {
   type BlockDTO,
   type CategoryDTO,
   type TaskDTO,
+  sortKeyAt,
 } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
+import { Sortable, SortableItem } from "@/components/sortable";
 import { BlockSheet, type BlockSheetHandle } from "./block-sheet";
 import { CategoryTag, categoryMap, PriorityTag } from "./plan-ui";
 import { PlanTabs } from "./plan-nav";
@@ -231,6 +233,7 @@ export function WeekView({
               onToggle={toggle}
               onEdit={openEdit}
               onNew={() => openNew(selected)}
+              onMove={move}
             />
           ) : (
             // Por horas en el celular: el calendario del día elegido en la tira.
@@ -265,6 +268,7 @@ function DayList({
   onToggle,
   onEdit,
   onNew,
+  onMove,
 }: {
   day: string;
   today: string;
@@ -273,7 +277,16 @@ function DayList({
   onToggle: (b: BlockDTO) => void;
   onEdit: (b: BlockDTO) => void;
   onNew: () => void;
+  onMove: (id: string, date: string, startTime?: string | null, sortKey?: number) => void;
 }) {
+  // Mantener apretado un bloque sin hora y moverlo: queda en ese lugar del día
+  // (entre los vecinos, como en la columna de la compu). Los que tienen hora van por horario.
+  function reorder(_ids: string[], moved: { id: string; to: number }) {
+    const b = blocks.find((x) => x.id === moved.id);
+    if (!b || b.startTime) return;
+    const rest = blocks.filter((x) => x.id !== moved.id);
+    onMove(b.id, day, undefined, sortKeyAt(rest, moved.to));
+  }
   return (
     <section aria-label={WEEKDAY_LONG[weekday(day)]}>
       <h3 className="display pb-3 text-[24px] first-letter:uppercase">
@@ -288,9 +301,16 @@ function DayList({
           </Button>
         </div>
       ) : (
+        <Sortable ids={blocks.map((b) => b.id)} onReorder={reorder}>
         <ol className="grid border-t border-line">
           {blocks.map((b) => (
-            <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25">
+            <SortableItem
+              key={b.id}
+              id={b.id}
+              disabled={!!b.startTime}
+              className="grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25 bg-bg"
+              draggingClass="rounded-xl shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+            >
               <span className="pt-3 text-right font-mono text-[13px] leading-tight font-medium text-fg/80 tabular">
                 {b.startTime ? b.startTime.replace(/^0/, "") : <span className="text-[11.5px] font-normal text-muted">Todo el día</span>}
                 {b.endTime && <span className="block font-normal text-muted">{b.endTime.replace(/^0/, "")}</span>}
@@ -301,9 +321,10 @@ function DayList({
                 onToggle={() => onToggle(b)}
                 onEdit={() => onEdit(b)}
               />
-            </li>
+            </SortableItem>
           ))}
         </ol>
+        </Sortable>
       )}
     </section>
   );

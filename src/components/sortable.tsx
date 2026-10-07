@@ -48,7 +48,8 @@ export function Sortable({
   children,
 }: {
   ids: string[];
-  onReorder: (ids: string[]) => void;
+  /** El orden nuevo; `moved` dice cuál se movió y a qué posición. */
+  onReorder: (ids: string[], moved: { id: string; to: number }) => void;
   /** Grilla de varias columnas (si no, lista vertical). */
   grid?: boolean;
   disabled?: boolean;
@@ -66,7 +67,7 @@ export function Sortable({
     const from = ids.indexOf(String(active.id));
     const to = ids.indexOf(String(over.id));
     if (from < 0 || to < 0) return;
-    onReorder(arrayMove(ids, from, to));
+    onReorder(arrayMove(ids, from, to), { id: String(active.id), to });
   }
   if (disabled) return <>{children}</>;
   return (
