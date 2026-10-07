@@ -1,9 +1,10 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
 import { useRouter } from "next/navigation";
 import { PhotoStrip } from "@/components/photos";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CaretDown, CaretLeft, Check, DotsThreeVertical, Plus, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui";
 import { formatLong, formatRelative } from "@/lib/dates";
@@ -121,8 +122,8 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   const confirmSheet = useRef<SheetHandle>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
-  const [leaving, startLeaving] = useTransition();
-  const [deleting, startDelete] = useTransition();
+  const [leaving, startLeaving] = useSafeTransition();
+  const [deleting, startDelete] = useSafeTransition();
   const { write } = useWrite();
 
   // Entrada nueva: directo a escribir.

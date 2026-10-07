@@ -104,14 +104,28 @@ export function parseQuick(text: string, accounts: QuickAccount[]): QuickParse |
   if (/\banteayer\b/.test(rest)) daysAgo = 2;
   else if (/\bayer\b/.test(rest)) daysAgo = 1;
   rest = rest.replace(/\b(anteayer|ayer|hoy)\b/g, " ");
+  // "-350 almuerzo": el menos adelante también es gasto (y no es parte del monto).
+  rest = rest.replace(/^\s*-\s*/, " ");
+  // "$ 300": el signo suelto no va al título.
+  rest = rest.replace(/(^|\s)\$(?=\s|$)/g, " ");
 
-  // Cuenta: la que más letras del nombre coincide ("mercado pago", "itau").
+  // Cuenta: la que más letras del nombre coincide ("mercado pago", "itau"). Solo
+  // al principio o al final ("350 itau almuerzo", "350 almuerzo itau"): en el
+  // medio es parte del título ("almuerzo con itau y amigos" no es de Itau).
+  const restTokens = rest.trim().split(/\s+/);
+  const atEdge = (w: string) => {
+    const len = w.split(" ").length;
+    for (let i = 0; i + len <= restTokens.length; i++) {
+      if (restTokens.slice(i, i + len).join(" ") === w) return i <= 1 || i + len === restTokens.length;
+    }
+    return false;
+  };
   let accountId: string | null = null;
   const sorted = [...accounts].sort((a, b) => b.name.length - a.name.length);
   for (const a of sorted) {
     const n = fold(a.name);
     const words = [n, ...(n.includes(" ") ? [n.split(" ")[0]] : [])];
-    const hit = words.find((w) => w.length >= 3 && new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(rest));
+    const hit = words.find((w) => w.length >= 3 && atEdge(w) && new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(rest));
     if (hit) {
       accountId = a.id;
       rest = rest.replace(new RegExp(`\\b${hit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`), " ");
@@ -136,7 +150,9 @@ export function parseQuick(text: string, accounts: QuickAccount[]): QuickParse |
   // El título sale del texto original (con sus mayúsculas), sin lo que ya se usó.
   const used = new Set(tokens.filter((t) => !kept.includes(t)));
   const words = original
-    .replace(/^\+/, "")
+    .replace(/^\s*[+-]\s*/, "")
+    .replace(/(^|\s)\$(?=\s|$)/g, " ")
+    .trim()
     .split(/\s+/)
     .filter((w) => kept.includes(fold(w)) && !used.has(fold(w)));
   const titleRaw = words

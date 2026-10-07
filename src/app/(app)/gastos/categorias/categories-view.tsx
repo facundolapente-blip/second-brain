@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { deleteCategory, saveCategory } from "@/lib/finance-actions";
 import { FINANCE_ICONS, FinanceIcon } from "@/lib/finance-icons";
@@ -18,8 +19,8 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<Draft>({ name: "", kind: "expense", icon: "Tag", color: "blue", txCount: 0 });
   const [formKey, setFormKey] = useState(0);
-  const [state, action, pending] = useActionState(saveCategory, null);
-  const [, startTransition] = useTransition();
+  const [state, action, pending] = useActionState(safeForm(saveCategory), null);
+  const [, startTransition] = useSafeTransition();
 
   useEffect(() => {
     if (state?.ok) sheet.current?.close();

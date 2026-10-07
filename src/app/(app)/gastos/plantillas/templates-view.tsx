@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useRef, useState } from "react";
 import { Copy, DotsThree } from "@phosphor-icons/react";
 import { moneyCents } from "@/lib/format";
 import { deleteTemplate, renameTemplate } from "@/lib/finance-actions";
@@ -30,7 +31,7 @@ export function TemplatesView({
   const editSheet = useRef<SheetHandle>(null);
   const [editing, setEditing] = useState<TemplateDTO | null>(null);
   const [name, setName] = useState("");
-  const [, startTransition] = useTransition();
+  const [, startTransition] = useSafeTransition();
 
   function describe(t: TemplateDTO): string {
     const parts: string[] = [KIND_LABEL[t.kind]];

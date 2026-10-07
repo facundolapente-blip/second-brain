@@ -1,8 +1,9 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ArrowBendUpRight,
@@ -198,7 +199,7 @@ function TrackPicker({
 function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
   const [date, setDate] = useState(today);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   return (
     <Panel icon={ArrowCounterClockwise} title="Pistas">
       <p className="max-w-[60ch] text-[14px] leading-relaxed text-muted">
@@ -792,7 +793,7 @@ function EditTab({
   onSaved: () => void;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   return (
     <>
       <Panel className="lg:row-span-2">

@@ -1,7 +1,8 @@
 "use client";
 
+import { safeForm, useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
-import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
+import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ArrowsDownUp, Check, Camera, X } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
@@ -72,8 +73,8 @@ export const TxSheet = forwardRef<
   // Los archivados no se ofrecen, salvo el que ya tiene el movimiento.
   const activeProjects = projects.filter((p) => !p.archived || p.id === d.projectId);
   const [formKey, setFormKey] = useState(0);
-  const [state, action, pending] = useActionState(saveTransaction, null);
-  const [, startTransition] = useTransition();
+  const [state, action, pending] = useActionState(safeForm(saveTransaction), null);
+  const [, startTransition] = useSafeTransition();
 
   const active = accounts.filter((a) => !a.archived);
   const defaultAccount = () =>

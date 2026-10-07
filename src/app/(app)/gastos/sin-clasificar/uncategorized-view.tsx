@@ -1,6 +1,7 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useOptimistic, useRef, useState } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { formatMonth, formatShort } from "@/lib/dates";
 import { applySuggestions, setTransactionCategory } from "@/lib/finance-actions";
@@ -52,7 +53,7 @@ export function UncategorizedView({
       await setTransactionCategory(t.id, s.categoryId);
     });
   }
-  const [, startTransition] = useTransition();
+  const [, startTransition] = useSafeTransition();
 
   function assign(categoryId: string) {
     if (!current) return;

@@ -1,7 +1,8 @@
 "use client";
 
+import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
-import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
+import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowsClockwise, CalendarPlus, Lightning, PencilSimple, Plus } from "@phosphor-icons/react";
@@ -220,8 +221,8 @@ export function ObjectivesView({
 
 /** Crear o renombrar un objetivo; borrarlo manda también sus resultados clave a la papelera. */
 function ObjectiveForm({ objective, year, onDone }: { objective: ObjectiveDTO | null; year: number; onDone: () => void }) {
-  const [state, action, pending] = useActionState(saveObjective, null);
-  const [, startDelete] = useTransition();
+  const [state, action, pending] = useActionState(safeForm(saveObjective), null);
+  const [, startDelete] = useSafeTransition();
   const notify = useEffectEvent(onDone);
   useEffect(() => {
     if (state?.ok) notify();
@@ -273,7 +274,7 @@ function PlanYearForm({
   const [objs, setObjs] = useState<Set<string>>(new Set());
   const [krs, setKrs] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const toggle = (set: Set<string>, id: string) => {
     const n = new Set(set);
     if (n.has(id)) n.delete(id);
@@ -435,11 +436,11 @@ function KrForm({
   year: number;
   onDone: () => void;
 }) {
-  const [state, action, pending] = useActionState(saveKeyResult, null);
+  const [state, action, pending] = useActionState(safeForm(saveKeyResult), null);
   const [kind, setKind] = useState<"activity" | "habit">(kr?.kind ?? "activity");
   const [status, setStatus] = useState<KrStatus>(kr?.status ?? "todo");
   const [objectiveId, setObjectiveId] = useState(kr?.objectiveId ?? objectives[0]?.id ?? "");
-  const [deleting, startDelete] = useTransition();
+  const [deleting, startDelete] = useSafeTransition();
   const notify = useEffectEvent(onDone);
   useEffect(() => {
     if (state?.ok) notify();

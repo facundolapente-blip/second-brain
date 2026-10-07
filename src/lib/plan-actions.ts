@@ -168,6 +168,9 @@ export async function copyWeekToNext(day: string): Promise<ActionResult> {
       date: toDbDate(addDays(fromDbDate(b.date), 7)),
       startTime: b.startTime,
       endTime: b.endTime,
+      // El lugar de los sin hora y la tarea vinculada también pasan a la copia.
+      sortKey: b.sortKey,
+      taskId: b.taskId,
       priority: b.priority,
       place: b.place,
       notes: b.notes,

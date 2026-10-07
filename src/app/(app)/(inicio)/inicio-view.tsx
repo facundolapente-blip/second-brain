@@ -1,11 +1,12 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import { HabitDayRows, useJustCompleted } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
 import { dayProgress } from "../habitos/today-panel";
 import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
-import { useId, useOptimistic, useRef, useState, useTransition } from "react";
+import { useId, useOptimistic, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -337,7 +338,7 @@ function PlanToday({ d }: { d: Dashboard }) {
   const [blocks, setDone] = useOptimistic(d.plan.today, (cur: PlanBlock[], u: { id: string; done: boolean }) =>
     cur.map((b) => (b.id === u.id ? { ...b, done: u.done } : b)),
   );
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const real = blocks.filter((b) => !isFreeBlock(b));
   const doneN = real.filter((b) => b.done).length;
 

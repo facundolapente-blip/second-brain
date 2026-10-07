@@ -1,7 +1,8 @@
 "use client";
 
+import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bank, CaretRight, Plus } from "@phosphor-icons/react";
 import { ACCOUNT_TYPES, CURRENCIES, currencySymbol } from "@/lib/format";
 import { PALETTE, tone } from "@/lib/palette";
@@ -56,8 +57,8 @@ export function AccountsView({
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<Draft>(blank());
   const [formKey, setFormKey] = useState(0);
-  const [state, action, pending] = useActionState(saveAccount, null);
-  const [, startTransition] = useTransition();
+  const [state, action, pending] = useActionState(safeForm(saveAccount), null);
+  const [, startTransition] = useSafeTransition();
   const [sorting, setSorting] = useState(false);
   const [order, setOrder] = useState<string[] | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);

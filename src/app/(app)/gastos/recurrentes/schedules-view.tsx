@@ -1,8 +1,9 @@
 "use client";
 
+import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { FixedSuggestions } from "./fixed-suggestions";
 import type { FixedSuggestion } from "@/lib/smart-logic";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowsClockwise, Pause, Play, Plus } from "@phosphor-icons/react";
 import { deleteSchedule, saveSchedule, setScheduleActive, type ActionResult } from "@/lib/finance-actions";
 import { centsToInput, type AccountDTO, type CategoryDTO } from "@/lib/finance-logic";
@@ -39,7 +40,7 @@ export function SchedulesView({
   const sheet = useRef<SheetHandle>(null);
   const [editing, setEditing] = useState<ScheduleDTO | null>(null);
   const [formKey, setFormKey] = useState(0);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
 
   function open(s: ScheduleDTO | null) {
     setEditing(s);
@@ -187,7 +188,7 @@ function ScheduleForm({
   const [accountId, setAccountId] = useState(s?.accountId ?? accounts[0]?.id ?? "");
   const [toAccountId, setToAccountId] = useState(s?.toAccountId ?? accounts.find((a) => a.id !== accountId)?.id ?? "");
   const [frequency, setFrequency] = useState<ScheduleFrequency>(s?.frequency ?? "monthly");
-  const [state, action, saving] = useActionState<ActionResult | null, FormData>(saveSchedule, null);
+  const [state, action, saving] = useActionState<ActionResult | null, FormData>(safeForm(saveSchedule), null);
 
   useEffect(() => {
     if (state?.ok) onDone();

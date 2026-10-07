@@ -1,8 +1,9 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { Archive, CaretLeft, Check, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { archiveProject, deleteProject, setTransactionsProject } from "@/lib/finance-actions";
 import type { AccountDTO, CategoryDTO, TxDTO } from "@/lib/finance-logic";
@@ -35,7 +36,7 @@ export function ProjectView({
   const editSheet = useRef<SheetHandle>(null);
   const addSheet = useRef<SheetHandle>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [editKey, setEditKey] = useState(0);
 
   const st = budgetState(p.spentCents, p.amountCents, null);

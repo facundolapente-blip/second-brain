@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CaretRight, Notebook, Receipt, Wallet } from "@phosphor-icons/react";
 import { shareToJournal } from "@/lib/journal-actions";
@@ -39,7 +40,7 @@ export function ShareView({ title, text, url, photos, recent }: { title: string;
   const content = parts.join("\n");
   const [shared, setShared] = useState<{ keys: string[]; blobs: Blob[]; urls: string[] }>({ keys: [], blobs: [], urls: [] });
   const [picking, setPicking] = useState(false);
-  const [busy, start] = useTransition();
+  const [busy, start] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

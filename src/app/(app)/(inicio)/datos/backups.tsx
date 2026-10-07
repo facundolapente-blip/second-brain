@@ -1,5 +1,6 @@
 "use client";
 
+import { safeForm } from "@/components/safe-action";
 import { useActionState } from "react";
 import { ArrowsClockwise, CheckCircle, ClockCounterClockwise, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
 import { backupNow, type BackupResult } from "@/lib/backup-actions";
@@ -22,7 +23,7 @@ function kb(n: number) {
 
 /** Respaldo automático de los lunes: los guardados, el último estado y "hacer uno ahora". */
 export function Backups({ enabled, backups, status }: { enabled: boolean; backups: BackupInfo[]; status: BackupStatus }) {
-  const [state, action, pending] = useActionState<BackupResult>(backupNow, null);
+  const [state, action, pending] = useActionState<BackupResult>(safeForm(backupNow), null);
   const failed = status && !status.ok;
 
   return (

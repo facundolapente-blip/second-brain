@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
+import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { CalendarPlus, Check, Link as LinkIcon, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask } from "@/lib/plan-actions";
 import { linkLabel, normalizeLink, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskLink, type TaskStatus } from "@/lib/plan-logic";
@@ -52,11 +53,11 @@ function TaskForm({
   onDone: () => void;
   onSchedule: (t: TaskDTO) => void;
 }) {
-  const [state, action, pending] = useActionState(saveTask, null);
+  const [state, action, pending] = useActionState(safeForm(saveTask), null);
   const [categoryId, setCategoryId] = useState(task?.categoryId ?? "");
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "todo");
   const [priority, setPriority] = useState(task?.priority ?? 1);
-  const [deleting, startDelete] = useTransition();
+  const [deleting, startDelete] = useSafeTransition();
   const notify = useEffectEvent(onDone);
   useEffect(() => {
     if (state?.ok) notify();
@@ -195,7 +196,7 @@ function TaskForm({
 function Subtasks({ task }: { task: TaskDTO }) {
   const [items, setItems] = useState(task.subtasks);
   const [text, setText] = useState("");
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const done = items.filter((s) => s.done).length;
 
   function add() {

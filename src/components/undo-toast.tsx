@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowCounterClockwise } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, WarningCircle } from "@phosphor-icons/react";
+import { cx } from "./ui";
 import { undoLastDelete } from "@/lib/trash-actions";
 
 /**
@@ -11,15 +12,21 @@ import { undoLastDelete } from "@/lib/trash-actions";
  * actions de una pestaña van en fila, así que el deshacer corre después del borrado.
  */
 const EVENT = "sb:borrado";
+const EVENT_ERROR = "sb:error";
 const MS = 6000;
 
 export function notifyDeleted(label: string) {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: label }));
 }
 
+/** El mismo aviso de abajo, para cuando algo no se pudo guardar (sin botón). */
+export function notifyError(text: string) {
+  window.dispatchEvent(new CustomEvent(EVENT_ERROR, { detail: text }));
+}
+
 export function UndoToast() {
   const router = useRouter();
-  const [msg, setMsg] = useState<{ label: string; key: number; done?: string } | null>(null);
+  const [msg, setMsg] = useState<{ label: string; key: number; done?: string; error?: boolean } | null>(null);
   const [pending, start] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -27,25 +34,37 @@ export function UndoToast() {
     const h = (e: Event) => {
       setMsg({ label: (e as CustomEvent<string>).detail, key: Date.now() });
     };
+    const he = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      setMsg({ label: text, done: text, error: true, key: Date.now() });
+    };
     window.addEventListener(EVENT, h);
-    return () => window.removeEventListener(EVENT, h);
+    window.addEventListener(EVENT_ERROR, he);
+    return () => {
+      window.removeEventListener(EVENT, h);
+      window.removeEventListener(EVENT_ERROR, he);
+    };
   }, []);
 
   useEffect(() => {
     clearTimeout(timer.current);
     if (!msg || pending) return;
-    timer.current = setTimeout(() => setMsg(null), msg.done ? 2500 : MS);
+    timer.current = setTimeout(() => setMsg(null), msg.error ? 5000 : msg.done ? 2500 : MS);
     return () => clearTimeout(timer.current);
   }, [msg, pending]);
 
   if (!msg) return null;
   return (
     <div
-      role="status"
+      role={msg.error ? "alert" : "status"}
       key={msg.key}
-      className="toast-in fixed inset-x-4 bottom-[calc(92px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-sm items-center gap-3 rounded-full bg-[var(--text)] py-2 pr-2 pl-5 text-[14px] text-[var(--bg)] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] lg:bottom-6 print:hidden"
+      className={cx(
+        "toast-in fixed inset-x-4 bottom-[calc(92px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-sm items-center gap-3 bg-[var(--text)] py-2 pr-2 pl-5 text-[14px] text-[var(--bg)] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] lg:bottom-6 print:hidden",
+        msg.error ? "rounded-2xl pr-5" : "rounded-full",
+      )}
     >
-      <span className="min-w-0 flex-1 truncate">{msg.done ?? msg.label}</span>
+      {msg.error && <WarningCircle size={18} weight="fill" className="-ml-1 shrink-0" aria-hidden />}
+      <span className={cx("min-w-0 flex-1", msg.error ? "py-1 leading-snug" : "truncate")}>{msg.done ?? msg.label}</span>
       {!msg.done && (
         <button
           type="button"

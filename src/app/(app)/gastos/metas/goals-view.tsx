@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus, Target } from "@phosphor-icons/react";
 import { addToGoal, archiveGoal, deleteGoal, saveGoal, type ActionResult } from "@/lib/finance-actions";
 import type { GoalDTO } from "@/lib/finance";
@@ -149,10 +150,10 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
 const ICONS = ["PiggyBank", "Airplane", "House", "Car", "Laptop", "GraduationCap", "Gift", "Heartbeat"];
 
 function GoalForm({ goal, accounts, onDone }: { goal: GoalDTO | null; accounts: AccountDTO[]; onDone: () => void }) {
-  const [state, action, pending] = useActionState<ActionResult | null, FormData>(saveGoal, null);
+  const [state, action, pending] = useActionState<ActionResult | null, FormData>(safeForm(saveGoal), null);
   const [icon, setIcon] = useState(goal?.icon ?? "PiggyBank");
   const [color, setColor] = useState(goal?.color ?? "green");
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   useEffect(() => {
     if (state?.ok) onDone();
   }, [state, onDone]);
@@ -263,7 +264,7 @@ function GoalForm({ goal, accounts, onDone }: { goal: GoalDTO | null; accounts: 
 function AddForm({ goal, onDone }: { goal: GoalDTO; onDone: () => void }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return (
     <form
       className="grid gap-4"

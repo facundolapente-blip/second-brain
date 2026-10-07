@@ -1,7 +1,8 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useState } from "react";
 import {
   ArrowCounterClockwise,
   CheckCircle,
@@ -80,7 +81,7 @@ export function HistoryLog({
   limit: number;
 }) {
   const [items, removeOptimistic] = useOptimistic(trash, (state, id: string) => state.filter((t) => t.id !== id));
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [filter, setFilter] = useState<string>("todo");
   const shown = filter === "todo" ? items : items.filter((t) => t.module === filter);

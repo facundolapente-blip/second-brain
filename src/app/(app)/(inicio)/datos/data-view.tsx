@@ -1,5 +1,6 @@
 "use client";
 
+import { safeForm } from "@/components/safe-action";
 import { useActionState, useRef, useState } from "react";
 import { CheckCircle, DownloadSimple, FileArrowUp, Medal, Notebook, Wallet, WarningCircle, type Icon } from "@phosphor-icons/react";
 import { importBackup, type ImportResult } from "@/lib/data-actions";
@@ -106,7 +107,7 @@ function ImportCard({
   how: string;
   status: string;
 }) {
-  const [state, action, pending] = useActionState<ImportResult, FormData>(importBackup, null);
+  const [state, action, pending] = useActionState<ImportResult, FormData>(safeForm(importBackup), null);
   const [name, setName] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 

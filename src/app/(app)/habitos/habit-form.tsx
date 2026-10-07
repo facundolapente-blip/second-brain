@@ -1,5 +1,6 @@
 "use client";
 
+import { safeForm } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { Flag } from "@phosphor-icons/react";
 import { saveHabit } from "@/lib/habit-actions";
@@ -110,7 +111,7 @@ export function HabitFormBody({
   onSaved?: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
-  const [state, action, pending] = useActionState(saveHabit, null);
+  const [state, action, pending] = useActionState(safeForm(saveHabit), null);
 
   // Solo cuando llega una respuesta nueva, no cada vez que cambia onSaved.
   const notifySaved = useEffectEvent(() => onSaved?.());

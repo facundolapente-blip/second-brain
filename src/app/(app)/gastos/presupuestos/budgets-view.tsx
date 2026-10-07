@@ -1,7 +1,8 @@
 "use client";
 
+import { safeForm, useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { CaretRight, PiggyBank, Plus } from "@phosphor-icons/react";
 import { saveCategoryBudget, saveProject, type ActionResult } from "@/lib/finance-actions";
 import { centsToInput, type CategoryDTO } from "@/lib/finance-logic";
@@ -349,7 +350,7 @@ function Meter({
 function BudgetForm({ category, budget, onDone }: { category: CategoryDTO; budget?: CategoryBudgetDTO; onDone: () => void }) {
   const [value, setValue] = useState(centsToInput(budget?.amountCents));
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   function save(raw: string) {
     start(async () => {
       const r = await saveCategoryBudget(category.id, raw);
@@ -387,7 +388,7 @@ const PROJECT_ICONS = ["Airplane", "Suitcase", "House", "Gift", "Car", "Graduati
 
 /** Formulario de presupuesto puntual (también lo usa el detalle para editar). */
 export function ProjectForm({ project, onDone }: { project?: ProjectDTO; onDone: () => void }) {
-  const [state, action, pending] = useActionState<ActionResult | null, FormData>(saveProject, null);
+  const [state, action, pending] = useActionState<ActionResult | null, FormData>(safeForm(saveProject), null);
   const [icon, setIcon] = useState(project?.icon ?? "Airplane");
   const [color, setColor] = useState(project?.color ?? "teal");
   useEffect(() => {

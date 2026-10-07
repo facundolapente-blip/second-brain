@@ -67,11 +67,15 @@ self.addEventListener("fetch", (event) => {
         }
         return res;
       } catch {
-        const hit = await cache.match(req, { ignoreSearch: isData ? false : true });
+        // Solo la copia de esa misma dirección: con otro ?mes= sería otro mes
+        // mostrado como si fuera el pedido. Sin copia, el aviso de "sin conexión".
+        const hit = await cache.match(req);
         if (hit) return hit;
         if (isPage) {
-          const home = await cache.match("/");
-          if (home) return home;
+          if (!url.search) {
+            const home = url.pathname === "/" ? null : await cache.match("/");
+            if (home) return home;
+          }
           return new Response(OFFLINE_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
         }
         return Response.error();

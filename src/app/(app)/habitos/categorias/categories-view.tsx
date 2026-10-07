@@ -1,7 +1,8 @@
 "use client";
 
+import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { CaretRight, Plus } from "@phosphor-icons/react";
 import { deleteCategory, saveCategory } from "@/lib/habit-actions";
 import { HABIT_ICONS, HabitAvatar, HabitIcon } from "@/lib/habit-icons";
@@ -17,8 +18,8 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<Draft>({ name: "", icon: "Circle", color: "blue" });
   const [formKey, setFormKey] = useState(0);
-  const [state, action, pending] = useActionState(saveCategory, null);
-  const [, startTransition] = useTransition();
+  const [state, action, pending] = useActionState(safeForm(saveCategory), null);
+  const [, startTransition] = useSafeTransition();
 
   useEffect(() => {
     if (state?.ok) sheet.current?.close();

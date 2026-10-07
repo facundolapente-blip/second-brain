@@ -4,7 +4,8 @@ import { UndoToast } from "./undo-toast";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
+import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
+import { signOut } from "@/lib/auth-client";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
 import { flushQueue, pendingCount } from "@/lib/offline-queue";
@@ -121,6 +122,51 @@ function applyTheme(t: Theme) {
 }
 
 /** Elegir el tema: se guarda en una cookie (la lee el servidor) y se aplica al instante. */
+/**
+ * Cerrar sesión (abajo del menú). Pide un segundo toque para no salir sin querer
+ * y borra las pantallas guardadas para usar sin señal (tienen tus datos).
+ */
+function SignOutButton() {
+  const router = useRouter();
+  const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  async function out() {
+    setBusy(true);
+    try {
+      await signOut();
+    } catch {
+      // Sin señal: igual se borra lo guardado y se va al login.
+    }
+    try {
+      for (const k of await caches.keys()) if (k.startsWith("pages-")) await caches.delete(k);
+    } catch {
+      // Navegador sin caché: nada que borrar.
+    }
+    router.replace("/login");
+    router.refresh();
+  }
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => (armed ? out() : setArmed(true))}
+      aria-live="polite"
+      className={cx(
+        "flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-[13.5px] transition-colors",
+        armed ? "bg-[var(--st-fail-bg)] font-medium text-[var(--st-fail-fg)]" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
+      )}
+    >
+      <SignOut size={17} aria-hidden />
+      {busy ? "Saliendo…" : armed ? "Tocá de nuevo para salir" : "Cerrar sesión"}
+    </button>
+  );
+}
+
 function ThemePicker({ initial }: { initial: Theme }) {
   const [theme, setTheme] = useState<Theme>(initial);
   function pick(t: Theme) {
@@ -217,8 +263,9 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
         <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex print:hidden">
           <Brand />
           <Nav />
-          <div className="mt-auto">
+          <div className="mt-auto grid gap-3">
             <ThemePicker initial={theme} />
+            <SignOutButton />
           </div>
         </aside>
 
@@ -242,8 +289,9 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
           >
             <Brand />
             <Nav onNavigate={() => setDrawer(false)} />
-            <div className="mt-auto">
+            <div className="mt-auto grid gap-3">
               <ThemePicker initial={theme} />
+              <SignOutButton />
             </div>
           </aside>
         </div>

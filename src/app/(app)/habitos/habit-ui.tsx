@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enqueue, flushQueue, isNetworkError, pendingOps } from "@/lib/offline-queue";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
@@ -78,7 +79,7 @@ export function useHabitLogs(packed: PackedLogMap) {
   // Llegan compactas (ver packLogs); se abren una vez por cada versión del servidor.
   const initial = useMemo(() => queued.reduce(withMark, unpackAll(packed)), [packed, queued]);
   const [logs, apply] = useOptimistic(initial, withMark);
-  const [, startTransition] = useTransition();
+  const [, startTransition] = useSafeTransition();
 
   const mark: MarkFn = (habitId, date, status, value = 1, note) => {
     const m: Mark = { habitId, date, status, value, note };
@@ -512,7 +513,7 @@ function StatusOption({
  */
 export function useHabitOrder(habits: HabitDTO[], manualOrder: boolean) {
   const [local, setLocal] = useState<string[] | null>(null);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const base = [...habits]
     .sort((a, b) =>
       manualOrder ? a.order - b.order || a.name.localeCompare(b.name, "es") : b.priority - a.priority || a.name.localeCompare(b.name, "es"),

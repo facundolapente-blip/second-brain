@@ -1,8 +1,8 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { Camera, CaretLeft, Smiley, SmileyBlank, SmileyMeh, SmileyNervous, SmileySad, SmileyWink, type Icon, type IconWeight } from "@phosphor-icons/react";
 import { MenuButton } from "@/components/shell";
 import { cx } from "@/components/ui";
@@ -89,7 +89,7 @@ export function JournalHeader({
 
 /** Abre la entrada del día o crea una. Sin fecha, es hoy. */
 export function useWrite() {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   return {
     pending,
     write: (date?: string, nueva = false) => start(() => writeOnDay(date, nueva)),

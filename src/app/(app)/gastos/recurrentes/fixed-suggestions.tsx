@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useState } from "react";
 import { Sparkle } from "@phosphor-icons/react";
 import type { FixedSuggestion } from "@/lib/smart-logic";
 import type { AccountDTO, CategoryDTO } from "@/lib/finance-logic";
@@ -22,7 +23,7 @@ export function FixedSuggestions({
   const lk = useLookups(accounts, categories);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const shown = suggestions.filter((s) => !hidden.has(s.key));
   if (!shown.length) return null;
 

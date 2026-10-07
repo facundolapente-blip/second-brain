@@ -1,6 +1,7 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { quiet, useSafeTransition } from "@/components/safe-action";
+import { useOptimistic, useRef, useState } from "react";
 import { CaretDown, Check, Minus, Plus } from "@phosphor-icons/react";
 import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
@@ -69,7 +70,7 @@ export function TasksBoard({
   const cats = categoryMap(categories);
   // Orden optimista mientras se guarda lo arrastrado.
   const [localOrder, setLocalOrder] = useState<Map<string, number> | null>(null);
-  const [, startOrder] = useTransition();
+  const [, startOrder] = useSafeTransition();
   const manual = manualOrder || localOrder !== null;
   const ordered = localOrder ? tasks.map((t) => ({ ...t, order: localOrder.get(t.id) ?? t.order })) : tasks;
   const matching = applyTaskView(ordered, view, manual);
@@ -263,7 +264,7 @@ function Deadline({ deadline, left, done }: { deadline: string | null; left: num
 
 /** Botones de +1 / −1 del progreso (en la tabla aparecen al pasar el mouse). */
 function ProgressButtons({ task: t, hover }: { task: TaskDTO; hover?: boolean }) {
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   const cls =
     "relative inline-flex size-8 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1.5 hover:bg-surface-3 hover:text-fg";
   return (
@@ -305,7 +306,7 @@ function TaskTable({
     if (w === null) delete next[k];
     else next[k] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, w)));
     setWidths(next);
-    if (save) void saveTaskColumns(next);
+    if (save) quiet(saveTaskColumns(next));
   }
   return (
     // El envoltorio de arrastre va por fuera de la tabla (mete elementos de accesibilidad que una tabla no admite).
@@ -433,7 +434,7 @@ function ColumnResizer({ label, width, onResize }: { label: string; width: numbe
 /** Casilla "Agendada" (se tilda en la tabla, como en Notion). */
 function ScheduledBox({ task }: { task: TaskDTO }) {
   const [on, setOn] = useOptimistic(task.scheduled);
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   return (
     <button
       type="button"

@@ -1,8 +1,9 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState } from "react";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone } from "@/lib/plan-actions";
 import { addDays, formatShort, weekday } from "@/lib/dates";
@@ -54,7 +55,7 @@ export function WeekView({
     state.map((b) => (b.id === m.id ? { ...b, ...m } : b)),
   );
   const [view, setView] = useState<"lista" | "horas">("lista");
-  const [, startTransition] = useTransition();
+  const [, startTransition] = useSafeTransition();
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const sheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);

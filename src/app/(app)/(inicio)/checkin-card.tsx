@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useRef, useState } from "react";
 import { BatteryHigh, CaretDown, Check, Minus, Moon, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
 import { saveCheckin } from "@/lib/checkin-actions";
 import {
@@ -32,7 +33,7 @@ export function CheckinCard({
   const [day, setDay] = useState<"today" | "yesterday">("today");
   const [data, setData] = useState({ today, yesterday });
   const [saved, setSaved] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const cur = data[day];
   const filled = countFilled(cur);
   // Con el de hoy completo arranca plegado: una línea con lo cargado.
@@ -49,12 +50,17 @@ export function CheckinCard({
 
   function set(patch: CheckinPatch) {
     const key = day;
+    const before = data;
     setData((d) => ({ ...d, [key]: { ...d[key], ...patch } }));
     setSaved(false);
-    start(async () => {
-      await saveCheckin(data[key].date, patch);
-      setSaved(true);
-    });
+    start(
+      async () => {
+        await saveCheckin(data[key].date, patch);
+        setSaved(true);
+      },
+      // Si no se guardó (sin señal), vuelve a como estaba: no mostrar algo que no quedó.
+      { onError: () => setData(before) },
+    );
   }
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useState } from "react";
 import { ArrowsLeftRight, Scales } from "@phosphor-icons/react";
 import { convertToTransfer, markAsAdjustment } from "@/lib/finance-actions";
 import { formatShort } from "@/lib/dates";
@@ -24,7 +25,7 @@ export function AdjustAssistant({
   lk: Lookups;
   onDone: (ids: string[]) => void;
 }) {
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const [transferFor, setTransferFor] = useState<string | null>(null);
   const [other, setOther] = useState("");
   const [error, setError] = useState<string | null>(null);

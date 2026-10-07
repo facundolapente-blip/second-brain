@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useState } from "react";
 import { Scales } from "@phosphor-icons/react";
 import { adjustBalance } from "@/lib/finance-actions";
 import { todayISO } from "@/lib/dates";
@@ -27,7 +28,7 @@ export function BalanceAdjuster({
   const [real, setReal] = useState("");
   const [date, setDate] = useState(todayISO());
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
 
   if (!open) {
     return (

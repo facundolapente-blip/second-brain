@@ -1,9 +1,10 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import {
   Leaf,
   Archive,
@@ -209,7 +210,7 @@ function HabitCard({
   onDetail: (h: HabitDTO, d: string) => void;
   onEdit: () => void;
 }) {
-  const [, startTransition] = useTransition();
+  const [, startTransition] = useSafeTransition();
   const tap = useDayTap(habit, logs, mark, onDetail);
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
   const streak = currentStreak(habit, logs, today);

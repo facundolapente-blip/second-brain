@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useRef, useState } from "react";
 import { CheckCircle, FileArrowUp, Footprints, WarningCircle } from "@phosphor-icons/react";
 import { importHealth, type HealthImportResult } from "@/lib/checkin-actions";
 import { parseHealthFile, type HealthParse } from "@/lib/health-parse";
@@ -14,7 +15,7 @@ export function HealthImport({ status }: { status: string }) {
   const [parsed, setParsed] = useState<(HealthParse & { name: string }) | null>(null);
   const [reading, setReading] = useState(false);
   const [result, setResult] = useState<HealthImportResult | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const input = useRef<HTMLInputElement>(null);
 
   async function pick(file: File | undefined) {

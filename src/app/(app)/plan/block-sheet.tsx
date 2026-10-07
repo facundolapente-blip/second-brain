@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
+import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { deleteBlock, passToNextWeek, saveBlock } from "@/lib/plan-actions";
 import { ArrowArcRight } from "@phosphor-icons/react";
 import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
@@ -52,11 +53,11 @@ function BlockForm({
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
   onDone: () => void;
 }) {
-  const [state, action, pending] = useActionState(saveBlock, null);
+  const [state, action, pending] = useActionState(safeForm(saveBlock), null);
   const [title, setTitle] = useState(initial.title ?? "");
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
   const [priority, setPriority] = useState(initial.priority ?? 0);
-  const [deleting, startDelete] = useTransition();
+  const [deleting, startDelete] = useSafeTransition();
   const notify = useEffectEvent(onDone);
   useEffect(() => {
     if (state?.ok) notify();

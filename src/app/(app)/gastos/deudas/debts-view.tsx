@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Handshake, Plus } from "@phosphor-icons/react";
 import { deleteDebt, reopenDebt, saveDebt, settleDebt, type ActionResult } from "@/lib/finance-actions";
 import type { DebtDTO } from "@/lib/finance";
@@ -155,9 +156,9 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
 }
 
 function DebtForm({ debt, onDone }: { debt: DebtDTO | null; onDone: () => void }) {
-  const [state, action, pending] = useActionState<ActionResult | null, FormData>(saveDebt, null);
+  const [state, action, pending] = useActionState<ActionResult | null, FormData>(safeForm(saveDebt), null);
   const [dir, setDir] = useState<Dir>(debt?.direction ?? "owed_to_me");
-  const [, start] = useTransition();
+  const [, start] = useSafeTransition();
   useEffect(() => {
     if (state?.ok) onDone();
   }, [state, onDone]);
@@ -235,7 +236,7 @@ function SettleForm({
   const [accountId, setAccountId] = useState(same[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const back = debt.direction === "owed_to_me";
   // Lo que te devuelven puede ser el reintegro de un gasto (la nafta que pagaste por otro).
   const cats = categories.filter((c) => (back ? true : c.kind === "expense"));

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { useRef, useState } from "react";
 import { CheckCircle, Lightning } from "@phosphor-icons/react";
 import { quickAdd } from "@/lib/finance-actions";
 import { parseQuick, type QuickAccount } from "@/lib/smart-logic";
@@ -17,7 +18,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
-  const [pending, start] = useTransition();
+  const [pending, start] = useSafeTransition();
   const input = useRef<HTMLInputElement>(null);
   const p = text.trim() ? parseQuick(text, accounts) : null;
   const acc = p?.accountId ? accounts.find((a) => a.id === p.accountId) : null;
