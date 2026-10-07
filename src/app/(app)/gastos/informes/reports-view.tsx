@@ -12,13 +12,15 @@ import {
   type AccountDTO,
   type CategoryDTO,
   type FlowRow,
+  type Period,
 } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
 import { cx, Segmented } from "@/components/ui";
 import { AccountChips, AccountSwitcher } from "../account-switcher";
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
-import { CategoryAvatar, MonthNav, useLookups } from "../shared";
+import { CategoryAvatar, useLookups } from "../shared";
+import { PeriodNav } from "../period-nav";
 
 /** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
 const CARD =
@@ -40,6 +42,7 @@ function monthName(m: string) {
  * cuentas elegidas en el selector.
  */
 export function ReportsView({
+  period,
   month,
   months,
   today,
@@ -47,6 +50,8 @@ export function ReportsView({
   categories,
   rows,
 }: {
+  /** Mes (el de siempre) o año entero. */
+  period: Period;
   month: string;
   months: string[];
   today: string;
@@ -69,15 +74,39 @@ export function ReportsView({
     () => rows.filter((r) => isSelected(selection, r.accountId) && lk.currencyOf(r.accountId) === currency),
     [rows, selection, lk, currency],
   );
-  const monthRows = useMemo(() => scoped.filter((r) => r.date.startsWith(month)), [scoped, month]);
+  const yearMode = period.kind === "year";
+  const year = yearMode ? period.year : month.slice(0, 4);
+  const prevYear = String(Number(year) - 1);
+  const isCurrentYear = yearMode && year === today.slice(0, 4);
+  // Lo que se mira: el mes elegido, o el año entero.
+  const periodRows = useMemo(
+    () => scoped.filter((r) => (yearMode ? r.date.startsWith(year) : r.date.startsWith(month))),
+    [scoped, month, year, yearMode],
+  );
   const evolution = useMemo(() => byMonth(scoped, months), [scoped, months]);
-  const cats = useMemo(() => byCategory(monthRows, kind), [monthRows, kind]);
+  const cats = useMemo(() => byCategory(periodRows, kind), [periodRows, kind]);
 
   const prevMonth = shiftMonth(month, -1);
-  const isCurrent = month === today.slice(0, 7);
+  const isCurrent = !yearMode && month === today.slice(0, 7);
 
-  // Promedio de los tres meses anteriores por categoría, para comparar el mes elegido.
+  // Año: el anterior (en el año en curso, hasta el mismo día) para comparar total y categorías.
+  const prevYearRows = useMemo(
+    () => (yearMode ? scoped.filter((r) => r.date.startsWith(prevYear) && (!isCurrentYear || r.date.slice(5) <= today.slice(5))) : []),
+    [scoped, yearMode, prevYear, isCurrentYear, today],
+  );
+
+  // Promedio de los tres meses anteriores por categoría, para comparar el mes elegido
+  // (por año: lo del año anterior).
   const avgPrev = useMemo(() => {
+    if (yearMode) {
+      const m = new Map<string, number>();
+      for (const r of prevYearRows) {
+        if (r.kind !== kind) continue;
+        const k = r.categoryId ?? "none";
+        m.set(k, (m.get(k) ?? 0) + r.cents);
+      }
+      return m;
+    }
     const prev3 = [1, 2, 3].map((n) => shiftMonth(month, -n));
     const m = new Map<string, number>();
     for (const r of scoped) {
@@ -86,18 +115,19 @@ export function ReportsView({
       m.set(k, (m.get(k) ?? 0) + r.cents / 3);
     }
     return m;
-  }, [scoped, month, kind]);
+  }, [scoped, month, kind, yearMode, prevYearRows]);
 
   // Gasto promedio por día de la semana en toda la ventana (lunes primero).
   const weekdayAvg = useMemo(() => {
     const from = monthBounds(months[0]).from;
-    const end = isCurrent ? today : monthBounds(month).to;
+    const last = monthBounds(yearMode ? months[11] : month).to;
+    const end = last > today ? today : last;
     const count = [0, 0, 0, 0, 0, 0, 0];
     for (let d = from; d <= end; d = addDays(d, 1)) count[(weekday(d) + 6) % 7]++;
     const sum = [0, 0, 0, 0, 0, 0, 0];
     for (const r of scoped) if (r.kind === "expense" && r.date >= from && r.date <= end) sum[(weekday(r.date) + 6) % 7] += r.cents;
     return sum.map((s, i) => (count[i] ? Math.round(s / count[i]) : 0));
-  }, [scoped, months, month, isCurrent, today]);
+  }, [scoped, months, month, yearMode, today]);
   // En el mes en curso se compara contra el anterior hasta el mismo día: comparar
   // 2 días contra un mes entero siempre da "−95%" y no dice nada.
   const cutDay = isCurrent ? Number(today.slice(8)) : 31;
@@ -107,11 +137,38 @@ export function ReportsView({
     return out;
   }, [scoped, prevMonth, cutDay]);
 
-  const cur = evolution[evolution.length - 1];
+  const yearTotals = useMemo(() => {
+    const out = { expense: 0, income: 0 };
+    for (const r of periodRows) out[r.kind] += r.cents;
+    return out;
+  }, [periodRows]);
+  const prevYearTotals = useMemo(() => {
+    const out = { expense: 0, income: 0 };
+    for (const r of prevYearRows) out[r.kind] += r.cents;
+    return out;
+  }, [prevYearRows]);
+
+  const cur = yearMode ? { month, ...yearTotals } : evolution[evolution.length - 1];
+  const prevCmp = yearMode ? prevYearTotals : prevPartial;
   const total = kind === "expense" ? cur.expense : cur.income;
-  const elapsed = isCurrent ? cutDay : daysInMonth(month);
-  const compareLabel = isCurrent ? `vs. ${shortMonth(prevMonth)} al día ${cutDay}` : `vs. ${monthName(prevMonth)}`;
+  const daysOfYear = Number(year) % 4 === 0 ? 366 : 365;
+  const elapsed = yearMode
+    ? isCurrentYear
+      ? Math.round((Date.parse(today) - Date.parse(`${year}-01-01`)) / 86_400_000) + 1
+      : daysOfYear
+    : isCurrent
+      ? cutDay
+      : daysInMonth(month);
+  const compareLabel = yearMode
+    ? isCurrentYear
+      ? `vs. ${prevYear} a esta altura`
+      : `vs. ${prevYear}`
+    : isCurrent
+      ? `vs. ${shortMonth(prevMonth)} al día ${cutDay}`
+      : `vs. ${monthName(prevMonth)}`;
   const empty = cur.expense === 0 && cur.income === 0 && evolution.every((e) => e.expense === 0 && e.income === 0);
+  // En modo año se ven los 12 meses también en el celular.
+  const phoneEvolution = yearMode ? evolution : evolution.slice(-6);
 
   return (
     <>
@@ -130,9 +187,7 @@ export function ReportsView({
         </div>
         <section className="grid gap-3 lg:col-span-12 lg:grid-cols-[1fr_minmax(0,340px)] lg:items-center" aria-label="Filtros">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="-ml-3">
-              <MonthNav month={month} basePath="/gastos/informes" current={today.slice(0, 7)} />
-            </div>
+            <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} basePath="/gastos/informes" modes={["month", "year"]} />
             {currencies.length > 1 && (
               <div className="w-36">
                 <Segmented
@@ -153,19 +208,19 @@ export function ReportsView({
             </span>
             <h2 className="display text-[28px]">Sin movimientos en {currency}</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
-              No hay gastos ni ingresos en estos meses para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
+              No hay gastos ni ingresos {yearMode ? `en ${year}` : "en estos meses"} para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
           </div>
         ) : (
           <>
             <section
               className={`grid grid-cols-2 gap-x-6 gap-y-6 border-y border-line py-6 sm:grid-cols-4 lg:col-span-12 ${CARD}`}
-              aria-label="Cifras del mes"
+              aria-label={yearMode ? "Cifras del año" : "Cifras del mes"}
             >
               <Stat
-                label={isCurrent ? "Gastado hasta hoy" : "Gastos"}
+                label={isCurrent || isCurrentYear ? "Gastado hasta hoy" : "Gastos"}
                 cents={cur.expense}
-                prevCents={prevPartial.expense}
+                prevCents={prevCmp.expense}
                 compareLabel={compareLabel}
                 currency={currency}
                 upIsGood={false}
@@ -174,7 +229,7 @@ export function ReportsView({
               <Stat
                 label="Ingresos"
                 cents={cur.income}
-                prevCents={prevPartial.income}
+                prevCents={prevCmp.income}
                 compareLabel={compareLabel}
                 currency={currency}
                 upIsGood
@@ -184,6 +239,7 @@ export function ReportsView({
             </section>
 
             <div className="grid content-start gap-12 lg:col-span-7 lg:gap-5">
+              {!yearMode && (
               <section className={`grid content-start gap-3 ${CARD}`}>
                 <div className="grid gap-0.5">
                   <h2 className="display text-[28px]">Ritmo del mes</h2>
@@ -191,12 +247,15 @@ export function ReportsView({
                 </div>
                 <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} />
               </section>
+              )}
 
               <section className={`grid content-start gap-3 ${CARD}`}>
                 <div className="grid gap-0.5">
                   <h2 className="display text-[28px]">Qué días gastás</h2>
                   <p className="text-[14px] text-muted">
-                    Gasto promedio por día de la semana, desde {monthName(months[0])} de {months[0].slice(0, 4)}.
+                    {yearMode
+                      ? `Gasto promedio por día de la semana en ${year}.`
+                      : `Gasto promedio por día de la semana, desde ${monthName(months[0])} de ${months[0].slice(0, 4)}.`}
                   </p>
                 </div>
                 <WeekdaySpend values={weekdayAvg} currency={currency} />
@@ -219,7 +278,7 @@ export function ReportsView({
               </div>
               {cats.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted">
-                  No hay {kind === "expense" ? "gastos" : "ingresos"} en {currency} este mes.
+                  No hay {kind === "expense" ? "gastos" : "ingresos"} en {currency} {yearMode ? `en ${year}` : "este mes"}.
                 </p>
               ) : (
                 <CategoryBars
@@ -232,17 +291,24 @@ export function ReportsView({
                   total={total}
                   currency={currency}
                   color={kind === "expense" ? "var(--fin-out)" : "var(--fin-in)"}
+                  vsLabel={yearMode ? (isCurrentYear ? `${prevYear} a esta altura` : prevYear) : undefined}
                 />
               )}
             </section>
 
             <section className={`grid content-start gap-3 lg:col-span-12 ${CARD}`}>
               <h2 className="display text-[28px]">
-                Últimos <span className="lg:hidden">{Math.min(6, months.length)}</span>
-                <span className="hidden lg:inline">{months.length}</span> meses
+                {yearMode ? (
+                  `Mes a mes en ${year}`
+                ) : (
+                  <>
+                    Últimos <span className="lg:hidden">{Math.min(6, months.length)}</span>
+                    <span className="hidden lg:inline">{months.length}</span> meses
+                  </>
+                )}
               </h2>
               <div className="lg:hidden">
-                <MonthlyColumns data={evolution.slice(-6)} current={month} currency={currency} />
+                <MonthlyColumns data={phoneEvolution} current={month} currency={currency} />
               </div>
               <div className="hidden lg:block">
                 <MonthlyColumns data={evolution} current={month} currency={currency} height={220} />
@@ -251,11 +317,11 @@ export function ReportsView({
 
             <section className={`grid content-start gap-3 lg:col-span-12 ${CARD}`}>
               <div className="grid gap-0.5">
-                <h2 className="display text-[28px]">Ahorro por mes</h2>
+                <h2 className="display text-[28px]">{yearMode ? `Ahorro por mes en ${year}` : "Ahorro por mes"}</h2>
                 <p className="text-[14px] text-muted">Ingresos menos gastos. Arriba de la línea sobró, abajo faltó.</p>
               </div>
               <div className="lg:hidden">
-                <NetColumns data={evolution.slice(-6)} current={month} currency={currency} />
+                <NetColumns data={phoneEvolution} current={month} currency={currency} />
               </div>
               <div className="hidden lg:block">
                 <NetColumns data={evolution} current={month} currency={currency} height={200} />
@@ -296,7 +362,19 @@ function Stat({
   return (
     <div className={cx("grid content-start gap-1", hero && "col-span-2 sm:col-span-1")}>
       <span className="kicker">{label}</span>
-      <span className={cx("figure pt-1", hero ? "text-[44px]" : "text-[28px]")}>
+      {/* Siempre en un renglón: las cifras largas (un año entero) van un poco más chicas. */}
+      <span
+        className={cx(
+          "figure pt-1 whitespace-nowrap",
+          hero
+            ? moneyCents(cents, currency).length > 11
+              ? "text-[32px] lg:text-[36px]"
+              : "text-[44px]"
+            : moneyCents(cents, currency).length > 11
+              ? "text-[22px] lg:text-[24px]"
+              : "text-[28px]",
+        )}
+      >
         {signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}
         {moneyCents(cents, currency)}
       </span>
@@ -540,12 +618,15 @@ function CategoryBars({
   total,
   currency,
   color,
+  vsLabel,
 }: {
-  /** avg: promedio de los tres meses anteriores, para el "vs. promedio" de cada fila. */
+  /** avg: promedio de los tres meses anteriores (o lo del año anterior), para el "vs." de cada fila. */
   items: { key: string; category?: CategoryDTO; cents: number; avg?: number }[];
   total: number;
   currency: string;
   color: string;
+  /** Contra qué se compara (por año: "2025"); sin esto, el promedio de 3 meses. */
+  vsLabel?: string;
 }) {
   const max = Math.max(...items.map((i) => i.cents), 1);
   // Las primeras ocho a la vista; el resto, plegado, para que la lista no se coma la pantalla.
@@ -579,7 +660,7 @@ function CategoryBars({
             </span>
             {it.avg !== undefined && (
               <span className="col-start-2">
-                <VsAverage cents={it.cents} avg={it.avg} />
+                <VsAverage cents={it.cents} avg={it.avg} vsLabel={vsLabel} />
               </span>
             )}
           </li>
@@ -787,17 +868,18 @@ function TooltipRow({ color, label, value }: { color: string; label: string; val
 // ─── Comparación con el promedio ────────────────────────────────────────────
 
 /** "+23% vs. promedio": texto neutro (en gastos subir es malo, en ingresos bueno; la flecha no juzga). */
-function VsAverage({ cents, avg }: { cents: number; avg: number }) {
-  if (avg <= 0) return <span className="text-[12px] text-muted">Nueva: sin movimientos en los 3 meses anteriores</span>;
+function VsAverage({ cents, avg, vsLabel }: { cents: number; avg: number; vsLabel?: string }) {
+  if (avg <= 0)
+    return <span className="text-[12px] text-muted">{vsLabel ? `Nueva: sin movimientos en ${vsLabel}` : "Nueva: sin movimientos en los 3 meses anteriores"}</span>;
   const delta = (cents - avg) / avg;
   const pct = Math.round(Math.abs(delta) * 100);
-  if (pct < 1) return <span className="text-[12px] text-muted">Igual que el promedio de 3 meses</span>;
+  if (pct < 1) return <span className="text-[12px] text-muted">{vsLabel ? `Igual que en ${vsLabel}` : "Igual que el promedio de 3 meses"}</span>;
   return (
     <span className="inline-flex items-center gap-1 text-[12px] text-muted">
       {delta > 0 ? <ArrowUpRight size={12} weight="bold" aria-hidden /> : <ArrowDownRight size={12} weight="bold" aria-hidden />}
       <span className="tabular">
         {delta > 0 ? "+" : "−"}
-        {pct}% vs. promedio de 3 meses
+        {pct}% vs. {vsLabel ?? "promedio de 3 meses"}
       </span>
     </span>
   );

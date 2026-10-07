@@ -17,7 +17,18 @@ const todayBtn =
  * Qué se ve en Movimientos: un mes, un año o un período con fecha de inicio y
  * de fin. Todo va en la URL (?mes=, ?anio=, ?desde=&hasta=).
  */
-export function PeriodNav({ period, today, basePath = "/gastos" }: { period: Period; today: string; basePath?: string }) {
+export function PeriodNav({
+  period,
+  today,
+  basePath = "/gastos",
+  modes = ["month", "year", "range"],
+}: {
+  period: Period;
+  today: string;
+  basePath?: string;
+  /** Qué modos se ofrecen (Informes: solo mes y año). */
+  modes?: Period["kind"][];
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<Period["kind"]>(period.kind);
   const [from, setFrom] = useState(period.from);
@@ -30,7 +41,7 @@ export function PeriodNav({ period, today, basePath = "/gastos" }: { period: Per
 
   return (
     <div className="grid gap-2">
-      <div className="w-full max-w-[19rem]">
+      <div className={cx("w-full", modes.length === 3 ? "max-w-[19rem]" : "max-w-[13rem]")}>
         <Segmented
           value={mode}
           onChange={(m) => {
@@ -38,11 +49,13 @@ export function PeriodNav({ period, today, basePath = "/gastos" }: { period: Per
             if (m === "month") go({ kind: "month", month: ref.slice(0, 7) });
             if (m === "year") go({ kind: "year", year: ref.slice(0, 4) });
           }}
-          options={[
-            { value: "month", label: "Mes" },
-            { value: "year", label: "Año" },
-            { value: "range", label: "Período" },
-          ]}
+          options={(
+            [
+              { value: "month", label: "Mes" },
+              { value: "year", label: "Año" },
+              { value: "range", label: "Período" },
+            ] as const
+          ).filter((o) => modes.includes(o.value))}
         />
       </div>
 
