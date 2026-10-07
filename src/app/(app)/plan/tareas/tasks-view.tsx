@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { CaretDown, Minus, Plus } from "@phosphor-icons/react";
-import { bumpTaskProgress, reorderTasks } from "@/lib/plan-actions";
+import { useOptimistic, useRef, useState, useTransition } from "react";
+import { CaretDown, Check, Minus, Plus } from "@phosphor-icons/react";
+import { bumpTaskProgress, reorderTasks, setTaskScheduled } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
   applyTaskView,
@@ -294,11 +294,12 @@ function TaskTable({
       <table className="w-full min-w-[56rem] table-fixed text-left text-[14px]">
         <thead>
           <tr className="border-b border-line text-[12px] text-muted">
-            <th className="w-[31%] py-3 pr-3 pl-5 font-medium">Tarea</th>
+            <th className="w-[27%] py-3 pr-3 pl-5 font-medium">Tarea</th>
             <th className="w-[14%] px-3 py-3 font-medium">Estado</th>
             <th className="w-[14%] px-3 py-3 font-medium">Categoría</th>
             <th className="w-[11%] px-3 py-3 font-medium">Prioridad</th>
             <th className="w-[12%] px-3 py-3 font-medium">Deadline</th>
+            <th className="w-[8%] px-3 py-3 text-center font-medium">Agendada</th>
             <th className="py-3 pr-5 pl-3 font-medium">Progreso</th>
           </tr>
         </thead>
@@ -320,7 +321,7 @@ function TaskTable({
                 <td className="py-2 pr-3 pl-3">
                   <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full content-center gap-0.5 rounded-lg px-2 text-left">
                     <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
-                    <TaskMeta t={t} done={done} />
+                    <TaskMeta t={t} done={done} hideScheduled />
                   </button>
                 </td>
                 <td className="px-3 py-2">
@@ -334,6 +335,9 @@ function TaskTable({
                 </td>
                 <td className="px-3 py-2">
                   <Deadline deadline={t.deadline} left={left} done={done} />
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <ScheduledBox task={t} />
                 </td>
                 <td className="py-2 pr-4 pl-3">
                   {pct !== null ? (
@@ -355,11 +359,41 @@ function TaskTable({
   );
 }
 
-/** Debajo del título: pasos, si se repite y si está agendada. */
-function TaskMeta({ t, done }: { t: TaskDTO; done: boolean }) {
+/** Casilla "Agendada" (se tilda en la tabla, como en Notion). */
+function ScheduledBox({ task }: { task: TaskDTO }) {
+  const [on, setOn] = useOptimistic(task.scheduled);
+  const [, start] = useTransition();
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      aria-label={`${task.title}: ${on ? "agendada" : "sin agendar"}`}
+      onClick={() =>
+        start(async () => {
+          setOn(!on);
+          await setTaskScheduled(task.id, !on);
+        })
+      }
+      className="inline-flex size-11 items-center justify-center rounded-full"
+    >
+      <span
+        className={cx(
+          "inline-flex size-[22px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
+          on ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent" : "border-fg/45 hover:border-fg/70",
+        )}
+      >
+        {on && <Check size={14} weight="bold" />}
+      </span>
+    </button>
+  );
+}
+
+/** Debajo del título: pasos, si se repite y si está agendada (en la tabla, eso va en su columna). */
+function TaskMeta({ t, done, hideScheduled }: { t: TaskDTO; done: boolean; hideScheduled?: boolean }) {
   const steps = t.subtasks.length ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length} pasos` : null;
   const rep = repeatLabel(t.repeat, t.repeatEvery);
-  const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, t.scheduled && !done ? "agendada" : null].filter(Boolean);
+  const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, t.scheduled && !done && !hideScheduled ? "agendada" : null].filter(Boolean);
   if (!parts.length) return null;
   return <span className="text-[12px] text-muted first-letter:uppercase">{parts.join(" · ")}</span>;
 }

@@ -263,6 +263,13 @@ export async function bumpTaskProgress(id: string, delta: 1 | -1) {
   refrescar();
 }
 
+/** Casilla "Agendada" de la tabla de tareas. */
+export async function setTaskScheduled(id: string, scheduled: boolean) {
+  await exigirSesion();
+  await prisma.planTask.updateMany({ where: { id: String(id) }, data: { scheduled: !!scheduled } });
+  refrescar();
+}
+
 /** Orden arrastrado: recibe todas las tareas en el orden nuevo. Desde ahí las vistas lo usan. */
 export async function reorderTasks(ids: string[]) {
   await exigirSesion();
