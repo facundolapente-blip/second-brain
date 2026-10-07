@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
 import { HOURS_TODO_FOLD_COOKIE, isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
@@ -42,6 +42,21 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
   const [dragging, setDragging] = useState<BlockDTO | null>(null);
   const [slot, setSlot] = useState<{ day: string; index: number } | null>(null);
   const untimed = dragging !== null && !dragging.startTime;
+  // Al soltar en otra columna la tarjeta se vuelve a dibujar ahí y el "dragend" le
+  // llega a la vieja (que ya no está): sin esto la nueva quedaba transparente.
+  useEffect(() => {
+    const clear = () => {
+      setDragging(null);
+      setSlot(null);
+      setOver(null);
+    };
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
   return (
     // Cada día con un ancho mínimo cómodo: si no entran los 7, se corre de costado.
     <div className="overflow-x-auto pb-2">
@@ -71,6 +86,7 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               const id = e.dataTransfer.getData(DRAG);
               setOver(null);
               setSlot(null);
+              setDragging(null);
               if (!id) return;
               if (untimed && dragging.id === id) {
                 const rest = list.filter((b) => b.id !== id);
