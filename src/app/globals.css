@@ -240,7 +240,7 @@ body {
 }
 
 /* Tarjetas: toda caja con fondo de superficie y borde flota con un aro y sombra teñida. */
-.bg-surface.border:not(.border-line-strong):not(input, textarea, select) {
+.bg-surface.border:not(.border-line-strong):not(.border-dashed):not(input, textarea, select) {
   border-color: var(--card-ring);
   box-shadow: var(--card-shadow);
 }

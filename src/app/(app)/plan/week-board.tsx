@@ -398,7 +398,7 @@ function TodoRow({
       )}
       <button type="button" onClick={() => onEdit(b)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
         {c && <span aria-hidden style={tone(c.color)} className="chip-solid size-2 shrink-0 rounded-full" />}
-        <span className={cx("truncate text-[13.5px]", (b.done || free) && "text-muted", b.done && "line-through decoration-faint")}>{b.title}</span>
+        <span className={cx("truncate text-[13.5px]", b.done && "text-muted", b.done && "line-through decoration-faint")}>{b.title}</span>
         {c && <span className="sr-only">, {c.name}</span>}
       </button>
     </li>
@@ -431,7 +431,7 @@ function Chip({
       className={cx(
         "group flex cursor-grab items-start gap-1 overflow-hidden rounded-lg bg-tone px-1.5 py-1 text-tone-fg active:cursor-grabbing",
         full && "h-full",
-        isFreeBlock(b) && "opacity-60",
+        isFreeBlock(b) && "outline-1 -outline-offset-1 outline-dashed outline-current/40",
         b.done && "opacity-60",
       )}
       title="Arrastralo a otro día u hora"

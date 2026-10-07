@@ -379,7 +379,6 @@ function PlanToday({ d }: { d: Dashboard }) {
                   }
                   className={cx(
                     "relative flex min-h-11 w-full items-center gap-3 rounded-xl py-1 pr-2 text-left transition-colors hover:bg-surface-2 disabled:hover:bg-transparent",
-                    free && "opacity-55",
                   )}
                 >
                   <span className="tabular w-14 shrink-0 text-right font-mono text-[11.5px] text-muted">
