@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyDeleted } from "@/components/undo-toast";
 import { useRouter } from "next/navigation";
 import { PhotoStrip } from "@/components/photos";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -278,7 +279,10 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             <Button
               className="bg-danger! text-on-accent!"
               disabled={deleting}
-              onClick={() => startDelete(() => deleteEntry(entry.id))}
+              onClick={() => {
+                startDelete(() => deleteEntry(entry.id));
+                notifyDeleted("Entrada borrada");
+              }}
             >
               <Trash size={16} weight="bold" /> Borrar
             </Button>

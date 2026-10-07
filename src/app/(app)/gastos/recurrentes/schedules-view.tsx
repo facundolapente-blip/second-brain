@@ -304,7 +304,7 @@ function ScheduleForm({
               {s.active ? <Pause size={15} aria-hidden /> : <Play size={15} aria-hidden />}
               {s.active ? "Pausar" : "Reanudar"}
             </Button>
-            <ConfirmButton onConfirm={() => onDelete(s)}>Borrar</ConfirmButton>
+            <ConfirmButton undo="Recurrente borrado" onConfirm={() => onDelete(s)}>Borrar</ConfirmButton>
           </>
         )}
       </div>

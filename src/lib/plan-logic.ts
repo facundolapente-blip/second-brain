@@ -8,8 +8,8 @@ export type TaskStatus = "backlog" | "todo" | "doing" | "done";
 export type KrStatus = "todo" | "doing" | "done" | "closed";
 
 export const TASK_STATUS: Record<TaskStatus, { label: string; tone: string }> = {
-  backlog: { label: "Programada", tone: "stone" },
-  todo: { label: "Sin empezar", tone: "red" },
+  backlog: { label: "Programada", tone: "purple" },
+  todo: { label: "Sin empezar", tone: "stone" },
   doing: { label: "En curso", tone: "blue" },
   done: { label: "Terminado", tone: "green" },
 };

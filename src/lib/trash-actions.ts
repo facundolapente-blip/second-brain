@@ -26,6 +26,28 @@ export async function restoreItem(id: string): Promise<TrashResult> {
   return { ok: true };
 }
 
+/**
+ * Deshace el último borrado (el aviso de abajo): restaura lo que entró a la
+ * papelera en el último minuto, junto con lo que se borró en la misma tanda
+ * (las cuotas de una compra son varias filas).
+ */
+export async function undoLastDelete(): Promise<TrashResult> {
+  await exigirSesion();
+  const recent = await prisma.trashItem.findMany({
+    where: { deletedAt: { gte: new Date(Date.now() - 60_000) } },
+    orderBy: { deletedAt: "desc" },
+    take: 30,
+  });
+  if (!recent.length) return { ok: false, error: "Ya no se puede deshacer: está en la papelera." };
+  const newest = recent[0].deletedAt.getTime();
+  const batch = recent.filter((t) => newest - t.deletedAt.getTime() < 5_000 && t.module === recent[0].module).reverse();
+  for (const t of batch) {
+    const r = await restoreItem(t.id);
+    if (!r.ok) return r;
+  }
+  return { ok: true };
+}
+
 /** Borra para siempre un elemento de la papelera. */
 export async function purgeItem(id: string) {
   await exigirSesion();

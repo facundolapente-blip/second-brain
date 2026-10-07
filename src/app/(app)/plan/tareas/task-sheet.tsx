@@ -172,6 +172,7 @@ function TaskForm({
         )}
         {task && (
           <ConfirmButton
+            undo="Tarea borrada"
             disabled={deleting}
             onConfirm={() =>
               startDelete(async () => {

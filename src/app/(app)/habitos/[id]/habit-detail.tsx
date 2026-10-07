@@ -33,7 +33,7 @@ import {
 } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
-import { Button, cx, Segmented } from "@/components/ui";
+import { Button, ConfirmButton, cx, Segmented } from "@/components/ui";
 import {
   CalendarMonth,
   DaySheet,
@@ -811,20 +811,19 @@ function EditTab({
             {habit.archived ? <ArrowCounterClockwise size={16} /> : <Archive size={16} />}
             {habit.archived ? "Restaurar hábito" : "Archivar hábito"}
           </Button>
-          <Button
-            variant="danger"
+          <ConfirmButton
+            undo={`"${habit.name}" borrado`}
             disabled={pending}
-            onClick={() => {
-              if (confirm(`¿Eliminar "${habit.name}" y todo su historial? No se puede deshacer.`)) {
-                startTransition(async () => {
-                  await deleteHabit(habit.id);
-                  router.push("/habitos/lista");
-                });
-              }
-            }}
+            confirmLabel="Tocá de nuevo: se borra con su historial"
+            onConfirm={() =>
+              startTransition(async () => {
+                await deleteHabit(habit.id);
+                router.push("/habitos/lista");
+              })
+            }
           >
             <Trash size={16} /> Eliminar hábito
-          </Button>
+          </ConfirmButton>
         </div>
       </Panel>
     </>

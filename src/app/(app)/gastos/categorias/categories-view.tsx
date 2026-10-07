@@ -175,6 +175,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
             {draft.id && (
               <>
                 <ConfirmButton
+                  undo="Categoría borrada"
                   confirmLabel="Tocá de nuevo para eliminar"
                   onConfirm={() => {
                     const id = draft.id!;

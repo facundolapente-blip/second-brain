@@ -137,14 +137,14 @@ function Row({ icon, label, hint, children }: { icon: React.ReactNode; label: st
       <p className="flex items-center gap-1.5 text-[12.5px] text-muted">
         {icon}
         <span className="font-medium text-fg">{label}</span>
-        {hint && <span className="truncate">· {hint}</span>}
+        {hint && <span className="truncate font-medium text-fg">· {hint}</span>}
       </p>
       {children}
     </div>
   );
 }
 
-/** Escala de 1 a 5 como barras que crecen. */
+/** Escala de 1 a 5 como barras que crecen, con los extremos escritos debajo. */
 function Scale({
   value,
   labels,
@@ -157,6 +157,7 @@ function Scale({
   onChange: (v: number | null) => void;
 }) {
   return (
+    <div className="grid gap-1">
     <div className="grid h-11 grid-cols-5 items-end gap-1.5">
       {labels.map((l, i) => {
         const v = i + 1;
@@ -178,6 +179,11 @@ function Scale({
           </button>
         );
       })}
+    </div>
+    <div aria-hidden className="flex justify-between text-[11px] text-muted">
+      <span>{labels[0]}</span>
+      <span>{labels[labels.length - 1]}</span>
+    </div>
     </div>
   );
 }

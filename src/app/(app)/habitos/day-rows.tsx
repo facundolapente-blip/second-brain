@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowBendUpRight, Check, X } from "@phosphor-icons/react";
 import { dayState, nextStatus, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
@@ -86,6 +87,7 @@ export function HabitDayRows({
 }
 
 function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => void; disabled?: boolean }) {
+  const [tapped, setTapped] = useState(false);
   const map: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
     done: {
       cls: "border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
@@ -117,7 +119,12 @@ function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => v
   return (
     <button
       type="button"
-      onClick={onTap}
+      onClick={() => {
+        // Respuesta al toque: un pulso corto (Android) y el ícono que aparece de golpe.
+        navigator.vibrate?.(8);
+        setTapped(true);
+        onTap();
+      }}
       disabled={disabled}
       aria-label={s.label}
       className={cx(
@@ -125,7 +132,45 @@ function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => v
         s.cls,
       )}
     >
-      {s.icon}
+      {s.icon && (
+        <span key={state} className={cx("inline-flex", tapped && "mark-pop")}>
+          {s.icon}
+        </span>
+      )}
     </button>
+  );
+}
+
+/**
+ * True justo cuando el día pasa a completo con un toque (no al abrir la página
+ * ya completa): dispara el único momento con movimiento propio de la app.
+ */
+export function useJustCompleted(complete: boolean) {
+  const [prev, setPrev] = useState(complete);
+  const [celebrate, setCelebrate] = useState(false);
+  if (prev !== complete) {
+    setPrev(complete);
+    setCelebrate(complete);
+  }
+  return celebrate;
+}
+
+/** Cierre de la lista cuando está todo hecho. */
+export function DayComplete({ done, total }: { done: number; total: number }) {
+  const complete = total > 0 && done >= total;
+  const celebrate = useJustCompleted(complete);
+  if (!complete) return null;
+  return (
+    <p className="flex items-center justify-center gap-2.5 py-6 text-[14px] font-medium text-fg" role="status">
+      <span
+        className={cx(
+          "inline-flex size-8 items-center justify-center rounded-full border-[1.5px] border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
+          celebrate && "day-done",
+        )}
+      >
+        <Check size={16} weight="bold" aria-hidden />
+      </span>
+      Día completo
+    </p>
   );
 }

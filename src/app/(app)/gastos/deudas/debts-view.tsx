@@ -204,6 +204,7 @@ function DebtForm({ debt, onDone }: { debt: DebtDTO | null; onDone: () => void }
       </Button>
       {debt && (
         <ConfirmButton
+            undo="Deuda borrada"
           onConfirm={() =>
             start(async () => {
               await deleteDebt(debt.id);

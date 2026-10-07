@@ -8,7 +8,7 @@ import { HABIT_ICONS, HabitAvatar, HabitIcon } from "@/lib/habit-icons";
 import { PALETTE, tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
-import { Button, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { HabitsTabs } from "../habits-nav";
 
 type Draft = { id?: string; name: string; icon: string; color: string };
@@ -153,19 +153,17 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
               {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear categoría"}
             </Button>
             {draft.id && (
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
-                  if (confirm(`¿Eliminar "${draft.name}"? Sus hábitos quedan sin categoría.`)) {
-                    const id = draft.id!;
-                    startTransition(() => deleteCategory(id));
-                    sheet.current?.close();
-                  }
+              <ConfirmButton
+                undo="Categoría borrada"
+                confirmLabel="Tocá de nuevo: sus hábitos quedan sin categoría"
+                onConfirm={() => {
+                  const id = draft.id!;
+                  startTransition(() => deleteCategory(id));
+                  sheet.current?.close();
                 }}
               >
                 Eliminar categoría
-              </Button>
+              </ConfirmButton>
             )}
           </div>
         </form>

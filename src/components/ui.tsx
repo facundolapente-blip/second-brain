@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "@phosphor-icons/react";
+import { notifyDeleted } from "./undo-toast";
 
 export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
@@ -121,35 +122,106 @@ export type SheetHandle = { open: () => void; close: () => void };
 
 /**
  * Hoja inferior en el celular, modal centrado en pantalla grande. Usa <dialog>
- * nativo: foco atrapado, Escape y fondo gratis.
+ * nativo: foco atrapado, Escape y fondo gratis. En el celular se cierra también
+ * arrastrando la agarradera hacia abajo; la salida es más rápida que la entrada.
  */
 export const Sheet = forwardRef<
   SheetHandle,
   { title: string; children: React.ReactNode; onClose?: () => void; defaultOpen?: boolean }
 >(function Sheet({ title, children, onClose, defaultOpen }, ref) {
   const dlg = useRef<HTMLDialogElement>(null);
-  useImperativeHandle(ref, () => ({
-    open: () => dlg.current?.showModal(),
-    close: () => dlg.current?.close(),
-  }));
+  const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
+
+  function reset(d: HTMLDialogElement) {
+    d.classList.remove("closing");
+    d.style.transform = "";
+    d.style.transition = "";
+  }
+  function open() {
+    const d = dlg.current;
+    if (!d) return;
+    clearTimeout(closing.current);
+    reset(d);
+    if (!d.open) d.showModal();
+  }
+  /** Cierra con la animación de salida (o al toque si se pidió menos movimiento). */
+  function close() {
+    const d = dlg.current;
+    if (!d?.open || d.classList.contains("closing")) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return d.close();
+    d.classList.add("closing");
+    closing.current = setTimeout(() => {
+      d.close();
+      reset(d);
+    }, 170);
+  }
+  useImperativeHandle(ref, () => ({ open, close }));
   useEffect(() => {
-    if (defaultOpen) dlg.current?.showModal();
+    if (defaultOpen) open();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultOpen]);
+  useEffect(() => () => clearTimeout(closing.current), []);
+
+  // Arrastrar hacia abajo desde la agarradera o el título (solo hoja de celular).
+  const dragProps = {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse" || (e.target as HTMLElement).closest("button")) return;
+      drag.current = { y: e.clientY, t: e.timeStamp, dy: 0 };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const g = drag.current;
+      const d = dlg.current;
+      if (!g || !d) return;
+      g.dy = Math.max(0, e.clientY - g.y);
+      d.style.transition = "none";
+      d.style.transform = `translateY(${g.dy}px)`;
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      const g = drag.current;
+      const d = dlg.current;
+      drag.current = null;
+      if (!g || !d) return;
+      const fast = g.dy / Math.max(1, e.timeStamp - g.t) > 0.6;
+      if (g.dy > 90 || (fast && g.dy > 24)) {
+        d.style.transition = "transform 170ms cubic-bezier(0.4, 0, 1, 1)";
+        d.style.transform = "translateY(100%)";
+        clearTimeout(closing.current);
+        closing.current = setTimeout(() => {
+          d.close();
+          reset(d);
+        }, 170);
+      } else {
+        d.style.transition = "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)";
+        d.style.transform = "";
+      }
+    },
+  };
 
   return (
     <dialog
       ref={dlg}
       className="sheet"
       onClose={onClose}
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
       onClick={(e) => {
-        if (e.target === dlg.current) dlg.current?.close();
+        if (e.target === dlg.current) close();
       }}
     >
-      <div className="flex items-center justify-between border-b border-line py-3 pr-3 pl-5">
+      <div {...dragProps} onPointerCancel={dragProps.onPointerUp} className="touch-none sm:touch-auto">
+        <div aria-hidden className="flex justify-center pt-2 sm:hidden">
+          <span className="h-1 w-9 rounded-full bg-line-strong" />
+        </div>
+      <div className="flex items-center justify-between border-b border-line py-3 pr-3 pl-5 max-sm:pt-1.5">
         <h2 className="display truncate text-[22px]">{title}</h2>
-        <IconButton label="Cerrar" type="button" onClick={() => dlg.current?.close()}>
+        <IconButton label="Cerrar" type="button" onClick={close}>
           <X size={18} />
         </IconButton>
+      </div>
       </div>
       <div className="max-h-[calc(92dvh-60px)] overflow-y-auto px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {children}
@@ -197,12 +269,15 @@ export function ConfirmButton({
   children,
   confirmLabel = "Tocá de nuevo para confirmar",
   onConfirm,
+  undo,
   className,
   disabled,
 }: {
   children: React.ReactNode;
   confirmLabel?: string;
   onConfirm: () => void;
+  /** Si va a la papelera: el texto del aviso con "Deshacer" ("Movimiento borrado"). */
+  undo?: string;
   className?: string;
   disabled?: boolean;
 }) {
@@ -223,6 +298,7 @@ export function ConfirmButton({
         if (armed) {
           setArmed(false);
           onConfirm();
+          if (undo) notifyDeleted(undo);
         } else setArmed(true);
       }}
     >

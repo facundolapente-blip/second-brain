@@ -1,6 +1,6 @@
 "use client";
 
-import { HabitDayRows } from "../habitos/day-rows";
+import { HabitDayRows, useJustCompleted } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
 import { dayProgress } from "../habitos/today-panel";
 import { showsOn } from "@/lib/habit-logic";
@@ -287,14 +287,17 @@ function HabitsToday({ d }: { d: Dashboard }) {
   const { sorted, reorder } = useHabitOrder(d.habits.list, d.habits.manualOrder);
   const visible = sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today));
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
+  const celebrate = useJustCompleted(due > 0 && done >= due);
   const daySheet = useRef<DaySheetHandle>(null);
 
   return (
     <Card title="Hábitos de hoy" href="/habitos" color="var(--c-habitos)" className="lg:col-span-5" i={1}>
       <div className="flex items-center gap-4">
-        <div className="relative">
+        <div className={cx("relative rounded-full", celebrate && "ring-glow")}>
           <Ring value={done} total={due} color="var(--c-habitos)" />
-          <span className="figure absolute inset-0 flex items-center justify-center text-[15px]">{pct(done, due)}%</span>
+          <span className="figure absolute inset-0 flex items-center justify-center text-[15px]">
+            {due > 0 && done >= due ? <Check size={22} weight="bold" className="text-[var(--c-habitos)]" aria-label="Día completo" /> : `${pct(done, due)}%`}
+          </span>
         </div>
         <div className="grid gap-0.5">
           <p className="figure text-[28px]">

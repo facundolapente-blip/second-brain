@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyDeleted } from "@/components/undo-toast";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
@@ -299,10 +300,10 @@ function HabitCard({
                 label: "Eliminar",
                 icon: <Trash size={16} />,
                 danger: true,
+                // Va a la papelera con su historial; el aviso de abajo permite deshacerlo.
                 onSelect: () => {
-                  if (confirm(`¿Eliminar "${habit.name}" y todo su historial? No se puede deshacer.`)) {
-                    startTransition(() => deleteHabit(habit.id));
-                  }
+                  startTransition(() => deleteHabit(habit.id));
+                  notifyDeleted(`"${habit.name}" borrado`);
                 },
               },
             ]}

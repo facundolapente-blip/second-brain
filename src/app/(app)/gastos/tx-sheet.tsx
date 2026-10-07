@@ -544,6 +544,7 @@ export const TxSheet = forwardRef<
 
         {d.id && (
           <ConfirmButton
+            undo="Movimiento borrado"
             onConfirm={() => {
               const id = d.id!;
               startTransition(() => deleteTransaction(id));
@@ -556,6 +557,7 @@ export const TxSheet = forwardRef<
 
         {d.id && d.installment && (
           <ConfirmButton
+            undo="Cuotas borradas"
             onConfirm={() => {
               const group = d.installment!.group;
               startTransition(() => deleteInstallments(group));

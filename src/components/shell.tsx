@@ -1,5 +1,6 @@
 "use client";
 
+import { UndoToast } from "./undo-toast";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -211,6 +212,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
       >
         Saltar al contenido
       </a>
+      <UndoToast />
       <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
         <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex print:hidden">
           <Brand />

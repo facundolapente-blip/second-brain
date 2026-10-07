@@ -9,10 +9,10 @@ import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "./habit-ui";
-import { HabitDayRows } from "./day-rows";
+import { DayComplete, HabitDayRows } from "./day-rows";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
-import { TodayPanel } from "./today-panel";
+import { dayProgress, TodayPanel } from "./today-panel";
 
 const PAST = 30;
 const FUTURE = 7;
@@ -83,6 +83,7 @@ export function TodayView({
               rowClassName="bg-bg py-1.5 lg:bg-surface lg:py-4"
             />
           )}
+          {visible.length > 0 && <DayComplete {...dayProgress(habits, logs, selected, today)} />}
         </div>
         </section>
 

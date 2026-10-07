@@ -239,6 +239,7 @@ function ObjectiveForm({ objective, year, onDone }: { objective: ObjectiveDTO | 
       </Button>
       {objective && (
         <ConfirmButton
+          undo="Objetivo borrado"
           onConfirm={() => {
             startDelete(() => deleteObjective(objective.id));
             onDone();
@@ -553,6 +554,7 @@ function KrForm({
         </Button>
         {kr && (
           <ConfirmButton
+            undo="Resultado clave borrado"
             disabled={deleting}
             onConfirm={() =>
               startDelete(async () => {

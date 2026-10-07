@@ -244,6 +244,7 @@ function GoalForm({ goal, accounts, onDone }: { goal: GoalDTO | null; accounts: 
             {goal.archived ? "Desarchivar" : "Archivar"}
           </Button>
           <ConfirmButton
+            undo="Meta borrada"
             onConfirm={() =>
               start(async () => {
                 await deleteGoal(goal.id);

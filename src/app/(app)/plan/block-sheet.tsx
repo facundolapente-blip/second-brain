@@ -174,6 +174,7 @@ function BlockForm({
         )}
         {initial.id && (
           <ConfirmButton
+            undo="Bloque borrado"
             disabled={deleting}
             onConfirm={() =>
               startDelete(async () => {

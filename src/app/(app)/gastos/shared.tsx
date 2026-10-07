@@ -74,20 +74,20 @@ export function CategoryAvatar({
     <span
       aria-hidden
       style={{ ...tone(category.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-tone text-tone-fg"
+      className="chip-solid inline-flex shrink-0 items-center justify-center rounded-full"
     >
       <FinanceIcon name={category.icon} size={icon} weight="fill" />
     </span>
   );
 }
 
-/** Cuadrado redondeado con el ícono del tipo de cuenta, en el color de la cuenta. */
+/** Cuadrado redondeado con el ícono del tipo de cuenta, lleno del color de la cuenta (como los de Hábitos). */
 export function AccountAvatar({ account, size = 36 }: { account: Pick<AccountDTO, "icon" | "color">; size?: number }) {
   return (
     <span
       aria-hidden
       style={{ ...tone(account.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-[6px] bg-tone text-tone-fg"
+      className="chip-solid inline-flex shrink-0 items-center justify-center rounded-[6px]"
     >
       <FinanceIcon name={account.icon} size={Math.round(size * 0.52)} weight="fill" />
     </span>

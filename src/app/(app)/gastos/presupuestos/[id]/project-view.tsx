@@ -182,6 +182,7 @@ export function ProjectView({
         <div className="grid gap-4">
           <ProjectForm key={editKey} project={p} onDone={() => editSheet.current?.close()} />
           <ConfirmButton
+            undo="Presupuesto borrado"
             onConfirm={() =>
               start(async () => {
                 await deleteProject(p.id);

@@ -106,6 +106,7 @@ export function TemplatesView({
               Guardar
             </Button>
             <ConfirmButton
+            undo="Plantilla borrada"
               onConfirm={() => {
                 if (!editing) return;
                 const id = editing.id;
