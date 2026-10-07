@@ -53,11 +53,11 @@ export function AnalysisView({
                 role="radio"
                 aria-checked={r === range}
                 className={cx(
-                  "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium transition-colors",
+                  "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors",
                   r === range ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
                 )}
               >
-                {r === 365 ? "1 año" : `${r} d`}
+                {r === 365 ? "1 año" : `${r}d`}
               </Link>
             ))}
           </div>
@@ -306,7 +306,8 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
   const [focus, setFocus] = useState<[number, number] | null>(null);
   const color = (r: number | null) => {
     if (r === null) return "var(--surface-2)";
-    const p = Math.round(Math.abs(r) * 85);
+    // Tope de intensidad para que el número se lea en los dos temas.
+    const p = Math.round(Math.abs(r) * 45);
     return `color-mix(in oklab, ${r >= 0 ? "var(--c-habitos)" : "var(--p-orange-solid)"} ${p}%, var(--surface-2))`;
   };
   const pairs: { a: string; b: string; r: number; n: number }[] = [];
@@ -358,7 +359,7 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
                       onFocus={() => setFocus([i, j])}
                       onBlur={() => setFocus(null)}
                       className="h-8 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-                      style={{ background: color(c.r), color: c.r !== null && Math.abs(c.r) > 0.55 ? "white" : undefined }}
+                      style={{ background: color(c.r) }}
                     >
                       {c.r === null ? "" : c.r.toFixed(1).replace("0.", ".").replace("-.", "−.")}
                     </td>

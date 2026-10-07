@@ -450,7 +450,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                 >
                   {daysLeftLabel(t.left)}
                 </span>
-                <Link href="/plan#tareas" className="min-w-0 truncate hover:underline">
+                <Link href="/plan#tareas" className="flex min-h-11 min-w-0 flex-1 items-center truncate hover:underline">
                   {t.title}
                 </Link>
               </li>
@@ -480,8 +480,9 @@ function WeekMix({ d }: { d: Dashboard }) {
             <span
               className="flex size-10 items-center justify-center rounded-full text-[11px] font-semibold tabular"
               style={{
-                background: `color-mix(in oklab, var(--c-habitos) ${Math.max(8, p)}%, var(--surface-2))`,
-                color: p >= 55 ? "white" : "var(--text)",
+                // Tope de intensidad: el número (en el color de texto) se lee en los dos temas.
+                background: `color-mix(in oklab, var(--c-habitos) ${Math.round(8 + p * 0.37)}%, var(--surface-2))`,
+                color: "var(--text)",
               }}
             >
               {p}%

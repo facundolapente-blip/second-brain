@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Copy, DotsThreeVertical, MapPin, Plus } from "@phosphor-icons/react";
@@ -74,6 +75,7 @@ export function WeekView({
   }
   const openEdit = (b: BlockDTO) => sheet.current?.open(b);
 
+  useOnNew(() => openNew(selected));
   const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move };
 
   const prev = addDays(monday, -7);
@@ -192,7 +194,7 @@ export function WeekView({
                   <span
                     className={cx(
                       "font-mono text-[10px] font-medium tracking-[0.08em] uppercase",
-                      active ? "text-on-ink/75" : "text-muted",
+                      active ? "text-on-ink" : "text-muted",
                     )}
                   >
                     {SHORT[weekday(d)]}
@@ -244,14 +246,6 @@ export function WeekView({
         </div>
       </main>
 
-      <button
-        type="button"
-        onClick={() => openNew(selected)}
-        aria-label="Nuevo bloque"
-        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
-      >
-        <Plus size={24} />
-      </button>
 
       <BlockSheet ref={sheet} categories={categories} tasks={tasks} />
     </>
@@ -294,7 +288,7 @@ function DayList({
             <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-3 border-b border-line">
               <span className="pt-3.5 text-right font-mono text-[11.5px] leading-tight text-muted tabular">
                 {b.startTime ? b.startTime.replace(/^0/, "") : "Todo el día"}
-                {b.endTime && <span className="block text-muted/80">{b.endTime.replace(/^0/, "")}</span>}
+                {b.endTime && <span className="block text-muted">{b.endTime.replace(/^0/, "")}</span>}
               </span>
               <BlockCard
                 block={b}

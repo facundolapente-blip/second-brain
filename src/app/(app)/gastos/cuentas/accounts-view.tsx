@@ -158,7 +158,7 @@ export function AccountsView({
           <>
             <section className="grid gap-3 pt-2 pb-5 lg:pt-6">
               {Object.keys(totals).length > 0 && (
-                <dl className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] border-t border-line lg:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] lg:gap-4 lg:border-t-0">
+                <dl className="grid grid-cols-1 border-t border-line min-[520px]:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] lg:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] lg:gap-4 lg:border-t-0">
                   {Object.keys(totals)
                     .sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
                     .map((c, i) => {
@@ -167,7 +167,7 @@ export function AccountsView({
                         <div
                           key={c}
                           className={cx(
-                            "grid gap-1.5 border-b border-line py-4 pr-4 lg:rounded-2xl lg:border-b-0 lg:px-6 lg:py-5",
+                            "grid min-w-0 gap-1.5 border-b border-line py-4 pr-4 lg:rounded-2xl lg:border-b-0 lg:px-6 lg:py-5",
                             // En la computadora el total principal va en el bloque destacado del tema.
                             i === 0
                               ? "lg:[background:var(--hero-bg)] lg:text-[var(--hero-fg)] lg:[&_.kicker]:text-[var(--hero-sub)]! lg:[&_dd:last-child]:text-[var(--hero-sub)] lg:[&_dt_span]:border-[var(--hero-sub)]"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnNew } from "@/components/nav-add";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -55,6 +56,7 @@ export function ObjectivesView({
   const [quarter, setQuarter] = useState<Quarter>("all");
   const [showClosed, setShowClosed] = useState(true);
   const sheet = useRef<KrSheetHandle>(null);
+  useOnNew(() => sheet.current?.open());
   const objSheet = useRef<SheetHandle>(null);
   const planSheet = useRef<SheetHandle>(null);
   const [editingObj, setEditingObj] = useState<ObjectiveDTO | null>(null);
@@ -202,14 +204,6 @@ export function ObjectivesView({
         )}
       </main>
 
-      <button
-        type="button"
-        onClick={() => sheet.current?.open()}
-        aria-label="Nuevo resultado clave"
-        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
-      >
-        <Plus size={24} />
-      </button>
 
       <KrSheet ref={sheet} objectives={objectives} links={links} year={year} />
 

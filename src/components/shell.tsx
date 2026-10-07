@@ -205,6 +205,12 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>
+      <a
+        href="#contenido"
+        className="sr-only z-50 rounded-full bg-ink px-4 py-2 text-[14px] font-medium text-on-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Saltar al contenido
+      </a>
       <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
         <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex print:hidden">
           <Brand />
@@ -240,7 +246,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
           </aside>
         </div>
 
-        <div className="min-w-0">
+        <div id="contenido" tabIndex={-1} className="min-w-0 outline-none">
           {offline && (
             <p role="status" className="sticky top-0 z-40 print:hidden bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
               Sin conexión: estás viendo lo último guardado. Lo que marques en Hábitos se guarda cuando vuelva la señal.

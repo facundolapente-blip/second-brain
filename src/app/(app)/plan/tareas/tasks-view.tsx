@@ -107,7 +107,7 @@ export function TasksBoard({
               )}
             >
               {v.label}
-              <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink/70" : "text-faint")}>{n}</span>
+              <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink/90" : "text-muted")}>{n}</span>
             </button>
           );
         })}

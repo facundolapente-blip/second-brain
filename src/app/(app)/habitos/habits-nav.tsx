@@ -1,5 +1,6 @@
 "use client";
 
+import { NavAddButton } from "@/components/nav-add";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ListChecks, Medal, SquaresFour, type Icon } from "@phosphor-icons/react";
@@ -23,7 +24,7 @@ export function HabitsNav() {
   const pathname = usePathname();
   return (
       <nav aria-label="Hábitos" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-3">
+        <div className="mx-auto grid max-w-md grid-cols-4 items-start">
           {TABS.map((t) => {
             const active = isActive(pathname, t.href);
             const Ico = t.icon;
@@ -46,6 +47,7 @@ export function HabitsNav() {
               </Link>
             );
           })}
+          <NavAddButton label={pathname.startsWith("/habitos/categorias") ? "Nueva categoría" : "Nuevo hábito"} />
         </div>
       </nav>
   );

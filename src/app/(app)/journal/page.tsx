@@ -2,9 +2,8 @@ import Link from "next/link";
 import { Fire, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { getAllTags, getEntries, getEntry, getHome, getQuickStats } from "@/lib/journal";
-import { getUsuario } from "@/lib/session";
 import { formatLong } from "@/lib/dates";
-import { greeting, isMood, MEMORY_COOKIE, moodInfo, normalizeTag } from "@/lib/journal-logic";
+import { isMood, MEMORY_COOKIE, moodInfo, normalizeTag } from "@/lib/journal-logic";
 import { EntryCard, JournalHeader } from "./journal-ui";
 import { JournalTabs, WriteTodayButton } from "./journal-nav";
 import { EmptyJournal, HomeActions, MemoryCard } from "./home-parts";
@@ -26,11 +25,10 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   const filtering = !!(q || tag || mood);
   const ver = one(sp.ver).slice(0, 64);
 
-  const [home, { entries, hasMore }, tags, user, jar, reading, quick] = await Promise.all([
+  const [home, { entries, hasMore }, tags, jar, reading, quick] = await Promise.all([
     getHome(),
     getEntries({ q, tag, mood, limit }),
     getAllTags(),
-    getUsuario(),
     cookies(),
     ver ? getEntry(ver) : null,
     getQuickStats(),
@@ -61,7 +59,6 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   if (reading) more.set("ver", reading.id);
   more.set("n", String(limit + 120));
 
-  const firstName = user?.name?.split(" ")[0] ?? "";
   let i = 0;
 
   return (
@@ -86,8 +83,8 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           <section className="rise grid gap-3 pt-1 lg:pt-0">
             <p className="kicker">{formatLong(home.today)}</p>
             <p className="display text-[38px] leading-[1.02] text-balance lg:text-[44px]">
-              {greeting(home.hour)}
-              {firstName && `, ${firstName}`}
+              {/* El saludo ya está en Inicio: acá, una invitación a escribir. */}
+              ¿Cómo estuvo tu día?
             </p>
             {home.streak > 0 && (
               <p className="inline-flex items-center gap-1.5 text-[14px] text-muted">

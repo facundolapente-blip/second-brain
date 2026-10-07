@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnNew } from "@/components/nav-add";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
@@ -34,6 +35,7 @@ export function TodayView({
   const [selected, setSelected] = useState(today);
   const form = useRef<HabitFormHandle>(null);
   const daySheet = useRef<DaySheetHandle>(null);
+  useOnNew(() => form.current?.create());
 
   const days = useMemo(
     () => Array.from({ length: PAST + FUTURE + 1 }, (_, i) => addDays(today, i - PAST)),
@@ -91,7 +93,6 @@ export function TodayView({
         )}
       </main>
 
-      <Fab onClick={() => form.current?.create()} />
       <HabitForm ref={form} categories={categories} today={today} />
       <DaySheet ref={daySheet} logs={logs} mark={mark} />
     </>
@@ -172,18 +173,6 @@ function DateStrip({
   );
 }
 
-export function Fab({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Nuevo hábito"
-      className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
-    >
-      <Plus size={24} />
-    </button>
-  );
-}
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import {
@@ -31,7 +32,6 @@ import { DayCircle, DaySheet, HabitBadge, useDayTap, useHabitLogs, useHabitOrder
 import { Sortable, SortableItem } from "@/components/sortable";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
-import { Fab } from "./today-view";
 
 export function HabitsList({
   habits,
@@ -55,6 +55,9 @@ export function HabitsList({
   const [category, setCategory] = useState<string | null>(null);
   const form = useRef<HabitFormHandle>(null);
   const daySheet = useRef<DaySheetHandle>(null);
+  useOnNew(() => {
+    if (!archived) form.current?.create();
+  });
 
   const q = query.trim().toLowerCase();
   // El orden arrastrado (el mismo de Hoy) o prioridad y nombre, como HabitNow.
@@ -184,7 +187,6 @@ export function HabitsList({
         )}
       </main>
 
-      {!archived && <Fab onClick={() => form.current?.create()} />}
       <HabitForm ref={form} categories={categories} today={today} />
       <DaySheet ref={daySheet} logs={logs} mark={mark} />
     </>

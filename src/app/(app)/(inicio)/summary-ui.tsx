@@ -68,7 +68,7 @@ export function Card({
         <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
         <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
         {href && (
-          <Link href={href} className="ml-auto text-[13px] text-muted hover:text-fg">
+          <Link href={href} className="-my-2 -mr-2 ml-auto inline-flex min-h-11 items-center px-2 text-[13px] text-muted hover:text-fg">
             Abrir
           </Link>
         )}

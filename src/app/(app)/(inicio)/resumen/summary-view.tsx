@@ -38,7 +38,7 @@ function printLight() {
 }
 
 const navClass =
-  "relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg";
+  "relative inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg";
 
 export function SummaryView({ s }: { s: MonthlySummary }) {
   const { now, before } = s;

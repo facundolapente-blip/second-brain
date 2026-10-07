@@ -61,7 +61,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
         <button
           type="submit"
           disabled={!p || pending}
-          className="h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-on-ink transition-opacity disabled:opacity-35"
+          className="h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-on-ink transition-colors duration-150 disabled:bg-surface-2 disabled:text-muted"
         >
           {pending ? "…" : "Cargar"}
         </button>

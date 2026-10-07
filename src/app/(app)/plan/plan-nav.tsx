@@ -1,5 +1,6 @@
 "use client";
 
+import { NavAddButton } from "@/components/nav-add";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDots, Target, type Icon } from "@phosphor-icons/react";
@@ -19,11 +20,11 @@ export function PlanNav() {
   const pathname = usePathname();
   return (
     <nav aria-label="Plan" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-2">
-        {TABS.map((t) => {
+      <div className="mx-auto grid max-w-md grid-cols-3 items-start">
+        {TABS.map((t, i) => {
           const active = isActive(pathname, t.href);
           const Ico = t.icon;
-          return (
+          const link = (
             <Link
               key={t.href}
               href={t.href}
@@ -38,6 +39,8 @@ export function PlanNav() {
               <span className={cx("text-[11.5px]", active ? "font-semibold text-fg" : "text-muted")}>{t.label}</span>
             </Link>
           );
+          // El "+" va en el medio, entre las dos pestañas (como en el Journal).
+          return i === 0 ? [link, <NavAddButton key="nuevo" label={pathname.startsWith("/plan/objetivos") ? "Nuevo resultado clave" : "Nuevo bloque"} />] : link;
         })}
       </div>
     </nav>

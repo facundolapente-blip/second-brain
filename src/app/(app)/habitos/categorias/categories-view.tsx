@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnNew } from "@/components/nav-add";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { CaretRight, Plus } from "@phosphor-icons/react";
 import { deleteCategory, saveCategory } from "@/lib/habit-actions";
@@ -9,7 +10,6 @@ import type { CategoryDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { HabitsTabs } from "../habits-nav";
-import { Fab } from "../today-view";
 
 type Draft = { id?: string; name: string; icon: string; color: string };
 
@@ -30,6 +30,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
     sheet.current?.open();
   }
   const create = () => open({ name: "", icon: "Sparkle", color: "blue" });
+  useOnNew(create);
 
   return (
     <>
@@ -84,7 +85,6 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         </ul>
       </main>
 
-      <Fab onClick={create} />
 
       <Sheet ref={sheet} title={draft.id ? "Editar categoría" : "Nueva categoría"}>
         <form key={formKey} action={action} className="grid gap-5">
