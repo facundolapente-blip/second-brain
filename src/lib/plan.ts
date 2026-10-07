@@ -4,6 +4,7 @@ import { getHabitsWithLogs } from "./habits";
 import { habitScore } from "./habit-logic";
 import { getAccounts, getGoals } from "./finance";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
+import { parseTaskLinks } from "./plan-logic";
 import type {
   BlockDTO,
   CategoryDTO,
@@ -86,7 +87,7 @@ export async function getTasks(): Promise<TaskDTO[]> {
     goal: t.goal,
     scheduled: t.scheduled,
     notes: t.notes,
-    links: t.links,
+    links: parseTaskLinks(t.links),
     blockCount: t._count.blocks,
     subtasks: t.subtasks.map((s) => ({ id: s.id, title: s.title, done: s.done })),
     repeat: t.repeat === "daily" || t.repeat === "weekly" || t.repeat === "monthly" ? t.repeat : null,

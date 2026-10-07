@@ -77,6 +77,17 @@
   --p-blue-bg: #e0ebf3; --p-blue-fg: #22648f; --p-blue-solid: #5b93bd;
   --p-purple-bg: #ebe6f2; --p-purple-fg: #5b4985; --p-purple-solid: #8d7bb9;
   --p-pink-bg: #f5e5ec; --p-pink-fg: #873b5f; --p-pink-solid: #c27295;
+  /* Etiquetas llenas: tonos puros y bien separados (antes salían de mezclar con
+     la tinta y rojo, rosa, naranja y amarillo quedaban parecidos). Texto ≥ 4,5:1. */
+  --p-stone-chip: #5f5a52; --p-stone-chip-fg: #ffffff;
+  --p-red-chip: #c42b1c; --p-red-chip-fg: #ffffff;
+  --p-orange-chip: #b8560b; --p-orange-chip-fg: #ffffff;
+  --p-yellow-chip: #f2c230; --p-yellow-chip-fg: #3d2c00;
+  --p-green-chip: #2e7d32; --p-green-chip-fg: #ffffff;
+  --p-teal-chip: #0f7469; --p-teal-chip-fg: #ffffff;
+  --p-blue-chip: #1f5fc4; --p-blue-chip-fg: #ffffff;
+  --p-purple-chip: #6b3fc4; --p-purple-chip-fg: #ffffff;
+  --p-pink-chip: #c2187a; --p-pink-chip-fg: #ffffff;
 
   color-scheme: light;
 }
@@ -153,6 +164,15 @@
   --p-blue-bg: #1d2a35; --p-blue-fg: #a0c6e5; --p-blue-solid: #5f99c4;
   --p-purple-bg: #2a2535; --p-purple-fg: #c4b6e3; --p-purple-solid: #9282bf;
   --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
+  --p-stone-chip: #b3ada2; --p-stone-chip-fg: #141413;
+  --p-red-chip: #f2766a; --p-red-chip-fg: #141413;
+  --p-orange-chip: #f39a4c; --p-orange-chip-fg: #141413;
+  --p-yellow-chip: #f4d04e; --p-yellow-chip-fg: #141413;
+  --p-green-chip: #6cc47c; --p-green-chip-fg: #141413;
+  --p-teal-chip: #45c3b3; --p-teal-chip-fg: #141413;
+  --p-blue-chip: #74aaf2; --p-blue-chip-fg: #141413;
+  --p-purple-chip: #ad90f4; --p-purple-chip-fg: #141413;
+  --p-pink-chip: #f28cc4; --p-pink-chip-fg: #141413;
   color-scheme: dark;
 }
 @theme inline {
@@ -330,6 +350,9 @@ dialog.sheet::backdrop {
   background: rgba(30, 26, 20, 0.34);
 }
 @media (min-width: 640px) {
+  dialog.sheet.sheet-wide {
+    max-width: 44rem;
+  }
   dialog.sheet {
     margin: auto;
     max-width: 30rem;
@@ -432,19 +455,12 @@ dialog.sheet::backdrop {
 /* Etiqueta llena (categoría, estado, prioridad): el tono profundo de la paleta
    con texto blanco; en oscuro, el tono medio con texto de tinta. */
 .chip-solid {
-  background: color-mix(in oklab, var(--tone-fg) 78%, var(--tone-solid));
-  color: #ffffff;
+  background: var(--tone-chip);
+  color: var(--tone-chip-fg);
 }
-:root[data-theme="oscuro"] .chip-solid {
-  background: var(--tone-solid);
-  color: #141413;
-}
-/* Barras llenas de la prioridad: el mismo tono que las etiquetas llenas. */
+/* Puntos llenos de la prioridad: el mismo tono que las etiquetas llenas. */
 .prio-on {
-  background: color-mix(in oklab, var(--tone-fg) 78%, var(--tone-solid));
-}
-:root[data-theme="oscuro"] .prio-on {
-  background: var(--tone-solid);
+  background: var(--tone-chip);
 }
 
 .lift {

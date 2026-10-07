@@ -42,6 +42,25 @@ export function normalizeLink(raw: string): string | null {
   }
 }
 
+/** Un link de una tarea, con nombre opcional. */
+export type TaskLink = { url: string; name: string };
+
+/**
+ * Lista de links desde lo guardado o lo que manda el formulario: acepta
+ * `{ url, name }` o un texto con el link (como se guardaban antes); sin repetidos.
+ */
+export function parseTaskLinks(raw: unknown): TaskLink[] {
+  if (!Array.isArray(raw)) return [];
+  const out: TaskLink[] = [];
+  for (const item of raw.slice(0, 60)) {
+    const obj = typeof item === "string" ? { url: item, name: "" } : (item as Partial<TaskLink> | null);
+    const url = normalizeLink(String(obj?.url ?? ""));
+    if (!url || out.some((l) => l.url === url)) continue;
+    out.push({ url, name: String(obj?.name ?? "").trim().slice(0, 80) });
+  }
+  return out.slice(0, 30);
+}
+
 /** Cómo se muestra un link: dominio (sin www) y el camino, cortado. */
 export function linkLabel(url: string): string {
   try {
@@ -99,7 +118,7 @@ export type TaskDTO = {
   goal: number | null;
   scheduled: boolean;
   notes: string | null;
-  links: string[];
+  links: TaskLink[];
   blockCount: number;
   /** Pasos (checklist). */
   subtasks: { id: string; title: string; done: boolean }[];

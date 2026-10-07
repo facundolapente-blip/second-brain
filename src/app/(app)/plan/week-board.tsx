@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
 import { isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
-import { PRIORITIES, PriorityBars } from "./plan-ui";
+import { PRIORITIES, PriorityDots } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
 import { BlockCard } from "./week-view";
@@ -332,7 +332,7 @@ function Chip({
             {c && <span className="truncate font-medium">{c.name}</span>}
             {priority && (
               <span role="img" aria-label={`Prioridad ${priority.label.toLowerCase()}`} title={`Prioridad ${priority.label.toLowerCase()}`} className="inline-flex">
-                <PriorityBars n={priority.value} size={12} mono />
+                <PriorityDots n={priority.value} size={6} mono />
               </span>
             )}
           </span>

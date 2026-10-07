@@ -127,8 +127,15 @@ export type SheetHandle = { open: () => void; close: () => void };
  */
 export const Sheet = forwardRef<
   SheetHandle,
-  { title: string; children: React.ReactNode; onClose?: () => void; defaultOpen?: boolean }
->(function Sheet({ title, children, onClose, defaultOpen }, ref) {
+  {
+    title: string;
+    children: React.ReactNode;
+    onClose?: () => void;
+    defaultOpen?: boolean;
+    /** Más ancha en pantalla grande (formularios largos). */
+    wide?: boolean;
+  }
+>(function Sheet({ title, children, onClose, defaultOpen, wide }, ref) {
   const dlg = useRef<HTMLDialogElement>(null);
   const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
@@ -202,7 +209,7 @@ export const Sheet = forwardRef<
   return (
     <dialog
       ref={dlg}
-      className="sheet"
+      className={cx("sheet", wide && "sheet-wide")}
       onClose={onClose}
       onCancel={(e) => {
         e.preventDefault();

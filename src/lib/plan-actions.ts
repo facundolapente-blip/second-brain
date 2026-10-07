@@ -6,7 +6,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, normalizeLink } from "./plan-logic";
+import { isTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -199,7 +199,7 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     goal: entero(fd, "goal", 0, 1_000_000),
     scheduled: fd.get("scheduled") === "on",
     notes: texto(fd, "notes", 4000) || null,
-    links: [...new Set(fd.getAll("links").map((v) => normalizeLink(String(v))).filter((v): v is string => !!v))].slice(0, 30),
+    links: parseTaskLinks(jsonOrEmpty(String(fd.get("links") ?? "[]"))),
     repeat: ["daily", "weekly", "monthly"].includes(texto(fd, "repeat")) ? texto(fd, "repeat") : null,
     repeatEvery: entero(fd, "repeatEvery", 1, 60) ?? 1,
   };
@@ -269,6 +269,14 @@ export async function saveTaskColumns(widths: TaskColumnWidths) {
   await exigirSesion();
   const value = JSON.stringify(parseTaskColumns(JSON.stringify(widths ?? {})));
   await prisma.appSetting.upsert({ where: { key: "tareas_columnas" }, create: { key: "tareas_columnas", value }, update: { value } });
+}
+
+function jsonOrEmpty(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
 }
 
 /** Casilla "Agendada" de la tabla de tareas. */
@@ -439,7 +447,7 @@ async function spawnNext(id: string) {
       goal: t.goal,
       progress: t.goal ? 0 : null,
       notes: t.notes,
-      links: t.links,
+      links: parseTaskLinks(t.links),
       repeat: t.repeat,
       repeatEvery: t.repeatEvery,
       // Toma el lugar de la que se terminó.

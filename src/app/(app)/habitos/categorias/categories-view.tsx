@@ -117,7 +117,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   aria-label={p}
                   style={tone(p)}
                   className={cx(
-                    "size-8 rounded-full bg-tone-solid transition-transform active:scale-90",
+                    "chip-solid size-8 rounded-full transition-transform active:scale-90",
                     draft.color === p && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 />

@@ -52,3 +52,6 @@ next-env.d.ts
 
 # grafo de graphify (se regenera con /graphify)
 /graphify-out/
+
+# registros del navegador de pruebas
+/.playwright-cli/

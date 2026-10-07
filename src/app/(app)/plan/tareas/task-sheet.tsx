@@ -1,9 +1,9 @@
 "use client";
 
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { CalendarPlus, Check, Link as LinkIcon, Plus, X } from "@phosphor-icons/react";
+import { CalendarPlus, Check, Link as LinkIcon, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask } from "@/lib/plan-actions";
-import { linkLabel, normalizeLink, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
+import { linkLabel, normalizeLink, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskLink, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, IconButton, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { PriorityPicker } from "../plan-ui";
@@ -26,7 +26,7 @@ export const TaskSheet = forwardRef<
     },
   }));
   return (
-    <Sheet ref={sheet} title={task ? "Editar tarea" : "Nueva tarea"}>
+    <Sheet ref={sheet} wide title={task ? "Editar tarea" : "Nueva tarea"}>
       <TaskForm
         key={key}
         task={task}
@@ -271,66 +271,106 @@ function Subtasks({ task }: { task: TaskDTO }) {
 }
 
 /**
- * Links de la tarea: se agregan de a uno (Enter o "Agregar") y viajan con el
- * formulario como campos ocultos `links`. Se abren en otra pestaña.
+ * Links de la tarea, cada uno con nombre opcional (si no, se ve el dominio). Se
+ * agregan de a uno (Enter o "Agregar"); el lápiz cambia el nombre. Viajan con el
+ * formulario en un campo oculto `links` (JSON); un link escrito y sin agregar
+ * también se guarda. Se abren en otra pestaña.
  */
-function LinksField({ initial }: { initial: string[] }) {
+function LinksField({ initial }: { initial: TaskLink[] }) {
   const [links, setLinks] = useState(initial);
-  const [text, setText] = useState("");
+  const [url, setUrl] = useState("");
+  const [name, setName] = useState("");
   const [bad, setBad] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const pending = normalizeLink(url);
+  const all = pending && !links.some((l) => l.url === pending) ? [...links, { url: pending, name: name.trim() }] : links;
   function add() {
-    const url = normalizeLink(text);
-    if (!url) {
-      setBad(text.trim() !== "");
+    if (!pending) {
+      setBad(url.trim() !== "");
       return;
     }
-    if (!links.includes(url)) setLinks([...links, url]);
-    setText("");
+    setLinks(all);
+    setUrl("");
+    setName("");
     setBad(false);
   }
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      add();
+    }
+  };
+  const rename = (u: string, n: string) => setLinks(links.map((l) => (l.url === u ? { ...l, name: n.trim().slice(0, 80) } : l)));
   return (
     <div className="grid gap-2">
       <span className="text-sm font-medium">Links (opcional)</span>
-      {links.map((l) => (
-        <input key={l} type="hidden" name="links" value={l} />
-      ))}
+      <input type="hidden" name="links" value={JSON.stringify(all)} />
       {links.length > 0 && (
-        <ul className="grid gap-1.5">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           {links.map((l) => (
-            <li key={l} className="flex min-h-11 items-center gap-2 rounded-xl bg-surface-2 pr-1 pl-3">
-              <LinkIcon size={15} className="shrink-0 text-muted" aria-hidden />
-              <a href={l} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-[14px] text-accent-fg underline-offset-4 hover:underline">
-                {linkLabel(l)}
-              </a>
-              <IconButton label={`Sacar ${linkLabel(l)}`} type="button" onClick={() => setLinks(links.filter((x) => x !== l))}>
+            <li key={l.url} className="flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-surface-2 py-1.5 pr-1 pl-3">
+              <LinkIcon size={16} className="shrink-0 text-muted" aria-hidden />
+              {editing === l.url ? (
+                <Input
+                  autoFocus
+                  defaultValue={l.name}
+                  placeholder={linkLabel(l.url)}
+                  aria-label="Nombre del link"
+                  maxLength={80}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Escape") {
+                      e.preventDefault();
+                      if (e.key === "Enter") rename(l.url, e.currentTarget.value);
+                      setEditing(null);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    rename(l.url, e.currentTarget.value);
+                    setEditing(null);
+                  }}
+                  className="h-9 min-w-0 flex-1"
+                />
+              ) : (
+                <a href={l.url} target="_blank" rel="noopener noreferrer" className="grid min-w-0 flex-1 underline-offset-4 hover:underline">
+                  <span className="truncate text-[14px] font-medium text-accent-fg">{l.name || linkLabel(l.url)}</span>
+                  {l.name && <span className="truncate text-[12px] text-muted">{linkLabel(l.url)}</span>}
+                </a>
+              )}
+              <IconButton label={`Ponerle nombre a ${l.name || linkLabel(l.url)}`} type="button" onClick={() => setEditing(l.url)}>
+                <PencilSimple size={15} />
+              </IconButton>
+              <IconButton label={`Sacar ${l.name || linkLabel(l.url)}`} type="button" onClick={() => setLinks(links.filter((x) => x.url !== l.url))}>
                 <X size={15} />
               </IconButton>
             </li>
           ))}
         </ul>
       )}
-      <div className="flex gap-2">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
         <Input
-          value={text}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={onEnter}
+          maxLength={80}
+          autoComplete="off"
+          placeholder="Nombre (opcional)"
+          aria-label="Nombre del link nuevo"
+        />
+        <Input
+          value={url}
           onChange={(e) => {
-            setText(e.target.value);
+            setUrl(e.target.value);
             setBad(false);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          onBlur={() => text.trim() && add()}
+          onKeyDown={onEnter}
           inputMode="url"
           autoComplete="off"
           placeholder="Pegá un link"
           aria-label="Link nuevo"
           aria-invalid={bad}
-          className={cx("min-w-0 flex-1", bad && "border-danger")}
+          className={cx("min-w-0", bad && "border-danger")}
         />
-        <Button type="button" variant="outline" onClick={add} disabled={!text.trim()}>
+        <Button type="button" variant="outline" onClick={add} disabled={!url.trim()}>
           Agregar
         </Button>
       </div>

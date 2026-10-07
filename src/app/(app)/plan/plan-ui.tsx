@@ -44,7 +44,7 @@ export function StatusPill({ label, toneKey }: { label: string; toneKey: string 
 }
 
 /**
- * Prioridad 0 a 4: se muestra con barras de señal (1 a 4 llenas, en el color de
+ * Prioridad 0 a 4: se muestra con puntos (1 a 4 llenos, en el color de
  * cada nivel); la palabra queda para el lector de pantalla y el cartelito.
  */
 export const PRIORITIES: { value: number; label: string; tone: string }[] = [
@@ -55,19 +55,20 @@ export const PRIORITIES: { value: number; label: string; tone: string }[] = [
 ];
 
 /** Las cuatro barras que crecen; llenas hasta el nivel. `mono`: en el color del texto (sobre fondos de color). */
-export function PriorityBars({ n, size = 18, mono }: { n: number; size?: number; mono?: boolean }) {
+/** Cuatro puntos, llenos hasta el nivel. `size`: diámetro en px. `mono`: en el color del texto (sobre fondos de color). */
+export function PriorityDots({ n, size = 8, mono }: { n: number; size?: number; mono?: boolean }) {
   const p = PRIORITIES.find((x) => x.value === n);
   if (!p) return null;
-  const w = Math.max(3, Math.round(size / 4.5));
   return (
-    <span aria-hidden style={mono ? undefined : tone(p.tone)} className="inline-flex items-end">
+    <span aria-hidden style={mono ? undefined : tone(p.tone)} className="inline-flex items-center">
       {[1, 2, 3, 4].map((i) => (
         <span
           key={i}
-          className={cx("rounded-[1.5px]", i > 1 && "ml-[2px]", i <= n && !mono && "prio-on")}
+          className={cx("rounded-full", i <= n && !mono && "prio-on")}
           style={{
-            width: w,
-            height: Math.round((size * (i + 1)) / 5),
+            width: size,
+            height: size,
+            marginLeft: i > 1 ? Math.max(2, Math.round(size * 0.4)) : 0,
             background:
               i <= n
                 ? mono
@@ -89,7 +90,7 @@ export function PriorityTag({ n }: { n: number }) {
   const label = `Prioridad ${p.label.toLowerCase()}`;
   return (
     <span role="img" aria-label={label} title={label} className="inline-flex h-6 items-center px-0.5">
-      <PriorityBars n={n} />
+      <PriorityDots n={n} />
     </span>
   );
 }
@@ -115,7 +116,7 @@ export function PriorityPicker({ value, onChange, name }: { value: number; onCha
               on ? "border-[var(--tone-solid)] bg-tone ring-1 ring-[var(--tone-solid)]" : "border-line-strong hover:bg-surface-2",
             )}
           >
-            <PriorityBars n={p.value} size={18} />
+            <PriorityDots n={p.value} size={9} />
           </button>
         );
       })}

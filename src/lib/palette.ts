@@ -17,5 +17,7 @@ export function tone(key: string): React.CSSProperties {
     "--tone-bg": `var(--p-${k}-bg)`,
     "--tone-fg": `var(--p-${k}-fg)`,
     "--tone-solid": `var(--p-${k}-solid)`,
+    "--tone-chip": `var(--p-${k}-chip)`,
+    "--tone-chip-fg": `var(--p-${k}-chip-fg)`,
   } as React.CSSProperties;
 }
