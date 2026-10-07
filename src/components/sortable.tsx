@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   closestCenter,
   DndContext,
@@ -53,6 +54,7 @@ export function Sortable({
   disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const dndId = useId();
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }),
@@ -69,6 +71,8 @@ export function Sortable({
   if (disabled) return <>{children}</>;
   return (
     <DndContext
+      // Id estable: sin esto los ids internos no coinciden entre servidor y navegador.
+      id={dndId}
       sensors={sensors}
       collisionDetection={closestCenter}
       modifiers={grid ? undefined : [onlyVertical]}

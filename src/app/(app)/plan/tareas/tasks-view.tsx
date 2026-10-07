@@ -258,6 +258,8 @@ function TaskTable({
   onReorder: (ids: string[]) => void;
 }) {
   return (
+    // El envoltorio de arrastre va por fuera de la tabla (mete elementos de accesibilidad que una tabla no admite).
+    <Sortable ids={tasks.map((t) => t.id)} onReorder={onReorder} disabled={!sortable}>
     <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
       <table className="w-full min-w-[56rem] table-fixed text-left text-[14px]">
         <thead>
@@ -270,7 +272,6 @@ function TaskTable({
             <th className="py-3 pr-5 pl-3 font-medium">Progreso</th>
           </tr>
         </thead>
-        <Sortable ids={tasks.map((t) => t.id)} onReorder={onReorder} disabled={!sortable}>
         <tbody>
           {tasks.map((t) => {
             const left = daysLeft(t.deadline, today);
@@ -318,9 +319,9 @@ function TaskTable({
             );
           })}
         </tbody>
-        </Sortable>
       </table>
     </div>
+    </Sortable>
   );
 }
 

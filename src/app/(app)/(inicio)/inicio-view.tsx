@@ -1,7 +1,11 @@
 "use client";
 
+import { HabitDayRows } from "../habitos/day-rows";
+import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
+import { dayProgress } from "../habitos/today-panel";
+import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
-import { useId, useOptimistic, useState, useTransition } from "react";
+import { useId, useOptimistic, useRef, useState, useTransition } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -11,7 +15,6 @@ import {
   Check,
   ClipboardText,
   CreditCard,
-  Flame,
   Medal,
   NotePencil,
   Notebook,
@@ -22,12 +25,10 @@ import {
 import type { Dashboard } from "@/lib/dashboard";
 import { addDays, formatLong, formatMonth, formatShort, shiftMonth, weekday } from "@/lib/dates";
 import { greeting } from "@/lib/journal-logic";
-import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
 import { money, moneyCents } from "@/lib/format";
 import { daysLeftLabel, isFreeBlock, timeRange } from "@/lib/plan-logic";
-import { setHabitLog } from "@/lib/habit-actions";
 import { setBlockDone } from "@/lib/plan-actions";
 import { writeOnDay } from "@/lib/journal-actions";
 import { PageHeader } from "@/components/page-header";
@@ -258,8 +259,6 @@ function Card({
 
 // ─── Hábitos de hoy ─────────────────────────────────────────────────────────
 
-type HabitToday = Dashboard["habits"]["today"][number];
-
 function Ring({ value, total, color }: { value: number; total: number; color: string }) {
   const r = 26;
   const c = 2 * Math.PI * r;
@@ -282,21 +281,13 @@ function Ring({ value, total, color }: { value: number; total: number; color: st
   );
 }
 
+/** La misma lista que Hoy en Hábitos: filas, orden, toques y hoja del día. */
 function HabitsToday({ d }: { d: Dashboard }) {
-  const [list, setDone] = useOptimistic(d.habits.today, (cur: HabitToday[], u: { id: string; done: boolean }) =>
-    cur.map((h) => (h.id === u.id ? { ...h, state: u.done ? ("done" as const) : ("pending" as const) } : h)),
-  );
-  const [, start] = useTransition();
-  const done = list.filter((h) => h.state === "done").length;
-  const due = list.filter((h) => h.state !== "skipped").length;
-
-  function toggle(h: HabitToday) {
-    const next = h.state !== "done";
-    start(async () => {
-      setDone({ id: h.id, done: next });
-      await setHabitLog(h.id, d.today, next ? "done" : null);
-    });
-  }
+  const { logs, mark } = useHabitLogs(d.habits.packed);
+  const { sorted, reorder } = useHabitOrder(d.habits.list, d.habits.manualOrder);
+  const visible = sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today));
+  const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
+  const daySheet = useRef<DaySheetHandle>(null);
 
   return (
     <Card title="Hábitos de hoy" href="/habitos" color="var(--c-habitos)" className="lg:col-span-5" i={1}>
@@ -315,64 +306,21 @@ function HabitsToday({ d }: { d: Dashboard }) {
           </p>
         </div>
       </div>
-      {list.length > 0 ? (
-        <ul className="-mx-1 grid gap-0.5">
-          {list.map((h) => {
-            const isDone = h.state === "done";
-            const content = (
-              <>
-                <HabitAvatar icon={h.icon} color={h.color} size={32} />
-                <span
-                  className={cx(
-                    "min-w-0 flex-1 truncate text-[14px]",
-                    isDone && "text-muted line-through decoration-faint",
-                    h.state === "skipped" && "text-muted",
-                  )}
-                >
-                  {h.name}
-                  {h.state === "skipped" && <span className="ml-2 text-[12px] text-[var(--st-skip-fg)]">Salteado</span>}
-                </span>
-                {h.streak > 1 && (
-                  <span className="tabular inline-flex items-center gap-0.5 text-[12px] text-muted" title="Racha">
-                    <Flame size={13} weight="fill" aria-hidden className="text-[var(--p-orange-solid)]" />
-                    {h.streak}
-                  </span>
-                )}
-                <span
-                  aria-hidden
-                  className={cx(
-                    "inline-flex size-7 items-center justify-center rounded-full border-2 transition-colors duration-200",
-                    isDone
-                      ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-white"
-                      : h.state === "skipped"
-                        ? "border-[var(--st-skip-line)] bg-[var(--st-skip-bg)]"
-                        : "border-line-strong",
-                  )}
-                >
-                  {isDone && <Check size={14} weight="bold" />}
-                </span>
-              </>
-            );
-            const cls =
-              "flex min-h-12 w-full items-center gap-3 rounded-xl px-1.5 text-left transition-colors hover:bg-surface-2";
-            return (
-              <li key={h.id}>
-                {h.quantity ? (
-                  <Link href={`/habitos/${h.id}`} className={cls}>
-                    {content}
-                  </Link>
-                ) : (
-                  <button type="button" onClick={() => toggle(h)} aria-pressed={isDone} className={cls}>
-                    {content}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+      {visible.length > 0 ? (
+        <HabitDayRows
+          habits={visible}
+          logs={logs}
+          day={d.today}
+          today={d.today}
+          mark={mark}
+          onOpen={(h) => daySheet.current?.show(h, d.today)}
+          onReorder={reorder}
+          rowClassName="bg-surface py-1.5 lg:py-2.5"
+        />
       ) : (
         <p className="text-[14px] text-muted">No hay hábitos para hoy.</p>
       )}
+      <DaySheet ref={daySheet} logs={logs} mark={mark} />
     </Card>
   );
 }

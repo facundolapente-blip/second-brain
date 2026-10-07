@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowBendUpRight, Check, Plus, X } from "@phosphor-icons/react";
+import { Plus } from "@phosphor-icons/react";
 import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
-import { dayState, WEEKDAY_SHORT, type PackedLogMap, showsOn, nextStatus } from "@/lib/habit-logic";
-import { HabitAvatar } from "@/lib/habit-icons";
+import { WEEKDAY_SHORT, type PackedLogMap, showsOn } from "@/lib/habit-logic";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
-import { DaySheet, HabitBadge, useHabitLogs, useHabitOrder, type DaySheetHandle } from "./habit-ui";
-import { Sortable, SortableItem } from "@/components/sortable";
+import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "./habit-ui";
+import { HabitDayRows } from "./day-rows";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { TodayPanel } from "./today-panel";
@@ -45,7 +44,6 @@ export function TodayView({
   const { sorted, reorder } = useHabitOrder(habits, manualOrder);
   const visible = sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected));
 
-  const isFuture = selected > today;
 
   return (
     <>
@@ -71,52 +69,17 @@ export function TodayView({
           ) : visible.length === 0 ? (
             <p className="display py-20 text-center text-[22px] text-muted">No hay hábitos para este día.</p>
           ) : (
-            // Mantener apretado (o clic y arrastrar) y mover para cambiar el orden.
-            <Sortable ids={visible.map((h) => h.id)} onReorder={reorder}>
-            <ul className="divide-y divide-line border-b border-line lg:border-b-0">
-              {visible.map((h) => {
-                const hLogs = logs[h.id] ?? {};
-                const log = hLogs[selected];
-                const state = dayState(h, hLogs, selected, today);
-                const isCount = h.target > 1 || !!h.unit;
-                return (
-                  <SortableItem key={h.id} id={h.id} className="flex items-center gap-3 bg-bg py-1.5 lg:gap-4 lg:bg-surface lg:py-4">
-                    <button
-                      type="button"
-                      onClick={() => daySheet.current?.show(h, selected)}
-                      disabled={isFuture}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left lg:gap-4"
-                    >
-                      <HabitAvatar icon={h.icon} color={h.color} className="size-8 lg:size-[42px]" />
-                      <span className="grid min-w-0 gap-0.5 lg:gap-1">
-                        <span className="flex items-baseline gap-2">
-                          <span className="truncate text-[15px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
-                          {isCount && (
-                            <span className="tabular shrink-0 text-sm text-muted">
-                              {log?.s === "done" ? log.v : 0}
-                              {h.target > 1 ? `/${h.target}` : ""} {h.unit ?? ""}
-                            </span>
-                          )}
-                        </span>
-                        <span>
-                          <HabitBadge habit={h} compact />
-                        </span>
-                      </span>
-                    </button>
-                    <CheckButton
-                      state={state}
-                      disabled={isFuture}
-                      onTap={() => {
-                        if (isCount) daySheet.current?.show(h, selected);
-                        // Un toque: tilde verde; dos: cruz roja; tres: vuelve a blanco.
-                        else mark(h.id, selected, nextStatus(log), 1);
-                      }}
-                    />
-                  </SortableItem>
-                );
-              })}
-            </ul>
-            </Sortable>
+            <HabitDayRows
+              habits={visible}
+              logs={logs}
+              day={selected}
+              today={today}
+              mark={mark}
+              onOpen={(h) => daySheet.current?.show(h, selected)}
+              onReorder={reorder}
+              className="border-b border-line lg:border-b-0"
+              rowClassName="bg-bg py-1.5 lg:bg-surface lg:py-4"
+            />
           )}
         </div>
         </section>
@@ -206,51 +169,6 @@ function DateStrip({
         );
       })}
     </div>
-  );
-}
-
-function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => void; disabled?: boolean }) {
-  const map: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
-    done: {
-      cls: "border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
-      icon: <Check size={20} weight="bold" />,
-      label: "Hecho",
-    },
-    failed: {
-      cls: "border-[var(--st-fail-line)] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
-      icon: <X size={18} weight="bold" />,
-      label: "Fallado",
-    },
-    skipped: {
-      cls: "border-[var(--st-skip-line)] bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
-      icon: <ArrowBendUpRight size={18} weight="bold" />,
-      label: "Salteado",
-    },
-    unmarked: {
-      cls: "border-transparent bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
-      icon: null,
-      label: "Sin marcar",
-    },
-    partial: {
-      cls: "border-dashed border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
-      icon: null,
-      label: "A medias",
-    },
-  };
-  const s = map[state] ?? { cls: "border-line-strong hover:border-fg/50", icon: null, label: "Marcar como hecho" };
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      disabled={disabled}
-      aria-label={s.label}
-      className={cx(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-[transform,background-color,border-color] duration-200 active:scale-90 lg:size-11 disabled:opacity-40 motion-reduce:transition-none motion-reduce:active:scale-100",
-        s.cls,
-      )}
-    >
-      {s.icon}
-    </button>
   );
 }
 

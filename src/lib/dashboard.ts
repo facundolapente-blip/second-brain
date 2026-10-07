@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { backupWarning } from "./backup";
 import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
-import { currentStreak as habitStreak, dayState, type DayState } from "./habit-logic";
+import { currentStreak as habitStreak, dayState, packAll, showsOn, type DayState } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
 import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, runSchedules } from "./finance";
 import { budgetState, monthShare } from "./budget-logic";
@@ -60,7 +60,7 @@ export async function getDashboard() {
     getCategoryBudgets(today.slice(0, 7)),
     backupWarning(),
   ]);
-  const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, blockLogs, tasks] = await Promise.all([
+  const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, blockLogs, tasks, habitOrderFlag] = await Promise.all([
     getHabitsWithLogs(),
     prisma.journalEntry.findMany({
       where: { OR: [{ title: { not: null } }, { body: { not: "" } }] },
@@ -95,6 +95,7 @@ export async function getDashboard() {
       where: { status: { not: "done" } },
       select: { id: true, title: true, deadline: true, priority: true, status: true, progress: true, goal: true },
     }),
+    prisma.appSetting.findUnique({ where: { key: "habitos_orden_manual" } }),
   ]);
 
   // ─── Hábitos ──────────────────────────────────────────────────────────────
@@ -112,9 +113,8 @@ export async function getDashboard() {
       quantity: h.target > 1 || !!h.unit,
       priority: h.priority,
     }))
-    .filter((h) => COUNTS.includes(h.state) || h.state === "skipped")
-    // Orden fijo (prioridad y nombre): al tildar desde Inicio la fila no salta.
-    .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name, "es"));
+    // Los mismos que muestra la lista Hoy (`showsOn`), así las cifras coinciden.
+    .filter((h) => showsOn(habits.find((x) => x.id === h.id)!, logs[h.id] ?? {}, today));
 
   const habitDay = (iso: string) => {
     let done = 0;
@@ -242,7 +242,11 @@ export async function getDashboard() {
       today: habitsToday,
       doneToday: habitsToday.filter((h) => h.state === "done").length,
       skippedToday: habitsToday.filter((h) => h.state === "skipped").length,
-      dueToday: habitsToday.filter((h) => h.state !== "skipped").length,
+      dueToday: habitsToday.length,
+      // Para la tarjeta de Inicio, que es la misma lista que Hoy (filas, orden, marcas).
+      list: habits,
+      packed: packAll(logs),
+      manualOrder: !!habitOrderFlag,
       history: habitHistory,
       best: bestHabitStreak && bestHabitStreak.streak > 0 ? bestHabitStreak : null,
     },
