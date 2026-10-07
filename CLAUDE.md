@@ -46,6 +46,7 @@ node --env-file=.env scripts/seed-gastos-demo.ts  # cuentas y movimientos de eje
 
 - App: https://second-brain-ochre-phi.vercel.app (Vercel, proyecto `second-brain`, región `gru1`). Repo privado: github.com/facundolapente-blip/second-brain.
 - Base: Neon, proyecto `second-brain` (`dry-mode-32198909`, aws-sa-east-1). Conexiones y secreto en `.env.production.local` (fuera de git). Para correr algo contra producción: `set -a; . ./.env.production.local; set +a` (los importadores mejor con `DATABASE_URL="$DIRECT_URL"`).
+- `src/lib/prisma.ts` agrega `pgbouncer=true` a `DATABASE_URL` si no lo tiene: el pooler de Neon guarda consultas preparadas y, después de una migración que cambia el tipo de una columna, fallaban con "cached plan must not change result type" (le pasó a /plan el 2026-10-07 con `PlanTask.links`).
 - Variables en Vercel: `DATABASE_URL` (pooled), `DIRECT_URL`, `BETTER_AUTH_SECRET`, `ALLOWED_EMAILS`. `BETTER_AUTH_URL` no hace falta: `urlBase()` usa `VERCEL_PROJECT_PRODUCTION_URL`.
 - Deploy: Vercel está conectado al repo, **cada push a `main` despliega solo** (el build aplica migraciones solo en producción, `scripts/build.mjs`). A mano: `npx vercel deploy --prod`.
 
