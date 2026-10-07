@@ -197,6 +197,7 @@ export async function getDashboard() {
     date: fromDbDate(b.date),
     startTime: b.startTime,
     endTime: b.endTime,
+    sortKey: b.sortKey,
     priority: b.priority,
     done: b.done,
     place: b.place,

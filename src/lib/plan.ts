@@ -51,6 +51,7 @@ function blockDTO(b: BlockRow): BlockDTO {
     date: fromDbDate(b.date),
     startTime: b.startTime,
     endTime: b.endTime,
+    sortKey: b.sortKey,
     priority: b.priority,
     done: b.done,
     place: b.place,

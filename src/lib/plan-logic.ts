@@ -69,6 +69,8 @@ export type BlockDTO = {
   date: string;
   startTime: string | null;
   endTime: string | null;
+  /** Lugar en el día de un bloque sin hora (minutos); null = arriba. */
+  sortKey: number | null;
   priority: number;
   done: boolean;
   place: string | null;
@@ -126,11 +128,36 @@ export function durationMinutes(b: Pick<BlockDTO, "startTime" | "endTime">): num
 }
 
 /** Bloques del día en orden: primero los de todo el día, después por hora. */
-export function sortBlocks<T extends Pick<BlockDTO, "startTime" | "title">>(blocks: T[]): T[] {
+/**
+ * Lugar de un bloque en la columna del día, en minutos: los que tienen hora, su
+ * hora de inicio; los que no, el lugar donde se soltaron (`sortKey`) o arriba.
+ */
+export function blockSortKey(b: Pick<BlockDTO, "startTime"> & { sortKey?: number | null }): number {
+  if (b.startTime) return Number(b.startTime.slice(0, 2)) * 60 + Number(b.startTime.slice(3, 5));
+  return b.sortKey ?? -1;
+}
+
+export function sortBlocks<T extends Pick<BlockDTO, "startTime" | "title"> & { sortKey?: number | null }>(blocks: T[]): T[] {
   return [...blocks].sort(
     (a, b) =>
-      (a.startTime ?? "").localeCompare(b.startTime ?? "") || a.title.localeCompare(b.title, "es"),
+      blockSortKey(a) - blockSortKey(b) ||
+      // Empatados: primero el que no tiene hora (se soltó justo antes de ese horario).
+      Number(!!a.startTime) - Number(!!b.startTime) ||
+      a.title.localeCompare(b.title, "es"),
   );
+}
+
+/**
+ * `sortKey` para soltar un bloque sin hora en la posición `index` de la lista
+ * del día (ya ordenada y sin el bloque que se mueve): entre sus dos vecinos.
+ */
+export function sortKeyAt<T extends Pick<BlockDTO, "startTime"> & { sortKey?: number | null }>(list: T[], index: number): number {
+  const prev = index > 0 ? blockSortKey(list[index - 1]) : null;
+  const next = index < list.length ? blockSortKey(list[index]) : null;
+  if (prev === null && next === null) return -1;
+  if (prev === null) return next! - 10;
+  if (next === null) return prev + 1;
+  return (prev + next) / 2;
 }
 
 /** Un bloque "Libre" es tiempo propio: se ve más tenue. */

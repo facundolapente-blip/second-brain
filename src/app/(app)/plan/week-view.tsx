@@ -3,7 +3,7 @@
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
-import { ArrowArcRight, CaretLeft, CaretRight, Check, Copy, DotsThreeVertical, MapPin, Plus } from "@phosphor-icons/react";
+import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone } from "@/lib/plan-actions";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
@@ -65,12 +65,14 @@ export function WeekView({
     });
   }
   const openNew = (date: string, startTime?: string) => sheet.current?.open(startTime ? { date, startTime } : { date });
-  function move(id: string, date: string, startTime?: string | null) {
+  function move(id: string, date: string, startTime?: string | null, sortKey?: number) {
     const b = blocks.find((x) => x.id === id);
-    if (!b || (b.date === date && (startTime === undefined || startTime === b.startTime))) return;
+    if (!b) return;
+    const sameSpot = b.date === date && (startTime === undefined || startTime === b.startTime);
+    if (sameSpot && (sortKey === undefined || sortKey === b.sortKey)) return;
     startTransition(async () => {
-      applyDone({ id, date, ...(startTime !== undefined ? { startTime } : {}) });
-      await moveBlock(id, date, startTime);
+      applyDone({ id, date, ...(startTime !== undefined ? { startTime } : {}), ...(sortKey !== undefined ? { sortKey } : {}) });
+      await moveBlock(id, date, startTime, sortKey);
     });
   }
   const openEdit = (b: BlockDTO) => sheet.current?.open(b);
@@ -285,10 +287,10 @@ function DayList({
       ) : (
         <ol className="grid border-t border-line">
           {blocks.map((b) => (
-            <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-3 border-b border-line">
-              <span className="pt-3.5 text-right font-mono text-[11.5px] leading-tight text-muted tabular">
-                {b.startTime ? b.startTime.replace(/^0/, "") : "Todo el día"}
-                {b.endTime && <span className="block text-muted">{b.endTime.replace(/^0/, "")}</span>}
+            <li key={b.id} className="grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25">
+              <span className="pt-3 text-right font-mono text-[13px] leading-tight font-medium text-fg/80 tabular">
+                {b.startTime ? b.startTime.replace(/^0/, "") : <span className="text-[11.5px] font-normal text-muted">Todo el día</span>}
+                {b.endTime && <span className="block font-normal text-muted">{b.endTime.replace(/^0/, "")}</span>}
               </span>
               <BlockCard
                 block={b}
@@ -323,7 +325,7 @@ export function BlockCard({
     <article
       className={cx(
         "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
-        compact ? "border-b border-line px-1 py-2.5" : "py-2.5 pr-1",
+        compact ? "border-b-2 border-fg/25 px-1 py-2.5" : "py-2.5 pr-1",
         free && "opacity-80",
       )}
     >
@@ -337,6 +339,13 @@ export function BlockCard({
         >
           {b.title}
         </span>
+        {/* La hora, cerca del título y con peso parecido al de las etiquetas. */}
+        {compact && range && (
+          <span className="mt-1 flex items-center gap-1 font-mono text-[13px] font-medium whitespace-nowrap text-fg/75 tabular">
+            <Clock size={13} weight="bold" aria-hidden className="shrink-0 text-muted" />
+            {range.replace(" a ", "–")}
+          </span>
+        )}
       </button>
       {!free && (
         <button
@@ -371,7 +380,6 @@ export function BlockCard({
           <CategoryTag category={category} />
           <PriorityTag n={b.priority} />
         </span>
-        {compact && range && <span className="font-mono text-[11px] text-muted tabular">{range}</span>}
         {b.place && (
           <span className="inline-flex items-center gap-1 text-[12px] text-muted">
             <MapPin size={12} aria-hidden /> {b.place}

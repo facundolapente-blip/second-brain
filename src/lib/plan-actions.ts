@@ -369,7 +369,8 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
  * Mueve un bloque a otro día (y opcionalmente a otra hora, conservando la
  * duración). Es la misma tarjeta: no se crea otra.
  */
-export async function moveBlock(id: string, date: string, startTime?: string | null) {
+/** Mueve un bloque de día (y hora). `sortKey`: lugar en la columna de uno sin hora. */
+export async function moveBlock(id: string, date: string, startTime?: string | null, sortKey?: number) {
   await exigirSesion();
   if (!isISODate(date)) return;
   const b = await prisma.planBlock.findUnique({ where: { id } });
@@ -387,7 +388,8 @@ export async function moveBlock(id: string, date: string, startTime?: string | n
   }
   const to = toDbDate(date);
   const done = +b.date === +to ? b.done : await changeWeek(b, to);
-  await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end, done } });
+  const key = sortKey !== undefined && Number.isFinite(sortKey) && !start ? { sortKey } : {};
+  await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end, done, ...key } });
   refrescar();
 }
 

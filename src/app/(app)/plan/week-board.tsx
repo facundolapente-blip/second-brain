@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
-import { isFreeBlock, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
+import { isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
 import { PRIORITIES } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -17,14 +17,31 @@ type Props = {
   onToggle: (b: BlockDTO) => void;
   onEdit: (b: BlockDTO) => void;
   onNew: (date: string, startTime?: string) => void;
-  onMove: (id: string, date: string, startTime?: string | null) => void;
+  onMove: (id: string, date: string, startTime?: string | null, sortKey?: number) => void;
 };
 
 const DRAG = "text/x-bloque";
 
 /** Escritorio, vista lista: 7 columnas; los bloques se arrastran de un día a otro. */
+/**
+ * Lugar donde caería lo arrastrado: antes de la tarjeta cuyo centro queda por
+ * debajo del puntero (las tarjetas llevan `data-bloque`).
+ */
+function dropIndex(section: HTMLElement, y: number, skip: string | null): number {
+  const cards = [...section.querySelectorAll<HTMLElement>("[data-bloque]")].filter((c) => c.dataset.bloque !== skip);
+  const i = cards.findIndex((c) => {
+    const r = c.getBoundingClientRect();
+    return y < r.top + r.height / 2;
+  });
+  return i === -1 ? cards.length : i;
+}
+
 export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove }: Props) {
   const [over, setOver] = useState<string | null>(null);
+  // Lo que se arrastra (durante el arrastre el navegador no deja leer los datos) y dónde caería.
+  const [dragging, setDragging] = useState<BlockDTO | null>(null);
+  const [slot, setSlot] = useState<{ day: string; index: number } | null>(null);
+  const untimed = dragging !== null && !dragging.startTime;
   return (
     // Cada día con un ancho mínimo cómodo: si no entran los 7, se corre de costado.
     <div className="overflow-x-auto pb-2">
@@ -39,12 +56,26 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               if (!e.dataTransfer.types.includes(DRAG)) return;
               e.preventDefault();
               setOver(d);
+              // Un bloque sin hora se puede dejar en cualquier lugar de la columna.
+              if (untimed) {
+                const index = dropIndex(e.currentTarget, e.clientY, dragging.id);
+                setSlot((s) => (s?.day === d && s.index === index ? s : { day: d, index }));
+              }
             }}
-            onDragLeave={() => setOver((o) => (o === d ? null : o))}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setOver((o) => (o === d ? null : o));
+              setSlot((s) => (s?.day === d ? null : s));
+            }}
             onDrop={(e) => {
               const id = e.dataTransfer.getData(DRAG);
               setOver(null);
-              if (id) onMove(id, d);
+              setSlot(null);
+              if (!id) return;
+              if (untimed && dragging.id === id) {
+                const rest = list.filter((b) => b.id !== id);
+                onMove(id, d, undefined, sortKeyAt(rest, dropIndex(e.currentTarget, e.clientY, id)));
+              } else onMove(id, d);
             }}
             className={cx(
               "grid min-h-[60dvh] min-w-0 content-start border-r border-line px-2.5 pb-6 transition-colors first:pl-0 last:border-r-0 last:pr-0",
@@ -59,16 +90,34 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               </span>
               <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.length || ""}</span>
             </header>
-            {list.map((b) => (
+            {list.map((b) => {
+              const others = list.filter((x) => x.id !== dragging?.id);
+              const i = others.findIndex((x) => x.id === b.id);
+              const lineBefore = slot?.day === d && i !== -1 && slot.index === i;
+              const lineAfter = slot?.day === d && i !== -1 && i === others.length - 1 && slot.index === others.length;
+              return (
               <div
                 key={b.id}
+                data-bloque={b.id}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData(DRAG, b.id);
                   e.dataTransfer.effectAllowed = "move";
+                  setDragging(b);
                 }}
-                className="cursor-grab active:cursor-grabbing"
-                title="Arrastralo a otro día"
+                onDragEnd={() => {
+                  setDragging(null);
+                  setSlot(null);
+                  setOver(null);
+                }}
+                className={cx(
+                  "relative cursor-grab active:cursor-grabbing",
+                  dragging?.id === b.id && "opacity-40",
+                  // Línea donde va a caer el bloque.
+                  lineBefore && "before:absolute before:inset-x-0 before:-top-px before:h-0.5 before:rounded-full before:bg-accent",
+                  lineAfter && "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-accent",
+                )}
+                title={b.startTime ? "Arrastralo a otro día" : "Arrastralo a otro día o a otro lugar de la columna"}
               >
                 <BlockCard
                   block={b}
@@ -78,7 +127,8 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                   onEdit={() => onEdit(b)}
                 />
               </div>
-            ))}
+              );
+            })}
             <button
               type="button"
               onClick={() => onNew(d)}

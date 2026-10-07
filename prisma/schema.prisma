@@ -578,6 +578,9 @@ model PlanBlock {
   /// "HH:MM" en hora de Montevideo; sin hora = todo el día.
   startTime  String?
   endTime    String?
+  /// Lugar en la columna del día de un bloque sin hora, en minutos (para quedar
+  /// entre los que tienen hora); null = arriba de todo.
+  sortKey    Float?
   priority   Int           @default(0)
   done       Boolean       @default(false)
   place      String?
