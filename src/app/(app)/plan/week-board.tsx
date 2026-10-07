@@ -78,15 +78,23 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               } else onMove(id, d);
             }}
             className={cx(
-              "grid min-h-[60dvh] min-w-0 content-start border-r border-line px-2.5 pb-6 transition-colors first:pl-0 last:border-r-0 last:pr-0",
-              d === today && "bg-[color-mix(in_oklab,var(--accent)_4%,transparent)]",
-              over === d && "bg-[color-mix(in_oklab,var(--accent)_12%,transparent)]",
+              "grid min-h-[60dvh] min-w-0 content-start gap-2 border-r border-line px-2.5 pb-6 transition-colors last:border-r-0",
+              // Hoy: columna teñida del acento y una franja arriba.
+              d === today && "rounded-t-lg bg-[color-mix(in_oklab,var(--accent)_13%,transparent)] shadow-[inset_0_3px_0_var(--accent)]",
+              over === d && "bg-[color-mix(in_oklab,var(--accent)_18%,transparent)]",
             )}
           >
             <header className="flex items-end justify-between gap-1.5 border-b border-line px-1 pt-3 pb-2.5">
-              <span className="grid gap-0.5">
-                <span className={cx("kicker", d === today && "text-accent-fg!")}>{WEEKDAY_LONG[weekday(d)]}</span>
-                <span className="figure text-[30px]">{Number(d.slice(8))}</span>
+              <span className="grid justify-items-start gap-0.5">
+                <span className={cx("kicker", d === today && "text-accent-fg!")}>{d === today ? `Hoy · ${WEEKDAY_LONG[weekday(d)]}` : WEEKDAY_LONG[weekday(d)]}</span>
+                <span
+                  className={cx(
+                    "figure text-[30px]",
+                    d === today && "-ml-1 rounded-lg bg-accent px-1.5 text-on-accent",
+                  )}
+                >
+                  {Number(d.slice(8))}
+                </span>
               </span>
               <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.length || ""}</span>
             </header>
@@ -114,8 +122,8 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                   "relative cursor-grab active:cursor-grabbing",
                   dragging?.id === b.id && "opacity-40",
                   // Línea donde va a caer el bloque.
-                  lineBefore && "before:absolute before:inset-x-0 before:-top-px before:h-0.5 before:rounded-full before:bg-accent",
-                  lineAfter && "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-accent",
+                  lineBefore && "before:absolute before:inset-x-0 before:-top-[5px] before:h-0.5 before:rounded-full before:bg-accent",
+                  lineAfter && "after:absolute after:inset-x-0 after:-bottom-[5px] after:h-0.5 after:rounded-full after:bg-accent",
                 )}
                 title={b.startTime ? "Arrastralo a otro día" : "Arrastralo a otro día o a otro lugar de la columna"}
               >

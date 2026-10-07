@@ -325,7 +325,8 @@ export function BlockCard({
     <article
       className={cx(
         "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
-        compact ? "border-b-2 border-fg/25 px-1 py-2.5" : "py-2.5 pr-1",
+        // En la columna de la compu cada bloque es una tarjeta (bien separada de la siguiente).
+        compact ? "rounded-xl border border-line bg-surface px-3 py-2.5" : "py-2.5 pr-1",
         free && "opacity-80",
       )}
     >

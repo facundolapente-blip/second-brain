@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { CaretLeft, CaretRight, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
-import { getMonthEntries } from "@/lib/journal";
-import { addDays, formatLong, formatMonth, formatShort, isISODate, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
+import { CaretDown, CaretLeft, CaretRight, MagnifyingGlass, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
+import { getMonthEntries, getRangeEntries } from "@/lib/journal";
+import { addDays, diffDays, formatLong, formatMonth, formatShort, isISODate, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { EntryCard, JournalHeader, WriteDayButton } from "../journal-ui";
@@ -13,17 +13,27 @@ export const metadata = { title: "Calendario · Journal" };
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 const WEEK_HEAD = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const field =
+  "h-11 rounded-[10px] border border-line-strong bg-surface px-3 text-[14px] text-fg outline-none focus:border-accent";
+const goBtn =
+  "inline-flex h-11 items-center rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink transition-opacity hover:opacity-85";
 
 export default async function CalendarPage({ searchParams }: PageProps<"/journal/calendario">) {
   const sp = await searchParams;
   const today = todayISO();
+  // Período (?desde=&hasta=): lista todo lo escrito entre esas fechas y el calendario va al mes del final.
+  let desde = typeof sp.desde === "string" && isISODate(sp.desde) ? sp.desde : null;
+  let hasta = typeof sp.hasta === "string" && isISODate(sp.hasta) ? sp.hasta : null;
+  if (desde && hasta && desde > hasta) [desde, hasta] = [hasta, desde];
+  if (desde && hasta && diffDays(hasta, desde) > 366 * 10) desde = addDays(hasta, -366 * 10);
+  const range = desde && hasta ? { from: desde, to: hasta } : null;
   const mesRaw = typeof sp.mes === "string" ? sp.mes : "";
-  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesRaw) ? mesRaw : today.slice(0, 7);
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesRaw) ? mesRaw : range ? range.to.slice(0, 7) : today.slice(0, 7);
   const diaRaw = typeof sp.dia === "string" ? sp.dia : "";
   const { from, to } = monthBounds(month);
   const selected = isISODate(diaRaw) && diaRaw >= from && diaRaw <= to ? diaRaw : today >= from && today <= to ? today : null;
 
-  const entries = await getMonthEntries(month);
+  const [entries, rangeEntries] = await Promise.all([getMonthEntries(month), range ? getRangeEntries(range.from, range.to) : null]);
   const byDay = new Map<string, typeof entries>();
   for (const e of entries) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e]);
 
@@ -35,7 +45,14 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
   const selectedEntries = selected ? (byDay.get(selected) ?? []) : [];
   const monthWords = entries.reduce((n, e) => n + e.words, 0);
   const nf = new Intl.NumberFormat("es-UY");
-  const href = (m: string, d?: string) => `/journal/calendario?mes=${m}${d ? `&dia=${d}` : ""}`;
+  // Con un período elegido, moverse por el calendario lo mantiene.
+  const keep = range ? `&desde=${range.from}&hasta=${range.to}` : "";
+  const href = (m: string, d?: string) => `/journal/calendario?mes=${m}${d ? `&dia=${d}` : ""}${keep}`;
+  const rangeLabel = range
+    ? range.from === range.to
+      ? `${formatShort(range.from)} ${range.from.slice(0, 4)}`
+      : `${formatShort(range.from)} ${range.from.slice(0, 4)} – ${formatShort(range.to)} ${range.to.slice(0, 4)}`
+    : "";
 
   return (
     <>
@@ -75,6 +92,44 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
             </Link>
           </div>
 
+          {/* Ir directo a un mes o elegir un período (formularios comunes: andan sin JavaScript). */}
+          <details className="group rounded-xl border border-line px-3 py-2" open={!!range}>
+            <summary className="flex min-h-9 cursor-pointer list-none items-center gap-2 text-[13.5px] font-medium text-muted marker:hidden hover:text-fg">
+              <MagnifyingGlass size={15} aria-hidden />
+              Buscar un mes o un período
+              <CaretDown size={13} aria-hidden className="ml-auto transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="grid gap-3 pt-2 pb-1">
+              <form action="/journal/calendario" className="flex flex-wrap items-end gap-2">
+                <label className="grid gap-1 text-[12.5px] text-muted">
+                  Ir a un mes
+                  <input type="month" name="mes" defaultValue={month} required className={field} />
+                </label>
+                <button type="submit" className={goBtn}>
+                  Ir
+                </button>
+              </form>
+              <form action="/journal/calendario" className="flex flex-wrap items-end gap-2">
+                <label className="grid gap-1 text-[12.5px] text-muted">
+                  Desde
+                  <input type="date" name="desde" defaultValue={range?.from ?? monthBounds(month).from} required className={field} />
+                </label>
+                <label className="grid gap-1 text-[12.5px] text-muted">
+                  Hasta
+                  <input type="date" name="hasta" defaultValue={range?.to ?? (today < monthBounds(month).to ? today : monthBounds(month).to)} required className={field} />
+                </label>
+                <button type="submit" className={goBtn}>
+                  Ver período
+                </button>
+                {range && (
+                  <Link href={`/journal/calendario?mes=${month}`} scroll={false} className="inline-flex h-11 items-center px-2 text-[13px] font-medium text-accent-fg hover:underline">
+                    Quitar período
+                  </Link>
+                )}
+              </form>
+            </div>
+          </details>
+
           <div className="grid grid-cols-7 justify-items-center gap-y-1 lg:gap-y-2">
             {WEEK_HEAD.map((w) => (
               <span key={w} aria-hidden className="kicker pb-1">
@@ -87,10 +142,11 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               const withMood = list?.findLast((e) => e.mood !== null);
               const info = moodInfo(withMood?.mood);
               const isSel = d === selected;
+              const inRange = !!range && d >= range.from && d <= range.to;
               return (
                 <Link
                   key={d}
-                  href={href(month, d)}
+                  href={`/journal/calendario?mes=${month}&dia=${d}`}
                   scroll={false}
                   aria-label={`${formatLong(d)}${list ? `, ${list.length} ${list.length === 1 ? "entrada" : "entradas"}` : ""}`}
                   aria-current={isSel ? "date" : undefined}
@@ -101,9 +157,11 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                       ? info
                         ? "bg-tone font-semibold text-tone-fg ring-2 ring-inset ring-[var(--tone-solid)]"
                         : "bg-accent font-semibold text-on-accent"
-                      : d > today
-                        ? "text-faint"
-                        : "text-fg hover:bg-surface-2",
+                      : inRange
+                        ? "bg-[color-mix(in_oklab,var(--accent)_16%,transparent)] text-fg"
+                        : d > today
+                          ? "text-faint"
+                          : "text-fg hover:bg-surface-2",
                     isSel && "ring-[1.5px] ring-fg ring-offset-2 ring-offset-bg lg:ring-offset-surface",
                   )}
                 >
@@ -129,7 +187,23 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
         </section>
 
         <section className="grid content-start gap-3">
-          {selected ? (
+          {rangeEntries && (
+            <div className="grid gap-3">
+              <div className="grid gap-1 border-b border-fg/80 pb-3">
+                <span className="kicker">Período</span>
+                <h2 className="display text-[24px]">{rangeLabel}</h2>
+                <span className="text-[13.5px] text-muted tabular">
+                  {rangeEntries.length === 0
+                    ? "No escribiste en esas fechas."
+                    : `${rangeEntries.length === 1 ? "1 entrada" : `${rangeEntries.length} entradas`} en ${new Set(rangeEntries.map((e) => e.date)).size} días, ${nf.format(rangeEntries.reduce((n, e) => n + e.words, 0))} palabras`}
+                </span>
+              </div>
+              {[...rangeEntries].reverse().map((e, i) => (
+                <EntryCard key={e.id} entry={e} index={i} />
+              ))}
+            </div>
+          )}
+          {range ? null : selected ? (
             <>
               <div className="flex items-center justify-between gap-3 border-b border-fg/80 pb-3">
                 <h2 className="display text-[24px] first-letter:uppercase">{formatLong(selected)}</h2>
@@ -161,7 +235,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
           )}
 
           {/* En la computadora sobra lugar: el resto del mes, renglón por renglón. */}
-          {entries.length > 0 && (
+          {!range && entries.length > 0 && (
             <div className="mt-8 hidden gap-1 lg:grid">
               <h3 className="kicker border-b border-line pb-2">Todo el mes</h3>
               <ul className="grid">

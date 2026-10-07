@@ -203,6 +203,11 @@ export async function getCategories(): Promise<CategoryDTO[]> {
 /** Movimientos de un mes ("YYYY-MM"), del más nuevo al más viejo. */
 export async function getMonthTransactions(month: string): Promise<TxDTO[]> {
   const { from, to } = monthBounds(month);
+  return getRangeTransactions(from, to);
+}
+
+/** Movimientos entre dos días (inclusive), del más nuevo al más viejo. */
+export async function getRangeTransactions(from: string, to: string): Promise<TxDTO[]> {
   const rows = await prisma.transaction.findMany({
     where: { date: { gte: toDbDate(from), lte: toDbDate(to) } },
     orderBy: newestFirst,

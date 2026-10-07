@@ -214,6 +214,11 @@ export type QuickStatsDTO = Awaited<ReturnType<typeof getQuickStats>>;
 /** Entradas de un mes para el calendario. */
 export async function getMonthEntries(month: string) {
   const { from, to } = monthBounds(month);
+  return getRangeEntries(from, to);
+}
+
+/** Entradas con algo escrito entre dos días (inclusive), de la más vieja a la más nueva. */
+export async function getRangeEntries(from: string, to: string) {
   const rows = await prisma.journalEntry.findMany({
     where: { AND: [NOT_EMPTY, { date: { gte: toDbDate(from), lte: toDbDate(to) } }] },
     select: CARD_SELECT,

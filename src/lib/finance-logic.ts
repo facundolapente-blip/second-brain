@@ -6,7 +6,7 @@
  * el signo lo da el tipo de movimiento; acá se traduce a "efectos" con signo
  * sobre cada cuenta, que es lo único que se suma.
  */
-import { diffDays, formatLong, todayISO } from "./dates";
+import { diffDays, formatLong, formatMonth, formatShort, isISODate, monthBounds, todayISO } from "./dates";
 
 export type TxKind = "expense" | "income" | "transfer";
 export const TX_KINDS: TxKind[] = ["expense", "income", "transfer"];
@@ -237,6 +237,58 @@ export function groupByDay(txs: TxDTO[], sel: Selection, currencyOf: (id: string
  * Rótulo de un día como en la app de Facu: "Hoy", "Ayer", "Anteayer",
  * "Hace 3 días" (hasta 6) y después la fecha. A futuro: "Mañana", "En 3 días".
  */
+// ─── Período de Movimientos ─────────────────────────────────────────────────
+
+/** Lo que se ve en Movimientos: un mes, un año o un período con inicio y fin (días inclusive). */
+export type Period =
+  | { kind: "month"; month: string; from: string; to: string }
+  | { kind: "year"; year: string; from: string; to: string }
+  | { kind: "range"; from: string; to: string };
+
+const MAX_RANGE_DAYS = 366 * 5;
+
+/** Período desde la URL: ?desde=&hasta= (período), ?anio= (año) o ?mes= (mes; sin nada, el de hoy). */
+export function periodFromParams(sp: { mes?: unknown; anio?: unknown; desde?: unknown; hasta?: unknown }, today = todayISO()): Period {
+  const s = (v: unknown) => (typeof v === "string" ? v : Array.isArray(v) ? String(v[0] ?? "") : "");
+  let from = s(sp.desde);
+  let to = s(sp.hasta);
+  if (isISODate(from) && isISODate(to)) {
+    if (from > to) [from, to] = [to, from];
+    // Tope de 5 años para no traer la base entera de una vez.
+    if (diffDays(to, from) > MAX_RANGE_DAYS) from = to.slice(0, 4) === from.slice(0, 4) ? from : `${Number(to.slice(0, 4)) - 5}${to.slice(4)}`;
+    return { kind: "range", from, to };
+  }
+  const anio = s(sp.anio);
+  if (/^(19|20)\d{2}$/.test(anio)) return { kind: "year", year: anio, from: `${anio}-01-01`, to: `${anio}-12-31` };
+  const mes = s(sp.mes);
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? mes : today.slice(0, 7);
+  return { kind: "month", month, ...monthBounds(month) };
+}
+
+/** URL de un período (el mes en curso queda sin parámetros). */
+export function periodHref(
+  p: { kind: "month"; month: string } | { kind: "year"; year: string } | { kind: "range"; from: string; to: string },
+  today = todayISO(),
+  basePath = "/gastos",
+): string {
+  if (p.kind === "month") return p.month === today.slice(0, 7) ? basePath : `${basePath}?mes=${p.month}`;
+  if (p.kind === "year") return `${basePath}?anio=${p.year}`;
+  return `${basePath}?desde=${p.from}&hasta=${p.to}`;
+}
+
+/** "octubre 2026", "2026" o "3 ago 2026 – 15 oct 2026". */
+export function periodLabel(p: Period): string {
+  if (p.kind === "month") return formatMonth(p.month);
+  if (p.kind === "year") return p.year;
+  const f = (iso: string) => `${formatShort(iso)} ${iso.slice(0, 4)}`;
+  return p.from === p.to ? f(p.from) : `${f(p.from)} – ${f(p.to)}`;
+}
+
+/** Si hoy cae dentro del período. */
+export function periodIncludes(p: Period, iso: string): boolean {
+  return iso >= p.from && iso <= p.to;
+}
+
 export function dayLabel(iso: string, today = todayISO()): { label: string; relative: boolean } {
   const d = diffDays(today, iso);
   if (d === 0) return { label: "Hoy", relative: true };
@@ -245,7 +297,8 @@ export function dayLabel(iso: string, today = todayISO()): { label: string; rela
   if (d > 2 && d <= 6) return { label: `Hace ${d} días`, relative: true };
   if (d === -1) return { label: "Mañana", relative: true };
   if (d < -1 && d >= -6) return { label: `En ${-d} días`, relative: true };
-  const long = formatLong(iso);
+  // De otro año, con el año (al ver un año entero o un período largo).
+  const long = formatLong(iso) + (iso.slice(0, 4) !== today.slice(0, 4) ? ` de ${iso.slice(0, 4)}` : "");
   return { label: long.charAt(0).toUpperCase() + long.slice(1), relative: false };
 }
 

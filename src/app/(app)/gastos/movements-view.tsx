@@ -14,10 +14,12 @@ import {
   dayLabel,
   groupByDay,
   netByCurrency,
+  periodIncludes,
   sortedCurrencies,
   touchesSelection,
   type AccountDTO,
   type CategoryDTO,
+  type Period,
   type TemplateDTO,
   type TxDTO,
 } from "@/lib/finance-logic";
@@ -27,7 +29,8 @@ import { GastosTabs } from "./gastos-nav";
 import { AccountChips, selectionLabel } from "./account-switcher";
 import { useSelection } from "./selection";
 import { QuickAdd } from "./quick-add";
-import { Balance, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
+import { Balance, EmptyBlock, Fab, TotalsInline, TxRow, useLookups } from "./shared";
+import { PeriodNav } from "./period-nav";
 import { TxSheet, type TxSheetHandle } from "./tx-sheet";
 import { CategorySpend, SideBalances } from "./month-side";
 
@@ -51,7 +54,7 @@ function useNewShortcut(onNew: () => void) {
 }
 
 export function MovementsView({
-  month,
+  period,
   today,
   accounts,
   categories,
@@ -59,7 +62,7 @@ export function MovementsView({
   txs,
   uncategorized,
 }: {
-  month: string;
+  period: Period;
   today: string;
   accounts: AccountDTO[];
   categories: CategoryDTO[];
@@ -123,7 +126,10 @@ export function MovementsView({
     [accounts, selection],
   );
   const showAccount = selection === null || selection.length > 1;
-  const isCurrent = month === today.slice(0, 7);
+  const isCurrent = periodIncludes(period, today);
+  const netLabel = { month: "Neto del mes", year: "Neto del año", range: "Neto del período" }[period.kind] + (isCurrent && period.kind !== "range" ? " en curso" : "");
+  // Informes trabaja por mes: el del final de lo que se ve (sin pasar de hoy).
+  const reportMonth = (period.to > today ? today : period.to).slice(0, 7);
 
   return (
     <>
@@ -165,15 +171,13 @@ export function MovementsView({
               <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
               <QuickAdd accounts={accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency }))} />
               <div className="grid gap-3">
-                <div className="-ml-3">
-                  <MonthNav month={month} basePath="/gastos" current={today.slice(0, 7)} />
-                </div>
+                <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} />
                 <div className="grid gap-1">
                   <span className="kicker">Saldo actual · {selectionLabel(accounts, selection)}</span>
                   <BalanceHero totals={balance} />
                   {Object.keys(net).length > 0 && (
                     <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted">
-                      {isCurrent ? "Neto del mes en curso" : "Neto del mes"}
+                      {netLabel}
                       <TotalsInline totals={net} className="font-mono text-[13px] font-medium" />
                     </p>
                   )}
@@ -219,7 +223,7 @@ export function MovementsView({
               </div>
               <div className="hidden gap-4 lg:grid">
                 <SideBalances accounts={accounts} selection={selection} onChange={setSelection} />
-                <CategorySpend txs={visible} lk={lk} month={month} />
+                <CategorySpend txs={visible} lk={lk} month={reportMonth} />
               </div>
             </aside>
 
@@ -228,9 +232,9 @@ export function MovementsView({
                 <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
                   <Receipt size={20} aria-hidden />
                 </span>
-                <p className="display text-[24px]">No hay movimientos este mes</p>
+                <p className="display text-[24px]">{period.kind === "month" ? "No hay movimientos este mes" : period.kind === "year" ? "No hay movimientos este año" : "No hay movimientos en este período"}</p>
                 <p className="max-w-[34ch] text-sm text-muted">
-                  {selection ? "En las cuentas elegidas. Probá con todas o con otro mes." : "Cargá el primero con el botón de más."}
+                  {selection ? "En las cuentas elegidas. Probá con todas o con otras fechas." : "Cargá el primero con el botón de más."}
                 </p>
               </div>
             ) : (

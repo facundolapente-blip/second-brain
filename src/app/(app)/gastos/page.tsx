@@ -3,28 +3,28 @@ import {
   countUncategorized,
   getAccounts,
   getCategories,
-  getMonthTransactions,
+  getRangeTransactions,
   getTemplates,
-  parseMonth,
 } from "@/lib/finance";
+import { periodFromParams } from "@/lib/finance-logic";
 import { MovementsView } from "./movements-view";
 
 export const metadata = { title: "Movimientos · Gastos" };
 
 export default async function GastosPage({ searchParams }: PageProps<"/gastos">) {
-  const { mes } = await searchParams;
-  const month = parseMonth(mes);
+  const today = todayISO();
+  const period = periodFromParams(await searchParams, today);
   const [accounts, categories, templates, txs, uncategorized] = await Promise.all([
     getAccounts(),
     getCategories(),
     getTemplates(),
-    getMonthTransactions(month),
+    getRangeTransactions(period.from, period.to),
     countUncategorized(),
   ]);
   return (
     <MovementsView
-      month={month}
-      today={todayISO()}
+      period={period}
+      today={today}
       accounts={accounts}
       categories={categories}
       templates={templates}
