@@ -525,6 +525,8 @@ model PlanTask {
   /// "Agendada": ya tiene lugar en la semana.
   scheduled   Boolean       @default(false)
   notes       String?
+  /// Links de la tarea (http/https), en el orden en que se agregaron.
+  links       String[]      @default([])
   completedAt DateTime?
   /// Tarea que se repite: al terminarla aparece la siguiente (daily | weekly | monthly).
   repeat      String?

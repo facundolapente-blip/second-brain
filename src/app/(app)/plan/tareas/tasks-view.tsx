@@ -2,7 +2,7 @@
 
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { CaretDown, Check, Minus, Plus } from "@phosphor-icons/react";
-import { bumpTaskProgress, reorderTasks, setTaskScheduled } from "@/lib/plan-actions";
+import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
   applyTaskView,
@@ -17,6 +17,11 @@ import {
   type CategoryDTO,
   type TaskDTO,
   type TaskView,
+  TASK_COLUMNS,
+  TASK_COLUMN_MAX,
+  TASK_COLUMN_MIN,
+  type TaskColumnKey,
+  type TaskColumnWidths,
 } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { mergeOrder, Sortable, SortableItem } from "@/components/sortable";
@@ -37,6 +42,7 @@ export function TasksBoard({
   today,
   manualOrder = false,
   folded: foldedInitial = false,
+  columns = {},
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
@@ -45,6 +51,8 @@ export function TasksBoard({
   manualOrder?: boolean;
   /** En el celular, las tareas se pliegan en una línea de resumen. */
   folded?: boolean;
+  /** Anchos de columna guardados (tabla de la compu). */
+  columns?: TaskColumnWidths;
 }) {
   const [folded, setFolded] = useState(foldedInitial);
   function toggleFold() {
@@ -150,7 +158,7 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} />
+          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} columns={columns} />
           {/* Celular: mantener apretada una tarea y moverla para cambiar el orden. */}
           <Sortable ids={visible.map((t) => t.id)} onReorder={reorder} disabled={!canSort}>
           <ul className="grid border-t border-line lg:hidden">
@@ -278,6 +286,7 @@ function TaskTable({
   onOpen,
   sortable,
   onReorder,
+  columns,
 }: {
   tasks: TaskDTO[];
   cats: Map<string, CategoryDTO>;
@@ -286,20 +295,40 @@ function TaskTable({
   /** Clic y arrastrar una fila para cambiar el orden. */
   sortable: boolean;
   onReorder: (ids: string[]) => void;
+  columns: TaskColumnWidths;
 }) {
+  const [widths, setWidths] = useState<TaskColumnWidths>(columns);
+  const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
+  const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0) + 180;
+  function resize(k: TaskColumnKey, w: number | null, save: boolean) {
+    const next = { ...widths };
+    if (w === null) delete next[k];
+    else next[k] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, w)));
+    setWidths(next);
+    if (save) void saveTaskColumns(next);
+  }
   return (
     // El envoltorio de arrastre va por fuera de la tabla (mete elementos de accesibilidad que una tabla no admite).
     <Sortable ids={tasks.map((t) => t.id)} onReorder={onReorder} disabled={!sortable}>
     <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
-      <table className="w-full min-w-[56rem] table-fixed text-left text-[14px]">
+      <table className="w-full table-fixed text-left text-[14px]" style={{ minWidth: total }}>
+        <colgroup>
+          {TASK_COLUMNS.map((c) => (
+            <col key={c.key} style={{ width: widthOf(c.key) }} />
+          ))}
+          <col />
+        </colgroup>
         <thead>
           <tr className="border-b border-line text-[12px] text-muted">
-            <th className="w-[27%] py-3 pr-3 pl-5 font-medium">Tarea</th>
-            <th className="w-[14%] px-3 py-3 font-medium">Estado</th>
-            <th className="w-[14%] px-3 py-3 font-medium">Categoría</th>
-            <th className="w-[11%] px-3 py-3 font-medium">Prioridad</th>
-            <th className="w-[12%] px-3 py-3 font-medium">Deadline</th>
-            <th className="w-[8%] px-3 py-3 text-center font-medium">Agendada</th>
+            {TASK_COLUMNS.map((c, i) => (
+              <th
+                key={c.key}
+                className={cx("relative py-3 font-medium", i === 0 ? "pr-3 pl-5" : "px-3", c.key === "scheduled" && "text-center")}
+              >
+                <span className="block truncate">{c.label}</span>
+                <ColumnResizer label={c.label} width={widthOf(c.key)} onResize={(w, save) => resize(c.key, w, save)} />
+              </th>
+            ))}
             <th className="py-3 pr-5 pl-3 font-medium">Progreso</th>
           </tr>
         </thead>
@@ -359,6 +388,48 @@ function TaskTable({
   );
 }
 
+/**
+ * Borde derecho de un encabezado: arrastrar cambia el ancho de la columna
+ * (se guarda al soltar); doble clic vuelve al ancho de siempre; con teclado, flechas.
+ */
+function ColumnResizer({ label, width, onResize }: { label: string; width: number; onResize: (w: number | null, save: boolean) => void }) {
+  const start = useRef<{ x: number; w: number } | null>(null);
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Ancho de ${label}`}
+      aria-valuenow={width}
+      tabIndex={0}
+      title="Arrastrá para cambiar el ancho · doble clic: ancho original"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        start.current = { x: e.clientX, w: width };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (start.current) onResize(start.current.w + e.clientX - start.current.x, false);
+      }}
+      onPointerUp={(e) => {
+        if (!start.current) return;
+        onResize(start.current.w + e.clientX - start.current.x, true);
+        start.current = null;
+      }}
+      onDoubleClick={() => onResize(null, true)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          onResize(width + (e.key === "ArrowRight" ? 16 : -16), true);
+        }
+      }}
+      className="group/res absolute inset-y-0 right-0 z-10 flex w-3 cursor-col-resize touch-none justify-end outline-none"
+    >
+      <span className="my-2 w-0.5 rounded-full bg-line transition-colors group-hover/res:bg-accent group-focus-visible/res:bg-accent group-active/res:bg-accent" />
+    </span>
+  );
+}
+
 /** Casilla "Agendada" (se tilda en la tabla, como en Notion). */
 function ScheduledBox({ task }: { task: TaskDTO }) {
   const [on, setOn] = useOptimistic(task.scheduled);
@@ -389,11 +460,12 @@ function ScheduledBox({ task }: { task: TaskDTO }) {
   );
 }
 
-/** Debajo del título: pasos, si se repite y si está agendada (en la tabla, eso va en su columna). */
+/** Debajo del título: pasos, si se repite, cuántos links y si está agendada (en la tabla, eso va en su columna). */
 function TaskMeta({ t, done, hideScheduled }: { t: TaskDTO; done: boolean; hideScheduled?: boolean }) {
   const steps = t.subtasks.length ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length} pasos` : null;
   const rep = repeatLabel(t.repeat, t.repeatEvery);
-  const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, t.scheduled && !done && !hideScheduled ? "agendada" : null].filter(Boolean);
+  const links = t.links.length ? (t.links.length === 1 ? "1 link" : `${t.links.length} links`) : null;
+  const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, links, t.scheduled && !done && !hideScheduled ? "agendada" : null].filter(Boolean);
   if (!parts.length) return null;
   return <span className="text-[12px] text-muted first-letter:uppercase">{parts.join(" · ")}</span>;
 }

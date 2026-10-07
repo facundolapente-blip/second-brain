@@ -43,7 +43,10 @@ export function StatusPill({ label, toneKey }: { label: string; toneKey: string 
   );
 }
 
-/** Prioridad 0 a 4 en palabras (antes eran fueguitos, como en Notion). */
+/**
+ * Prioridad 0 a 4: se muestra con barras de señal (1 a 4 llenas, en el color de
+ * cada nivel); la palabra queda para el lector de pantalla y el cartelito.
+ */
 export const PRIORITIES: { value: number; label: string; tone: string }[] = [
   { value: 1, label: "Baja", tone: "stone" },
   { value: 2, label: "Media", tone: "blue" },
@@ -51,13 +54,43 @@ export const PRIORITIES: { value: number; label: string; tone: string }[] = [
   { value: 4, label: "Urgente", tone: "red" },
 ];
 
+/** Las cuatro barras que crecen; llenas hasta el nivel. `mono`: en el color del texto (sobre fondos de color). */
+export function PriorityBars({ n, size = 18, mono }: { n: number; size?: number; mono?: boolean }) {
+  const p = PRIORITIES.find((x) => x.value === n);
+  if (!p) return null;
+  const w = Math.max(3, Math.round(size / 4.5));
+  return (
+    <span aria-hidden style={mono ? undefined : tone(p.tone)} className="inline-flex items-end">
+      {[1, 2, 3, 4].map((i) => (
+        <span
+          key={i}
+          className={cx("rounded-[1.5px]", i > 1 && "ml-[2px]", i <= n && !mono && "prio-on")}
+          style={{
+            width: w,
+            height: Math.round((size * (i + 1)) / 5),
+            background:
+              i <= n
+                ? mono
+                  ? "currentColor"
+                  : undefined
+                : mono
+                  ? "color-mix(in oklab, currentColor 28%, transparent)"
+                  : "var(--border-strong)",
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 export function PriorityTag({ n }: { n: number }) {
   const p = PRIORITIES.find((x) => x.value === n);
   if (!p) return null;
+  const label = `Prioridad ${p.label.toLowerCase()}`;
   return (
-    <Chip toneKey={p.tone} title={`Prioridad ${p.label.toLowerCase()}`}>
-      {p.label}
-    </Chip>
+    <span role="img" aria-label={label} title={label} className="inline-flex h-6 items-center px-0.5">
+      <PriorityBars n={n} />
+    </span>
   );
 }
 
@@ -74,13 +107,15 @@ export function PriorityPicker({ value, onChange, name }: { value: number; onCha
             role="radio"
             aria-checked={on}
             onClick={() => onChange(on ? 0 : p.value)}
+            aria-label={p.label}
+            title={p.label}
             style={tone(p.tone)}
             className={cx(
-              "inline-flex h-10 items-center rounded-full border px-3.5 text-[13px] font-medium transition-colors",
-              on ? "chip-solid border-transparent" : "border-line-strong text-muted hover:text-fg",
+              "inline-flex h-11 w-14 items-center justify-center rounded-full border transition-colors",
+              on ? "border-[var(--tone-solid)] bg-tone ring-1 ring-[var(--tone-solid)]" : "border-line-strong hover:bg-surface-2",
             )}
           >
-            {p.label}
+            <PriorityBars n={p.value} size={18} />
           </button>
         );
       })}

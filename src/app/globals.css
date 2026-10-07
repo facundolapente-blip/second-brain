@@ -439,6 +439,13 @@ dialog.sheet::backdrop {
   background: var(--tone-solid);
   color: #141413;
 }
+/* Barras llenas de la prioridad: el mismo tono que las etiquetas llenas. */
+.prio-on {
+  background: color-mix(in oklab, var(--tone-fg) 78%, var(--tone-solid));
+}
+:root[data-theme="oscuro"] .prio-on {
+  background: var(--tone-solid);
+}
 
 .lift {
   box-shadow:

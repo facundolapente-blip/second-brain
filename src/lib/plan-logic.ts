@@ -24,6 +24,65 @@ export const KR_STATUS: Record<KrStatus, { label: string; tone: string }> = {
 
 export const QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const;
 
+/**
+ * Un link escrito a mano: sin esquema se le agrega https://. Solo http/https
+ * (nada de javascript: ni similares); null si no es un link válido.
+ */
+export function normalizeLink(raw: string): string | null {
+  const t = raw.trim();
+  if (!t || t.length > 600) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (!u.hostname.includes(".") && u.hostname !== "localhost") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Cómo se muestra un link: dominio (sin www) y el camino, cortado. */
+export function linkLabel(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = (u.pathname + u.search).replace(/\/$/, "");
+    const label = u.hostname.replace(/^www\./, "") + path;
+    return label.length > 60 ? `${label.slice(0, 57)}…` : label;
+  } catch {
+    return url;
+  }
+}
+
+/** Columnas de la tabla de tareas (compu) con su ancho por defecto en px. La última (Progreso) toma lo que sobra. */
+export const TASK_COLUMNS = [
+  { key: "title", label: "Tarea", width: 340 },
+  { key: "status", label: "Estado", width: 150 },
+  { key: "category", label: "Categoría", width: 150 },
+  { key: "priority", label: "Prioridad", width: 120 },
+  { key: "deadline", label: "Deadline", width: 130 },
+  { key: "scheduled", label: "Agendada", width: 100 },
+] as const;
+export type TaskColumnKey = (typeof TASK_COLUMNS)[number]["key"];
+export type TaskColumnWidths = Partial<Record<TaskColumnKey, number>>;
+export const TASK_COLUMN_MIN = 72;
+export const TASK_COLUMN_MAX = 900;
+
+/** Anchos guardados (`AppSetting "tareas_columnas"`), solo los válidos. */
+export function parseTaskColumns(raw: string | null | undefined): TaskColumnWidths {
+  const out: TaskColumnWidths = {};
+  try {
+    const v = JSON.parse(raw ?? "{}") as Record<string, unknown>;
+    for (const c of TASK_COLUMNS) {
+      const n = Number(v[c.key]);
+      if (Number.isFinite(n)) out[c.key] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, n)));
+    }
+  } catch {
+    // Valor roto: se usan los anchos por defecto.
+  }
+  return out;
+}
+
 /** Cookie con las tareas plegadas en el celular (se recuerda entre visitas). */
 export const TASKS_FOLD_COOKIE = "plan_tareas_plegadas";
 
@@ -40,6 +99,7 @@ export type TaskDTO = {
   goal: number | null;
   scheduled: boolean;
   notes: string | null;
+  links: string[];
   blockCount: number;
   /** Pasos (checklist). */
   subtasks: { id: string; title: string; done: boolean }[];

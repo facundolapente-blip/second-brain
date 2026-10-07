@@ -1,11 +1,11 @@
 "use client";
 
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState, useTransition } from "react";
-import { CalendarPlus, Check, Plus, X } from "@phosphor-icons/react";
+import { CalendarPlus, Check, Link as LinkIcon, Plus, X } from "@phosphor-icons/react";
 import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask } from "@/lib/plan-actions";
-import { TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
+import { linkLabel, normalizeLink, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
-import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, ConfirmButton, cx, Field, IconButton, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { PriorityPicker } from "../plan-ui";
 
 export type TaskSheetHandle = { open: (task?: TaskDTO) => void };
@@ -155,6 +155,8 @@ function TaskForm({
         <textarea name="notes" defaultValue={task?.notes ?? ""} rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} />
       </Field>
 
+      <LinksField key={task?.id ?? "nueva"} initial={task?.links ?? []} />
+
       {state && !state.ok && (
         <p role="alert" className="text-sm text-danger">
           {state.error}
@@ -264,6 +266,75 @@ function Subtasks({ task }: { task: TaskDTO }) {
           <Plus size={15} />
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Links de la tarea: se agregan de a uno (Enter o "Agregar") y viajan con el
+ * formulario como campos ocultos `links`. Se abren en otra pestaña.
+ */
+function LinksField({ initial }: { initial: string[] }) {
+  const [links, setLinks] = useState(initial);
+  const [text, setText] = useState("");
+  const [bad, setBad] = useState(false);
+  function add() {
+    const url = normalizeLink(text);
+    if (!url) {
+      setBad(text.trim() !== "");
+      return;
+    }
+    if (!links.includes(url)) setLinks([...links, url]);
+    setText("");
+    setBad(false);
+  }
+  return (
+    <div className="grid gap-2">
+      <span className="text-sm font-medium">Links (opcional)</span>
+      {links.map((l) => (
+        <input key={l} type="hidden" name="links" value={l} />
+      ))}
+      {links.length > 0 && (
+        <ul className="grid gap-1.5">
+          {links.map((l) => (
+            <li key={l} className="flex min-h-11 items-center gap-2 rounded-xl bg-surface-2 pr-1 pl-3">
+              <LinkIcon size={15} className="shrink-0 text-muted" aria-hidden />
+              <a href={l} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-[14px] text-accent-fg underline-offset-4 hover:underline">
+                {linkLabel(l)}
+              </a>
+              <IconButton label={`Sacar ${linkLabel(l)}`} type="button" onClick={() => setLinks(links.filter((x) => x !== l))}>
+                <X size={15} />
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        <Input
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setBad(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          onBlur={() => text.trim() && add()}
+          inputMode="url"
+          autoComplete="off"
+          placeholder="Pegá un link"
+          aria-label="Link nuevo"
+          aria-invalid={bad}
+          className={cx("min-w-0 flex-1", bad && "border-danger")}
+        />
+        <Button type="button" variant="outline" onClick={add} disabled={!text.trim()}>
+          Agregar
+        </Button>
+      </div>
+      {bad && <p className="text-[12.5px] text-danger">Eso no parece un link.</p>}
     </div>
   );
 }
