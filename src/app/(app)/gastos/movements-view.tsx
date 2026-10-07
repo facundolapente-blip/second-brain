@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowDownLeft, ArrowsClockwise, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
+import { Menu } from "@/components/menu";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import {
@@ -22,7 +24,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
 import { GastosTabs } from "./gastos-nav";
-import { AccountChips, AccountSwitcher, selectionLabel } from "./account-switcher";
+import { AccountChips, selectionLabel } from "./account-switcher";
 import { useSelection } from "./selection";
 import { QuickAdd } from "./quick-add";
 import { Balance, EmptyBlock, Fab, MonthNav, TotalsInline, TxRow, useLookups } from "./shared";
@@ -65,6 +67,7 @@ export function MovementsView({
   txs: TxDTO[];
   uncategorized: number;
 }) {
+  const router = useRouter();
   const { selection, setSelection } = useSelection(accounts);
   const lk = useLookups(accounts, categories);
   const form = useRef<TxSheetHandle>(null);
@@ -168,6 +171,12 @@ export function MovementsView({
                 <div className="grid gap-1">
                   <span className="kicker">Saldo actual · {selectionLabel(accounts, selection)}</span>
                   <BalanceHero totals={balance} />
+                  {Object.keys(net).length > 0 && (
+                    <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted">
+                      {isCurrent ? "Neto del mes en curso" : "Neto del mes"}
+                      <TotalsInline totals={net} className="font-mono text-[13px] font-medium" />
+                    </p>
+                  )}
                 </div>
                 <dl className="grid grid-cols-2 divide-x divide-line border-y border-line lg:max-w-xl">
                   <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
@@ -178,25 +187,34 @@ export function MovementsView({
 
             {/* Celular: debajo del resumen. Computadora: panel lateral fijo con saldos y gasto por categoría. */}
             <aside className="grid content-start gap-4 pb-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pt-6 lg:pb-0">
-              <div className="grid gap-2">
-                <AccountSwitcher
-                  accounts={accounts}
-                  selection={selection}
-                  onChange={setSelection}
-                  summary={{ label: isCurrent ? "Neto del mes en curso" : "Neto del mes", totals: net }}
-                />
-                <div className="flex flex-wrap gap-2">
-                  {uncategorized > 0 && (
-                    <QuickLink
-                      href="/gastos/sin-clasificar"
-                      label={`${uncategorized} sin clasificar`}
-                      icon={<Tag size={14} aria-hidden />}
-                    />
-                  )}
-                  <QuickLink href="/gastos/plantillas" label="Plantillas" icon={<Copy size={14} aria-hidden />} />
-                  <QuickLink href="/gastos/recurrentes" label="Recurrentes" icon={<ArrowsClockwise size={14} aria-hidden />} />
-                  <QuickLink href="/gastos/buscar" label="Buscar" icon={<MagnifyingGlass size={14} aria-hidden />} />
-                  <QuickLink href="/gastos/deudas" label="Deudas" icon={<Handshake size={14} aria-hidden />} />
+              {/* Celular: lo pendiente a la vista y el resto en "Más" (en compu está en las pestañas). */}
+              <div className="flex flex-wrap gap-2 empty:hidden">
+                {uncategorized > 0 && (
+                  <QuickLink
+                    href="/gastos/sin-clasificar"
+                    label={`${uncategorized} sin clasificar`}
+                    icon={<Tag size={14} aria-hidden />}
+                  />
+                )}
+                <div className="lg:hidden">
+                  <Menu
+                    align="left"
+                    trigger={(toggle) => (
+                      <button
+                        type="button"
+                        onClick={toggle}
+                        className="inline-flex h-10 items-center gap-1.5 rounded-[4px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                      >
+                        <DotsThree size={16} weight="bold" aria-hidden /> Más
+                      </button>
+                    )}
+                    items={[
+                      { label: "Buscar", icon: <MagnifyingGlass size={16} aria-hidden />, onSelect: () => router.push("/gastos/buscar") },
+                      { label: "Recurrentes", icon: <ArrowsClockwise size={16} aria-hidden />, onSelect: () => router.push("/gastos/recurrentes") },
+                      { label: "Plantillas", icon: <Copy size={16} aria-hidden />, onSelect: () => router.push("/gastos/plantillas") },
+                      { label: "Deudas", icon: <Handshake size={16} aria-hidden />, onSelect: () => router.push("/gastos/deudas") },
+                    ]}
+                  />
                 </div>
               </div>
               <div className="hidden gap-4 lg:grid">

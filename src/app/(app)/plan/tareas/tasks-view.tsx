@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Minus, Plus } from "@phosphor-icons/react";
+import { CaretDown, Minus, Plus } from "@phosphor-icons/react";
 import { bumpTaskProgress, reorderTasks } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
   applyTaskView,
   daysLeft,
+  TASKS_FOLD_COOKIE,
   daysLeftLabel,
   progressPct,
   repeatLabel,
@@ -35,13 +36,24 @@ export function TasksBoard({
   categories,
   today,
   manualOrder = false,
+  folded: foldedInitial = false,
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
   today: string;
   /** Si se arrastró alguna vez, las vistas ordenables usan ese orden. */
   manualOrder?: boolean;
+  /** En el celular, las tareas se pliegan en una línea de resumen. */
+  folded?: boolean;
 }) {
+  const [folded, setFolded] = useState(foldedInitial);
+  function toggleFold() {
+    const next = !folded;
+    setFolded(next);
+    document.cookie = `${TASKS_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+  }
+  const open = tasks.filter((t) => t.status !== "done");
+  const overdue = open.filter((t) => (daysLeft(t.deadline, today) ?? 0) < 0).length;
   const [view, setView] = useState<TaskView>("todo");
   const [all, setAll] = useState(false);
   const sheet = useRef<TaskSheetHandle>(null);
@@ -76,14 +88,31 @@ export function TasksBoard({
   return (
     <section id="tareas" aria-label="Tareas" className="scroll-mt-24 pt-3 lg:pt-5">
       <div className="flex items-center gap-2">
-        <h2 className="display text-[22px] lg:text-[26px]">Tareas</h2>
-        <span className="font-mono text-[12px] text-muted tabular">
-          {tasks.filter((t) => t.status !== "done").length} abiertas
-        </span>
+        {/* En el celular el título pliega la lista (queda una línea con el resumen). */}
+        <button
+          type="button"
+          onClick={toggleFold}
+          aria-expanded={!folded}
+          aria-controls="tareas-cuerpo"
+          className="-ml-1 flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 text-left lg:pointer-events-none"
+        >
+          <h2 className="display text-[22px] lg:text-[26px]">Tareas</h2>
+          <span className="truncate font-mono text-[12px] text-muted tabular">
+            {open.length} abiertas
+            {overdue > 0 && <span className="text-danger"> · {overdue === 1 ? "1 vencida" : `${overdue} vencidas`}</span>}
+          </span>
+          <CaretDown
+            size={14}
+            weight="bold"
+            aria-hidden
+            className={cx("shrink-0 text-muted transition-transform duration-200 lg:hidden", folded && "-rotate-90")}
+          />
+        </button>
         <Button variant="outline" size="sm" className="ml-auto" onClick={() => sheet.current?.open()}>
           <Plus size={15} weight="bold" /> Nueva tarea
         </Button>
       </div>
+      <div id="tareas-cuerpo" className={cx(folded && "max-lg:hidden")}>
       <div
         role="tablist"
         aria-label="Vistas"
@@ -148,6 +177,7 @@ export function TasksBoard({
           {all ? "Ver menos" : `Ver todas (${hidden} más)`}
         </button>
       )}
+      </div>
 
       <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} />
       <BlockSheet

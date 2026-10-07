@@ -122,9 +122,10 @@ export function InicioView({ d }: { d: Dashboard }) {
           </div>
         </section>
 
-        <CheckinCard today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} />
+        {/* Primero lo que se hace en el día; el check-in, que se completa una vez, después. */}
         <HabitsToday d={d} />
         <PlanToday d={d} />
+        <CheckinCard today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} />
         <WeekMix d={d} />
         <GastosCard d={d} delta={delta} prevName={prevName} />
         <JournalCard d={d} />

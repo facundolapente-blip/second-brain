@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { BatteryHigh, Check, Minus, Moon, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
+import { BatteryHigh, CaretDown, Check, Minus, Moon, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
 import { saveCheckin } from "@/lib/checkin-actions";
 import {
   ENERGY_LABELS,
@@ -34,9 +34,18 @@ export function CheckinCard({
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const cur = data[day];
-  const filled = ["mood", "energy", "stress", "sleepMin", "weightG"].filter(
-    (k) => cur[k as keyof CheckinDTO] !== null,
-  ).length;
+  const filled = countFilled(cur);
+  // Con el de hoy completo arranca plegado: una línea con lo cargado.
+  const [open, setOpen] = useState(() => countFilled(today) < 5);
+  const summary = [
+    MOODS.find((m) => m.value === cur.mood)?.label,
+    cur.energy ? `Energía ${ENERGY_LABELS[cur.energy - 1].toLowerCase()}` : null,
+    cur.stress ? `Estrés ${STRESS_LABELS[cur.stress - 1].toLowerCase()}` : null,
+    cur.sleepMin !== null ? formatSleep(cur.sleepMin) : null,
+    cur.weightG !== null ? `${String(cur.weightG / 1000).replace(".", ",")} kg` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function set(patch: CheckinPatch) {
     const key = day;
@@ -55,8 +64,17 @@ export function CheckinCard({
       className="rise grid gap-4 rounded-[20px] border border-line bg-surface p-4 lg:col-span-12 lg:p-5"
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span aria-hidden className="size-2 rounded-full bg-[var(--mod-inicio)]" />
-        <h2 className="text-[15px] font-semibold tracking-tight">¿Cómo estás?</h2>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls="checkin-cuerpo"
+          className="-my-2 -ml-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
+        >
+          <span aria-hidden className="size-2 rounded-full bg-[var(--mod-inicio)]" />
+          <h2 className="text-[15px] font-semibold tracking-tight">¿Cómo estás?</h2>
+          <CaretDown size={13} weight="bold" aria-hidden className={cx("text-muted transition-transform duration-200", !open && "-rotate-90")} />
+        </button>
         <span className="tabular text-[12.5px] text-muted" aria-live="polite">
           {pending ? "Guardando…" : saved ? (
             <span className="inline-flex items-center gap-1">
@@ -85,7 +103,12 @@ export function CheckinCard({
         </div>
       </header>
 
-      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]">
+      {!open && summary && (
+        <button type="button" onClick={() => setOpen(true)} className="-mt-2 truncate text-left text-[13.5px] text-muted">
+          {summary}
+        </button>
+      )}
+      <div id="checkin-cuerpo" className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", !open && "hidden")}>
         <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label}>
           <div className="grid grid-cols-5 gap-1.5">
             {MOODS.map((m) => {
@@ -129,6 +152,10 @@ export function CheckinCard({
       </div>
     </section>
   );
+}
+
+function countFilled(c: CheckinDTO) {
+  return (["mood", "energy", "stress", "sleepMin", "weightG"] as const).filter((k) => c[k] !== null).length;
 }
 
 function Row({ icon, label, hint, children }: { icon: React.ReactNode; label: string; hint?: string; children: React.ReactNode }) {

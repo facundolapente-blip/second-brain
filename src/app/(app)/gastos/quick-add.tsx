@@ -16,6 +16,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
   const [text, setText] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const [pending, start] = useTransition();
   const input = useRef<HTMLInputElement>(null);
   const p = text.trim() ? parseQuick(text, accounts) : null;
@@ -52,6 +53,8 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
             setDone(null);
             setError(null);
           }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           aria-label="Carga rápida"
           placeholder="Carga rápida: 350 almuerzo itau"
           enterKeyHint="send"
@@ -66,7 +69,8 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
           {pending ? "…" : "Cargar"}
         </button>
       </form>
-      <p className="min-h-5 px-4 text-[12.5px] text-muted" aria-live="polite">
+      {/* La ayuda aparece solo mientras se usa (o con el resultado), así no ocupa lugar siempre. */}
+      <p className={cx("px-4 text-[12.5px] text-muted", !(focused || text.trim() || done || error) && "sr-only")} aria-live="polite">
         {error ? (
           <span className="text-danger">{error}</span>
         ) : done ? (

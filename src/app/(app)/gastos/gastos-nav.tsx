@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bank, ChartPieSlice, PiggyBank, Receipt, SquaresFour, type Icon } from "@phosphor-icons/react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bank, CaretDown, ChartPieSlice, PiggyBank, Receipt, SquaresFour, type Icon } from "@phosphor-icons/react";
+import { Menu } from "@/components/menu";
 import { cx } from "@/components/ui";
 
 type Tab = { href: string; label: string; icon?: Icon; mobile: boolean };
@@ -76,12 +77,18 @@ export function GastosNav() {
   );
 }
 
-/** Pestañas del módulo en pantalla grande, debajo del título. */
+/**
+ * Pestañas del módulo en pantalla grande, debajo del título: las mismas cinco
+ * del celular y el resto en "Más" (que toma el nombre de la pantalla abierta).
+ */
 export function GastosTabs() {
   const pathname = usePathname();
+  const router = useRouter();
+  const extra = TABS.filter((t) => !t.mobile);
+  const current = extra.find((t) => isActive(pathname, t.href));
   return (
-    <div className="hidden gap-6 overflow-x-auto border-b border-line [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
-      {TABS.map((t) => {
+    <div className="hidden items-end gap-6 border-b border-line lg:flex">
+      {TABS.filter((t) => t.mobile).map((t) => {
         const active = isActive(pathname, t.href);
         return (
           <Link
@@ -97,6 +104,24 @@ export function GastosTabs() {
           </Link>
         );
       })}
+      <Menu
+        align="left"
+        trigger={(toggle) => (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-current={current ? "page" : undefined}
+            className={cx(
+              "-mb-px inline-flex items-center gap-1 border-b-[1.5px] pb-3 text-[14px] whitespace-nowrap transition-colors",
+              current ? "border-fg font-medium text-fg" : "border-transparent text-muted hover:text-fg",
+            )}
+          >
+            {current ? current.label : "Más"}
+            <CaretDown size={12} weight="bold" aria-hidden />
+          </button>
+        )}
+        items={extra.map((t) => ({ label: t.label, onSelect: () => router.push(t.href) }))}
+      />
     </div>
   );
 }

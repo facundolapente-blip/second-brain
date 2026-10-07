@@ -24,6 +24,9 @@ export const KR_STATUS: Record<KrStatus, { label: string; tone: string }> = {
 
 export const QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const;
 
+/** Cookie con las tareas plegadas en el celular (se recuerda entre visitas). */
+export const TASKS_FOLD_COOKIE = "plan_tareas_plegadas";
+
 export type CategoryDTO = { id: string; name: string; color: string };
 
 export type TaskDTO = {
