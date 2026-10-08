@@ -11,7 +11,19 @@ import { cx } from "./ui";
  */
 export type ContextMenuItem =
   | { label: string; icon?: React.ReactNode; onSelect: () => void; danger?: boolean }
-  | { label: string; icon?: React.ReactNode; rename: { value: string; onSave: (value: string) => void } };
+  | { label: string; icon?: React.ReactNode; rename: { value: string; onSave: (value: string) => void } }
+  | {
+      label: string;
+      icon?: React.ReactNode;
+      /** Día y horario ahí mismo (bloques del Plan). */
+      schedule: {
+        date: string;
+        start: string | null;
+        end: string | null;
+        onSave: (date: string, start: string | null, end: string | null) => void;
+      };
+    };
+type FormItem = Exclude<ContextMenuItem, { onSelect: () => void }>;
 
 type Open = { x: number; y: number; title?: string; items: ContextMenuItem[]; key: number };
 const EVENT = "sb:menu-contextual";
@@ -30,7 +42,7 @@ export function showContextMenu(e: React.MouseEvent, items: ContextMenuItem[], t
 
 export function ContextMenuHost() {
   const [open, setOpen] = useState<Open | null>(null);
-  const [renaming, setRenaming] = useState<Extract<ContextMenuItem, { rename: unknown }> | null>(null);
+  const [renaming, setRenaming] = useState<FormItem | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -110,7 +122,9 @@ export function ContextMenuHost() {
       style={{ left: pos?.left ?? open.x, top: pos?.top ?? open.y, visibility: pos ? "visible" : "hidden" }}
       className="fixed z-[60] min-w-52 overflow-hidden rounded-xl border border-line-strong bg-surface py-1 shadow-[0_14px_36px_-14px_rgba(var(--shadow-tint),0.45)] print:hidden"
     >
-      {renaming ? (
+      {renaming && "schedule" in renaming ? (
+        <ScheduleForm item={renaming} onDone={() => setOpen(null)} />
+      ) : renaming && "rename" in renaming ? (
         <form
           className="grid gap-2 p-2"
           onSubmit={(e) => {
@@ -144,7 +158,7 @@ export function ContextMenuHost() {
               type="button"
               role="menuitem"
               onClick={() => {
-                if ("rename" in it) setRenaming(it);
+                if ("rename" in it || "schedule" in it) setRenaming(it);
                 else {
                   setOpen(null);
                   it.onSelect();
@@ -164,5 +178,69 @@ export function ContextMenuHost() {
         </>
       )}
     </div>
+  );
+}
+
+/** Suma días a "YYYY-MM-DD" (en UTC, sin corrimientos de zona). */
+function shiftIso(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Día, desde y hasta en el mismo menú, con atajo de una semana para adelante o para atrás. */
+function ScheduleForm({ item, onDone }: { item: Extract<ContextMenuItem, { schedule: unknown }>; onDone: () => void }) {
+  const s = item.schedule;
+  const [date, setDate] = useState(s.date);
+  const [start, setStart] = useState(s.start ?? "");
+  const [end, setEnd] = useState(s.end ?? "");
+  // Cambiar el "desde" corre el "hasta" igual (mantiene lo que dura).
+  function onStart(v: string) {
+    if (v && start && end) {
+      const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+      const e = Math.min(23 * 60 + 59, mins(v) + mins(end) - mins(start));
+      setEnd(`${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`);
+    }
+    setStart(v);
+  }
+  const field = "h-10 rounded-lg border border-line-strong bg-surface px-2.5 text-[14px] outline-none focus:border-accent";
+  return (
+    <form
+      className="grid w-[19rem] max-w-[86vw] gap-2.5 p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!date) return;
+        s.onSave(date, start || null, start && end ? end : null);
+        onDone();
+      }}
+    >
+      <span className="px-0.5 text-[12px] font-medium text-muted">{item.label}</span>
+      <label className="grid gap-1 text-[12px] text-muted">
+        Día
+        <input type="date" required autoFocus value={date} onChange={(e) => setDate(e.target.value)} className={field} />
+      </label>
+      <div className="flex gap-1.5">
+        <button type="button" onClick={() => date && setDate(shiftIso(date, -7))} className="h-9 flex-1 rounded-full border border-line-strong text-[12.5px] text-muted hover:bg-surface-2 hover:text-fg">
+          −1 semana
+        </button>
+        <button type="button" onClick={() => date && setDate(shiftIso(date, 7))} className="h-9 flex-1 rounded-full border border-line-strong text-[12.5px] font-medium text-fg hover:bg-surface-2">
+          +1 semana
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="grid gap-1 text-[12px] text-muted">
+          Desde
+          <input type="time" value={start} onChange={(e) => onStart(e.target.value)} className={field} />
+        </label>
+        <label className="grid gap-1 text-[12px] text-muted">
+          Hasta
+          <input type="time" value={end} disabled={!start} onChange={(e) => setEnd(e.target.value)} className={cx(field, "disabled:opacity-50")} />
+        </label>
+      </div>
+      <span className="px-0.5 text-[11.5px] text-muted">Sin hora de inicio, queda para todo el día.</span>
+      <button type="submit" className="h-10 rounded-full bg-[var(--text)] text-[14px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">
+        Guardar
+      </button>
+    </form>
   );
 }

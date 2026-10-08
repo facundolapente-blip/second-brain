@@ -6,8 +6,8 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useOptimistic, useRef, useState } from "react";
-import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock } from "@/lib/plan-actions";
+import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
+import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock } from "@/lib/plan-actions";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
@@ -100,6 +100,29 @@ export function WeekView({
                 await renameBlock(b.id, title);
               }),
           },
+        },
+        {
+          label: "Cambiar fecha y hora",
+          icon: <CalendarBlank size={15} />,
+          schedule: {
+            date: b.date,
+            start: b.startTime,
+            end: b.endTime,
+            onSave: (date, start, end) =>
+              startTransition(async () => {
+                applyDone({ id: b.id, date, startTime: start, endTime: end, ...(date !== b.date && date > b.date ? { done: false } : {}) });
+                await rescheduleBlock(b.id, date, start, end);
+              }),
+          },
+        },
+        {
+          label: "Pasar a la semana que viene",
+          icon: <ArrowArcRight size={15} />,
+          onSelect: () =>
+            startTransition(async () => {
+              applyDone({ id: b.id, date: addDays(b.date, 7), done: false });
+              await passToNextWeek(b.id);
+            }),
         },
         { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => startTransition(() => duplicateBlock(b.id)) },
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => openEdit(b) },

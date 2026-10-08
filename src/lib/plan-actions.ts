@@ -467,6 +467,24 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
  * duración). Es la misma tarjeta: no se crea otra.
  */
 /** Mueve un bloque de día (y hora). `sortKey`: lugar en la columna de uno sin hora. */
+/**
+ * Cambiar día y horario de una vez (clic derecho → "Cambiar fecha y hora").
+ * Sin "desde" queda para todo el día; un "hasta" que no es posterior se descarta.
+ * Si cambia de semana, igual que arrastrar: llega sin tildar y deja el registro.
+ */
+export async function rescheduleBlock(id: string, date: string, startTime: string | null, endTime: string | null) {
+  await exigirSesion();
+  if (!isISODate(date)) return;
+  const b = await prisma.planBlock.findUnique({ where: { id: String(id) } });
+  if (!b) return;
+  const start = startTime && isTime(startTime) ? startTime : null;
+  const end = start && endTime && isTime(endTime) && endTime > start ? endTime : null;
+  const to = toDbDate(date);
+  const done = +b.date === +to ? b.done : await changeWeek(b, to);
+  await prisma.planBlock.update({ where: { id: b.id }, data: { date: to, startTime: start, endTime: end, done } });
+  refrescar();
+}
+
 export async function moveBlock(id: string, date: string, startTime?: string | null, sortKey?: number) {
   await exigirSesion();
   if (!isISODate(date)) return;
