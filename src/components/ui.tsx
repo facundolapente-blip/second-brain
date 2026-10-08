@@ -139,6 +139,9 @@ export const Sheet = forwardRef<
   const dlg = useRef<HTMLDialogElement>(null);
   const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
+  // Dónde empezó el clic: seleccionar texto arrastrando y soltar afuera también
+  // da un "click" en el fondo, y eso cerraba la hoja.
+  const downOnBackdrop = useRef(false);
 
   function reset(d: HTMLDialogElement) {
     d.classList.remove("closing");
@@ -215,8 +218,12 @@ export const Sheet = forwardRef<
         e.preventDefault();
         close();
       }}
+      onPointerDown={(e) => {
+        downOnBackdrop.current = e.target === dlg.current;
+      }}
       onClick={(e) => {
-        if (e.target === dlg.current) close();
+        if (e.target === dlg.current && downOnBackdrop.current) close();
+        downOnBackdrop.current = false;
       }}
     >
       <div {...dragProps} onPointerCancel={dragProps.onPointerUp} className="touch-none sm:touch-auto">
