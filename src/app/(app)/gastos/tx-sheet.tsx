@@ -300,10 +300,7 @@ export const TxSheet = forwardRef<
         <AmountMath
           amount={d.amount}
           currency={from?.currency ?? "UYU"}
-          onApply={(v) => {
-            set({ amount: v });
-            amountRef.current?.focus();
-          }}
+          onChange={(v) => set({ amount: v })}
         />
 
         {d.kind !== "transfer" && (
@@ -723,22 +720,39 @@ const MATH_OPS = [
 /**
  * Corregir el monto sin borrarlo: cuatro signos chicos debajo (+ − × ÷). Al tocar
  * uno aparece un campo para el otro número con la cuenta a la vista ("500 + 20 =
- * $ 520"); Listo o Enter la aplica. También se puede escribir la cuenta en el monto.
+ * $ 520"). Lo que se escribe ya va al monto como cuenta ("500+20"): Guardar
+ * guarda el resultado (sin botón de aplicar, pedido de Facu). Enter deja el
+ * número final; cerrar el cartel (el mismo signo o Escape) vuelve al monto de antes.
  */
-function AmountMath({ amount, currency, onApply }: { amount: string; currency: string; onApply: (v: string) => void }) {
+function AmountMath({ amount, currency, onChange }: { amount: string; currency: string; onChange: (v: string) => void }) {
   const [op, setOp] = useState<(typeof MATH_OPS)[number] | null>(null);
   const [value, setValue] = useState("");
-  const base = parseAmount(amount);
-  const result = op && base !== null && value.trim() ? parseAmount(`${centsToInput(base)}${op.op}${value}`) : null;
+  // El monto al abrir el cartel (después el campo pasa a tener la cuenta).
+  const [baseText, setBaseText] = useState("");
+  const base = op ? parseAmount(baseText) : parseAmount(amount);
+  const result = op && base !== null && value.trim() ? parseAmount(`${baseText}${op.op}${value}`) : null;
   const sign = op ? ("sign" in op ? op.sign : op.op) : "";
+  function open(o: (typeof MATH_OPS)[number]) {
+    const start = op ? baseText : centsToInput(parseAmount(amount));
+    if (!start) return;
+    setBaseText(start);
+    setOp(o);
+    setValue("");
+    onChange(start);
+  }
+  function cancel() {
+    if (op) onChange(baseText);
+    setOp(null);
+    setValue("");
+  }
   function apply() {
     if (result === null) return;
-    onApply(centsToInput(result));
+    onChange(centsToInput(result));
     setOp(null);
     setValue("");
   }
   return (
-    <div className="-mt-3 grid gap-2">
+    <div className="-mt-3 grid min-w-0 gap-2">
       <div className="flex gap-1.5" role="group" aria-label="Corregir el monto con una cuenta">
         {MATH_OPS.map((o) => {
           const s = "sign" in o ? o.sign : o.op;
@@ -751,10 +765,7 @@ function AmountMath({ amount, currency, onApply }: { amount: string; currency: s
               aria-pressed={on}
               title={o.label}
               disabled={base === null}
-              onClick={() => {
-                setOp(on ? null : o);
-                setValue("");
-              }}
+              onClick={() => (on ? cancel() : open(o))}
               className={cx(
                 "inline-flex size-9 items-center justify-center rounded-full border font-mono text-[17px] leading-none transition-colors disabled:opacity-35",
                 on ? "border-ink bg-ink text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
@@ -766,9 +777,9 @@ function AmountMath({ amount, currency, onApply }: { amount: string; currency: s
         })}
       </div>
       {op && base !== null && (
-        <div className="grid gap-1.5 rounded-xl border border-accent bg-surface p-2.5 ring-3 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
-          <div className="flex items-center gap-2">
-            <span className="w-5 text-center font-mono text-[20px] font-medium text-accent-fg" aria-hidden>
+        <div className="grid min-w-0 gap-1.5 rounded-xl border border-accent bg-surface p-2.5 ring-3 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="w-5 shrink-0 text-center font-mono text-[20px] font-medium text-accent-fg" aria-hidden>
               {sign}
             </span>
             <input
@@ -779,7 +790,11 @@ function AmountMath({ amount, currency, onApply }: { amount: string; currency: s
               aria-label={`${op.label} al monto`}
               style={{ outline: "none" }}
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setValue(v);
+                onChange(v.trim() ? `${baseText}${op.op}${v.trim()}` : baseText);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -787,22 +802,19 @@ function AmountMath({ amount, currency, onApply }: { amount: string; currency: s
                 } else if (e.key === "Escape") {
                   e.preventDefault();
                   e.stopPropagation();
-                  setOp(null);
+                  cancel();
                 }
               }}
               placeholder="0"
-              className="figure h-10 min-w-0 flex-1 bg-transparent text-[24px] outline-none placeholder:text-faint"
+              className="figure h-10 w-0 min-w-0 flex-1 bg-transparent text-[24px] outline-none placeholder:text-faint"
             />
-            <Button type="button" variant="accent" size="sm" onClick={apply} disabled={result === null}>
-              Listo
-            </Button>
           </div>
           <p className="font-mono text-[12.5px] text-muted tabular" aria-live="polite">
             {!value.trim()
-              ? `${centsToInput(base)} ${sign} …`
+              ? `${baseText} ${sign} …`
               : result === null
                 ? "El resultado tiene que ser mayor que cero."
-                : `${centsToInput(base)} ${sign} ${value.trim()} = ${moneyCents(result, currency)}`}
+                : `${baseText} ${sign} ${value.trim()} = ${moneyCents(result, currency)}`}
           </p>
         </div>
       )}
