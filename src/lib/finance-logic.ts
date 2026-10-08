@@ -119,7 +119,60 @@ export function centsToDecimalString(cents: number): string {
  * Acepta "1250", "1.250", "1.250,50", "1250,5", "1250.50", "$ 1.250".
  * Con coma, la coma es decimal. Con solo puntos, "1.250" son miles y "12.5" es decimal.
  */
+/**
+ * Monto escrito a centavos. Acepta cuentas con + − × ÷ ("500+20", "1500/3",
+ * "20x3", "1.250,50-250"): primero × y ÷, después + y −. Sin esto "500+20" se
+ * leía como 50020. Null si no es un monto válido o el resultado no es positivo.
+ */
 export function parseAmount(raw: string): number | null {
+  const s = normalizeExpr(raw);
+  if (!/\d[+\-*/]/.test(s)) return parsePlainAmount(raw);
+  const parts = s.split(/([+\-*/])/);
+  if (parts.length % 2 === 0) return null;
+  const nums: number[] = [];
+  const ops: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      ops.push(parts[i]);
+      continue;
+    }
+    const c = parsePlainAmount(parts[i]);
+    if (c === null) return null;
+    nums.push(c / 100);
+  }
+  // Primero multiplicar y dividir, después sumar y restar.
+  const vals = [nums[0]];
+  const addOps: string[] = [];
+  for (let i = 0; i < ops.length; i++) {
+    const n = nums[i + 1];
+    if (ops[i] === "*") vals[vals.length - 1] *= n;
+    else if (ops[i] === "/") vals[vals.length - 1] /= n;
+    else {
+      addOps.push(ops[i]);
+      vals.push(n);
+    }
+  }
+  let total = vals[0];
+  for (let i = 0; i < addOps.length; i++) total = addOps[i] === "+" ? total + vals[i + 1] : total - vals[i + 1];
+  const cents = Math.round(total * 100);
+  return Number.isFinite(cents) && cents > 0 && cents < 1e14 ? cents : null;
+}
+
+/** Signos de cuenta que se pueden escribir (× x X → *, ÷ : → /, − → -), sin espacios ni $. */
+function normalizeExpr(raw: string): string {
+  return raw
+    .replace(/[\s$]/g, "")
+    .replace(/[−–]/g, "-")
+    .replace(/[x×X]/g, "*")
+    .replace(/[÷:]/g, "/");
+}
+
+/** Si lo escrito es una cuenta (no un número solo). */
+export function isAmountExpr(raw: string): boolean {
+  return /\d[+\-*/]/.test(normalizeExpr(raw));
+}
+
+function parsePlainAmount(raw: string): number | null {
   let s = raw.replace(/[^\d.,-]/g, "");
   if (!s || s.includes("-")) return null;
   const lastComma = s.lastIndexOf(",");

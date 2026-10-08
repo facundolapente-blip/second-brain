@@ -11,6 +11,7 @@ import { splitInstallments } from "@/lib/card-logic";
 import { moneyCents } from "@/lib/format";
 import {
   centsToInput,
+  isAmountExpr,
   parseAmount,
   type AccountDTO,
   type CategoryDTO,
@@ -271,6 +272,12 @@ export const TxSheet = forwardRef<
               style={{ outline: "none" }}
               value={d.amount}
               onChange={(e) => set({ amount: e.target.value })}
+              // "500+20" escrito a mano: al salir del campo queda el resultado.
+              onBlur={() => {
+                if (!isAmountExpr(d.amount)) return;
+                const c = parseAmount(d.amount);
+                if (c !== null) set({ amount: centsToInput(c) });
+              }}
               placeholder="0"
               required
               aria-describedby={state && !state.ok ? "tx-error" : undefined}
@@ -289,6 +296,14 @@ export const TxSheet = forwardRef<
             )}
           </span>
         </label>
+        <AmountMath
+          amount={d.amount}
+          currency={from?.currency ?? "UYU"}
+          onApply={(v) => {
+            set({ amount: v });
+            amountRef.current?.focus();
+          }}
+        />
 
         {d.kind !== "transfer" && (
           <Field label="Título">
@@ -678,4 +693,101 @@ function installmentHint(d: Draft, currency: string): string | undefined {
   if (n < 2 || total === null) return "Cada cuota cae en su mes, en el resumen que le toca.";
   const parts = splitInstallments(total, n);
   return `${n} cuotas de ${moneyCents(parts[1], currency)}${parts[0] !== parts[1] ? ` (la primera ${moneyCents(parts[0], currency)})` : ""}, una por mes.`;
+}
+
+const MATH_OPS = [
+  { op: "+", label: "Sumar" },
+  { op: "-", sign: "−", label: "Restar" },
+  { op: "*", sign: "×", label: "Multiplicar" },
+  { op: "/", sign: "÷", label: "Dividir" },
+] as const;
+
+/**
+ * Corregir el monto sin borrarlo: cuatro signos chicos debajo (+ − × ÷). Al tocar
+ * uno aparece un campo para el otro número con la cuenta a la vista ("500 + 20 =
+ * $ 520"); Listo o Enter la aplica. También se puede escribir la cuenta en el monto.
+ */
+function AmountMath({ amount, currency, onApply }: { amount: string; currency: string; onApply: (v: string) => void }) {
+  const [op, setOp] = useState<(typeof MATH_OPS)[number] | null>(null);
+  const [value, setValue] = useState("");
+  const base = parseAmount(amount);
+  const result = op && base !== null && value.trim() ? parseAmount(`${centsToInput(base)}${op.op}${value}`) : null;
+  const sign = op ? ("sign" in op ? op.sign : op.op) : "";
+  function apply() {
+    if (result === null) return;
+    onApply(centsToInput(result));
+    setOp(null);
+    setValue("");
+  }
+  return (
+    <div className="-mt-3 grid gap-2">
+      <div className="flex gap-1.5" role="group" aria-label="Corregir el monto con una cuenta">
+        {MATH_OPS.map((o) => {
+          const s = "sign" in o ? o.sign : o.op;
+          const on = op?.op === o.op;
+          return (
+            <button
+              key={o.op}
+              type="button"
+              aria-label={o.label}
+              aria-pressed={on}
+              title={o.label}
+              disabled={base === null}
+              onClick={() => {
+                setOp(on ? null : o);
+                setValue("");
+              }}
+              className={cx(
+                "inline-flex size-9 items-center justify-center rounded-full border font-mono text-[17px] leading-none transition-colors disabled:opacity-35",
+                on ? "border-ink bg-ink text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
+              )}
+            >
+              {s}
+            </button>
+          );
+        })}
+      </div>
+      {op && base !== null && (
+        <div className="grid gap-1.5 rounded-xl border border-accent bg-surface p-2.5 ring-3 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
+          <div className="flex items-center gap-2">
+            <span className="w-5 text-center font-mono text-[20px] font-medium text-accent-fg" aria-hidden>
+              {sign}
+            </span>
+            <input
+              autoFocus
+              inputMode="decimal"
+              enterKeyHint="done"
+              autoComplete="off"
+              aria-label={`${op.label} al monto`}
+              style={{ outline: "none" }}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  apply();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOp(null);
+                }
+              }}
+              placeholder="0"
+              className="figure h-10 min-w-0 flex-1 bg-transparent text-[24px] outline-none placeholder:text-faint"
+            />
+            <Button type="button" variant="accent" size="sm" onClick={apply} disabled={result === null}>
+              Listo
+            </Button>
+          </div>
+          <p className="font-mono text-[12.5px] text-muted tabular" aria-live="polite">
+            {!value.trim()
+              ? `${centsToInput(base)} ${sign} …`
+              : result === null
+                ? "El resultado tiene que ser mayor que cero."
+                : `${centsToInput(base)} ${sign} ${value.trim()} = ${moneyCents(result, currency)}`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
