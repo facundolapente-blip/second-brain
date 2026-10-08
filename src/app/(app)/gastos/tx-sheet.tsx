@@ -1,12 +1,13 @@
 "use client";
 
+import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { ArrowsDownUp, Check, Camera, X } from "@phosphor-icons/react";
+import { ArrowsDownUp, Check, Camera, X, CopySimple } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
-import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory } from "@/lib/finance-actions";
+import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory, duplicateTransaction } from "@/lib/finance-actions";
 import { splitInstallments } from "@/lib/card-logic";
 import { moneyCents } from "@/lib/format";
 import {
@@ -556,6 +557,23 @@ export const TxSheet = forwardRef<
             <input type="checkbox" name="saveTemplate" className="size-4 accent-[var(--accent)]" />
             Guardar también como plantilla
           </label>
+        )}
+
+        {d.id && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const id = d.id!;
+              startTransition(async () => {
+                await duplicateTransaction(id);
+                notifyInfo("Movimiento duplicado");
+              });
+              sheet.current?.close();
+            }}
+          >
+            <CopySimple size={16} /> Duplicar movimiento
+          </Button>
         )}
 
         {d.id && (

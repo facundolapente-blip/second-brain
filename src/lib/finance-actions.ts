@@ -154,6 +154,37 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
   return { ok: true, id: saved.id };
 }
 
+/** Cambiar el título desde el menú de clic derecho. */
+export async function renameTransaction(id: string, title: string) {
+  await exigirSesion();
+  const t = String(title ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
+  await prisma.transaction.updateMany({ where: { id: String(id) }, data: { title: t || null } });
+  refrescar();
+}
+
+/** Duplicar un movimiento (mismo día, cuenta, monto y categoría; sin fotos ni cuotas). */
+export async function duplicateTransaction(id: string) {
+  await exigirSesion();
+  const t = await prisma.transaction.findUnique({ where: { id: String(id) } });
+  if (!t) return;
+  const copy = await prisma.transaction.create({
+    data: {
+      kind: t.kind,
+      date: t.date,
+      title: t.title,
+      amount: t.amount,
+      accountId: t.accountId,
+      categoryId: t.categoryId,
+      toAccountId: t.toAccountId,
+      toAmount: t.toAmount,
+      note: t.note,
+      projectId: t.projectId,
+    },
+  });
+  await logActivity("created", "transaction", copy.id, `${t.title || "Movimiento"} (copia)`);
+  refrescar();
+}
+
 export async function deleteTransaction(id: string) {
   await exigirSesion();
   await trashAndDelete("transaction", id);

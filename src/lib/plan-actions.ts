@@ -98,6 +98,41 @@ export async function setBlockDone(id: string, done: boolean) {
   refrescar();
 }
 
+const cleanTitle = (t: unknown) => String(t ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
+
+/** Cambiar el nombre desde el menú de clic derecho. */
+export async function renameBlock(id: string, title: string) {
+  await exigirSesion();
+  const t = cleanTitle(title);
+  if (!t) return;
+  await prisma.planBlock.updateMany({ where: { id: String(id) }, data: { title: t } });
+  refrescar();
+}
+
+/** Duplicar desde el menú de clic derecho: la copia queda el mismo día, justo después y sin tildar. */
+export async function duplicateBlock(id: string) {
+  await exigirSesion();
+  const b = await prisma.planBlock.findUnique({ where: { id: String(id) } });
+  if (!b) return;
+  const copy = await prisma.planBlock.create({
+    data: {
+      title: b.title,
+      categoryId: b.categoryId,
+      date: b.date,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      // Un sin hora queda pegado debajo del original.
+      sortKey: b.startTime ? null : (b.sortKey ?? -1) + 0.01,
+      priority: b.priority,
+      place: b.place,
+      notes: b.notes,
+      taskId: b.taskId,
+    },
+  });
+  await logActivity("created", "block", copy.id, `${b.title} (copia)`);
+  refrescar();
+}
+
 export async function deleteBlock(id: string) {
   await exigirSesion();
   const block = await prisma.planBlock.findUnique({ where: { id } });
@@ -300,6 +335,42 @@ export async function reorderTasks(ids: string[]) {
     create: { key: "tareas_orden_manual", value: "1" },
     update: { value: "1" },
   });
+  refrescar();
+}
+
+export async function renameTask(id: string, title: string) {
+  await exigirSesion();
+  const t = cleanTitle(title);
+  if (!t) return;
+  await prisma.planTask.updateMany({ where: { id: String(id) }, data: { title: t } });
+  refrescar();
+}
+
+/** Duplicar una tarea: misma configuración, pasos sin tildar, justo debajo de la original. */
+export async function duplicateTask(id: string) {
+  await exigirSesion();
+  const t = await prisma.planTask.findUnique({ where: { id: String(id) }, include: { subtasks: { orderBy: { order: "asc" } } } });
+  if (!t) return;
+  await prisma.planTask.updateMany({ where: { order: { gt: t.order } }, data: { order: { increment: 1 } } });
+  const copy = await prisma.planTask.create({
+    data: {
+      title: t.title,
+      categoryId: t.categoryId,
+      status: t.status === "done" ? "todo" : t.status,
+      priority: t.priority,
+      deadline: t.deadline,
+      progress: t.goal ? 0 : t.progress,
+      goal: t.goal,
+      scheduled: false,
+      notes: t.notes,
+      links: parseTaskLinks(t.links),
+      repeat: t.repeat,
+      repeatEvery: t.repeatEvery,
+      order: t.order + 1,
+      subtasks: { create: t.subtasks.map((s) => ({ title: s.title, order: s.order })) },
+    },
+  });
+  await logActivity("created", "task", copy.id, `${t.title} (copia)`);
   refrescar();
 }
 

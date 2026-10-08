@@ -18,6 +18,8 @@ type Props = {
   onEdit: (b: BlockDTO) => void;
   onNew: (date: string, startTime?: string) => void;
   onMove: (id: string, date: string, startTime?: string | null, sortKey?: number) => void;
+  /** Clic derecho en un bloque (duplicar, cambiar nombre...). */
+  onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
 };
 
 const DRAG = "text/x-bloque";
@@ -36,7 +38,7 @@ function dropIndex(section: HTMLElement, y: number, skip: string | null): number
   return i === -1 ? cards.length : i;
 }
 
-export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove }: Props) {
+export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu }: Props) {
   const [over, setOver] = useState<string | null>(null);
   // Lo que se arrastra (durante el arrastre el navegador no deja leer los datos) y dónde caería.
   const [dragging, setDragging] = useState<BlockDTO | null>(null);
@@ -123,6 +125,7 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               <div
                 key={b.id}
                 data-bloque={b.id}
+                onContextMenu={(e) => onMenu?.(e, b)}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData(DRAG, b.id);
@@ -177,7 +180,7 @@ const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
  * Escritorio, vista por horas: como un calendario. Arriba lo que no tiene
  * hora; tocar un hueco crea un bloque a esa hora; arrastrar mueve día y hora.
  */
-export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, todoFolded = false }: Props & { todoFolded?: boolean }) {
+export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, todoFolded = false }: Props & { todoFolded?: boolean }) {
   const [over, setOver] = useState<string | null>(null);
   // Los bloques sin hora son pendientes del día: lista corta arriba que se pliega (cookie: se recuerda entre visitas).
   const [folded, setFolded] = useState(todoFolded);
@@ -245,7 +248,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
               {!folded && todo.length > 0 && (
                 <ul className="grid">
                   {todo.map((b) => (
-                    <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} />
+                    <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} />
                   ))}
                 </ul>
               )}
@@ -302,7 +305,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                       className="absolute"
                       style={{ top, height, left: `calc(${(lane / lanes) * 100}% + 3px)`, width: `calc(${100 / lanes}% - 6px)` }}
                     >
-                      <Chip b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} full />
+                      <Chip b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} full />
                     </div>
                   );
                 })}
@@ -358,16 +361,19 @@ function TodoRow({
   cats,
   onEdit,
   onToggle,
+  onMenu,
 }: {
   b: BlockDTO;
   cats: Map<string, CategoryDTO>;
   onEdit: (b: BlockDTO) => void;
   onToggle: (b: BlockDTO) => void;
+  onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
 }) {
   const c = b.categoryId ? cats.get(b.categoryId) : null;
   const free = isFreeBlock(b);
   return (
     <li
+      onContextMenu={(e) => onMenu?.(e, b)}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG, b.id);
@@ -410,18 +416,21 @@ function Chip({
   cats,
   onEdit,
   onToggle,
+  onMenu,
   full,
 }: {
   b: BlockDTO;
   cats: Map<string, CategoryDTO>;
   onEdit: (b: BlockDTO) => void;
   onToggle: (b: BlockDTO) => void;
+  onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
   full?: boolean;
 }) {
   const c = b.categoryId ? cats.get(b.categoryId) : null;
   const priority = PRIORITIES.find((p) => p.value === b.priority);
   return (
     <div
+      onContextMenu={(e) => onMenu?.(e, b)}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG, b.id);

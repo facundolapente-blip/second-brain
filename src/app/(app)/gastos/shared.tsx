@@ -201,12 +201,15 @@ export function TxRow({
   selection,
   showAccount,
   onClick,
+  onMenu,
 }: {
   tx: TxDTO;
   lk: Lookups;
   selection: Selection;
   showAccount: boolean;
   onClick?: () => void;
+  /** Clic derecho (duplicar, cambiar título...). */
+  onMenu?: (e: React.MouseEvent) => void;
 }) {
   const isTransfer = tx.kind === "transfer";
   const category = lk.category(tx.categoryId);
@@ -241,6 +244,7 @@ export function TxRow({
     <button
       type="button"
       onClick={onClick}
+      onContextMenu={onMenu}
       className="flex min-h-[64px] w-full items-center gap-3.5 border-b border-line px-1 py-3 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2"
     >
       <CategoryAvatar category={category} transfer={isTransfer} />

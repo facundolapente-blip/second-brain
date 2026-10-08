@@ -104,9 +104,11 @@ export function SortableItem({
   className,
   draggingClass = "rounded-xl bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]",
   disabled,
+  onContextMenu,
   children,
 }: {
   id: string;
+  onContextMenu?: (e: React.MouseEvent) => void;
   as?: "li" | "tr" | "div" | "article";
   className?: string;
   /** Cómo se ve mientras se arrastra (levantado). */
@@ -130,6 +132,7 @@ export function SortableItem({
       }}
       className={[className, disabled ? "" : DRAG_CLASS, isDragging ? draggingClass : ""].filter(Boolean).join(" ")}
       {...(disabled ? {} : { ...attrs, ...listeners })}
+      onContextMenu={onContextMenu}
     >
       {children}
     </Tag>

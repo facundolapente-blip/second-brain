@@ -1,9 +1,13 @@
 "use client";
 
+import { useSafeTransition } from "@/components/safe-action";
+import { notifyDeleted } from "@/components/undo-toast";
+import { showContextMenu } from "@/components/context-menu";
+import { deleteTransaction, duplicateTransaction, renameTransaction } from "@/lib/finance-actions";
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { Menu } from "@/components/menu";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
@@ -101,6 +105,34 @@ export function MovementsView({
     // Solo al entrar con esos parámetros.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasAccounts]);
+
+  // Clic derecho en un movimiento: cambiar el título, duplicar, editar o borrar.
+  const [, startMenu] = useSafeTransition();
+  function txMenu(e: React.MouseEvent, t: TxDTO) {
+    const name = t.title || (t.kind === "transfer" ? "Transferencia" : "Sin título");
+    showContextMenu(
+      e,
+      [
+        {
+          label: "Cambiar título",
+          icon: <PencilSimple size={15} />,
+          rename: { value: t.title ?? "", onSave: (title) => startMenu(() => renameTransaction(t.id, title)) },
+        },
+        { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => startMenu(() => duplicateTransaction(t.id)) },
+        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => form.current?.edit(t) },
+        {
+          label: t.installment ? "Borrar esta cuota" : "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            startMenu(() => deleteTransaction(t.id));
+            notifyDeleted("Movimiento borrado");
+          },
+        },
+      ],
+      name,
+    );
+  }
 
   const visible = useMemo(() => txs.filter((t) => touchesSelection(t, selection)), [txs, selection]);
   const groups = useMemo(() => groupByDay(visible, selection, lk.currencyOf), [visible, selection, lk]);
@@ -265,6 +297,7 @@ export function MovementsView({
                               selection={selection}
                               showAccount={showAccount}
                               onClick={() => form.current?.edit(t)}
+                              onMenu={(e) => txMenu(e, t)}
                             />
                           </li>
                         ))}

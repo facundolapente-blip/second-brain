@@ -13,10 +13,16 @@ import { undoLastDelete } from "@/lib/trash-actions";
  */
 const EVENT = "sb:borrado";
 const EVENT_ERROR = "sb:error";
+const EVENT_INFO = "sb:info";
 const MS = 6000;
 
 export function notifyDeleted(label: string) {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: label }));
+}
+
+/** El mismo aviso de abajo, para confirmar algo ("Bloque duplicado"), sin botón. */
+export function notifyInfo(text: string) {
+  window.dispatchEvent(new CustomEvent(EVENT_INFO, { detail: text }));
 }
 
 /** El mismo aviso de abajo, para cuando algo no se pudo guardar (sin botón). */
@@ -38,11 +44,17 @@ export function UndoToast() {
       const text = (e as CustomEvent<string>).detail;
       setMsg({ label: text, done: text, error: true, key: Date.now() });
     };
+    const hi = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      setMsg({ label: text, done: text, key: Date.now() });
+    };
     window.addEventListener(EVENT, h);
     window.addEventListener(EVENT_ERROR, he);
+    window.addEventListener(EVENT_INFO, hi);
     return () => {
       window.removeEventListener(EVENT, h);
       window.removeEventListener(EVENT_ERROR, he);
+      window.removeEventListener(EVENT_INFO, hi);
     };
   }, []);
 

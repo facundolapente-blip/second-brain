@@ -1,11 +1,13 @@
 "use client";
 
+import { notifyDeleted } from "@/components/undo-toast";
+import { showContextMenu } from "@/components/context-menu";
 import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useOptimistic, useRef, useState } from "react";
-import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus } from "@phosphor-icons/react";
-import { copyWeekToNext, moveBlock, passWeek, setBlockDone } from "@/lib/plan-actions";
+import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
+import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock } from "@/lib/plan-actions";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
@@ -82,9 +84,44 @@ export function WeekView({
     });
   }
   const openEdit = (b: BlockDTO) => sheet.current?.open(b);
+  // Clic derecho en un bloque: cambiar el nombre ahí mismo, duplicar, editar o borrar.
+  function blockMenu(e: React.MouseEvent, b: BlockDTO) {
+    showContextMenu(
+      e,
+      [
+        {
+          label: "Cambiar nombre",
+          icon: <PencilSimple size={15} />,
+          rename: {
+            value: b.title,
+            onSave: (title) =>
+              startTransition(async () => {
+                applyDone({ id: b.id, title });
+                await renameBlock(b.id, title);
+              }),
+          },
+        },
+        { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => startTransition(() => duplicateBlock(b.id)) },
+        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => openEdit(b) },
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            startTransition(async () => {
+              applyDone({ id: b.id, date: "" });
+              await deleteBlock(b.id);
+            });
+            notifyDeleted("Bloque borrado");
+          },
+        },
+      ],
+      b.title,
+    );
+  }
 
   useOnNew(() => openNew(selected));
-  const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move };
+  const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move, onMenu: blockMenu };
 
   const prev = addDays(monday, -7);
   const next = addDays(monday, 7);

@@ -1,9 +1,10 @@
 "use client";
 
+import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
-import { deleteBlock, passToNextWeek, saveBlock } from "@/lib/plan-actions";
-import { ArrowArcRight } from "@phosphor-icons/react";
+import { deleteBlock, passToNextWeek, saveBlock, duplicateBlock } from "@/lib/plan-actions";
+import { ArrowArcRight, CopySimple } from "@phosphor-icons/react";
 import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
@@ -171,6 +172,23 @@ function BlockForm({
             }
           >
             <ArrowArcRight size={16} /> Pasar a la semana que viene
+          </Button>
+        )}
+        {initial.id && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={deleting}
+            className="h-11"
+            onClick={() =>
+              startDelete(async () => {
+                await duplicateBlock(initial.id!);
+                onDone();
+                notifyInfo("Bloque duplicado");
+              })
+            }
+          >
+            <CopySimple size={16} /> Duplicar
           </Button>
         )}
         {initial.id && (

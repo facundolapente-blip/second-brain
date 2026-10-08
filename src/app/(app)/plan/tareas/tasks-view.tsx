@@ -1,9 +1,11 @@
 "use client";
 
+import { notifyDeleted } from "@/components/undo-toast";
+import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { useOptimistic, useRef, useState } from "react";
-import { CaretDown, Check, Minus, Plus } from "@phosphor-icons/react";
-import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled } from "@/lib/plan-actions";
+import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
+import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/plan-actions";
 import { formatShort } from "@/lib/dates";
 import {
   applyTaskView,
@@ -85,6 +87,33 @@ export function TasksBoard({
   }
   const visible = all ? matching : matching.slice(0, LIMIT);
   const hidden = matching.length - visible.length;
+  // Clic derecho en una tarea (tabla de la compu).
+  const [, startMenu] = useSafeTransition();
+  function taskMenu(e: React.MouseEvent, t: TaskDTO) {
+    showContextMenu(
+      e,
+      [
+        {
+          label: "Cambiar nombre",
+          icon: <PencilSimple size={15} />,
+          rename: { value: t.title, onSave: (title) => startMenu(() => renameTask(t.id, title)) },
+        },
+        { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => startMenu(() => duplicateTask(t.id)) },
+        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => sheet.current?.open(t) },
+        ...(t.status !== "done" ? [{ label: "Agendar en la semana", icon: <CalendarPlus size={15} />, onSelect: () => schedule(t) }] : []),
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            startMenu(() => deleteTask(t.id));
+            notifyDeleted("Tarea borrada");
+          },
+        },
+      ],
+      t.title,
+    );
+  }
   const schedule = (t: TaskDTO) =>
     blockSheet.current?.open({
       date: today,
@@ -159,7 +188,7 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} columns={columns} />
+          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} columns={columns} onMenu={taskMenu} />
           {/* Celular: mantener apretada una tarea y moverla para cambiar el orden. */}
           <Sortable ids={visible.map((t) => t.id)} onReorder={reorder} disabled={!canSort}>
           <ul className="grid border-t border-line lg:hidden">
@@ -288,6 +317,7 @@ function TaskTable({
   sortable,
   onReorder,
   columns,
+  onMenu,
 }: {
   tasks: TaskDTO[];
   cats: Map<string, CategoryDTO>;
@@ -297,6 +327,7 @@ function TaskTable({
   sortable: boolean;
   onReorder: (ids: string[]) => void;
   columns: TaskColumnWidths;
+  onMenu: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
   const [widths, setWidths] = useState<TaskColumnWidths>(columns);
   const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
@@ -345,6 +376,7 @@ function TaskTable({
                 key={t.id}
                 id={t.id}
                 disabled={!sortable}
+                onContextMenu={(e) => onMenu(e, t)}
                 className="group border-b border-line bg-surface transition-colors last:border-b-0 hover:bg-surface-2/60"
                 draggingClass="shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
               >
