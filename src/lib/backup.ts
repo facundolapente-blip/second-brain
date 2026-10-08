@@ -6,15 +6,20 @@ import { prisma } from "./prisma";
 
 /**
  * Respaldo completo: todas las tablas menos las del login, en un JSON comprimido.
- * El automático corre los lunes (cron de Vercel) y se guarda en un almacén privado
- * de Vercel Blob, fuera de la base: si la base se rompe, el respaldo sigue ahí.
+ * El automático corre todos los días a las 6 (cron de Vercel) y se guarda en un
+ * almacén privado de Vercel Blob, fuera de la base: si la base se rompe, el
+ * respaldo sigue ahí. Además conviene bajar una copia a la compu cada tanto
+ * (Datos → Exportar → "Todo"): se registra y Inicio lo recuerda al mes.
+ * Restaurar: `scripts/restaurar-respaldo.ts`.
  */
 
 const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit"]);
 const PREFIX = "respaldos/";
-/** Cuántos se guardan (los más viejos se borran). */
-const KEEP = 12;
+/** Se guardan los últimos 30 y, de antes, el último de cada mes durante un año. */
+const KEEP_DAILY = 30;
+const KEEP_MONTHLY = 12;
 const STATUS_KEY = "respaldo_estado";
+const DOWNLOAD_KEY = "respaldo_descarga";
 
 type Delegate = { findMany: () => Promise<unknown[]> };
 
@@ -66,9 +71,34 @@ export async function listBackups(): Promise<BackupInfo[]> {
 }
 
 async function prune() {
-  const all = await listBackups();
-  const old = all.slice(KEEP).map((b) => b.pathname);
+  const all = await listBackups(); // del más nuevo al más viejo
+  const keep = new Set(all.slice(0, KEEP_DAILY).map((b) => b.pathname));
+  const months = new Set<string>();
+  for (const b of all.slice(KEEP_DAILY)) {
+    const m = b.at.slice(0, 7);
+    if (months.has(m) || months.size >= KEEP_MONTHLY) continue;
+    months.add(m);
+    keep.add(b.pathname);
+  }
+  const old = all.filter((b) => !keep.has(b.pathname)).map((b) => b.pathname);
   if (old.length) await del(old);
+}
+
+/** Se bajó una copia completa a un aparato (para el recordatorio de Inicio). */
+export async function markDownloaded() {
+  const value = JSON.stringify({ at: new Date().toISOString() });
+  await prisma.appSetting
+    .upsert({ where: { key: DOWNLOAD_KEY }, create: { key: DOWNLOAD_KEY, value }, update: { value } })
+    .catch(() => {});
+}
+
+export async function lastDownload(): Promise<string | null> {
+  const row = await prisma.appSetting.findUnique({ where: { key: DOWNLOAD_KEY } });
+  try {
+    return row ? (JSON.parse(row.value) as { at: string }).at : null;
+  } catch {
+    return null;
+  }
 }
 
 /** El archivo de un respaldo, para descargarlo (solo los de la carpeta de respaldos). */
@@ -93,12 +123,18 @@ export async function getBackupStatus(): Promise<BackupStatus> {
   }
 }
 
-/** Aviso para Inicio si el respaldo semanal falló o hace más de 8 días que no corre. */
+/**
+ * Aviso para Inicio: si el respaldo diario falló o hace más de 2 días que no
+ * corre, o si hace más de un mes que no se baja una copia a la compu.
+ */
 export async function backupWarning(): Promise<string | null> {
   if (!backupsEnabled()) return null;
   const s = await getBackupStatus();
   if (!s) return "Todavía no se guardó ningún respaldo.";
   if (!s.ok) return "El último respaldo automático falló.";
-  if (Date.now() - Date.parse(s.at) > 8 * 86_400_000) return "Hace más de una semana que no se guarda un respaldo.";
+  if (Date.now() - Date.parse(s.at) > 2 * 86_400_000) return "Hace más de 2 días que no se guarda un respaldo.";
+  const dl = await lastDownload();
+  if (!dl || Date.now() - Date.parse(dl) > 31 * 86_400_000)
+    return "Hace más de un mes que no bajás una copia de tus datos a la compu (por si algún día falla la nube).";
   return null;
 }

@@ -1,5 +1,5 @@
 import { getUsuario } from "@/lib/session";
-import { openBackup } from "@/lib/backup";
+import { markDownloaded, openBackup } from "@/lib/backup";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,7 @@ export async function GET(req: Request) {
   const pathname = new URL(req.url).searchParams.get("archivo") ?? "";
   const r = await openBackup(pathname);
   if (!r) return new Response("No existe ese respaldo", { status: 404 });
+  await markDownloaded();
   return new Response(r.stream, {
     headers: {
       "Content-Type": "application/gzip",

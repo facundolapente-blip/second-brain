@@ -21,7 +21,7 @@ function kb(n: number) {
   return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
-/** Respaldo automático de los lunes: los guardados, el último estado y "hacer uno ahora". */
+/** Respaldo automático diario: los guardados, el último estado, "hacer uno ahora" y bajar una copia. */
 export function Backups({ enabled, backups, status }: { enabled: boolean; backups: BackupInfo[]; status: BackupStatus }) {
   const [state, action, pending] = useActionState<BackupResult>(safeForm(backupNow), null);
   const failed = status && !status.ok;
@@ -35,8 +35,9 @@ export function Backups({ enabled, backups, status }: { enabled: boolean; backup
             Respaldo automático
           </h2>
           <p className="text-[13.5px] text-muted">
-            Todos los lunes a las 6 de la mañana se guarda una copia completa en un almacén privado, aparte de la base. Quedan las
-            últimas 12.
+            Todos los días a las 6 de la mañana se guarda una copia completa en un almacén privado, aparte de la base. Quedan las de
+            los últimos 30 días y una por mes durante un año. Para tener otra copia fuera de la nube, bajala a la compu cada tanto:
+            tocá cualquiera de la lista o &quot;Todo (JSON comprimido)&quot; en Exportar.
           </p>
         </div>
         {enabled && (
@@ -69,7 +70,7 @@ export function Backups({ enabled, backups, status }: { enabled: boolean; backup
       {!enabled ? (
         <p className="rounded-xl bg-surface-2 p-3 text-[13px] text-muted">Los respaldos automáticos solo corren en la versión publicada.</p>
       ) : backups.length === 0 ? (
-        <p className="rounded-xl bg-surface-2 p-3 text-[13px] text-muted">Todavía no hay respaldos guardados. El primero sale el próximo lunes, o hacelo ahora.</p>
+        <p className="rounded-xl bg-surface-2 p-3 text-[13px] text-muted">Todavía no hay respaldos guardados. El primero sale mañana a las 6, o hacelo ahora.</p>
       ) : (
         <ul className="grid divide-y divide-line overflow-hidden rounded-xl border border-line">
           {backups.map((b) => (

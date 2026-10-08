@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { buildBackup } from "@/lib/backup";
+import { buildBackup, markDownloaded } from "@/lib/backup";
 import { getUsuario } from "@/lib/session";
 import { fromDbDate, todayISO } from "@/lib/dates";
 
@@ -59,7 +59,9 @@ export async function GET(req: Request) {
     return download(`# Journal\n\n${md}`, `journal-${stamp}.md`, "text/markdown; charset=utf-8");
   }
 
-  return download(new Uint8Array(await buildBackup()), `second-brain-${stamp}.json.gz`, "application/gzip");
+  const body = new Uint8Array(await buildBackup());
+  await markDownloaded();
+  return download(body, `second-brain-${stamp}.json.gz`, "application/gzip");
 }
 
 function download(body: string | Uint8Array<ArrayBuffer>, name: string, type: string) {
