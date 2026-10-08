@@ -4,7 +4,7 @@ import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { CaretRight, Plus } from "@phosphor-icons/react";
-import { deleteCategory, saveCategory } from "@/lib/habit-actions";
+import { deleteCategory, saveCategory } from "@/lib/offline/habit";
 import { HABIT_ICONS, HabitAvatar, HabitIcon } from "@/lib/habit-icons";
 import { PALETTE, tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/habits";

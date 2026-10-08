@@ -4,7 +4,7 @@ import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { CalendarPlus, Check, Link as LinkIcon, PencilSimple, Plus, X, CopySimple } from "@phosphor-icons/react";
-import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask, duplicateTask } from "@/lib/plan-actions";
+import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask, duplicateTask } from "@/lib/offline/plan";
 import { linkLabel, normalizeLink, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskLink, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, IconButton, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";

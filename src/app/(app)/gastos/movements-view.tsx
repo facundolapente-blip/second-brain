@@ -1,9 +1,10 @@
 "use client";
 
+import { PendingFinance } from "./pending-list";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
-import { deleteTransaction, duplicateTransaction, renameTransaction } from "@/lib/finance-actions";
+import { deleteTransaction, duplicateTransaction, renameTransaction } from "@/lib/offline/finance";
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -201,6 +202,7 @@ export function MovementsView({
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-x-10">
             <section className="grid gap-5 pt-1 pb-5 lg:col-start-1 lg:row-start-1 lg:pt-6">
               <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
+              <PendingFinance />
               <QuickAdd accounts={accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency }))} />
               <div className="grid gap-3">
                 <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} />

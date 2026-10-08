@@ -21,7 +21,7 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react";
-import { archiveHabit, deleteHabit } from "@/lib/habit-actions";
+import { archiveHabit, deleteHabit } from "@/lib/offline/habit";
 import { addDays, weekday } from "@/lib/dates";
 import { cleanDays, currentStreak, dayState, habitScore, WEEKDAY_SHORT, type LogMap, type PackedLogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";

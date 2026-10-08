@@ -3,7 +3,7 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { useState } from "react";
 import { ArrowsLeftRight, Scales } from "@phosphor-icons/react";
-import { convertToTransfer, markAsAdjustment } from "@/lib/finance-actions";
+import { convertToTransfer, markAsAdjustment } from "@/lib/offline/finance";
 import { formatShort } from "@/lib/dates";
 import type { AccountDTO, TxDTO } from "@/lib/finance-logic";
 import { Button, cx, inputClass } from "@/components/ui";

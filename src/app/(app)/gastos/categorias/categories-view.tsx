@@ -3,7 +3,7 @@
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "@phosphor-icons/react";
-import { deleteCategory, saveCategory } from "@/lib/finance-actions";
+import { deleteCategory, saveCategory } from "@/lib/offline/finance";
 import { FINANCE_ICONS, FinanceIcon } from "@/lib/finance-icons";
 import { PALETTE, tone } from "@/lib/palette";
 import type { CategoryDTO } from "@/lib/finance-logic";

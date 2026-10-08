@@ -3,7 +3,7 @@
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
-import { deleteBlock, passToNextWeek, saveBlock, duplicateBlock } from "@/lib/plan-actions";
+import { deleteBlock, passToNextWeek, saveBlock, duplicateBlock } from "@/lib/offline/plan";
 import { ArrowArcRight, CopySimple } from "@phosphor-icons/react";
 import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";

@@ -4,7 +4,7 @@ import { safeForm, useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { CaretRight, PiggyBank, Plus } from "@phosphor-icons/react";
-import { saveCategoryBudget, saveProject, type ActionResult } from "@/lib/finance-actions";
+import { saveCategoryBudget, saveProject, type ActionResult } from "@/lib/offline/finance";
 import { centsToInput, type CategoryDTO } from "@/lib/finance-logic";
 import {
   budgetState,

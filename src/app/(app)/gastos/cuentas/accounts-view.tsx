@@ -6,7 +6,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bank, CaretRight, Plus } from "@phosphor-icons/react";
 import { ACCOUNT_TYPES, CURRENCIES, currencySymbol } from "@/lib/format";
 import { PALETTE, tone } from "@/lib/palette";
-import { archiveAccount, deleteAccount, reorderAccounts, saveAccount } from "@/lib/finance-actions";
+import { archiveAccount, deleteAccount, reorderAccounts, saveAccount } from "@/lib/offline/finance";
 import {
   ACCOUNT_TYPE_ICON,
   balanceByCurrency,

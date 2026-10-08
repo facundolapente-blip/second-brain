@@ -7,7 +7,7 @@ import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, use
 import { ArrowsDownUp, Check, Camera, X, CopySimple } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
-import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory, duplicateTransaction } from "@/lib/finance-actions";
+import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory, duplicateTransaction } from "@/lib/offline/finance";
 import { splitInstallments } from "@/lib/card-logic";
 import { moneyCents } from "@/lib/format";
 import {

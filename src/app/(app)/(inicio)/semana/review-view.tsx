@@ -10,7 +10,7 @@ import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
 import { moneyCents } from "@/lib/format";
-import { writeWeeklyReview } from "@/lib/journal-actions";
+import { writeWeeklyReview } from "@/lib/offline/journal";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";

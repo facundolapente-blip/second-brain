@@ -4,7 +4,7 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CaretRight, Notebook, Receipt, Wallet } from "@phosphor-icons/react";
-import { shareToJournal } from "@/lib/journal-actions";
+import { shareToJournal } from "@/lib/offline/journal";
 import { sendPhoto } from "@/components/photos";
 import { PageHeader } from "@/components/page-header";
 import { cx } from "@/components/ui";

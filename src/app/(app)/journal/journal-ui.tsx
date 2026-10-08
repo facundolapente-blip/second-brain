@@ -8,7 +8,7 @@ import { MenuButton } from "@/components/shell";
 import { cx } from "@/components/ui";
 import { formatLong, formatShort } from "@/lib/dates";
 import { moodInfo } from "@/lib/journal-logic";
-import { writeOnDay } from "@/lib/journal-actions";
+import { writeOnDay } from "@/lib/offline/journal";
 import { tone } from "@/lib/palette";
 import type { EntryCardDTO } from "@/lib/journal";
 

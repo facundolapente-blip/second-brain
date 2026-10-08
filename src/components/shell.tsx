@@ -1,6 +1,6 @@
 "use client";
 
-import { UndoToast } from "./undo-toast";
+import { notifyInfo, UndoToast } from "./undo-toast";
 import { ContextMenuHost } from "./context-menu";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import { signOut } from "@/lib/auth-client";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
 import { flushQueue, pendingCount } from "@/lib/offline-queue";
+import { flushActions, pendingActions, subscribePending } from "@/lib/offline/registry";
 import { cx } from "./ui";
 
 type Module = { href: string; label: string; icon: Icon; color: string };
@@ -222,34 +223,58 @@ function useRefreshOnReturn() {
 
 /**
  * Sin señal: registra el service worker (solo en producción), avisa cuando no
- * hay conexión y, al volver, manda lo que quedó en cola.
+ * hay conexión y, al volver, manda lo que quedó en este aparato (las marcas de
+ * Hábitos y la cola general de `lib/offline/queue.ts`), en orden. Reintenta cada
+ * 30 s mientras quede algo (la señal a veces "vuelve" antes de andar de verdad).
  */
 function useOffline() {
   const router = useRouter();
   const [offline, setOffline] = useState(false);
+  const [pending, setPending] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
+    const count = () => setPending(pendingCount() + pendingActions().length);
+    let busy = false;
     const update = async () => {
       setOffline(!navigator.onLine);
-      if (navigator.onLine && pendingCount() > 0 && (await flushQueue()) > 0) router.refresh();
+      count();
+      if (busy || !navigator.onLine || pendingCount() + pendingActions().length === 0) return;
+      busy = true;
+      setSyncing(true);
+      try {
+        const sent = (await flushQueue()) + (await flushActions());
+        if (sent > 0) {
+          router.refresh();
+          notifyInfo(sent === 1 ? "Se subió 1 cambio hecho sin conexión." : `Se subieron ${sent} cambios hechos sin conexión.`);
+        }
+      } finally {
+        busy = false;
+        setSyncing(false);
+        count();
+      }
     };
     update();
+    const unsub = subscribePending(count);
+    const timer = setInterval(update, 30_000);
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {
+      unsub();
+      clearInterval(timer);
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
   }, [router]);
-  return offline;
+  return { offline, pending, syncing };
 }
 
 export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
   const [drawer, setDrawer] = useState(false);
   useRefreshOnReturn();
-  const offline = useOffline();
+  const { offline, pending, syncing } = useOffline();
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>
@@ -299,9 +324,13 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
         </div>
 
         <div id="contenido" tabIndex={-1} className="min-w-0 outline-none">
-          {offline && (
+          {(offline || pending > 0) && (
             <p role="status" className="sticky top-0 z-40 print:hidden bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
-              Sin conexión: estás viendo lo último guardado. Lo que marques en Hábitos se guarda cuando vuelva la señal.
+              {offline
+                ? `Sin conexión: lo que hagas se guarda en este aparato y se sube cuando vuelva la señal.${pending ? ` ${pending === 1 ? "1 cambio pendiente" : `${pending} cambios pendientes`}.` : ""}`
+                : syncing
+                  ? `Subiendo ${pending === 1 ? "1 cambio" : `${pending} cambios`} hechos sin conexión…`
+                  : `${pending === 1 ? "1 cambio hecho sin conexión" : `${pending} cambios hechos sin conexión`} todavía sin subir. Se reintenta solo.`}
             </p>
           )}
           {children}

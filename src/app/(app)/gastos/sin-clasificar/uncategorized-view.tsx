@@ -4,7 +4,7 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useOptimistic, useRef, useState } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { formatMonth, formatShort } from "@/lib/dates";
-import { applySuggestions, setTransactionCategory } from "@/lib/finance-actions";
+import { applySuggestions, setTransactionCategory } from "@/lib/offline/finance";
 import { dayLabel, type AccountDTO, type CategoryDTO, type TxDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, Sheet, type SheetHandle } from "@/components/ui";

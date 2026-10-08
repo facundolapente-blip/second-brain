@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Archive, CaretLeft, Check, PencilSimple, Plus, X } from "@phosphor-icons/react";
-import { archiveProject, deleteProject, setTransactionsProject } from "@/lib/finance-actions";
+import { archiveProject, deleteProject, setTransactionsProject } from "@/lib/offline/finance";
 import type { AccountDTO, CategoryDTO, TxDTO } from "@/lib/finance-logic";
 import { budgetState, type ProjectDTO } from "@/lib/budget-logic";
 import { formatShort } from "@/lib/dates";

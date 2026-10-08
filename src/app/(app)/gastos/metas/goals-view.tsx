@@ -3,7 +3,7 @@
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus, Target } from "@phosphor-icons/react";
-import { addToGoal, archiveGoal, deleteGoal, saveGoal, type ActionResult } from "@/lib/finance-actions";
+import { addToGoal, archiveGoal, deleteGoal, saveGoal, type ActionResult } from "@/lib/offline/finance";
 import type { GoalDTO } from "@/lib/finance";
 import { centsToInput, type AccountDTO } from "@/lib/finance-logic";
 import { diffDays, formatShort } from "@/lib/dates";

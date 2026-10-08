@@ -5,7 +5,7 @@ import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { useOptimistic, useRef, useState } from "react";
 import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/plan-actions";
+import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
 import {
   applyTaskView,

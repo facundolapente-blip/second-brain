@@ -5,7 +5,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, use
 import { useRouter } from "next/navigation";
 import { enqueue, flushQueue, isNetworkError, pendingOps } from "@/lib/offline-queue";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
-import { reorderHabits, setHabitLog } from "@/lib/habit-actions";
+import { reorderHabits, setHabitLog } from "@/lib/offline/habit";
 import {
   dayState,
   frequencyLabel,

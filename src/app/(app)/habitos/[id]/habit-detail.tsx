@@ -20,7 +20,7 @@ import {
   X,
   type Icon,
 } from "@phosphor-icons/react";
-import { archiveHabit, deleteHabit, mergeLastTrack, startNewTrack } from "@/lib/habit-actions";
+import { archiveHabit, deleteHabit, mergeLastTrack, startNewTrack } from "@/lib/offline/habit";
 import { addDays, formatLong, formatShort, monthBounds, shiftMonth, startOfWeek } from "@/lib/dates";
 import {
   isDone,

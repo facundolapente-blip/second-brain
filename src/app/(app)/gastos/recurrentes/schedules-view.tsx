@@ -5,7 +5,7 @@ import { FixedSuggestions } from "./fixed-suggestions";
 import type { FixedSuggestion } from "@/lib/smart-logic";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowsClockwise, Pause, Play, Plus } from "@phosphor-icons/react";
-import { deleteSchedule, saveSchedule, setScheduleActive, type ActionResult } from "@/lib/finance-actions";
+import { deleteSchedule, saveSchedule, setScheduleActive, type ActionResult } from "@/lib/offline/finance";
 import { centsToInput, type AccountDTO, type CategoryDTO } from "@/lib/finance-logic";
 import { formatShort, monthBounds } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";

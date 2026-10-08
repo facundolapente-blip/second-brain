@@ -6,7 +6,7 @@ import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHan
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowsClockwise, CalendarPlus, Lightning, PencilSimple, Plus } from "@phosphor-icons/react";
-import { copyToYear, deleteKeyResult, deleteObjective, saveKeyResult, saveObjective } from "@/lib/plan-actions";
+import { copyToYear, deleteKeyResult, deleteObjective, saveKeyResult, saveObjective } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
 import {
   daysLeft,

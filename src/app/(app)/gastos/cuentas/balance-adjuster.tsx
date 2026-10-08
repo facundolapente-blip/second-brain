@@ -3,7 +3,7 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { useState } from "react";
 import { Scales } from "@phosphor-icons/react";
-import { adjustBalance } from "@/lib/finance-actions";
+import { adjustBalance } from "@/lib/offline/finance";
 import { todayISO } from "@/lib/dates";
 import { currencySymbol, moneyCents } from "@/lib/format";
 import { Button, Field, Input } from "@/components/ui";

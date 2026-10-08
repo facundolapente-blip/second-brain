@@ -4,7 +4,7 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useRef, useState } from "react";
 import { Copy, DotsThree } from "@phosphor-icons/react";
 import { moneyCents } from "@/lib/format";
-import { deleteTemplate, renameTemplate } from "@/lib/finance-actions";
+import { deleteTemplate, renameTemplate } from "@/lib/offline/finance";
 import type { AccountDTO, CategoryDTO, TemplateDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, Field, IconButton, Input, Sheet, type SheetHandle } from "@/components/ui";

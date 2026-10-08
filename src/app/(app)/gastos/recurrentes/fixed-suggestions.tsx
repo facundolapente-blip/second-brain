@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Sparkle } from "@phosphor-icons/react";
 import type { FixedSuggestion } from "@/lib/smart-logic";
 import type { AccountDTO, CategoryDTO } from "@/lib/finance-logic";
-import { acceptFixed, ignoreFixed } from "@/lib/finance-actions";
+import { acceptFixed, ignoreFixed } from "@/lib/offline/finance";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import { CategoryAvatar, useLookups } from "../shared";

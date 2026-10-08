@@ -3,7 +3,7 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { useRef, useState } from "react";
 import { CheckCircle, FileArrowUp, Footprints, WarningCircle } from "@phosphor-icons/react";
-import { importHealth, type HealthImportResult } from "@/lib/checkin-actions";
+import { importHealth, type HealthImportResult } from "@/lib/offline/checkin";
 import { parseHealthFile, type HealthParse } from "@/lib/health-parse";
 import { formatShort } from "@/lib/dates";
 import { cx } from "@/components/ui";

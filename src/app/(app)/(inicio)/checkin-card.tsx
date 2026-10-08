@@ -1,9 +1,10 @@
 "use client";
 
+import { usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
 import { useRef, useState } from "react";
 import { BatteryHigh, CaretDown, Check, Minus, Moon, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
-import { saveCheckin } from "@/lib/checkin-actions";
+import { saveCheckin } from "@/lib/offline/checkin";
 import {
   ENERGY_LABELS,
   formatSleep,
@@ -32,6 +33,20 @@ export function CheckinCard({
 }) {
   const [day, setDay] = useState<"today" | "yesterday">("today");
   const [data, setData] = useState({ today, yesterday });
+  // Lo cargado sin conexión (todavía sin subir) se retoma al abrir.
+  const queued = usePendingActions().filter((o) => o.name === "checkin.saveCheckin");
+  const [restored, setRestored] = useState(false);
+  if (queued.length && !restored) {
+    // Ajuste de estado al dibujar (una vez): lo cargado sin conexión se suma a lo del servidor.
+    setRestored(true);
+    const next = { today: { ...data.today }, yesterday: { ...data.yesterday } };
+    for (const o of queued) {
+      const patch = o.args[1] as CheckinPatch;
+      if (o.args[0] === next.today.date) next.today = { ...next.today, ...patch };
+      if (o.args[0] === next.yesterday.date) next.yesterday = { ...next.yesterday, ...patch };
+    }
+    setData(next);
+  }
   const [saved, setSaved] = useState(false);
   const [pending, start] = useSafeTransition();
   const cur = data[day];

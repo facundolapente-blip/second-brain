@@ -3,7 +3,7 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { useRef, useState } from "react";
 import { CheckCircle, Lightning } from "@phosphor-icons/react";
-import { quickAdd } from "@/lib/finance-actions";
+import { quickAdd } from "@/lib/offline/finance";
 import { parseQuick, type QuickAccount } from "@/lib/smart-logic";
 import { moneyCents } from "@/lib/format";
 import { cx } from "@/components/ui";

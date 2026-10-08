@@ -3,7 +3,7 @@
 import { safeForm } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { Flag } from "@phosphor-icons/react";
-import { saveHabit } from "@/lib/habit-actions";
+import { saveHabit } from "@/lib/offline/habit";
 import { WEEKDAY_SHORT, type Frequency } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";

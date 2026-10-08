@@ -1,13 +1,15 @@
 "use client";
 
+import { applyPendingBlocks } from "@/lib/offline/plan-pending";
+import { usePendingActions } from "@/lib/offline/queue";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
 import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
-import { useOptimistic, useRef, useState } from "react";
+import { useOptimistic, useRef, useState, useMemo } from "react";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
-import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock } from "@/lib/plan-actions";
+import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock } from "@/lib/offline/plan";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
@@ -53,7 +55,10 @@ export function WeekView({
   const isThisWeek = days.includes(today);
   const [selected, setSelected] = useState(isThisWeek ? today : monday);
   // Cambios optimistas: tildar o mover (día y hora).
-  const [blocks, applyDone] = useOptimistic(initialBlocks, (state, m: Partial<BlockDTO> & { id: string }) =>
+  // Lo hecho sin conexión (todavía sin subir) ya se ve.
+  const pendingOps = usePendingActions();
+  const withPending = useMemo(() => applyPendingBlocks(initialBlocks, pendingOps), [initialBlocks, pendingOps]);
+  const [blocks, applyDone] = useOptimistic(withPending, (state, m: Partial<BlockDTO> & { id: string }) =>
     state.map((b) => (b.id === m.id ? { ...b, ...m } : b)),
   );
   const [view, setView] = useState<"lista" | "horas">("lista");

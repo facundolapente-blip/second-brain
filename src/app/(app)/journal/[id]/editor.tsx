@@ -1,5 +1,6 @@
 "use client";
 
+import { pendingActions as pendingActionsNow, usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
 import { useRouter } from "next/navigation";
@@ -8,13 +9,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CaretDown, CaretLeft, Check, DotsThreeVertical, Plus, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui";
 import { formatLong, formatRelative } from "@/lib/dates";
-import { deleteEntry, discardIfEmpty, saveEntry, type EntryInput } from "@/lib/journal-actions";
+import { deleteEntry, discardIfEmpty, saveEntry, type EntryInput } from "@/lib/offline/journal";
 import { isEmptyEntry, MOODS, normalizeTag, TAGS_MAX, TITLE_MAX, wordCount } from "@/lib/journal-logic";
 import type { EntryDTO } from "@/lib/journal";
 import { tone } from "@/lib/palette";
 import { MoodIcon, useWrite } from "../journal-ui";
 
-type Status = "idle" | "pending" | "saving" | "saved" | "error";
+type Status = "idle" | "pending" | "saving" | "saved" | "local" | "error";
 
 const DEBOUNCE = 900;
 
@@ -45,7 +46,8 @@ function useAutosave(id: string, initial: EntryInput) {
         if (r.ok) {
           saved.current = Math.max(saved.current, v);
           setError(null);
-          setStatus(version.current === saved.current ? "saved" : "pending");
+          // Sin señal queda guardado en este aparato y se sube después.
+          setStatus(version.current === saved.current ? ("queued" in r ? "local" : "saved") : "pending");
         } else {
           setError(r.error);
           setStatus("error");
@@ -125,6 +127,27 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   const [leaving, startLeaving] = useSafeTransition();
   const [deleting, startDelete] = useSafeTransition();
   const { write } = useWrite();
+
+  // Si quedó texto sin subir de cuando no había señal, se retoma ese (es el más nuevo).
+  const pending = usePendingActions();
+  const pendingSave = pending.findLast((o) => o.name === "journal.saveEntry" && o.args[0] === entry.id);
+  const [restoredFrom, setRestoredFrom] = useState<string | null>(null);
+  if (pendingSave && restoredFrom === null) {
+    // Ajuste de estado al dibujar (una sola vez): el texto pendiente reemplaza al del servidor.
+    setRestoredFrom(pendingSave.id);
+    const d = pendingSave.args[1] as Partial<EntryInput>;
+    if (typeof d.title === "string") setTitle(d.title);
+    if (typeof d.body === "string") setBody(d.body);
+    if (d.mood !== undefined) setMood(d.mood ?? null);
+    if (Array.isArray(d.tags)) setTags(d.tags);
+    if (typeof d.date === "string") setDate(d.date);
+  }
+  // Y el autoguardado parte de ese texto (si no, el próximo guardado mandaría el viejo).
+  useEffect(() => {
+    if (!restoredFrom) return;
+    const op = pendingActionsNow().find((o) => o.id === restoredFrom);
+    if (op) update(op.args[1] as Partial<EntryInput>);
+  }, [restoredFrom, update]);
 
   // Entrada nueva: directo a escribir.
   useEffect(() => {
@@ -313,7 +336,7 @@ function SaveStatus({ status }: { status: Status }) {
       ) : (
         <Check size={13} weight="bold" aria-hidden />
       )}
-      {busy ? "Guardando" : status === "error" ? "Sin guardar" : "Guardado"}
+      {busy ? "Guardando" : status === "error" ? "Sin guardar" : status === "local" ? "Guardado en el aparato" : "Guardado"}
     </span>
   );
 }

@@ -3,7 +3,7 @@
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Handshake, Plus } from "@phosphor-icons/react";
-import { deleteDebt, reopenDebt, saveDebt, settleDebt, type ActionResult } from "@/lib/finance-actions";
+import { deleteDebt, reopenDebt, saveDebt, settleDebt, type ActionResult } from "@/lib/offline/finance";
 import type { DebtDTO } from "@/lib/finance";
 import { centsToInput, type AccountDTO, type CategoryDTO } from "@/lib/finance-logic";
 import { formatShort, todayISO } from "@/lib/dates";
