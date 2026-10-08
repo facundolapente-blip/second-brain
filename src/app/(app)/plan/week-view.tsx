@@ -346,7 +346,7 @@ function DayList({
               key={b.id}
               id={b.id}
               disabled={!!b.startTime}
-              className="grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25 bg-bg"
+              className={cx("grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25 bg-bg", isFreeBlock(b) && "free-row")}
               draggingClass="rounded-xl shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
             >
               <span className="pt-3 text-right font-mono text-[13px] leading-tight font-medium text-fg/80 tabular">
@@ -388,12 +388,9 @@ export function BlockCard({
       className={cx(
         "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
         // En la columna de la compu cada bloque es una tarjeta (bien separada de la siguiente).
-        // "Libre": se lee igual que el resto; lo distingue el borde punteado (antes iba transparente).
-        compact
-          ? free
-            ? "rounded-xl border border-dashed border-fg/35 bg-surface px-3 py-2.5"
-            : "rounded-xl border border-line bg-surface px-3 py-2.5"
-          : "py-2.5 pr-1",
+        compact ? "rounded-xl border border-line bg-surface px-3 py-2.5" : "py-2.5 pr-1",
+        // "Libre": la misma tarjeta, teñida de verde suave.
+        compact && free && "free-block",
       )}
     >
       <button type="button" onClick={onEdit} className={cx("min-w-0 text-left", free && "col-span-2")}>

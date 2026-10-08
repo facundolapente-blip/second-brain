@@ -458,6 +458,14 @@ dialog.sheet::backdrop {
   background: var(--tone-chip);
   color: var(--tone-chip-fg);
 }
+/* Bloques "Libre" del Plan: tarjeta teñida de verde suave (claro y oscuro). */
+.free-block {
+  background-color: color-mix(in oklab, var(--p-green-chip) 13%, var(--surface)) !important;
+}
+.free-row {
+  background-color: color-mix(in oklab, var(--p-green-chip) 11%, var(--bg)) !important;
+}
+
 /* Puntos llenos de la prioridad: el mismo tono que las etiquetas llenas. */
 .prio-on {
   background: var(--tone-chip);

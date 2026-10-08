@@ -436,11 +436,11 @@ function Chip({
         e.dataTransfer.setData(DRAG, b.id);
         e.dataTransfer.effectAllowed = "move";
       }}
-      style={tone(c?.color ?? "stone")}
+      // "Libre": verde suave en vez del color de su categoría.
+      style={tone(isFreeBlock(b) ? "green" : (c?.color ?? "stone"))}
       className={cx(
         "group flex cursor-grab items-start gap-1 overflow-hidden rounded-lg bg-tone px-1.5 py-1 text-tone-fg active:cursor-grabbing",
         full && "h-full",
-        isFreeBlock(b) && "outline-1 -outline-offset-1 outline-dashed outline-current/40",
         b.done && "opacity-60",
       )}
       title="Arrastralo a otro día u hora"
