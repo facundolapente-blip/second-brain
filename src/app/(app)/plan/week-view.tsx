@@ -2,14 +2,14 @@
 
 import { applyPendingBlocks } from "@/lib/offline/plan-pending";
 import { usePendingActions } from "@/lib/offline/queue";
-import { notifyDeleted } from "@/components/undo-toast";
+import { notifyDeleted, notifyInfo } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
 import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useMemo } from "react";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
-import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock } from "@/lib/offline/plan";
+import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
 import { addDays, formatShort, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
@@ -149,7 +149,14 @@ export function WeekView({
   }
 
   useOnNew(() => openNew(selected));
-  const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move, onMenu: blockMenu };
+  // Una tarea soltada en un día: se agenda (el bloque aparece al guardarse).
+  function dropTask(taskId: string, date: string, startTime: string | null, sortKey?: number) {
+    startTransition(async () => {
+      await scheduleTask(taskId, date, startTime, sortKey);
+      notifyInfo("Tarea agendada");
+    });
+  }
+  const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move, onMenu: blockMenu, onDropTask: dropTask };
 
   const prev = addDays(monday, -7);
   const next = addDays(monday, 7);

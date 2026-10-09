@@ -102,6 +102,9 @@ export function parseTaskColumns(raw: string | null | undefined): TaskColumnWidt
   return out;
 }
 
+/** Tipo de dato al arrastrar una tarea de la tabla a un día de la semana. */
+export const TASK_DRAG = "text/x-tarea";
+
 /** Cookie con los pendientes sin hora plegados en la vista por horas. */
 export const HOURS_TODO_FOLD_COOKIE = "plan_pendientes_plegados";
 

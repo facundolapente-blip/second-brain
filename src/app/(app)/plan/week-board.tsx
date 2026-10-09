@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
-import { HOURS_TODO_FOLD_COOKIE, isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, TASK_DRAG } from "@/lib/plan-logic";
 import { PRIORITIES, PriorityDots } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -20,7 +20,10 @@ type Props = {
   onMove: (id: string, date: string, startTime?: string | null, sortKey?: number) => void;
   /** Clic derecho en un bloque (duplicar, cambiar nombre...). */
   onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
+  /** Soltar una tarea de la tabla en un día (o una hora): la agenda. */
+  onDropTask?: (taskId: string, date: string, startTime: string | null, sortKey?: number) => void;
 };
+const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes(DRAG) || e.dataTransfer.types.includes(TASK_DRAG);
 
 const DRAG = "text/x-bloque";
 
@@ -38,7 +41,7 @@ function dropIndex(section: HTMLElement, y: number, skip: string | null): number
   return i === -1 ? cards.length : i;
 }
 
-export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu }: Props) {
+export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, onDropTask }: Props) {
   const [over, setOver] = useState<string | null>(null);
   // Lo que se arrastra (durante el arrastre el navegador no deja leer los datos) y dónde caería.
   const [dragging, setDragging] = useState<BlockDTO | null>(null);
@@ -70,12 +73,12 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
             key={d}
             aria-label={WEEKDAY_LONG[weekday(d)]}
             onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes(DRAG)) return;
+              if (!accepts(e)) return;
               e.preventDefault();
               setOver(d);
-              // Un bloque sin hora se puede dejar en cualquier lugar de la columna.
-              if (untimed) {
-                const index = dropIndex(e.currentTarget, e.clientY, dragging.id);
+              // Un bloque sin hora (o una tarea) se puede dejar en cualquier lugar de la columna.
+              if (untimed || e.dataTransfer.types.includes(TASK_DRAG)) {
+                const index = dropIndex(e.currentTarget, e.clientY, dragging?.id ?? null);
                 setSlot((s) => (s?.day === d && s.index === index ? s : { day: d, index }));
               }
             }}
@@ -85,6 +88,13 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               setSlot((s) => (s?.day === d ? null : s));
             }}
             onDrop={(e) => {
+              const taskId = e.dataTransfer.getData(TASK_DRAG);
+              if (taskId) {
+                setOver(null);
+                setSlot(null);
+                onDropTask?.(taskId, d, null, sortKeyAt(list, dropIndex(e.currentTarget, e.clientY, null)));
+                return;
+              }
               const id = e.dataTransfer.getData(DRAG);
               setOver(null);
               setSlot(null);
@@ -180,7 +190,7 @@ const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
  * Escritorio, vista por horas: como un calendario. Arriba lo que no tiene
  * hora; tocar un hueco crea un bloque a esa hora; arrastrar mueve día y hora.
  */
-export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, todoFolded = false }: Props & { todoFolded?: boolean }) {
+export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, onDropTask, todoFolded = false }: Props & { todoFolded?: boolean }) {
   const [over, setOver] = useState<string | null>(null);
   // Los bloques sin hora son pendientes del día: lista corta arriba que se pliega (cookie: se recuerda entre visitas).
   const [folded, setFolded] = useState(todoFolded);
@@ -219,14 +229,16 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
             <div
               key={d}
               onDragOver={(e) => {
-                if (!e.dataTransfer.types.includes(DRAG)) return;
+                if (!accepts(e)) return;
                 e.preventDefault();
                 setOver(`${d}|`);
               }}
               onDragLeave={() => setOver(null)}
               onDrop={(e) => {
-                const id = e.dataTransfer.getData(DRAG);
                 setOver(null);
+                const taskId = e.dataTransfer.getData(TASK_DRAG);
+                if (taskId) return onDropTask?.(taskId, d, null);
+                const id = e.dataTransfer.getData(DRAG);
                 if (id) onMove(id, d, null);
               }}
               className={cx(
@@ -278,14 +290,16 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                     aria-label={`Nuevo bloque ${WEEKDAY_LONG[weekday(d)]} a las ${time}`}
                     onClick={() => onNew(d, time)}
                     onDragOver={(e) => {
-                      if (!e.dataTransfer.types.includes(DRAG)) return;
+                      if (!accepts(e)) return;
                       e.preventDefault();
                       setOver(slot);
                     }}
                     onDragLeave={() => setOver((o) => (o === slot ? null : o))}
                     onDrop={(e) => {
-                      const id = e.dataTransfer.getData(DRAG);
                       setOver(null);
+                      const taskId = e.dataTransfer.getData(TASK_DRAG);
+                      if (taskId) return onDropTask?.(taskId, d, time);
+                      const id = e.dataTransfer.getData(DRAG);
                       if (id) onMove(id, d, time);
                     }}
                     style={{ height: ROW }}

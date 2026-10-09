@@ -7,25 +7,7 @@ import { useOptimistic, useRef, useState } from "react";
 import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import {
-  applyTaskView,
-  daysLeft,
-  TASKS_FOLD_COOKIE,
-  daysLeftLabel,
-  progressPct,
-  repeatLabel,
-  TASK_STATUS,
-  SORTABLE_VIEWS,
-  TASK_VIEWS,
-  type CategoryDTO,
-  type TaskDTO,
-  type TaskView,
-  TASK_COLUMNS,
-  TASK_COLUMN_MAX,
-  TASK_COLUMN_MIN,
-  type TaskColumnKey,
-  type TaskColumnWidths,
-} from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, SORTABLE_VIEWS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { mergeOrder, Sortable, SortableItem } from "@/components/sortable";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
@@ -381,10 +363,32 @@ function TaskTable({
                 draggingClass="shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
               >
                 <td className="py-2 pr-3 pl-3">
-                  <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full content-center gap-0.5 rounded-lg px-2 text-left">
+                  <div className="flex items-center">
+                  {!done && (
+                    // Arrastrar esta agarradera a un día de la semana agenda la tarea.
+                    // (La fila entera se arrastra para ordenar: esto va aparte.)
+                    <span
+                      draggable
+                      role="button"
+                      tabIndex={-1}
+                      aria-label={`Arrastrar "${t.title}" a un día de la semana para agendarla`}
+                      title="Arrastrala a un día de la semana para agendarla"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(TASK_DRAG, t.id);
+                        e.dataTransfer.effectAllowed = "copy";
+                      }}
+                      className="-ml-1 inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
+                    >
+                      <CalendarPlus size={16} aria-hidden />
+                    </span>
+                  )}
+                  <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full min-w-0 content-center gap-0.5 rounded-lg px-2 text-left">
                     <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
                     <TaskMeta t={t} done={done} hideScheduled />
                   </button>
+                  </div>
                 </td>
                 <td className="px-3 py-2">
                   <StatusPill label={st.label} toneKey={st.tone} />

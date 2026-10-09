@@ -47,6 +47,25 @@ export function applyPendingBlocks(blocks: BlockDTO[], ops: QueuedOp[]): BlockDT
         if (b) list.push({ ...b, id: `pendiente-${op.id}`, done: false, sortKey: b.startTime ? null : (b.sortKey ?? -1) + 0.01 });
         break;
       }
+      case "plan.scheduleTask": {
+        const t = op.args;
+        // Sin los datos de la tarea a mano: se ve con su nombre al subir; mientras, "Tarea agendada".
+        list.push({
+          id: `pendiente-${op.id}`,
+          title: "Tarea agendada (sin subir)",
+          categoryId: null,
+          date: String(t[1]),
+          startTime: (t[2] as string) || null,
+          endTime: null,
+          sortKey: typeof t[3] === "number" ? t[3] : null,
+          priority: 0,
+          done: false,
+          place: null,
+          notes: null,
+          taskId: String(t[0]),
+        });
+        break;
+      }
       case "plan.saveBlock": {
         const fd = a[0];
         const id = queuedField(fd, "id");

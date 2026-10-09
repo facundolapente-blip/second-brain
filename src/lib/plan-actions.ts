@@ -100,6 +100,36 @@ export async function setBlockDone(id: string, done: boolean) {
 
 const cleanTitle = (t: unknown) => String(t ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
 
+/**
+ * Arrastrar una tarea a un día de la semana: crea el bloque vinculado (nombre,
+ * categoría y prioridad de la tarea) y la marca como agendada. Con hora, el
+ * bloque dura una hora; sin hora queda para el día, en el lugar donde se soltó.
+ */
+export async function scheduleTask(taskId: string, date: string, startTime: string | null, sortKey?: number) {
+  await exigirSesion();
+  if (!isISODate(date)) return;
+  const t = await prisma.planTask.findUnique({ where: { id: String(taskId) } });
+  if (!t) return;
+  const start = startTime && isTime(startTime) ? startTime : null;
+  const mins = start ? Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5)) + 60 : 0;
+  const end = start ? `${String(Math.min(23, Math.floor(mins / 60))).padStart(2, "0")}:${String(mins >= 24 * 60 ? 59 : mins % 60).padStart(2, "0")}` : null;
+  const block = await prisma.planBlock.create({
+    data: {
+      title: t.title,
+      categoryId: t.categoryId,
+      priority: t.priority,
+      taskId: t.id,
+      date: toDbDate(date),
+      startTime: start,
+      endTime: end,
+      sortKey: !start && sortKey !== undefined && Number.isFinite(sortKey) ? sortKey : null,
+    },
+  });
+  await prisma.planTask.update({ where: { id: t.id }, data: { scheduled: true } });
+  await logActivity("created", "block", block.id, `${t.title} (${date})`);
+  refrescar();
+}
+
 /** Cambiar el nombre desde el menú de clic derecho. */
 export async function renameBlock(id: string, title: string) {
   await exigirSesion();

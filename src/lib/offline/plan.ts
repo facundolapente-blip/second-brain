@@ -1,7 +1,7 @@
 "use client";
 
 // Las acciones de plan-actions.ts envueltas para funcionar sin conexión (ver offline/queue.ts).
-import { saveBlock as _saveBlock, setBlockDone as _setBlockDone, renameBlock as _renameBlock, duplicateBlock as _duplicateBlock, deleteBlock as _deleteBlock, passToNextWeek as _passToNextWeek, passWeek as _passWeek, copyWeekToNext as _copyWeekToNext, saveTask as _saveTask, setTaskStatus as _setTaskStatus, bumpTaskProgress as _bumpTaskProgress, saveTaskColumns as _saveTaskColumns, setTaskScheduled as _setTaskScheduled, reorderTasks as _reorderTasks, renameTask as _renameTask, duplicateTask as _duplicateTask, deleteTask as _deleteTask, saveKeyResult as _saveKeyResult, deleteKeyResult as _deleteKeyResult, saveCategory as _saveCategory, rescheduleBlock as _rescheduleBlock, moveBlock as _moveBlock, addSubtask as _addSubtask, toggleSubtask as _toggleSubtask, deleteSubtask as _deleteSubtask, saveObjective as _saveObjective, deleteObjective as _deleteObjective, copyToYear as _copyToYear } from "../plan-actions";
+import { saveBlock as _saveBlock, setBlockDone as _setBlockDone, renameBlock as _renameBlock, duplicateBlock as _duplicateBlock, deleteBlock as _deleteBlock, passToNextWeek as _passToNextWeek, passWeek as _passWeek, copyWeekToNext as _copyWeekToNext, saveTask as _saveTask, setTaskStatus as _setTaskStatus, bumpTaskProgress as _bumpTaskProgress, saveTaskColumns as _saveTaskColumns, setTaskScheduled as _setTaskScheduled, reorderTasks as _reorderTasks, renameTask as _renameTask, duplicateTask as _duplicateTask, deleteTask as _deleteTask, saveKeyResult as _saveKeyResult, deleteKeyResult as _deleteKeyResult, saveCategory as _saveCategory, rescheduleBlock as _rescheduleBlock, moveBlock as _moveBlock, addSubtask as _addSubtask, toggleSubtask as _toggleSubtask, deleteSubtask as _deleteSubtask, saveObjective as _saveObjective, deleteObjective as _deleteObjective, copyToYear as _copyToYear, scheduleTask as _scheduleTask } from "../plan-actions";
 import { queueable } from "./queue";
 export type { ActionResult } from "../plan-actions";
 
@@ -33,3 +33,4 @@ export const deleteSubtask = queueable("plan.deleteSubtask", _deleteSubtask);
 export const saveObjective = queueable("plan.saveObjective", _saveObjective);
 export const deleteObjective = queueable("plan.deleteObjective", _deleteObjective);
 export const copyToYear = queueable("plan.copyToYear", _copyToYear);
+export const scheduleTask = queueable("plan.scheduleTask", _scheduleTask);
