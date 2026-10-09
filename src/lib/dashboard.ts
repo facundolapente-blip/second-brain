@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { backupWarning } from "./backup";
 import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
-import { currentStreak as habitStreak, dayState, packAll, showsOn, type DayState } from "./habit-logic";
+import { currentStreak as habitStreak, dayProgress, dayState, packAll, showsOn } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
 import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL, runSchedules } from "./finance";
 import { budgetState, monthShare } from "./budget-logic";
@@ -16,9 +16,6 @@ import { getCheckin, lastWeight } from "./checkin";
  * Resumen de los cuatro módulos para Inicio. Todo se calcula acá (servidor) y
  * viaja como datos planos: los componentes solo dibujan.
  */
-
-/** Estados que cuentan para el cumplimiento de un día: lo que tocaba hacer. */
-const COUNTS: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pending"];
 
 export type DayMix = {
   date: string;
@@ -117,16 +114,10 @@ export async function getDashboard() {
     // Los mismos que muestra la lista Hoy (`showsOn`), así las cifras coinciden.
     .filter((h) => showsOn(habits.find((x) => x.id === h.id)!, logs[h.id] ?? {}, today));
 
+  // Misma regla que la lista de Hoy (los hábitos que aparecen ese día), así coinciden.
   const habitDay = (iso: string) => {
-    let done = 0;
-    let due = 0;
-    for (const h of habits) {
-      const s = dayState(h, logs[h.id], iso, today);
-      if (!COUNTS.includes(s)) continue;
-      due++;
-      if (s === "done") done++;
-    }
-    return { done, due };
+    const { done, total } = dayProgress(habits, logs, iso, today);
+    return { done, due: total };
   };
   const habitHistory: { date: string; done: number; due: number }[] = [];
   for (let iso = heatFrom; iso <= today; iso = addDays(iso, 1)) habitHistory.push({ date: iso, ...habitDay(iso) });
@@ -188,8 +179,9 @@ export async function getDashboard() {
     // Las cuentas de trabajo no suman a lo personal.
     if (a.archived || a.business) continue;
     balances[a.currency] = (balances[a.currency] ?? 0) + a.balanceCents;
-    netWorth += toUyu(a.balanceCents, a.currency, rates);
   }
+  // El total de cada moneda pasado a pesos (como el patrimonio de Cuentas).
+  for (const [c, v] of Object.entries(balances)) netWorth += toUyu(v, c, rates);
 
   // ─── Plan ─────────────────────────────────────────────────────────────────
   const blockDTOs: BlockDTO[] = blocks.map((b) => ({

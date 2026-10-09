@@ -3,17 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { addDays, formatLong, startOfWeek, weekday } from "@/lib/dates";
-import { currentStreak, dayState, habitScore, showsOn, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
+import { currentStreak, dayProgress, habitScore, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { HabitDTO } from "@/lib/habits";
 import { cx } from "@/components/ui";
 
-/** Hábitos que tocan un día y cuántos ya están hechos (misma regla que la lista de Hoy). */
-export function dayProgress(habits: HabitDTO[], logs: Record<string, LogMap>, iso: string, today: string) {
-  const due = habits.filter((h) => iso >= h.startDate && showsOn(h, logs[h.id] ?? {}, iso));
-  const done = due.filter((h) => dayState(h, logs[h.id] ?? {}, iso, today) === "done").length;
-  return { done, total: due.length };
-}
+export { dayProgress };
 
 /**
  * Panel lateral de Hoy en la computadora: el avance del día en el bloque

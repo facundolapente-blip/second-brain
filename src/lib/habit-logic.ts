@@ -116,6 +116,23 @@ export function showsOn(h: HabitRule, logs: LogMap, iso: string): boolean {
   return !weekMet(h, logs, periodStart(h, iso));
 }
 
+/**
+ * Hábitos que tocan un día y cuántos ya están hechos: los mismos que muestra la
+ * lista de Hoy (`showsOn`). Lo usan Hoy, su panel e Inicio (también "Tu semana"),
+ * así las cifras coinciden en todos lados.
+ */
+export function dayProgress(habits: (HabitRule & { id: string })[], logs: Record<string, LogMap>, iso: string, today: string): { done: number; total: number } {
+  let done = 0;
+  let total = 0;
+  for (const h of habits) {
+    const l = logs[h.id] ?? {};
+    if (iso < h.startDate || !showsOn(h, l, iso)) continue;
+    total++;
+    if (dayState(h, l, iso, today) === "done") done++;
+  }
+  return { done, total };
+}
+
 // ─── Estado de un día ───────────────────────────────────────────────────────
 
 export function dayState(h: HabitRule, logs: LogMap, iso: string, today: string): DayState {

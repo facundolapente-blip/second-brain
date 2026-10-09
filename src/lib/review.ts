@@ -62,8 +62,14 @@ export async function getWeeklyReview(day: string) {
     }),
   ]);
 
-  const week = all.filter((d) => d.date >= monday);
-  const prev = all.filter((d) => d.date < monday);
+  // En la semana en curso se compara contra la anterior hasta el mismo día
+  // (como el resumen del mes): si no, todo da en baja hasta el domingo.
+  const isCurrent = today >= monday && today <= sunday;
+  const cut = isCurrent ? addDays(today, -7) : addDays(monday, -1);
+  const week = all.filter((d) => d.date >= monday && (!isCurrent || d.date <= today));
+  const prev = all.filter((d) => d.date < monday && d.date <= cut);
+  /** Días que van de la semana (7 si ya terminó). */
+  const elapsed = isCurrent ? week.length : 7;
 
   // Hábitos: cuántas veces se hizo cada uno de las que tocaba.
   const perHabit = habits
@@ -103,9 +109,11 @@ export async function getWeeklyReview(day: string) {
     today,
     monday,
     sunday,
-    isCurrent: today >= monday && today <= sunday,
+    isCurrent,
+    elapsed,
     isFuture: monday > today,
-    days: week,
+    // Los siete días (los gráficos y la tabla van de lunes a domingo).
+    days: all.filter((d) => d.date >= monday),
     now: summarize(week),
     before: summarize(prev),
     perHabit,

@@ -14,11 +14,15 @@ export async function saveCheckin(date: string, patch: unknown) {
   const data = cleanPatch(patch);
   if (Object.keys(data).length === 0) return;
   const before = "mood" in data ? await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(date) }, select: { mood: true } }) : null;
-  await prisma.dailyCheckin.upsert({
+  const row = await prisma.dailyCheckin.upsert({
     where: { date: toDbDate(date) },
     create: { date: toDbDate(date), ...data },
     update: data,
   });
+  // Si quedó sin ningún dato (se borró todo), la fila sobra: si no, contaría como check-in.
+  if ([row.mood, row.energy, row.stress, row.sleepMin, row.weightG, row.steps, row.note].every((v) => v === null)) {
+    await prisma.dailyCheckin.delete({ where: { id: row.id } });
+  }
   // El ánimo es uno solo por día: pasa a las entradas del journal de ese día que
   // no tenían ánimo o tenían el mismo que el check-in (no pisa uno distinto elegido a mano).
   if ("mood" in data) {

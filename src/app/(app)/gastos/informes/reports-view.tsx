@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { ArrowDownRight, ArrowSquareOut, ArrowUpRight, CaretDown, ChartBar } from "@phosphor-icons/react";
 import { addDays, formatMonth, monthBounds, shiftMonth, weekday } from "@/lib/dates";
-import { currencySymbol, moneyCents } from "@/lib/format";
+import { currencySymbol, moneyCents, shortNumber, moneyWhole } from "@/lib/format";
 import {
   byCategory,
   byMonth,
@@ -371,16 +371,16 @@ function Stat({
         className={cx(
           "figure pt-1 whitespace-nowrap",
           hero
-            ? moneyCents(cents, currency).length > 11
+            ? moneyWhole(cents, currency).length > 11
               ? "text-[32px] lg:text-[36px]"
               : "text-[44px]"
-            : moneyCents(cents, currency).length > 11
+            : moneyWhole(cents, currency).length > 11
               ? "text-[22px] lg:text-[24px]"
               : "text-[28px]",
         )}
       >
         {signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}
-        {moneyCents(cents, currency)}
+        {moneyWhole(cents, currency)}
       </span>
       {delta !== null && Math.abs(delta) >= 0.005 ? (
         <span className={cx("inline-flex items-center gap-1 text-[12.5px]", good ? "fin-income" : "text-danger")}>
@@ -488,7 +488,7 @@ function PaceChart({
           ref={box}
           role="img"
           tabIndex={0}
-          aria-label={`Gasto acumulado: ${formatMonth(month)} ${moneyCents(curSeries[curEnd], currency)} al día ${curEnd}; ${formatMonth(prevMonth)} ${moneyCents(prevSeries[prevEnd], currency)} en total.`}
+          aria-label={`Gasto acumulado: ${formatMonth(month)} ${moneyWhole(curSeries[curEnd], currency)} al día ${curEnd}; ${formatMonth(prevMonth)} ${moneyWhole(prevSeries[prevEnd], currency)} en total.`}
           onPointerMove={(e) => pick(e.clientX)}
           onPointerDown={(e) => pick(e.clientX)}
           onPointerLeave={() => setHover(null)}
@@ -547,8 +547,8 @@ function PaceChart({
                 style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
               >
                 <span className="text-muted">Día {h}</span>
-                <TooltipRow color="var(--fin-out)" label={monthName(month)} value={h <= curEnd ? moneyCents(curSeries[h], currency) : "Sin datos"} />
-                <TooltipRow color="var(--faint)" label={monthName(prevMonth)} value={h <= prevEnd ? moneyCents(prevSeries[h], currency) : "Sin datos"} />
+                <TooltipRow color="var(--fin-out)" label={monthName(month)} value={h <= curEnd ? moneyWhole(curSeries[h], currency) : "Sin datos"} />
+                <TooltipRow color="var(--faint)" label={monthName(prevMonth)} value={h <= prevEnd ? moneyWhole(prevSeries[h], currency) : "Sin datos"} />
               </div>
             </>
           )}
@@ -579,8 +579,8 @@ function PaceChart({
               {Array.from({ length: span }, (_, i) => i + 1).map((d) => (
                 <tr key={d} className="border-t border-line">
                   <td className="py-1.5">{d}</td>
-                  <td className="py-1.5 text-right">{d <= curEnd ? moneyCents(curSeries[d], currency) : ""}</td>
-                  <td className="py-1.5 text-right">{d <= prevEnd ? moneyCents(prevSeries[d], currency) : ""}</td>
+                  <td className="py-1.5 text-right">{d <= curEnd ? moneyWhole(curSeries[d], currency) : ""}</td>
+                  <td className="py-1.5 text-right">{d <= prevEnd ? moneyWhole(prevSeries[d], currency) : ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -671,7 +671,7 @@ function CategoryBars({
                 />
               </span>
               <span className="shrink-0">
-                <span className="font-mono text-[13.5px] font-medium tabular">{moneyCents(it.cents, currency)}</span>
+                <span className="font-mono text-[13.5px] font-medium tabular">{moneyWhole(it.cents, currency)}</span>
                 <span className="tabular ml-2 inline-block w-9 text-right text-[12.5px] text-muted">
                   {pct === 0 && it.cents > 0 ? "<1" : pct}%
                 </span>
@@ -832,7 +832,8 @@ function CategoryDetail({
 
 // ─── Evolución mensual ──────────────────────────────────────────────────────
 
-const compact = new Intl.NumberFormat("es-UY", { notation: "compact", maximumFractionDigits: 1 });
+// Números cortos de los gráficos: siempre "k" minúscula y coma (Intl compact mezcla "K" y "k").
+const compact = { format: shortNumber };
 
 /** Tope "redondo" para el eje: 1, 2, 2.5 o 5 por potencia de 10. */
 function niceMax(v: number): number {
@@ -908,7 +909,7 @@ function MonthlyColumns({
                 <button
                   key={d.month}
                   type="button"
-                  aria-label={`${formatMonth(d.month)}: ingresos ${moneyCents(d.income, currency)}, gastos ${moneyCents(d.expense, currency)}`}
+                  aria-label={`${formatMonth(d.month)}: ingresos ${moneyWhole(d.income, currency)}, gastos ${moneyWhole(d.expense, currency)}`}
                   onPointerEnter={() => setHover(i)}
                   onPointerLeave={() => setHover((x) => (x === i ? null : x))}
                   onFocus={() => setHover(i)}
@@ -935,8 +936,8 @@ function MonthlyColumns({
               }}
             >
               <span className="text-muted first-letter:uppercase">{formatMonth(data[hover].month)}</span>
-              <TooltipRow color="var(--fin-in)" label="Ingresos" value={moneyCents(data[hover].income, currency)} />
-              <TooltipRow color="var(--fin-out)" label="Gastos" value={moneyCents(data[hover].expense, currency)} />
+              <TooltipRow color="var(--fin-in)" label="Ingresos" value={moneyWhole(data[hover].income, currency)} />
+              <TooltipRow color="var(--fin-out)" label="Gastos" value={moneyWhole(data[hover].expense, currency)} />
             </div>
           )}
         </div>
@@ -966,11 +967,11 @@ function MonthlyColumns({
             {data.map((d) => (
               <tr key={d.month} className="border-t border-line">
                 <td className="py-1.5 first-letter:uppercase">{formatMonth(d.month)}</td>
-                <td className="py-1.5 text-right">{moneyCents(d.income, currency)}</td>
-                <td className="py-1.5 text-right">{moneyCents(d.expense, currency)}</td>
+                <td className="py-1.5 text-right">{moneyWhole(d.income, currency)}</td>
+                <td className="py-1.5 text-right">{moneyWhole(d.expense, currency)}</td>
                 <td className="py-1.5 text-right">
                   {d.income - d.expense < 0 ? "− " : ""}
-                  {moneyCents(d.income - d.expense, currency)}
+                  {moneyWhole(d.income - d.expense, currency)}
                 </td>
               </tr>
             ))}
@@ -1060,7 +1061,7 @@ function WeekdaySpend({ values, currency }: { values: number[]; currency: string
               }}
             />
           </span>
-          <span className="text-right font-mono text-[12.5px] tabular">{moneyCents(round(v), currency)}</span>
+          <span className="text-right font-mono text-[12.5px] tabular">{moneyWhole(round(v), currency)}</span>
         </li>
       ))}
     </ul>
@@ -1109,7 +1110,7 @@ function NetColumns({
         </div>
         <p className="tabular min-h-5 text-[13px] text-muted first-letter:uppercase" aria-live="polite">
           {shownIdx >= 0 &&
-            `${formatMonth(data[shownIdx].month)}: ${word(nets[shownIdx])}${nets[shownIdx] !== 0 ? ` ${moneyCents(nets[shownIdx], currency)}` : ""}`}
+            `${formatMonth(data[shownIdx].month)}: ${word(nets[shownIdx])}${nets[shownIdx] !== 0 ? ` ${moneyWhole(nets[shownIdx], currency)}` : ""}`}
         </p>
       </div>
 
@@ -1143,7 +1144,7 @@ function NetColumns({
                 <button
                   key={d.month}
                   type="button"
-                  aria-label={`${formatMonth(d.month)}: ${word(n)} ${moneyCents(n, currency)}`}
+                  aria-label={`${formatMonth(d.month)}: ${word(n)} ${moneyWhole(n, currency)}`}
                   onPointerEnter={() => setHover(i)}
                   onPointerLeave={() => setHover((x) => (x === i ? null : x))}
                   onFocus={() => setHover(i)}
@@ -1206,7 +1207,7 @@ function NetColumns({
                 <td className="py-1.5 first-letter:uppercase">{formatMonth(d.month)}</td>
                 <td className="py-1.5 text-right">
                   {nets[i] < 0 ? "− " : nets[i] > 0 ? "+ " : ""}
-                  {moneyCents(nets[i], currency)}
+                  {moneyWhole(nets[i], currency)}
                 </td>
               </tr>
             ))}

@@ -198,7 +198,7 @@ export function HabitsList({
 function HabitCard({
   habit,
   logs,
-  today,
+  today: realToday,
   mark,
   onDetail,
   onEdit,
@@ -212,6 +212,8 @@ function HabitCard({
 }) {
   const [, startTransition] = useSafeTransition();
   const tap = useDayTap(habit, logs, mark, onDetail);
+  // Un archivado se mira como estaba el día que se archivó.
+  const today = habit.archivedOn && habit.archivedOn < realToday ? habit.archivedOn : realToday;
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
   const streak = currentStreak(habit, logs, today);
   const score = habitScore(habit, logs, today);

@@ -9,7 +9,7 @@ import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx } from "@/components/ui";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "./habit-ui";
-import { DayComplete, HabitDayRows } from "./day-rows";
+import { DayComplete, HabitDayRows, useStickyDay } from "./day-rows";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { dayProgress, TodayPanel } from "./today-panel";
@@ -44,7 +44,9 @@ export function TodayView({
 
   // Orden fijo (el arrastrado, o prioridad y nombre): al tildar, la fila no cambia de lugar.
   const { sorted, reorder } = useHabitOrder(habits, manualOrder);
-  const visible = sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected));
+  // Los que tocan hoy, y los que ya se vieron aunque al destildarlos dejen de tocar.
+  const sticky = useStickyDay(selected, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected)).map((h) => h.id));
+  const visible = sorted.filter((h) => sticky.has(h.id));
 
 
   return (

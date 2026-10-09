@@ -1,7 +1,7 @@
 "use client";
 
 import { pendingActions as pendingActionsNow, usePendingActions } from "@/lib/offline/queue";
-import { useSafeTransition } from "@/components/safe-action";
+import { quiet, useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
 import { useRouter } from "next/navigation";
 import { PhotoStrip } from "@/components/photos";
@@ -24,6 +24,9 @@ const DEBOUNCE = 900;
  * guardado. Los guardados van en fila (nunca dos a la vez) y siempre mandan el
  * último estado, así no se pisa nada aunque la red tarde.
  */
+/** Descartes pendientes por entrada (ver el efecto de salida en `Editor`). */
+const leaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 function useAutosave(id: string, initial: EntryInput) {
   const data = useRef(initial);
   const version = useRef(0);
@@ -153,6 +156,27 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   useEffect(() => {
     if (!entry.body && !entry.title) bodyRef.current?.focus();
   }, [entry.body, entry.title]);
+
+  // Al salir por cualquier lado (Atrás del navegador, el menú, otro enlace), una
+  // entrada vacía se descarta. Con un retraso corto: el modo estricto de React
+  // desmonta y vuelve a montar al abrir, y eso no es salir (el nuevo montaje lo cancela).
+  useEffect(() => {
+    const id = entry.id;
+    clearTimeout(leaveTimers.get(id));
+    const current = data;
+    const photos = photoCount;
+    return () => {
+      const empty = isEmptyEntry({ ...current.current, title: current.current.title || null }) && photos.current === 0;
+      if (!empty) return;
+      leaveTimers.set(
+        id,
+        setTimeout(() => {
+          leaveTimers.delete(id);
+          void quiet(discardIfEmpty(id));
+        }, 400),
+      );
+    };
+  }, [entry.id, data]);
 
   function goBack() {
     startLeaving(async () => {
@@ -294,7 +318,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
       <Sheet ref={confirmSheet} title="¿Borrar esta entrada?">
         <div className="grid gap-5">
           <p className="text-[15px] leading-relaxed text-muted">
-            Se borra la entrada del {formatLong(date)} con todo lo que escribiste. No se puede deshacer.
+            Se borra la entrada del {formatLong(date)} con todo lo que escribiste. Va a la papelera: se puede deshacer enseguida o recuperar desde Historial durante 30 días.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => confirmSheet.current?.close()}>

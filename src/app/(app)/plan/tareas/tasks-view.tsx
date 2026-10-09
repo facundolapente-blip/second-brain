@@ -117,9 +117,10 @@ export function TasksBoard({
           className="-ml-1 flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 text-left lg:pointer-events-none"
         >
           <h2 className="display text-[22px] lg:text-[26px]">Tareas</h2>
+          {/* Las vencidas primero: si no entra todo en el celular, lo que se corta es lo menos importante. */}
           <span className="truncate font-mono text-[12px] text-muted tabular">
+            {overdue > 0 && <span className="text-danger">{overdue === 1 ? "1 vencida" : `${overdue} vencidas`} · </span>}
             {open.length} abiertas
-            {overdue > 0 && <span className="text-danger"> · {overdue === 1 ? "1 vencida" : `${overdue} vencidas`}</span>}
           </span>
           <CaretDown
             size={14}

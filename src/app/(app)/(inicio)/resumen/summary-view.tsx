@@ -14,7 +14,7 @@ import { moodInfo } from "@/lib/journal-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
-import { moneyCents } from "@/lib/format";
+import { moneyCents, dec1, moneyWhole } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";
@@ -126,7 +126,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
             >
               <Delta now={now.wroteDays} before={before.wroteDays} />
             </Kpi>
-            <Kpi label="Gastado" value={moneyCents(now.spentCents)}>
+            <Kpi label="Gastado" value={moneyWhole(now.spentCents)}>
               <Delta
                 now={now.spentCents}
                 before={before.spentCents}
@@ -240,7 +240,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
                           {d.words ? nf.format(d.words) : "–"}
                         </td>
                         <td className="py-1.5 pr-3 text-right">
-                          {d.spentCents ? moneyCents(d.spentCents) : "–"}
+                          {d.spentCents ? moneyWhole(d.spentCents) : "–"}
                         </td>
                         <td className="py-1.5 text-right">
                           {d.blocksTotal
@@ -323,19 +323,19 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
               <dl className="grid grid-cols-2 gap-2">
                 <Mini
                   label="Ánimo promedio"
-                  value={now.mood === null ? "–" : now.mood.toFixed(1)}
+                  value={now.mood === null ? "–" : dec1(now.mood)}
                   sub={moodInfo(Math.round(now.mood ?? 0))?.label}
                 />
                 <Mini
                   label="Energía"
                   value={
-                    now.energy === null ? "–" : `${now.energy.toFixed(1)} / 5`
+                    now.energy === null ? "–" : `${dec1(now.energy)} / 5`
                   }
                 />
                 <Mini
                   label="Estrés"
                   value={
-                    now.stress === null ? "–" : `${now.stress.toFixed(1)} / 5`
+                    now.stress === null ? "–" : `${dec1(now.stress)} / 5`
                   }
                 />
                 <Mini
@@ -375,11 +375,11 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
           className="lg:col-span-7 print:col-span-1 print:break-inside-avoid"
         >
           <dl className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-3 print:grid-cols-3">
-            <Mini label="Gastado" value={moneyCents(now.spentCents)} />
-            <Mini label="Ingresos" value={moneyCents(now.incomeCents)} />
+            <Mini label="Gastado" value={moneyWhole(now.spentCents)} />
+            <Mini label="Ingresos" value={moneyWhole(now.incomeCents)} />
             <Mini
               label="Neto"
-              value={`${net < 0 ? "−" : "+"}${moneyCents(Math.abs(net))}`}
+              value={`${net < 0 ? "−" : "+"}${moneyWhole(Math.abs(net))}`}
             />
           </dl>
           {s.topCategories.length === 0 ? (
@@ -400,7 +400,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
                     />
                   </ToneSquare>
                   <span className="truncate">{c.name}</span>
-                  <span className="tabular">{moneyCents(c.cents)}</span>
+                  <span className="tabular">{moneyWhole(c.cents)}</span>
                   <span className="col-span-2 col-start-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
                     <span
                       className="block h-full rounded-full bg-[var(--c-gastos)]"
@@ -586,7 +586,7 @@ function MonthTable({ rows }: { rows: MonthlySummary["byMonth"] }) {
                   {r.wroteDays}/{r.days}
                 </td>
                 <td className="py-2 pr-3">
-                  {r.mood === null ? "–" : r.mood.toFixed(1)}
+                  {r.mood === null ? "–" : dec1(r.mood)}
                 </td>
                 <td className="py-2 pr-3">
                   <span className="flex items-center gap-2">
@@ -596,10 +596,10 @@ function MonthTable({ rows }: { rows: MonthlySummary["byMonth"] }) {
                         style={{ width: `${(r.spentCents / maxSpent) * 100}%` }}
                       />
                     </span>
-                    {moneyCents(r.spentCents)}
+                    {moneyWhole(r.spentCents)}
                   </span>
                 </td>
-                <td className="py-2 text-right">{moneyCents(r.incomeCents)}</td>
+                <td className="py-2 text-right">{moneyWhole(r.incomeCents)}</td>
               </tr>
             ))}
           </tbody>

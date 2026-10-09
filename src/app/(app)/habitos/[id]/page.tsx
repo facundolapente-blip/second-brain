@@ -21,7 +21,8 @@ export default async function HabitPage({ params, searchParams }: PageProps<"/ha
       key={id}
       habit={data.habit}
       logs={packLogs(data.logs)}
-      today={data.today}
+      // Un archivado se mira como estaba el día que se archivó (no sigue bajando).
+      today={data.habit.archivedOn && data.habit.archivedOn < data.today ? data.habit.archivedOn : data.today}
       categories={categories}
       initialTab={initialTab}
     />

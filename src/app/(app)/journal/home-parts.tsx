@@ -202,6 +202,7 @@ function yearsAgo(date: string, today: string) {
  */
 export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string }) {
   const [hidden, setHidden] = useState(false);
+  const [all, setAll] = useState(false);
   if (hidden) return null;
   const { title, line } = memoryText(memory, today);
   const [first, ...rest] = memory.entries;
@@ -247,7 +248,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
       {rest.length > 0 && (
         <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line border-t border-line">
-          {rest.slice(0, 3).map((e) => (
+          {(all ? rest : rest.slice(0, 3)).map((e) => (
             <li key={e.id}>
               <Link
                 href={`/journal/${e.id}`}
@@ -266,6 +267,18 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
               </Link>
             </li>
           ))}
+          {/* El texto de arriba cuenta todas: las que no entran se abren acá. */}
+          {rest.length > 3 && (
+            <li>
+              <button
+                type="button"
+                onClick={() => setAll(!all)}
+                className="kicker inline-flex min-h-11 items-center px-1 hover:text-fg"
+              >
+                {all ? "Ver menos" : `Ver ${rest.length - 3} más`}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </section>

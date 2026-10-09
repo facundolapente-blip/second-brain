@@ -1,9 +1,9 @@
 "use client";
 
 import { useSafeTransition } from "@/components/safe-action";
-import { HabitDayRows, useJustCompleted } from "../habitos/day-rows";
+import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
-import { dayProgress } from "../habitos/today-panel";
+import { dayProgress } from "@/lib/habit-logic";
 import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
 import { useId, useOptimistic, useRef, useState } from "react";
@@ -28,7 +28,7 @@ import { addDays, formatLong, formatMonth, formatShort, shiftMonth, weekday } fr
 import { greeting } from "@/lib/journal-logic";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
-import { money, moneyCents } from "@/lib/format";
+import { money, moneyCents, shortNumber } from "@/lib/format";
 import { daysLeftLabel, isFreeBlock, timeRange } from "@/lib/plan-logic";
 import { setBlockDone } from "@/lib/offline/plan";
 import { writeOnDay } from "@/lib/offline/journal";
@@ -44,7 +44,7 @@ const WD = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 function compact(cents: number) {
   const v = cents / 100;
   if (v < 1000) return `$${Math.round(v)}`;
-  return `$${(v / 1000).toLocaleString("es-UY", { maximumFractionDigits: v < 10000 ? 1 : 0 })}k`;
+  return `$${shortNumber(v)}`;
 }
 
 function pct(a: number, b: number) {
@@ -239,7 +239,7 @@ function Card({
     <section
       aria-label={title}
       style={{ "--i": i } as React.CSSProperties}
-      className={cx("rise grid min-w-0 content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}
+      className={cx("rise grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}
     >
       <header className="flex items-center gap-2">
         <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
@@ -287,7 +287,8 @@ function Ring({ value, total, color }: { value: number; total: number; color: st
 function HabitsToday({ d }: { d: Dashboard }) {
   const { logs, mark } = useHabitLogs(d.habits.packed);
   const { sorted, reorder } = useHabitOrder(d.habits.list, d.habits.manualOrder);
-  const visible = sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today));
+  const sticky = useStickyDay(d.today, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today)).map((h) => h.id));
+  const visible = sorted.filter((h) => sticky.has(h.id));
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
   const celebrate = useJustCompleted(due > 0 && done >= due);
   const daySheet = useRef<DaySheetHandle>(null);

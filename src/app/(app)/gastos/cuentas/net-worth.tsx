@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatMonth } from "@/lib/dates";
-import { moneyCents } from "@/lib/format";
+import { moneyCents, moneyWhole } from "@/lib/format";
 
 /**
  * Patrimonio: las cuentas juntas en pesos (los dólares con la cotización de hoy)
@@ -33,16 +33,16 @@ export function NetWorth({
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <div>
           <p className="kicker">{title}</p>
-          <p className="figure mt-1 text-[34px]">{moneyCents(now)}</p>
+          <p className="figure mt-1 text-[34px]">{moneyWhole(now)}</p>
         </div>
         <p className="pb-1 text-[13px] text-muted">
           {diff >= 0 ? "+" : "−"}
-          {moneyCents(Math.abs(diff))} en 12 meses
+          {moneyWhole(Math.abs(diff))} en 12 meses
           {usdRate ? ` · US$ 1 = ${moneyCents(Math.round(usdRate * 100))}` : ""}
         </p>
       </div>
       <p className="tabular min-h-5 text-[12.5px] text-muted first-letter:uppercase" aria-live="polite">
-        {series[shown] && `${formatMonth(series[shown].month)}: ${moneyCents(series[shown].cents)}`}
+        {series[shown] && `${formatMonth(series[shown].month)}: ${moneyWhole(series[shown].cents)}`}
       </p>
       <div className="flex h-24 items-end gap-1" role="list" aria-label="Patrimonio al cierre de cada mes">
         {series.map((s, i) => (
@@ -50,7 +50,7 @@ export function NetWorth({
             key={s.month}
             type="button"
             role="listitem"
-            aria-label={`${formatMonth(s.month)}: ${moneyCents(s.cents)}`}
+            aria-label={`${formatMonth(s.month)}: ${moneyWhole(s.cents)}`}
             onPointerEnter={() => setFocus(i)}
             onPointerLeave={() => setFocus(null)}
             onFocus={() => setFocus(i)}
@@ -76,7 +76,7 @@ export function NetWorth({
             {[...series].reverse().map((s) => (
               <tr key={s.month} className="border-t border-line">
                 <td className="py-1 first-letter:uppercase">{formatMonth(s.month)}</td>
-                <td className="py-1 text-right">{moneyCents(s.cents)}</td>
+                <td className="py-1 text-right">{moneyWhole(s.cents)}</td>
               </tr>
             ))}
           </tbody>

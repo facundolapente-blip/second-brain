@@ -83,18 +83,19 @@ function BlockForm({
         />
       </Field>
 
-      <div className="grid grid-cols-[1.3fr_1fr_1fr] gap-3">
-        <Field label="Día">
-          <Input type="date" name="date" defaultValue={initial.date} required />
+      {/* Columnas que se pueden achicar: los campos de fecha y hora del celular no lo hacen solos. */}
+      <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:gap-3">
+        <Field label="Día" className="min-w-0">
+          <Input type="date" name="date" defaultValue={initial.date} required className="min-w-0 !px-2 sm:!px-3" />
         </Field>
-        <Field label="Desde">
-          <Input type="time" name="startTime" defaultValue={initial.startTime ?? ""} />
+        <Field label="Desde" className="min-w-0">
+          <Input type="time" name="startTime" defaultValue={initial.startTime ?? ""} className="min-w-0 !px-2 sm:!px-3" />
         </Field>
-        <Field label="Hasta">
-          <Input type="time" name="endTime" defaultValue={initial.endTime ?? ""} />
+        <Field label="Hasta" className="min-w-0">
+          <Input type="time" name="endTime" defaultValue={initial.endTime ?? ""} className="min-w-0 !px-2 sm:!px-3" />
         </Field>
       </div>
-      <p className="-mt-3 text-xs text-muted">Sin hora, el bloque queda para todo el día.</p>
+      <p className="-mt-3 text-xs text-muted">Sin hora de inicio, queda para todo el día.</p>
 
       <div className="grid gap-1.5">
         <span className="kicker">Categoría</span>

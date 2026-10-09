@@ -115,11 +115,17 @@ export const TxSheet = forwardRef<
     sheet.current?.open();
     // En el celular el teclado numérico sale directo al abrir.
     // Si viene precargado (plantilla), queda seleccionado para pisarlo al tipear.
+    // Se reintenta un par de veces: abierta apenas carga la página (atajo "Cargar
+    // gasto"), la hoja todavía no terminó de abrir al primer intento.
     if (!next.id) {
-      setTimeout(() => {
-        amountRef.current?.focus();
-        amountRef.current?.select();
-      }, 60);
+      for (const ms of [60, 250, 600]) {
+        setTimeout(() => {
+          const el = amountRef.current;
+          if (!el || document.activeElement === el) return;
+          el.focus();
+          el.select();
+        }, ms);
+      }
     }
   }
 

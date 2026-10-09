@@ -343,9 +343,12 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
     const [target, setTarget] = useState<{ habit: HabitDTO; date: string } | null>(null);
     const [value, setValue] = useState(0);
     const [note, setNote] = useState("");
+    // Si ya se guardó al tocar un botón, cerrar no vuelve a guardar.
+    const handled = useRef(false);
 
     useImperativeHandle(ref, () => ({
       show(habit, date) {
+        handled.current = false;
         const log = logs[habit.id]?.[date];
         setTarget({ habit, date });
         setValue(log?.s === "done" ? log.v : 0);
@@ -362,12 +365,22 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
 
     function apply(status: LogStatus | null, v = 1) {
       if (!habit || !target) return;
+      handled.current = true;
       mark(habit.id, target.date, status, v, note);
       sheet.current?.close();
     }
 
     return (
-      <Sheet ref={sheet} title={habit?.name ?? ""}>
+      <Sheet
+        ref={sheet}
+        title={habit?.name ?? ""}
+        // Una nota escrita no se pierde al cerrar con la X, Escape o arrastrando: se guarda igual.
+        onClose={() => {
+          if (handled.current || !habit || !target || !noteChanged) return;
+          handled.current = true;
+          mark(habit.id, target.date, marked, current?.v ?? 1, note);
+        }}
+      >
         {habit && target && (
           <div className="grid gap-5">
             <p className="kicker">{formatLong(target.date)}</p>
@@ -456,6 +469,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   <Button
                     variant="outline"
                     onClick={() => {
+                      handled.current = true;
                       mark(habit.id, target.date, marked, current?.v ?? 1, note);
                       sheet.current?.close();
                     }}

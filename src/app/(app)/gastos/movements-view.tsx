@@ -18,7 +18,6 @@ import {
   flowOf,
   dayLabel,
   groupByDay,
-  netByCurrency,
   periodIncludes,
   sortedCurrencies,
   touchesSelection,
@@ -138,8 +137,6 @@ export function MovementsView({
   // "Todas" son las personales: lo de las cuentas de trabajo se ve solo si se eligen.
   const visible = useMemo(() => txs.filter((t) => touchesSelection(t, scope)), [txs, scope]);
   const groups = useMemo(() => groupByDay(visible, scope, lk.currencyOf), [visible, scope, lk]);
-  const net = useMemo(() => netByCurrency(visible, scope, lk.currencyOf), [visible, scope, lk]);
-
   // Ingresos y gastos del mes por moneda (sin transferencias), para el resumen.
   const flows = useMemo(() => {
     const inc: Record<string, number> = {};
@@ -154,6 +151,12 @@ export function MovementsView({
     }
     return { inc, exp };
   }, [visible, lk]);
+  // Neto = ingresos − gastos (como Informes): sin transferencias ni ajustes de saldo.
+  const net = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const c of new Set([...Object.keys(flows.inc), ...Object.keys(flows.exp)])) out[c] = (flows.inc[c] ?? 0) - (flows.exp[c] ?? 0);
+    return out;
+  }, [flows]);
 
   const balance = useMemo(
     () => balanceByCurrency(selection ? accounts : accounts.filter((a) => !a.archived), scope),

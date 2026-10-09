@@ -636,8 +636,10 @@ function netWorthOf(
     const end = monthBounds(m).to;
     return { month: m, end: end > today ? today : end };
   });
-  // Cambio en pesos de cada movimiento, por fecha.
-  const deltas: { date: string; uyu: number }[] = [];
+  // Cambio de cada movimiento en su moneda, por fecha. Se suma por moneda y se
+  // pasa a pesos el total de cada cierre (igual que Inicio), así no hay
+  // diferencias de redondeo entre las dos pantallas.
+  const deltas: { date: string; currency: string; cents: number }[] = [];
   // Solo lo que toca a estas cuentas (las de afuera no están en `cur`).
   for (const t of txs) {
     const d = fromDbDate(t.date);
@@ -645,21 +647,24 @@ function netWorthOf(
     const from = cur.get(t.accountId);
     const to = t.toAccountId ? cur.get(t.toAccountId) : undefined;
     if (t.kind === "income") {
-      if (from) deltas.push({ date: d, uyu: toUyu(amt, from, rates) });
+      if (from) deltas.push({ date: d, currency: from, cents: amt });
     } else if (t.kind === "expense") {
-      if (from) deltas.push({ date: d, uyu: -toUyu(amt, from, rates) });
+      if (from) deltas.push({ date: d, currency: from, cents: -amt });
     } else {
-      if (from) deltas.push({ date: d, uyu: -toUyu(amt, from, rates) });
-      if (to) deltas.push({ date: d, uyu: toUyu(t.toAmount ? toCents(t.toAmount) : amt, to, rates) });
+      if (from) deltas.push({ date: d, currency: from, cents: -amt });
+      if (to) deltas.push({ date: d, currency: to, cents: t.toAmount ? toCents(t.toAmount) : amt });
     }
   }
   deltas.sort((a, b) => a.date.localeCompare(b.date));
-  const start = accounts.reduce((n, a) => n + toUyu(toCents(a.initialBalance), a.currency, rates), 0);
+  const totals: Record<string, number> = {};
+  for (const a of accounts) totals[a.currency] = (totals[a.currency] ?? 0) + toCents(a.initialBalance);
   let i = 0;
-  let acc = start;
   return ends.map(({ month, end }) => {
-    while (i < deltas.length && deltas[i].date <= end) acc += deltas[i++].uyu;
-    return { month, cents: acc };
+    while (i < deltas.length && deltas[i].date <= end) {
+      const x = deltas[i++];
+      totals[x.currency] = (totals[x.currency] ?? 0) + x.cents;
+    }
+    return { month, cents: Object.entries(totals).reduce((n, [c, v]) => n + toUyu(v, c, rates), 0) };
   });
 }
 

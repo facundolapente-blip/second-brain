@@ -114,7 +114,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
                 <MagnifyingGlass size={20} aria-hidden />
               </span>
               <p className="display text-[24px]">No hay entradas que coincidan</p>
-              <p className="max-w-[36ch] text-sm text-muted">Probá con otra palabra o sacá algún filtro. La búsqueda distingue tildes.</p>
+              <p className="max-w-[36ch] text-sm text-muted">Probá con otra palabra o sacá algún filtro. La búsqueda no distingue tildes ni mayúsculas.</p>
             </div>
           ) : (
             <EmptyJournal />

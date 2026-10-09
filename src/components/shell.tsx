@@ -4,7 +4,7 @@ import { notifyInfo, UndoToast } from "./undo-toast";
 import { ContextMenuHost } from "./context-menu";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
 import { signOut } from "@/lib/auth-client";
 import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
@@ -273,6 +273,20 @@ function useOffline() {
 
 export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
   const [drawer, setDrawer] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  // Cajón abierto: Escape lo cierra, el foco entra al menú y al cerrar vuelve a
+  // donde estaba (el botón "Abrir menú").
+  useEffect(() => {
+    if (!drawer) return;
+    const opener = document.activeElement as HTMLElement | null;
+    drawerRef.current?.querySelector<HTMLElement>("a[href], button")?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
+  }, [drawer]);
   useRefreshOnReturn();
   const { offline, pending, syncing } = useOffline();
 
@@ -299,7 +313,8 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
         {/* Cajón lateral del celular */}
         <div
           className={cx("fixed inset-0 z-40 lg:hidden print:hidden", drawer ? "pointer-events-auto" : "pointer-events-none")}
-          aria-hidden={!drawer}
+          // Cerrado no se ve ni se alcanza con Tab.
+          inert={!drawer}
         >
           <div
             onClick={() => setDrawer(false)}
@@ -309,6 +324,10 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
             )}
           />
           <aside
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú"
             className={cx(
               "absolute inset-y-0 left-0 flex w-[17.5rem] flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
               drawer ? "translate-x-0" : "-translate-x-full",

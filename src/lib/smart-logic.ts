@@ -1,3 +1,5 @@
+import { parseAmount } from "./finance-logic";
+
 /**
  * Gastos "inteligentes", sin IA ni servicios externos (servidor y cliente):
  *  - clasificación: aprende de los títulos que ya clasificaste ("Mc" → Restaurante);
@@ -76,9 +78,11 @@ export type QuickParse = {
 
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-/** "1.250" → 125000, "45,50" → 4550, "12.5" → 1250. */
+/** "1.250" → 125000, "45,50" → 4550, "12.5" → 1250; "20x3", "1500/3" → la cuenta. */
 function amountOf(tok: string): number | null {
   let t = tok.replace(/^[+$]+/, "");
+  // Una cuenta, igual que en la hoja de carga ("20x3", "1500/3", "500+20").
+  if (/^\d[\d.,]*([+\-x*/×÷]\d[\d.,]*)+$/i.test(t)) return parseAmount(t);
   if (!/^\d[\d.,]*$/.test(t)) return null;
   if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(t)) t = t.replace(/\./g, "").replace(",", ".");
   else if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, "").replace(",", ".");

@@ -6,7 +6,7 @@ import { Lightbulb } from "@phosphor-icons/react";
 import type { Corr, Insight } from "@/lib/insights";
 import { METRICS, WEEKDAY_NAMES } from "@/lib/insights";
 import { formatShort } from "@/lib/dates";
-import { moneyCents } from "@/lib/format";
+import { moneyCents, dec1, shortNumber, moneyWhole } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { cx } from "@/components/ui";
 
@@ -125,7 +125,7 @@ export function AnalysisView({
             <MiniBars
               title="Ánimo promedio"
               color="var(--mod-inicio)"
-              items={weeks.map((w) => ({ key: w.monday, label: formatShort(w.monday), value: w.mood, text: w.mood === null ? "sin datos" : w.mood.toFixed(1) }))}
+              items={weeks.map((w) => ({ key: w.monday, label: formatShort(w.monday), value: w.mood, text: w.mood === null ? "sin datos" : dec1(w.mood) }))}
               max={5}
             />
           </div>
@@ -147,7 +147,7 @@ export function AnalysisView({
                     <td className="py-1 text-right">{w.habitPct === null ? "–" : `${w.habitPct}%`}</td>
                     <td className="py-1 text-right">{moneyCents(w.spentCents)}</td>
                     <td className="py-1 text-right">{w.wrote}</td>
-                    <td className="py-1 text-right">{w.mood === null ? "–" : w.mood.toFixed(1)}</td>
+                    <td className="py-1 text-right">{w.mood === null ? "–" : dec1(w.mood)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -248,7 +248,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
           Tu mejor día para los hábitos es el <strong className="font-medium text-fg">{WEEKDAY_NAMES[best.weekday].toLowerCase()}</strong> (
           {best.habitPct}%) y el más flojo el <strong className="font-medium text-fg">{WEEKDAY_NAMES[worst.weekday].toLowerCase()}</strong> (
           {worst.habitPct}%). Donde más gastás: los{" "}
-          <strong className="font-medium text-fg">{WEEKDAY_NAMES[spender.weekday].toLowerCase()}</strong> ({moneyCents(spender.spentAvg)} en
+          <strong className="font-medium text-fg">{WEEKDAY_NAMES[spender.weekday].toLowerCase()}</strong> ({moneyWhole(spender.spentAvg)} en
           promedio).
         </p>
       )}
@@ -282,7 +282,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
               const p = (w.spentAvg / maxSpent) * 100;
               return (
                 <td key={w.weekday} className="h-10 rounded-lg" style={{ background: cell(p, "var(--c-gastos)"), color: p > 60 ? "white" : undefined }}>
-                  {w.spentAvg >= 100_000 ? `${(w.spentAvg / 100_000).toFixed(1)}k` : Math.round(w.spentAvg / 100)}
+                  {shortNumber(w.spentAvg / 100)}
                 </td>
               );
             })}
@@ -353,7 +353,7 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
                     <td
                       key={m2.id}
                       tabIndex={0}
-                      aria-label={`${m.label} y ${m2.label}: ${c.r === null ? "pocos datos" : c.r.toFixed(2)}`}
+                      aria-label={`${m.label} y ${m2.label}: ${c.r === null ? "pocos datos" : c.r.toLocaleString("es-UY", { maximumFractionDigits: 2 })}`}
                       onPointerEnter={() => setFocus([i, j])}
                       onPointerLeave={() => setFocus(null)}
                       onFocus={() => setFocus([i, j])}
@@ -361,7 +361,7 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
                       className="h-8 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                       style={{ background: color(c.r) }}
                     >
-                      {c.r === null ? "" : c.r.toFixed(1).replace("0.", ".").replace("-.", "−.")}
+                      {c.r === null ? "" : dec1(c.r)}
                     </td>
                   );
                 })}

@@ -135,7 +135,8 @@ export function HabitDetail({
           </div>
         )}
         {tab === "estadisticas" && (
-          <div className="grid lg:grid-cols-3 lg:gap-5">
+          // Dos columnas hasta 1280 px (con tres, la racha y el anillo no entraban).
+          <div className="grid lg:grid-flow-row-dense lg:grid-cols-[repeat(2,minmax(0,1fr))] lg:gap-5 xl:grid-cols-[repeat(3,minmax(0,1fr))]">
             <StatsTab habit={habit} stats={stats} view={view} today={today} />
           </div>
         )}
@@ -310,8 +311,8 @@ function streakUnit(habit: HabitDTO, n: number) {
 
 function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
   return (
-    <span className="inline-flex items-baseline gap-2">
-      <span className="figure text-[52px]">{value}</span>
+    <span className="inline-flex flex-wrap items-baseline gap-x-2">
+      <span className="figure text-[44px] xl:text-[52px]">{value}</span>
       {unit && <span className="display text-[20px] text-muted">{unit}</span>}
     </span>
   );
@@ -447,11 +448,11 @@ function StatsTab({
         </dl>
       </Panel>
 
-      <Panel className="lg:col-span-3">
+      <Panel className="lg:col-span-2 xl:col-span-3">
         <MonthTimeline stateOf={stats.stateOf} today={today} />
       </Panel>
 
-      <Panel className="lg:col-span-2">
+      <Panel className="lg:col-span-2 xl:col-span-2">
         <DoneBars habit={habit} logs={logs} from={stats.from} today={today} />
       </Panel>
 
@@ -459,7 +460,7 @@ function StatsTab({
         <Donut achieved={periods.achieved} missed={periods.missed} labels={periodWords} />
       </Panel>
 
-      <Panel icon={Medal} title="Desafío de racha" className="lg:col-span-3">
+      <Panel icon={Medal} title="Desafío de racha" className="lg:col-span-2 xl:col-span-3">
         <StreakChallenge habit={habit} best={best} />
       </Panel>
     </>

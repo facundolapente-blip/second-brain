@@ -63,9 +63,9 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
     };
   }, []);
   return (
-    // Cada día con un ancho mínimo cómodo: si no entran los 7, se corre de costado.
+    // Cada día con un ancho mínimo cómodo (entran los 7 desde ~1280 px); si no, se corre de costado.
     <div className="overflow-x-auto pb-2">
-    <div className="grid min-w-[73.5rem] grid-cols-[repeat(7,minmax(10.5rem,1fr))] border-t border-fg/80">
+    <div className="grid min-w-[57.75rem] grid-cols-[repeat(7,minmax(8.25rem,1fr))] border-t border-fg/80">
       {days.map((d) => {
         const list = byDay.get(d)!;
         return (
@@ -124,7 +124,7 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                   {Number(d.slice(8))}
                 </span>
               </span>
-              <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.length || ""}</span>
+              <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.filter((b) => !isFreeBlock(b)).length || ""}</span>
             </header>
             {list.map((b) => {
               const others = list.filter((x) => x.id !== dragging?.id);

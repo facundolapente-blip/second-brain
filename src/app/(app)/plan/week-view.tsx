@@ -11,16 +11,7 @@ import { useOptimistic, useRef, useState, useMemo } from "react";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
 import { addDays, formatShort, weekday } from "@/lib/dates";
-import {
-  isFreeBlock,
-  sortBlocks,
-  timeRange,
-  WEEKDAY_LONG,
-  type BlockDTO,
-  type CategoryDTO,
-  type TaskDTO,
-  sortKeyAt,
-} from "@/lib/plan-logic";
+import { isFreeBlock, sortBlocks, timeRange, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type TaskDTO, sortKeyAt, PLAN_VIEW_COOKIE } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
@@ -40,7 +31,10 @@ export function WeekView({
   tasks,
   top,
   todoFolded = false,
+  initialView = "lista",
 }: {
+  /** Lista o Por horas, como quedó la última vez (cookie). */
+  initialView?: "lista" | "horas";
   /** Lo que va arriba del calendario: las tareas. */
   top?: React.ReactNode;
   /** Pendientes sin hora plegados en la vista por horas (cookie). */
@@ -61,7 +55,12 @@ export function WeekView({
   const [blocks, applyDone] = useOptimistic(withPending, (state, m: Partial<BlockDTO> & { id: string }) =>
     state.map((b) => (b.id === m.id ? { ...b, ...m } : b)),
   );
-  const [view, setView] = useState<"lista" | "horas">("lista");
+  const [view, setViewState] = useState<"lista" | "horas">(initialView);
+  // La vista elegida se recuerda (al recargar o cambiar de semana sigue igual).
+  const setView = (v: "lista" | "horas") => {
+    setViewState(v);
+    document.cookie = `${PLAN_VIEW_COOKIE}=${v}; path=/plan; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+  };
   const [, startTransition] = useSafeTransition();
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const sheet = useRef<BlockSheetHandle>(null);
@@ -423,15 +422,20 @@ export function BlockCard({
       className={cx(
         "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
         // En la columna de la compu cada bloque es una tarjeta (bien separada de la siguiente).
-        compact ? "rounded-xl border border-line bg-surface px-3 py-2.5" : "py-2.5 pr-1",
+        compact ? "rounded-xl border border-line bg-surface px-2.5 py-2.5" : "py-2.5 pr-1",
         // "Libre": la misma tarjeta, teñida de verde suave.
         compact && free && "free-block",
       )}
     >
-      <button type="button" onClick={onEdit} className={cx("min-w-0 text-left", free && "col-span-2")}>
+      {/* En la columna de la compu el título va a todo el ancho (la casilla baja a la
+          fila de las etiquetas), así las palabras largas no se parten. */}
+      <button type="button" onClick={onEdit} className={cx("min-w-0 text-left", (free || compact) && "col-span-2")}>
         <span
           className={cx(
-            "block text-[14.5px] leading-snug font-medium break-words hyphens-auto",
+            "block leading-snug font-medium break-words hyphens-auto",
+            // En la columna de la compu, un poco más chico hasta las pantallas grandes: así
+            // entran palabras largas ("Emprendimientos") sin partirse.
+            compact ? "text-[13.5px] tracking-[-0.01em] 2xl:text-[14.5px] 2xl:tracking-normal" : "text-[14.5px]",
             free && "font-normal",
             b.done && !free && "text-muted line-through decoration-faint",
           )}
@@ -440,51 +444,72 @@ export function BlockCard({
         </span>
         {/* La hora, cerca del título y con peso parecido al de las etiquetas. */}
         {compact && range && (
-          <span className="mt-1 flex items-center gap-1 font-mono text-[13px] font-medium whitespace-nowrap text-fg/75 tabular">
+          <span className="mt-1 flex items-center gap-1 font-mono text-[12px] font-medium whitespace-nowrap text-fg/75 tabular 2xl:text-[13px]">
             <Clock size={13} weight="bold" aria-hidden className="shrink-0 text-muted" />
             {range.replace(" a ", "–")}
           </span>
         )}
       </button>
-      {!free && (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={b.done}
-          aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
-          className={cx(
-            "row-span-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] active:scale-90",
-            compact && "row-span-1 -my-1.5 size-9",
-          )}
-        >
-          <span
+      {(() => {
+        const check = !free && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={b.done}
+            aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
             className={cx(
-              "inline-flex size-[22px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
-              b.done
-                ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
-                : "border-fg/45 bg-transparent group-hover:border-fg/70",
+              "inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] active:scale-90",
+              compact ? "-my-1.5 -mr-1.5 size-9" : "row-span-2",
             )}
           >
-            {b.done && <Check size={14} weight="bold" />}
-          </span>
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onEdit}
-        tabIndex={-1}
-        className={cx("grid min-w-0 gap-1.5 text-left", compact ? "col-span-2" : "col-start-1")}
-      >
-        <span className="flex flex-wrap items-center gap-1.5">
-          <CategoryTag category={category} />
-          <PriorityTag n={b.priority} />
-        </span>
-        {b.place && (
+            <span
+              className={cx(
+                "inline-flex size-[22px] items-center justify-center rounded-[4px] border-[1.5px] transition-colors",
+                b.done
+                  ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent"
+                  : "border-fg/45 bg-transparent group-hover:border-fg/70",
+              )}
+            >
+              {b.done && <Check size={14} weight="bold" />}
+            </span>
+          </button>
+        );
+        const place = b.place && (
           <span className="inline-flex items-center gap-1 text-[12px] text-muted">
             <MapPin size={12} aria-hidden /> {b.place}
           </span>
-        )}
-      </button>
+        );
+        // Columna de la compu: título y hora a todo el ancho, la etiqueta debajo y,
+        // en la última fila, la prioridad con la casilla a la derecha (nada se pisa
+        // aunque la columna sea angosta).
+        if (compact)
+          return (
+            <>
+              <button type="button" onClick={onEdit} tabIndex={-1} className="col-span-2 grid min-w-0 justify-items-start gap-1.5 text-left">
+                <CategoryTag category={category} />
+                {place}
+              </button>
+              <div className="col-span-2 flex min-h-7 items-center justify-between gap-2">
+                <button type="button" onClick={onEdit} tabIndex={-1} className="min-w-0 text-left">
+                  <PriorityTag n={b.priority} />
+                </button>
+                {check}
+              </div>
+            </>
+          );
+        return (
+          <>
+            {check}
+            <button type="button" onClick={onEdit} tabIndex={-1} className="col-start-1 grid min-w-0 gap-1.5 text-left">
+              <span className="flex flex-wrap items-center gap-1.5">
+                <CategoryTag category={category} />
+                <PriorityTag n={b.priority} />
+              </span>
+              {place}
+            </button>
+          </>
+        );
+      })()}
     </article>
   );
 }

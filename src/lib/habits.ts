@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
-import { fromDbDate, todayISO } from "./dates";
+import { dayOfInstant, fromDbDate, todayISO } from "./dates";
 import type { DayLog, Frequency, LogMap, PastTrack } from "./habit-logic";
 
 export type CategoryDTO = { id: string; name: string; icon: string; color: string; habitCount: number };
@@ -26,6 +26,8 @@ export type HabitDTO = {
   order: number;
   startDate: string;
   archived: boolean;
+  /** Día en que se archivó: sus números quedan congelados ahí (no siguen bajando). */
+  archivedOn: string | null;
   /** Pistas cerradas, de la más vieja a la más nueva. */
   tracks: PastTrack[];
 };
@@ -87,6 +89,7 @@ function toDTO(h: HabitRow): HabitDTO {
     order: h.order,
     startDate: fromDbDate(h.startDate),
     archived: h.archivedAt !== null,
+    archivedOn: h.archivedAt ? dayOfInstant(h.archivedAt) : null,
     tracks: h.tracks.map((t) => ({
       startDate: fromDbDate(t.startDate),
       endDate: fromDbDate(t.endDate),

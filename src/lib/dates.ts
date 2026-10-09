@@ -75,9 +75,9 @@ function fmt(iso: string, opts: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat("es-UY", { timeZone: "UTC", ...opts }).format(toDbDate(iso));
 }
 
-/** "jueves 2 de octubre" */
-export function formatLong(iso: string): string {
-  return fmt(iso, { weekday: "long", day: "numeric", month: "long" });
+/** "jueves 2 de octubre"; de otro año, "jueves 9 de octubre de 2025". */
+export function formatLong(iso: string, today = todayISO()): string {
+  return fmt(iso, { weekday: "long", day: "numeric", month: "long", ...(iso.slice(0, 4) !== today.slice(0, 4) ? { year: "numeric" } : {}) });
 }
 
 /** "2 oct" */
@@ -100,5 +100,5 @@ export function formatRelative(iso: string, today = todayISO()): string {
   const d = diffDays(today, iso);
   if (d === 0) return "Hoy";
   if (d === 1) return "Ayer";
-  return formatLong(iso);
+  return formatLong(iso, today);
 }

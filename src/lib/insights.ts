@@ -1,3 +1,4 @@
+import { dec1 } from "./format";
 /**
  * Cruces entre módulos a partir de las filas diarias (DayMetrics). Todo puro:
  * promedios de dos grupos de días y correlaciones de Pearson, con mínimos de
@@ -70,8 +71,8 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
         module: "habitos",
         text:
           m.a > m.b
-            ? `Con ${h.name} hecho, tu ánimo es mejor (${m.a.toFixed(1)} contra ${m.b.toFixed(1)})`
-            : `Los días con ${h.name} hecho tu ánimo es más bajo (${m.a.toFixed(1)} contra ${m.b.toFixed(1)})`,
+            ? `Con ${h.name} hecho, tu ánimo es mejor (${dec1(m.a)} contra ${dec1(m.b)})`
+            : `Los días con ${h.name} hecho tu ánimo es más bajo (${dec1(m.a)} contra ${dec1(m.b)})`,
         detail: `Escala de 1 a 5 · ${m.na} y ${m.nb} días`,
         weight: Math.min(1, Math.abs(m.a - m.b) / 2) + 0.2,
       });
@@ -84,7 +85,7 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
     out.push({
       id: "sueno-animo",
       module: "inicio",
-      text: `Durmiendo 7 h o más tu ánimo promedio es ${sleepMood.a.toFixed(1)}; con menos, ${sleepMood.b.toFixed(1)}`,
+      text: `Durmiendo 7 h o más tu ánimo promedio es ${dec1(sleepMood.a)}; con menos, ${dec1(sleepMood.b)}`,
       detail: `${sleepMood.na} y ${sleepMood.nb} días con sueño y ánimo cargados`,
       weight: Math.abs(sleepMood.a - sleepMood.b) / 2 + 0.3,
     });
@@ -110,7 +111,7 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
     out.push({
       id: "pasos-animo",
       module: "inicio",
-      text: `Los días con 8.000 pasos o más tu ánimo promedio es ${stepsMood.a.toFixed(1)}; con menos, ${stepsMood.b.toFixed(1)}`,
+      text: `Los días con 8.000 pasos o más tu ánimo promedio es ${dec1(stepsMood.a)}; con menos, ${dec1(stepsMood.b)}`,
       detail: `${stepsMood.na} y ${stepsMood.nb} días con pasos y ánimo`,
       weight: Math.abs(stepsMood.a - stepsMood.b) / 2 + 0.3,
     });

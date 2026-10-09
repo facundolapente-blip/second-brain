@@ -2,7 +2,7 @@
 
 import { usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BatteryHigh, CaretDown, Check, Minus, Moon, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
 import { saveCheckin } from "@/lib/offline/checkin";
 import {
@@ -63,19 +63,48 @@ export function CheckinCard({
     .filter(Boolean)
     .join(" · ");
 
-  function set(patch: CheckinPatch) {
-    const key = day;
-    const before = data;
-    setData((d) => ({ ...d, [key]: { ...d[key], ...patch } }));
-    setSaved(false);
+  // Los toques seguidos (bajar el sueño de a media hora, cambiar de idea) se juntan
+  // en un solo guardado por día: se ve al instante y se manda al rato de soltar.
+  const batch = useRef<{ day: "today" | "yesterday"; patch: CheckinPatch; before: typeof data; timer?: ReturnType<typeof setTimeout> } | null>(null);
+  function send() {
+    const b = batch.current;
+    if (!b) return;
+    batch.current = null;
+    clearTimeout(b.timer);
     start(
       async () => {
-        await saveCheckin(data[key].date, patch);
+        await saveCheckin(data[b.day].date, b.patch);
         setSaved(true);
       },
-      // Si no se guardó (sin señal), vuelve a como estaba: no mostrar algo que no quedó.
-      { onError: () => setData(before) },
+      // Si no se guardó, vuelve a como estaba: no mostrar algo que no quedó.
+      { onError: () => setData(b.before) },
     );
+  }
+  // Lo que quedó sin mandar se manda igual al salir de la página o al ocultarla.
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+  useEffect(() => {
+    const flush = () => sendRef.current();
+    const onHide = () => document.visibilityState === "hidden" && flush();
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHide);
+      flush();
+    };
+  }, []);
+  function set(patch: CheckinPatch) {
+    const key = day;
+    if (batch.current && batch.current.day !== key) send();
+    const b = (batch.current ??= { day: key, patch: {}, before: data });
+    b.patch = { ...b.patch, ...patch };
+    clearTimeout(b.timer);
+    b.timer = setTimeout(send, 700);
+    setData((d) => ({ ...d, [key]: { ...d[key], ...patch } }));
+    setSaved(false);
   }
 
   return (
@@ -236,8 +265,12 @@ function Scale({
   );
 }
 
-function Sleep({ value, onChange }: { value: number | null; onChange: (v: number) => void }) {
-  const step = (d: number) => onChange(Math.max(0, Math.min(16 * 60, (value ?? 7 * 60) + d)));
+function Sleep({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  // Bajar de media hora lo borra (vuelve a "Cargar"): "0 h" no es un dato.
+  const step = (d: number) => {
+    const next = Math.min(16 * 60, (value ?? 7 * 60) + d);
+    onChange(value !== null && next < 30 ? null : Math.max(30, next));
+  };
   return (
     <div className="flex h-11 items-center gap-1 rounded-xl bg-surface-2 p-1">
       <button
@@ -251,7 +284,7 @@ function Sleep({ value, onChange }: { value: number | null; onChange: (v: number
       <button
         type="button"
         onClick={() => value === null && onChange(7 * 60)}
-        className={cx("tabular flex-1 text-center text-[15px] font-semibold", value === null && "text-muted")}
+        className={cx("tabular h-full flex-1 text-center text-[15px] font-semibold", value === null && "text-muted")}
       >
         {value === null ? "Cargar" : formatSleep(value)}
       </button>

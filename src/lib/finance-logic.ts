@@ -363,7 +363,7 @@ export function dayLabel(iso: string, today = todayISO()): { label: string; rela
   if (d === -1) return { label: "Mañana", relative: true };
   if (d < -1 && d >= -6) return { label: `En ${-d} días`, relative: true };
   // De otro año, con el año (al ver un año entero o un período largo).
-  const long = formatLong(iso) + (iso.slice(0, 4) !== today.slice(0, 4) ? ` de ${iso.slice(0, 4)}` : "");
+  const long = formatLong(iso, today);
   return { label: long.charAt(0).toUpperCase() + long.slice(1), relative: false };
 }
 

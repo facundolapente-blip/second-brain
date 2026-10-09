@@ -1,4 +1,5 @@
-import { addDays, todayISO } from "@/lib/dates";
+import { addDays, todayISO, toDbDate } from "@/lib/dates";
+import { prisma } from "@/lib/prisma";
 import { getDailyMetrics } from "@/lib/daily-metrics";
 import { buildInsights, byWeekday, correlations, weeklySeries } from "@/lib/insights";
 import { AnalysisView } from "./analysis-view";
@@ -14,8 +15,13 @@ export default async function AnalisisPage({ searchParams }: PageProps<"/analisi
   const today = todayISO();
   // Hoy todavía no terminó: el análisis llega hasta ayer.
   const to = addDays(today, -1);
-  const { days, habits } = await getDailyMetrics(addDays(to, -(n - 1)), to);
-  const checkinDays = days.filter((d) => d.mood !== null || d.energy !== null || d.sleepMin !== null).length;
+  const from = addDays(to, -(n - 1));
+  // Los check-ins cargados de verdad (el ánimo de los días también puede venir del
+  // journal, así que no sirve para contarlos): el mismo número que muestra Datos.
+  const [{ days, habits }, checkinDays] = await Promise.all([
+    getDailyMetrics(from, to),
+    prisma.dailyCheckin.count({ where: { date: { gte: toDbDate(from), lte: toDbDate(to) } } }),
+  ]);
   return (
     <div data-module="inicio" className="min-h-dvh">
       <AnalysisView

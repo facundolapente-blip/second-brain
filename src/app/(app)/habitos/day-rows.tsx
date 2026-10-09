@@ -10,6 +10,22 @@ import { cx } from "@/components/ui";
 import { HabitBadge, type MarkFn } from "./habit-ui";
 
 /**
+ * Hábitos que se vieron en el día: al destildar uno que ya no tocaría (un
+ * fallado en una semana que igual se cumplió) no desaparece de la lista mientras
+ * se mira ese día. `ids` son los que tocan según `showsOn`; devuelve esos más los
+ * que ya se habían visto.
+ */
+export function useStickyDay(day: string, ids: string[]): Set<string> {
+  const [seen, setSeen] = useState<{ day: string; ids: Set<string> }>(() => ({ day, ids: new Set(ids) }));
+  let cur = seen.day === day ? seen : { day, ids: new Set<string>() };
+  if (cur !== seen || ids.some((id) => !cur.ids.has(id))) {
+    cur = { day, ids: new Set([...cur.ids, ...ids]) };
+    setSeen(cur);
+  }
+  return cur.ids;
+}
+
+/**
  * Las filas de hábitos de un día, iguales en Hoy (Hábitos) y en Inicio: ícono,
  * nombre, frecuencia y el círculo (un toque tilde, dos cruz, tres blanco). Tocar
  * el hábito abre la hoja del día. Mantener apretado (o clic y arrastrar) y mover
@@ -43,7 +59,9 @@ export function HabitDayRows({
         {habits.map((h) => {
           const hLogs = logs[h.id] ?? {};
           const log = hLogs[day];
-          const state = dayState(h, hLogs, day, today);
+          // El círculo muestra la marca que hay: un salteado de hoy (que el
+          // estado del día deja en blanco) se ve salteado, así el toque se entiende.
+          const state = log?.s === "skipped" ? "skipped" : dayState(h, hLogs, day, today);
           const isCount = h.target > 1 || !!h.unit;
           return (
             <SortableItem key={h.id} id={h.id} className={cx("flex items-center gap-3 lg:gap-4", rowClassName)}>
@@ -98,6 +116,12 @@ function CheckButton({ state, onTap, disabled }: { state: string; onTap: () => v
       cls: "border-[var(--st-fail-line)] bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
       icon: <X size={18} weight="bold" />,
       label: "Fallado",
+    },
+    // Fallado en una semana que igual llegó a la meta: la cruz, más suave.
+    missed: {
+      cls: "border-[var(--st-fail-line)]/50 bg-[var(--st-fail-bg)]/50 text-[var(--st-fail-fg)]/70",
+      icon: <X size={18} weight="bold" />,
+      label: "Fallado (la semana igual se cumplió)",
     },
     skipped: {
       cls: "border-[var(--st-skip-line)] bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",

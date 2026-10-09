@@ -35,6 +35,28 @@ export function moneyCents(cents: number, currency = "UYU"): string {
   return money(Math.abs(cents) / 100, currency);
 }
 
+/** Monto redondeado a pesos (para totales y promedios; en otras monedas quedan los centavos). */
+export function moneyWhole(cents: number, currency = "UYU"): string {
+  return moneyCents(currency === "UYU" ? Math.round(cents / 100) * 100 : cents, currency);
+}
+
+/** Un decimal, con coma: 3.6 → "3,6"; los negativos con "−". */
+export function dec1(n: number): string {
+  const v = Math.round(n * 10) / 10;
+  const s = Math.abs(v).toLocaleString("es-UY", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return v < 0 ? `−${s}` : s;
+}
+
+/** Número corto para gráficos: 850 → "850", 8.800 → "8,8k", 24.700 → "24,7k", 1.250.000 → "1,3M". */
+export function shortNumber(v: number): string {
+  const a = Math.abs(v);
+  const sign = v < 0 ? "−" : "";
+  const f = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits: 1 });
+  if (a < 1000) return sign + Math.round(a).toLocaleString("es-UY");
+  if (a < 1_000_000) return `${sign}${f(a / 1000)}k`;
+  return `${sign}${f(a / 1_000_000)}M`;
+}
+
 /** Símbolo corto para prefijar un campo de monto. */
 export function currencySymbol(currency: string): string {
   return currency === "UYU" ? "$" : currency === "USD" ? "US$" : currency;

@@ -9,7 +9,7 @@ import { moodInfo } from "@/lib/journal-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
-import { moneyCents } from "@/lib/format";
+import { moneyCents, dec1, moneyWhole } from "@/lib/format";
 import { writeWeeklyReview } from "@/lib/offline/journal";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
@@ -53,15 +53,15 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
       />
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         <section aria-label="Resumen de la semana" className="hero rise rounded-[22px] p-5 lg:col-span-12 lg:p-7">
-          <p className="hero-sub text-[13px]">{r.isCurrent ? "Semana en curso, hasta hoy" : "Comparado con la semana anterior"}</p>
+          <p className="hero-sub text-[13px]">{r.isCurrent ? "Semana en curso, hasta hoy · comparada con la anterior hasta el mismo día" : "Comparado con la semana anterior"}</p>
           <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
             <Kpi label="Hábitos cumplidos" value={now.habitPct === null ? "–" : `${now.habitPct}%`}>
               <Delta now={now.habitPct} before={before.habitPct} unit="pts" />
             </Kpi>
-            <Kpi label="Días escritos" value={`${now.wroteDays} de 7`}>
+            <Kpi label="Días escritos" value={`${now.wroteDays} de ${r.elapsed}`}>
               <Delta now={now.wroteDays} before={before.wroteDays} />
             </Kpi>
-            <Kpi label="Gastado" value={moneyCents(now.spentCents)}>
+            <Kpi label="Gastado" value={moneyWhole(now.spentCents)}>
               <Delta now={now.spentCents} before={before.spentCents} goodUp={false} />
             </Kpi>
             <Kpi label="Bloques del plan" value={`${now.blocksDone} de ${now.blocksTotal}`}>
@@ -150,9 +150,9 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
                 })}
               </div>
               <dl className="grid grid-cols-2 gap-2">
-                <Mini label="Ánimo promedio" value={now.mood === null ? "–" : now.mood.toFixed(1)} sub={moodInfo(Math.round(now.mood ?? 0))?.label} />
-                <Mini label="Energía" value={now.energy === null ? "–" : `${now.energy.toFixed(1)} / 5`} />
-                <Mini label="Estrés" value={now.stress === null ? "–" : `${now.stress.toFixed(1)} / 5`} />
+                <Mini label="Ánimo promedio" value={now.mood === null ? "–" : dec1(now.mood)} sub={moodInfo(Math.round(now.mood ?? 0))?.label} />
+                <Mini label="Energía" value={now.energy === null ? "–" : `${dec1(now.energy)} / 5`} />
+                <Mini label="Estrés" value={now.stress === null ? "–" : `${dec1(now.stress)} / 5`} />
                 <Mini label="Sueño promedio" value={now.sleepMin === null ? "–" : formatSleep(Math.round(now.sleepMin / 15) * 15)} />
               </dl>
               {r.weight && (
@@ -169,9 +169,9 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         {/* Gastos */}
         <Card title="Gastos" color="var(--c-gastos)" className="lg:col-span-7" href="/gastos">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
-            <p className="figure text-[30px]">{moneyCents(now.spentCents)}</p>
+            <p className="figure text-[30px]">{moneyWhole(now.spentCents)}</p>
             <p className="pb-1 text-[13px] text-muted">
-              la semana anterior {moneyCents(before.spentCents)} · ingresos {moneyCents(now.incomeCents)}
+              la semana anterior{r.isCurrent ? " a esta altura" : ""} {moneyWhole(before.spentCents)} · ingresos {moneyWhole(now.incomeCents)}
             </p>
           </div>
           <div className="grid h-28 grid-cols-7 items-end gap-2" role="img" aria-label="Gasto por día">
@@ -181,7 +181,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
                   <div
                     className="w-full rounded-t-md bg-[var(--c-gastos)]"
                     style={{ height: `${d.spentCents ? Math.max(4, (d.spentCents / maxSpent) * 100) : 0}%` }}
-                    title={`${formatShort(d.date)}: ${moneyCents(d.spentCents)}`}
+                    title={`${formatShort(d.date)}: ${moneyWhole(d.spentCents)}`}
                   />
                 </div>
                 <span className="font-mono text-[10.5px] text-muted">{WD[weekday(d.date)]}</span>
@@ -196,7 +196,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
                     <FinanceIcon name={c.icon} size={14} weight="fill" aria-hidden />
                   </ToneSquare>
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="tabular">{moneyCents(c.cents)}</span>
+                  <span className="tabular">{moneyWhole(c.cents)}</span>
                 </li>
               ))}
               {r.topCategories.length === 0 && <li className="text-[13.5px] text-muted">Sin gastos en pesos.</li>}

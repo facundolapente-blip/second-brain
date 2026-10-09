@@ -175,16 +175,13 @@ async function getMemory(today: string): Promise<MemoryDTO | null> {
 
 export async function getHome() {
   const today = todayISO();
-  const [days, memory, todayEntry] = await Promise.all([
-    writtenDays(),
-    getMemory(today),
-    prisma.journalEntry.findFirst({ where: { date: toDbDate(today) }, select: { id: true } }),
-  ]);
+  const [days, memory] = await Promise.all([writtenDays(), getMemory(today)]);
   return {
     today,
     hour: hourInMontevideo(),
     streak: currentStreak(new Set(days), today),
-    wroteToday: days.includes(today) || !!todayEntry,
+    // Solo cuenta lo escrito (una entrada vacía de hoy no es "seguir hoy").
+    wroteToday: days.includes(today),
     memory,
   };
 }

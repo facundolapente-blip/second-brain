@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useRef, useState } from "react";
-import { CaretDown, Check, Checks, GearSix } from "@phosphor-icons/react";
+import { Briefcase, CaretDown, Check, Checks, GearSix } from "@phosphor-icons/react";
 import { balanceByCurrency, scopeOf, type AccountDTO, type Selection } from "@/lib/finance-logic";
 import { cx, Sheet, type SheetHandle } from "@/components/ui";
 import { AccountAvatar, Balance, TotalsInline } from "./shared";
@@ -205,7 +205,9 @@ export function AccountChips({
         {work.length ? "Personales" : "Todas"}
       </button>
       {[...visible.filter((a) => !a.business), ...work].map((a, i, list) => {
-        const on = selection !== null && selection.includes(a.id) && !onWork;
+        // Con "Trabajo" activo sus cuentas no se ven elegidas una por una (el botón
+        // las representa), salvo en "Varias", donde sí se ve qué está tildado.
+        const on = selection !== null && selection.includes(a.id) && (!onWork || multi);
         // Antes de la primera cuenta de trabajo, el botón que las junta.
         const workChip = a.business && !list[i - 1]?.business && work.length > 1;
         return (
@@ -213,13 +215,14 @@ export function AccountChips({
           {workChip && (
             <button
               type="button"
-              aria-pressed={onWork}
+              aria-pressed={onWork && !multi}
               onClick={() => {
                 onChange(workIds);
                 setMulti(false);
               }}
-              className={cx(chip, onWork ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:text-fg")}
+              className={cx(chip, onWork && !multi ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-fg hover:bg-surface-2")}
             >
+              <Briefcase size={16} aria-hidden />
               Trabajo
             </button>
           )}

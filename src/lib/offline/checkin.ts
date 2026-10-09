@@ -6,4 +6,7 @@ import { queueable } from "./queue";
 export { importHealth } from "../checkin-actions";
 export type { HealthImportResult } from "../checkin-actions";
 
-export const saveCheckin = queueable("checkin.saveCheckin", _saveCheckin);
+// Sin señal, el último cambio de los mismos campos del mismo día reemplaza a los anteriores.
+export const saveCheckin = queueable("checkin.saveCheckin", _saveCheckin, {
+  key: (date, patch) => `${date}:${Object.keys((patch ?? {}) as object).sort().join(",")}`,
+});
