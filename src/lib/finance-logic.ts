@@ -24,6 +24,8 @@ export type AccountDTO = {
   order: number;
   archived: boolean;
   txCount: number;
+  /** Cuenta de trabajo (patrimonio de la empresa, aparte del personal). */
+  business: boolean;
   /** Tarjeta de crédito: día de cierre y de vencimiento, límite. */
   closingDay: number | null;
   dueDay: number | null;

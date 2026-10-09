@@ -5,10 +5,21 @@ import { formatMonth } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 
 /**
- * Patrimonio: todas las cuentas juntas en pesos (los dólares con la cotización
- * de hoy) y cómo cerró cada uno de los últimos 12 meses.
+ * Patrimonio: las cuentas juntas en pesos (los dólares con la cotización de hoy)
+ * y cómo cerró cada uno de los últimos 12 meses. Si hay cuentas de trabajo, se
+ * muestran dos: el personal y el de la empresa.
  */
-export function NetWorth({ series, usdRate }: { series: { month: string; cents: number }[]; usdRate: number | null }) {
+export function NetWorth({
+  series,
+  usdRate,
+  title = "Patrimonio total, en pesos",
+  note,
+}: {
+  series: { month: string; cents: number }[];
+  usdRate: number | null;
+  title?: string;
+  note?: string;
+}) {
   const [focus, setFocus] = useState<number | null>(null);
   const now = series.at(-1)?.cents ?? 0;
   const first = series[0]?.cents ?? 0;
@@ -18,10 +29,10 @@ export function NetWorth({ series, usdRate }: { series: { month: string; cents: 
   const label = (m: string) => formatMonth(m).split(" ")[0].slice(0, 3);
 
   return (
-    <section aria-label="Patrimonio" className="grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
+    <section aria-label={title} className="grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <div>
-          <p className="kicker">Patrimonio total, en pesos</p>
+          <p className="kicker">{title}</p>
           <p className="figure mt-1 text-[34px]">{moneyCents(now)}</p>
         </div>
         <p className="pb-1 text-[13px] text-muted">
@@ -71,7 +82,9 @@ export function NetWorth({ series, usdRate }: { series: { month: string; cents: 
           </tbody>
         </table>
       </details>
-      <p className="text-[11.5px] text-muted">Con la cotización de hoy para todos los meses: es una referencia, no el valor exacto de cada momento.</p>
+      <p className="text-[11.5px] text-muted">
+        {note ? `${note} ` : ""}Con la cotización de hoy para todos los meses: es una referencia, no el valor exacto de cada momento.
+      </p>
     </section>
   );
 }

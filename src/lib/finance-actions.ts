@@ -252,6 +252,7 @@ export async function saveAccount(_prev: ActionResult | null, fd: FormData): Pro
     closingDay: day("closingDay"),
     dueDay: day("dueDay"),
     creditLimit: limit === null ? null : centsToDecimalString(limit),
+    isBusiness: fd.get("business") === "on",
   };
 
   if (id) {

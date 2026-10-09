@@ -150,6 +150,8 @@ model Account {
   dueDay         Int?
   /// Límite de la tarjeta (opcional).
   creditLimit    Decimal?               @db.Decimal(14, 2)
+  /// Cuenta de trabajo (la empresa): no suma al patrimonio personal, va en el de la empresa.
+  isBusiness     Boolean                @default(false)
   archivedAt     DateTime?
   createdAt      DateTime               @default(now())
   transactions   Transaction[]          @relation("TxAccount")

@@ -135,6 +135,7 @@ export async function getAccounts(): Promise<AccountDTO[]> {
       order: a.order,
       archived: a.archivedAt !== null,
       txCount: count.get(a.id) ?? 0,
+      business: a.isBusiness,
       closingDay: a.closingDay,
       dueDay: a.dueDay,
       limitCents: a.creditLimit === null ? null : toCents(a.creditLimit),
@@ -596,14 +597,31 @@ export async function getGoals(): Promise<GoalDTO[]> {
 /**
  * Patrimonio en pesos al cierre de cada mes (los últimos `months`): saldo
  * inicial + todos los movimientos hasta ese día, con la cotización de hoy.
+ * Personal y de la empresa por separado: las cuentas de trabajo (`isBusiness`)
+ * van en el de la empresa; una transferencia entre una y otra sale de uno y
+ * entra en el otro.
  */
 export async function getNetWorthSeries(months = 12) {
-  const today = todayISO();
   const [accounts, txs, rates] = await Promise.all([
-    prisma.account.findMany({ select: { id: true, currency: true, initialBalance: true } }),
+    prisma.account.findMany({ select: { id: true, currency: true, initialBalance: true, isBusiness: true } }),
     prisma.transaction.findMany({ select: { date: true, kind: true, amount: true, toAmount: true, accountId: true, toAccountId: true } }),
     getRates(),
   ]);
+  const personal = accounts.filter((a) => !a.isBusiness);
+  const business = accounts.filter((a) => a.isBusiness);
+  return {
+    personal: netWorthOf(personal, txs, rates, months),
+    business: business.length ? netWorthOf(business, txs, rates, months) : null,
+  };
+}
+
+function netWorthOf(
+  accounts: { id: string; currency: string; initialBalance: Prisma.Decimal }[],
+  txs: { date: Date; kind: string; amount: Prisma.Decimal; toAmount: Prisma.Decimal | null; accountId: string; toAccountId: string | null }[],
+  rates: Awaited<ReturnType<typeof getRates>>,
+  months: number,
+) {
+  const today = todayISO();
   const cur = new Map(accounts.map((a) => [a.id, a.currency]));
   const ends = Array.from({ length: months }, (_, i) => {
     const m = shiftMonth(today.slice(0, 7), i - months + 1);
@@ -612,14 +630,19 @@ export async function getNetWorthSeries(months = 12) {
   });
   // Cambio en pesos de cada movimiento, por fecha.
   const deltas: { date: string; uyu: number }[] = [];
+  // Solo lo que toca a estas cuentas (las de afuera no están en `cur`).
   for (const t of txs) {
     const d = fromDbDate(t.date);
     const amt = toCents(t.amount);
-    if (t.kind === "income") deltas.push({ date: d, uyu: toUyu(amt, cur.get(t.accountId) ?? "UYU", rates) });
-    else if (t.kind === "expense") deltas.push({ date: d, uyu: -toUyu(amt, cur.get(t.accountId) ?? "UYU", rates) });
-    else {
-      deltas.push({ date: d, uyu: -toUyu(amt, cur.get(t.accountId) ?? "UYU", rates) });
-      if (t.toAccountId) deltas.push({ date: d, uyu: toUyu(t.toAmount ? toCents(t.toAmount) : amt, cur.get(t.toAccountId) ?? "UYU", rates) });
+    const from = cur.get(t.accountId);
+    const to = t.toAccountId ? cur.get(t.toAccountId) : undefined;
+    if (t.kind === "income") {
+      if (from) deltas.push({ date: d, uyu: toUyu(amt, from, rates) });
+    } else if (t.kind === "expense") {
+      if (from) deltas.push({ date: d, uyu: -toUyu(amt, from, rates) });
+    } else {
+      if (from) deltas.push({ date: d, uyu: -toUyu(amt, from, rates) });
+      if (to) deltas.push({ date: d, uyu: toUyu(t.toAmount ? toCents(t.toAmount) : amt, to, rates) });
     }
   }
   deltas.sort((a, b) => a.date.localeCompare(b.date));

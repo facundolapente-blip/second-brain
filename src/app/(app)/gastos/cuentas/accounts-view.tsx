@@ -35,6 +35,7 @@ type Draft = {
   closingDay: string;
   dueDay: string;
   limit: string;
+  business: boolean;
 };
 
 const CURRENCY_NAME: Record<string, string> = { UYU: "pesos", USD: "dólares", ARS: "pesos arg.", EUR: "euros", BRL: "reales" };
@@ -50,7 +51,7 @@ export function AccountsView({
   cards: CardSummary[];
   today: string;
   openNew: boolean;
-  netWorth: { series: { month: string; cents: number }[]; usdRate: number | null };
+  netWorth: { series: { month: string; cents: number }[]; business: { month: string; cents: number }[] | null; usdRate: number | null };
 }) {
   const router = useRouter();
   const { setSelection } = useSelection(accounts);
@@ -72,7 +73,10 @@ export function AccountsView({
         ...active.filter((a) => !order.includes(a.id)),
       ]
     : active;
-  const totals = balanceByCurrency(active, null);
+  // Los totales son personales: las cuentas de trabajo (la empresa) van aparte.
+  const personal = active.filter((a) => !a.business);
+  const totals = balanceByCurrency(personal, null);
+  const hasBusiness = active.some((a) => a.business);
 
   useEffect(() => {
     if (state?.ok) sheet.current?.close();
@@ -107,6 +111,7 @@ export function AccountsView({
       closingDay: a.closingDay ? String(a.closingDay) : "",
       dueDay: a.dueDay ? String(a.dueDay) : "",
       limit: a.limitCents ? centsToInput(a.limitCents) : "",
+      business: a.business,
     });
   }
 
@@ -143,7 +148,15 @@ export function AccountsView({
       <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         {active.length > 0 && (
           <div className="pt-2 lg:pt-6">
-            <NetWorth series={netWorth.series} usdRate={netWorth.usdRate} />
+            <NetWorth series={netWorth.series} usdRate={netWorth.usdRate} title={netWorth.business ? "Patrimonio personal, en pesos" : undefined} />
+            {netWorth.business && (
+              <NetWorth
+                series={netWorth.business}
+                usdRate={null}
+                title="Patrimonio de la empresa, en pesos"
+                note={`Las cuentas de trabajo: ${accounts.filter((a) => a.business && !a.archived).map((a) => a.name).join(", ")}.`}
+              />
+            )}
           </div>
         )}
         {active.length === 0 ? (
@@ -163,7 +176,7 @@ export function AccountsView({
                   {Object.keys(totals)
                     .sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
                     .map((c, i) => {
-                      const n = active.filter((a) => a.currency === c).length;
+                      const n = personal.filter((a) => a.currency === c).length;
                       return (
                         <div
                           key={c}
@@ -182,7 +195,10 @@ export function AccountsView({
                           <dd className="figure text-[clamp(2rem,9vw,2.75rem)]">
                             <Balance cents={totals[c]} currency={c} hero />
                           </dd>
-                          <dd className="text-[13px] text-muted">{n === 1 ? "1 cuenta" : `${n} cuentas`}</dd>
+                          <dd className="text-[13px] text-muted">
+                            {n === 1 ? "1 cuenta" : `${n} cuentas`}
+                            {hasBusiness ? ", sin las de trabajo" : ""}
+                          </dd>
                         </div>
                       );
                     })}
@@ -213,6 +229,7 @@ export function AccountsView({
                     <AccountAvatar account={a} size={40} />
                     <span className="grid min-w-0 flex-1 gap-0.5">
                       <span className="truncate text-[15px] font-medium">{a.name}</span>
+                      {a.business && <span className="w-fit shrink-0 justify-self-start rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">Trabajo</span>}
                       <span className="text-[13px] text-muted">
                         {ACCOUNT_TYPES[a.type] ?? a.type} · {a.currency}
                       </span>
@@ -352,6 +369,20 @@ export function AccountsView({
             </div>
           )}
 
+          <label className="flex min-h-11 items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              name="business"
+              checked={draft.business}
+              onChange={(e) => setDraft({ ...draft, business: e.target.checked })}
+              className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
+            />
+            <span className="grid gap-0.5">
+              <span className="font-medium">Cuenta de trabajo</span>
+              <span className="text-[12.5px] text-muted">No suma a tu patrimonio personal: va en el patrimonio de la empresa.</span>
+            </span>
+          </label>
+
           <Field label="Saldo inicial" hint="Lo que tenía la cuenta antes del primer movimiento. Para corregir el saldo de hoy (o de un día pasado) usá Ajustar saldo, abajo.">
             <span className="flex h-10 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
               <span className="text-sm text-muted">{currencySymbol(draft.currency)}</span>
@@ -453,7 +484,7 @@ export function AccountsView({
 }
 
 function blank(): Draft {
-  return { name: "", type: "bank", currency: "UYU", initial: "", color: "blue", archived: false, txCount: 0, closingDay: "", dueDay: "", limit: "" };
+  return { name: "", type: "bank", currency: "UYU", initial: "", color: "blue", archived: false, txCount: 0, closingDay: "", dueDay: "", limit: "", business: false };
 }
 
 function ChipGroup({

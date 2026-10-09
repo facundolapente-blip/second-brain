@@ -15,7 +15,7 @@ export default async function CuentasPage({ searchParams }: PageProps<"/gastos/c
       cards={cards}
       today={todayISO()}
       openNew={nueva === "1"}
-      netWorth={{ series, usdRate: rates.toUyu.USD ?? null }}
+      netWorth={{ series: series.personal, business: series.business, usdRate: rates.toUyu.USD ?? null }}
     />
   );
 }
