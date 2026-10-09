@@ -14,7 +14,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 import { calibrarSaldos } from "../src/lib/importers/gastos-saldos.ts";
 
 const SOURCE = "import:gastos-transferencias";
@@ -41,7 +41,7 @@ for (const [i, raw] of readFileSync(file, "utf8").split(/\r?\n/).entries()) {
   });
 }
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 const accounts = new Map((await prisma.account.findMany()).map((a) => [a.name, a]));
 
 const seen = new Map<string, number>();

@@ -7,12 +7,12 @@
  * movimientos, no agrega nada: solo ajusta los saldos iniciales para que los
  * saldos de hoy coincidan con los de las capturas.
  */
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 
 const url = process.env.DATABASE_URL ?? "";
 if (!/@(localhost|127\.0\.0\.1)[:/]/.test(url)) throw new Error("Solo contra la base local (DATABASE_URL en localhost).");
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 
 const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/Montevideo" }) + "T00:00:00Z");
 const day = (n: number) => new Date(today.getTime() - n * 86_400_000);

@@ -8,14 +8,14 @@
  * categorías. Sin --replace se puede correr varias veces: no duplica.
  */
 import { readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 import { importGastosCsv } from "../src/lib/importers/gastos-csv.ts";
 
 const args = process.argv.slice(2);
 const [file] = args.filter((a) => !a.startsWith("--"));
 if (!file) throw new Error("Uso: node --env-file=.env scripts/import-gastos-csv.ts <archivo.csv> [--replace] [--sin-ajuste]");
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 console.log(
   await importGastosCsv(prisma, readFileSync(file, "utf8"), {
     replace: args.includes("--replace"),

@@ -17,7 +17,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { strFromU8, unzipSync } from "fflate";
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 
 const SOURCE = "notion";
 const file = process.argv[2];
@@ -99,7 +99,7 @@ const COLORS: Record<string, string> = {
 };
 
 const DRY = process.argv.includes("--simular");
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 const report: string[] = [];
 const say = (s: string) => report.push(s);
 const low = (s: string) => s.trim().toLowerCase();

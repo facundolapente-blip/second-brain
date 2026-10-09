@@ -39,20 +39,20 @@ node --env-file=.env scripts/seed-gastos-demo.ts  # cuentas y movimientos de eje
 ```
 
 - **Nunca `prisma db push`**: el schema se cambia con migraciones.
-- La base local es PGlite: **una sola sesión compartida**. Por eso `DATABASE_URL` lleva `connection_limit=1&pgbouncer=true` (sin eso, error "prepared statement s0 already exists"). Tampoco admite varias bases: `CREATE DATABASE` no aísla nada.
+- La base local es PGlite: **una sola sesión compartida**. Por eso `DATABASE_URL` lleva `connection_limit=1`: `nuevoPrisma()` lo usa como tamaño del pool de node-postgres (con más de una conexión falla con "prepared statement already exists" o se cuelga). El `pgbouncer=true` que también trae ya no hace falta (se saca de la URL). Tampoco admite varias bases: `CREATE DATABASE` no aísla nada.
 - `LOCAL_SIN_LOGIN` en `.env` entra sin contraseña con `npm run dev` (nunca en producción).
 
 ## Producción
 
 - App: https://second-brain-ochre-phi.vercel.app (Vercel, proyecto `second-brain`, región `gru1`). Repo privado: github.com/facundolapente-blip/second-brain.
 - Base: Neon, proyecto `second-brain` (`dry-mode-32198909`, aws-sa-east-1). Conexiones y secreto en `.env.production.local` (fuera de git). Para correr algo contra producción: `set -a; . ./.env.production.local; set +a` (los importadores mejor con `DATABASE_URL="$DIRECT_URL"`).
-- `src/lib/prisma.ts` agrega `pgbouncer=true` a `DATABASE_URL` si no lo tiene: el pooler de Neon guarda consultas preparadas y, después de una migración que cambia el tipo de una columna, fallaban con "cached plan must not change result type" (le pasó a /plan el 2026-10-07 con `PlanTask.links`).
+- **Prisma sin motor de Rust** (`engineType = "client"` en el schema, desde 2026-10-09): para que cada función de Vercel pese menos (tope de 10 GB de "Function Storage" en el plan gratis). Las consultas salen por node-postgres con `@prisma/adapter-pg` (misma versión que Prisma, 6.19.3). Todo cliente se crea con `nuevoPrisma(url?)` de `src/lib/prisma-conexion.ts` (la app en `prisma.ts` y todos los scripts; `new PrismaClient()` sin adaptador falla): saca de la URL `pgbouncer` y `connection_limit` (este pasa a ser el tamaño del pool) y cambia `sslmode=require` por `verify-full`. node-postgres usa consultas preparadas sin nombre, así que el pooler de Neon ya no da "cached plan must not change result type" después de una migración (le pasó a /plan el 2026-10-07 con `PlanTask.links`, cuando hacía falta `pgbouncer=true`). `next.config.ts` excluye del rastreo los `*.wasm-base64.*` y `query_engine_bg.*` de `@prisma/client/runtime` (para edge, no se usan): cada función bajó de ~80 MB a ~24 MB. Las migraciones siguen igual (la CLI usa su propio motor de esquemas).
 - Variables en Vercel: `DATABASE_URL` (pooled), `DIRECT_URL`, `BETTER_AUTH_SECRET`, `ALLOWED_EMAILS`. `BETTER_AUTH_URL` no hace falta: `urlBase()` usa `VERCEL_PROJECT_PRODUCTION_URL`.
 - Deploy: Vercel está conectado al repo, **cada push a `main` despliega solo** (el build aplica migraciones solo en producción, `scripts/build.mjs`). A mano: `npx vercel deploy --prod`.
 
 ## Stack
 
-Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `revalidatePath`), React 19, Prisma 6 sobre Postgres (Neon en prod, pendiente), Tailwind v4, Better Auth (mail + contraseña, lista blanca `ALLOWED_EMAILS`), íconos Phosphor (no lucide).
+Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `revalidatePath`), React 19, Prisma 6 sobre Postgres con el adaptador de node-postgres (Neon en prod), Tailwind v4, Better Auth (mail + contraseña, lista blanca `ALLOWED_EMAILS`), íconos Phosphor (no lucide).
 
 **Acciones desde el cliente**: siempre con `useSafeTransition` (en vez de `useTransition`), `safeForm(accion)` dentro de `useActionState` o `quiet(promesa)` para llamadas sueltas (`components/safe-action.ts`). Si una server action falla (sin señal, servidor caído, sesión vencida) muestran un aviso abajo (`notifyError` en `undo-toast.tsx`) y lo optimista vuelve solo; sin esto React 19 manda el error al `error.tsx` y la pantalla entera queda en "No se pudo cargar". `onError` para deshacer estado local (el check-in lo usa). Las redirecciones de Next pasan (`unstable_rethrow`).
 

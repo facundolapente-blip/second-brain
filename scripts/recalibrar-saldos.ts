@@ -4,10 +4,10 @@
  *
  *   node --env-file=.env scripts/recalibrar-saldos.ts
  */
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 import { calibrarSaldos } from "../src/lib/importers/gastos-saldos.ts";
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 await calibrarSaldos(prisma);
 const accs = await prisma.account.findMany({ select: { name: true, initialBalance: true } });
 console.log(accs.map((a) => `${a.name}: inicial ${a.initialBalance}`).join("\n"));

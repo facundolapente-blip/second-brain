@@ -2,9 +2,11 @@
 // App de una sola persona: los datos no llevan userId, el acceso lo cierra ALLOWED_EMAILS.
 
 generator client {
-  provider      = "prisma-client-js"
-  // El runtime de Vercel es RHEL: sin esto el motor generado no corre en producción.
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  provider   = "prisma-client-js"
+  // Sin el motor de Rust (~17 MB por función en Vercel): las consultas se arman
+  // con un compilador en wasm y salen por node-postgres (`@prisma/adapter-pg`,
+  // ver `src/lib/prisma-conexion.ts`). Por eso `new PrismaClient()` sin adaptador falla.
+  engineType = "client"
 }
 
 datasource db {

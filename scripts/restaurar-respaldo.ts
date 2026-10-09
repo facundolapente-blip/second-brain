@@ -12,7 +12,9 @@
  */
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 
 const file = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const confirm = process.argv.includes("--confirmar");
@@ -63,7 +65,7 @@ const delegate = (p: PrismaClient | Prisma.TransactionClient, name: string) =>
     name[0].toLowerCase() + name.slice(1)
   ];
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 console.log(`Respaldo del ${json.exportado ?? "?"} (versión ${json.version ?? "?"})\n`);
 console.log("Tabla".padEnd(24), "Respaldo".padStart(9), "Base hoy".padStart(9));
 for (const name of order) {

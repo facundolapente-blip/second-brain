@@ -8,7 +8,7 @@
  * los hábitos, marcas y categorías antes; --update suma y actualiza sin borrar.
  */
 import { readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 import { importHabitNow } from "../src/lib/importers/habitnow.ts";
 
 const [file] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -17,6 +17,6 @@ const update = process.argv.includes("--update");
 if (!file) throw new Error("Uso: node --env-file=.env scripts/import-habitnow.ts <archivo.hn> [--replace | --update]");
 if (replace && update) throw new Error("--replace y --update no van juntos.");
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 console.log(await importHabitNow(prisma, readFileSync(file, "utf8"), replace ? "replace" : update ? "update" : "fresh"));
 await prisma.$disconnect();

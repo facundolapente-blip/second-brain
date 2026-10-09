@@ -1,25 +1,13 @@
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "./prisma-conexion";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 /**
- * En producción la conexión va por el pooler de Neon (PgBouncer), que guarda las
- * consultas preparadas por su texto: después de una migración que cambia el tipo
- * de una columna, esas consultas fallan ("cached plan must not change result
- * type") hasta que se renuevan las conexiones. Con `pgbouncer=true` Prisma no
- * reutiliza consultas preparadas y eso no pasa.
+ * El cliente de la app. Va por node-postgres con el adaptador de Prisma (sin el
+ * motor de Rust, para que cada función de Vercel pese menos); la conexión y la
+ * limpieza de la URL están en `prisma-conexion.ts`, compartidas con los scripts.
  */
-function databaseUrl(): string | undefined {
-  const url = process.env.DATABASE_URL;
-  if (!url || /[?&]pgbouncer=/.test(url)) return url;
-  return `${url}${url.includes("?") ? "&" : "?"}pgbouncer=true`;
-}
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    datasourceUrl: databaseUrl(),
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+export const prisma = globalForPrisma.prisma ?? nuevoPrisma();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

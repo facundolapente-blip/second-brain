@@ -9,7 +9,7 @@
  * leyó sin tocar la base. --drop-demo borra antes las entradas de ejemplo.
  */
 import { readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 import { importMyDiary, linesFromDocx, linesFromPdf, linesFromText, parseEntries } from "../src/lib/importers/mydiary.ts";
 
 const [file] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -23,7 +23,7 @@ const entries = parseEntries(lines);
 if (process.argv.includes("--dry")) {
   for (const e of entries) console.log(`── ${e.date} · ${e.title ?? "(sin título)"}\n${e.body}\n`);
 } else {
-  const prisma = new PrismaClient();
+  const prisma = nuevoPrisma();
   if (process.argv.includes("--drop-demo")) {
     const { count } = await prisma.journalEntry.deleteMany({ where: { source: "demo" } });
     console.log(`Borradas ${count} entradas de ejemplo.`);

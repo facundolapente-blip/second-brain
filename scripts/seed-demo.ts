@@ -4,9 +4,9 @@
  * Uso: node --env-file=.env scripts/seed-demo.ts
  * No correr contra producción: el historial es de mentira.
  */
-import { PrismaClient } from "@prisma/client";
+import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 
-const prisma = new PrismaClient();
+const prisma = nuevoPrisma();
 if (!process.env.DATABASE_URL?.includes("localhost")) throw new Error("Solo contra la base local.");
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
