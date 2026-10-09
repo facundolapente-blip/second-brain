@@ -258,12 +258,14 @@ export async function getFlowRows(fromMonth: string, toMonth: string): Promise<F
       date: { gte: toDbDate(monthBounds(fromMonth).from), lte: toDbDate(monthBounds(toMonth).to) },
       ...NOT_ADJUSTMENT,
     },
-    select: { date: true, kind: true, accountId: true, categoryId: true, amount: true, category: { select: { kind: true } } },
+    select: { id: true, title: true, date: true, kind: true, accountId: true, categoryId: true, amount: true, category: { select: { kind: true } } },
   });
   // Un ingreso con categoría de gasto es un reintegro: resta de ese gasto.
   return rows.map((r) => {
     const refund = r.kind === "income" && r.category?.kind === "expense";
     return {
+      id: r.id,
+      title: r.title?.trim() || null,
       date: fromDbDate(r.date),
       kind: refund || r.kind !== "income" ? "expense" : "income",
       accountId: r.accountId,

@@ -361,6 +361,9 @@ export function dayLabel(iso: string, today = todayISO()): { label: string; rela
 
 /** Fila mínima para análisis (gastos e ingresos; las transferencias no son consumo). */
 export type FlowRow = {
+  id: string;
+  /** El nombre que se le puso al movimiento (null = sin título). */
+  title: string | null;
   date: string;
   kind: "expense" | "income";
   accountId: string;
@@ -388,7 +391,7 @@ export function toFlowRows(txs: TxDTO[]): FlowRow[] {
   const rows: FlowRow[] = [];
   for (const t of txs) {
     if (t.kind === "transfer") continue;
-    rows.push({ date: t.date, kind: t.kind, accountId: t.accountId, categoryId: t.categoryId, cents: t.amountCents });
+    rows.push({ id: t.id, title: t.title, date: t.date, kind: t.kind, accountId: t.accountId, categoryId: t.categoryId, cents: t.amountCents });
   }
   return rows;
 }

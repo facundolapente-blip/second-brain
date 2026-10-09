@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, ChartBar } from "@phosphor-icons/react";
+import { ArrowDownRight, ArrowSquareOut, ArrowUpRight, CaretDown, ChartBar } from "@phosphor-icons/react";
 import { addDays, formatMonth, monthBounds, shiftMonth, weekday } from "@/lib/dates";
 import { currencySymbol, moneyCents } from "@/lib/format";
 import {
@@ -21,6 +21,7 @@ import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { CategoryAvatar, useLookups } from "../shared";
 import { PeriodNav } from "../period-nav";
+import { normTitle } from "@/lib/smart-logic";
 
 /** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
 const CARD =
@@ -292,6 +293,9 @@ export function ReportsView({
                   currency={currency}
                   color={kind === "expense" ? "var(--fin-out)" : "var(--fin-in)"}
                   vsLabel={yearMode ? (isCurrentYear ? `${prevYear} a esta altura` : prevYear) : undefined}
+                  rows={periodRows.filter((r) => r.kind === kind)}
+                  range={yearMode ? { from: `${year}-01-01`, to: `${year}-12-31` } : monthBounds(month)}
+                  today={today}
                 />
               )}
             </section>
@@ -619,6 +623,9 @@ function CategoryBars({
   currency,
   color,
   vsLabel,
+  rows,
+  range,
+  today,
 }: {
   /** avg: promedio de los tres meses anteriores (o lo del año anterior), para el "vs." de cada fila. */
   items: { key: string; category?: CategoryDTO; cents: number; avg?: number }[];
@@ -627,24 +634,42 @@ function CategoryBars({
   color: string;
   /** Contra qué se compara (por año: "2025"); sin esto, el promedio de 3 meses. */
   vsLabel?: string;
+  /** Los movimientos del período (de este tipo): al tocar una categoría se ven los suyos. */
+  rows: FlowRow[];
+  range: { from: string; to: string };
+  today: string;
 }) {
+  const [open, setOpen] = useState<string | null>(null);
   const max = Math.max(...items.map((i) => i.cents), 1);
   // Las primeras ocho a la vista; el resto, plegado, para que la lista no se coma la pantalla.
   const TOP = 8;
   const row = (it: (typeof items)[number], i: number) => {
         const pct = total > 0 ? Math.round((it.cents / total) * 100) : 0;
         const name = it.category?.name ?? "Sin clasificar";
+        const isOpen = open === it.key;
+        const panelId = `cat-detalle-${it.key}`;
         return (
-          <li
-            key={it.key}
-            className="rise grid grid-cols-[32px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5"
-            style={{ "--i": Math.min(i, 8) } as React.CSSProperties}
+          <li key={it.key} className="grid gap-2" style={{ "--i": Math.min(i, 8) } as React.CSSProperties}>
+          <button
+            type="button"
+            aria-expanded={isOpen}
+            aria-controls={panelId}
+            onClick={() => setOpen(isOpen ? null : it.key)}
+            className="-mx-2 grid grid-cols-[32px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
           >
             <span className="row-span-2">
               <CategoryAvatar category={it.category} size={32} />
             </span>
             <span className="flex items-baseline justify-between gap-3 text-[14px]">
-              <span className={cx("truncate", !it.category && "text-muted")}>{name}</span>
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className={cx("truncate", !it.category && "text-muted")}>{name}</span>
+                <CaretDown
+                  size={12}
+                  weight="bold"
+                  aria-hidden
+                  className={cx("shrink-0 text-faint transition-transform duration-150", isOpen && "rotate-180 text-muted")}
+                />
+              </span>
               <span className="shrink-0">
                 <span className="font-mono text-[13.5px] font-medium tabular">{moneyCents(it.cents, currency)}</span>
                 <span className="tabular ml-2 inline-block w-9 text-right text-[12.5px] text-muted">
@@ -663,6 +688,18 @@ function CategoryBars({
                 <VsAverage cents={it.cents} avg={it.avg} vsLabel={vsLabel} />
               </span>
             )}
+          </button>
+          {isOpen && (
+            <CategoryDetail
+              id={panelId}
+              name={name}
+              categoryKey={it.key}
+              rows={rows.filter((r) => (r.categoryId ?? "none") === it.key)}
+              currency={currency}
+              range={range}
+              today={today}
+            />
+          )}
           </li>
         );
   };
@@ -678,6 +715,117 @@ function CategoryBars({
           <ul className="mt-2 grid gap-3.5">{items.slice(TOP).map((it, i) => row(it, i + TOP))}</ul>
         </details>
       )}
+    </div>
+  );
+}
+
+const shortDay = new Intl.DateTimeFormat("es-UY", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/**
+ * Los movimientos de una categoría en el período, con el nombre que se les puso:
+ * uno por uno (del más nuevo al más viejo) o juntados por nombre ("Disco × 6").
+ * Un reintegro resta (va con "−").
+ */
+function CategoryDetail({
+  id,
+  name,
+  categoryKey,
+  rows,
+  currency,
+  range,
+  today,
+}: {
+  id: string;
+  name: string;
+  categoryKey: string;
+  rows: FlowRow[];
+  currency: string;
+  range: { from: string; to: string };
+  today: string;
+}) {
+  const [mode, setMode] = useState<"each" | "name">("each");
+  const [all, setAll] = useState(false);
+  const year = today.slice(0, 4);
+  const day = (iso: string) =>
+    shortDay.format(new Date(`${iso}T00:00:00Z`)).replace(".", "") + (iso.slice(0, 4) !== year ? ` ${iso.slice(0, 4)}` : "");
+
+  const each = useMemo(() => [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.cents - a.cents), [rows]);
+  const groups = useMemo(() => {
+    const map = new Map<string, { label: string | null; cents: number; count: number; last: string }>();
+    // `each` va del más nuevo al más viejo: el nombre que se muestra es el último que se usó.
+    for (const r of each) {
+      const key = r.title ? normTitle(r.title) || r.title.toLowerCase() : "";
+      const g = map.get(key);
+      if (g) {
+        g.cents += r.cents;
+        g.count += 1;
+      } else map.set(key, { label: r.title, cents: r.cents, count: 1, last: r.date });
+    }
+    return [...map.values()].sort((a, b) => b.cents - a.cents);
+  }, [each]);
+
+  const LIMIT = 10;
+  const total = mode === "each" ? each.length : groups.length;
+  const href = `/gastos/buscar?cat=${encodeURIComponent(categoryKey)}&desde=${range.from}&hasta=${range.to}`;
+  const amount = (c: number) => (c < 0 ? `−${moneyCents(-c, currency)}` : moneyCents(c, currency));
+
+  return (
+    <div id={id} className="grid gap-2 rounded-xl border border-line bg-surface-2/60 p-3 sm:ml-[44px]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[12.5px] text-muted">
+          {rows.length === 1 ? "1 movimiento" : `${rows.length} movimientos`}
+          {groups.length > 1 && rows.length !== groups.length ? ` · ${groups.length} nombres` : ""}
+        </p>
+        {groups.length < rows.length && (
+          <div className="w-[13rem]">
+            <Segmented
+              value={mode}
+              onChange={(v) => {
+                setMode(v);
+                setAll(false);
+              }}
+              options={[
+                { value: "each", label: "Uno por uno" },
+                { value: "name", label: "Por nombre" },
+              ]}
+            />
+          </div>
+        )}
+      </div>
+      <ul className="grid" aria-label={`Movimientos de ${name}`}>
+        {mode === "each"
+          ? (all ? each : each.slice(0, LIMIT)).map((r) => (
+              <li key={r.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-2 last:border-b-0">
+                <span className="font-mono text-[12px] text-muted tabular">{day(r.date)}</span>
+                <span className={cx("min-w-0 text-[13.5px] break-words", !r.title && "text-muted")}>
+                  {r.title ?? "Sin título"}
+                  {r.cents < 0 && <span className="ml-1.5 text-[11.5px] text-muted">reintegro</span>}
+                </span>
+                <span className="font-mono text-[13px] font-medium tabular">{amount(r.cents)}</span>
+              </li>
+            ))
+          : (all ? groups : groups.slice(0, LIMIT)).map((g, i) => (
+              <li key={`${g.label}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-2 last:border-b-0">
+                <span className="min-w-0 text-[13.5px] break-words">
+                  <span className={cx(!g.label && "text-muted")}>{g.label ?? "Sin título"}</span>
+                  <span className="ml-1.5 font-mono text-[12px] text-muted tabular">{g.count > 1 ? `× ${g.count}` : day(g.last)}</span>
+                </span>
+                <span className="font-mono text-[13px] font-medium tabular">{amount(g.cents)}</span>
+              </li>
+            ))}
+      </ul>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {total > LIMIT ? (
+          <button type="button" onClick={() => setAll(!all)} className="kicker inline-flex min-h-11 items-center hover:text-fg">
+            {all ? "Ver menos" : `Ver ${total - LIMIT} más`}
+          </button>
+        ) : (
+          <span />
+        )}
+        <Link href={href} className="inline-flex min-h-11 items-center gap-1.5 text-[12.5px] text-muted hover:text-fg">
+          Abrir en Buscar <ArrowSquareOut size={13} aria-hidden />
+        </Link>
+      </div>
     </div>
   );
 }
