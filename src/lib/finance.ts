@@ -275,6 +275,12 @@ export async function getFlowRows(fromMonth: string, toMonth: string): Promise<F
   });
 }
 
+/**
+ * Filtro de Prisma: solo movimientos de cuentas personales (las de trabajo no
+ * cuentan en Inicio, Presupuestos, Proyección, Análisis ni los resúmenes).
+ */
+export const PERSONAL = { account: { isBusiness: false } } satisfies Prisma.TransactionWhereInput;
+
 /** Filtro de Prisma: deja afuera los "Ajuste de saldo" (no son gasto ni ingreso). */
 export const NOT_ADJUSTMENT = {
   OR: [{ categoryId: null }, { category: { isAdjustment: false } }],
@@ -386,7 +392,7 @@ export async function getCategoryBudgets(month: string): Promise<{
     prisma.account.findMany({ select: { id: true, currency: true } }),
     prisma.transaction.groupBy({
       by: ["categoryId", "accountId", "kind"],
-      where: { kind: { in: ["expense", "income"] }, date: { gte: toDbDate(from), lte: toDbDate(to) }, ...NOT_ADJUSTMENT },
+      where: { kind: { in: ["expense", "income"] }, date: { gte: toDbDate(from), lte: toDbDate(to) }, ...NOT_ADJUSTMENT, ...PERSONAL },
       _sum: { amount: true },
     }),
     getRates(),

@@ -30,8 +30,11 @@ export function SideBalances({
   onChange: (s: Selection) => void;
 }) {
   const visible = accounts.filter((a) => !a.archived);
-  const total = balanceByCurrency(visible, null);
+  const hasWork = visible.some((a) => a.business);
+  // El total es el personal; las cuentas de trabajo van aparte, abajo.
+  const total = balanceByCurrency(visible.filter((a) => !a.business), null);
   const cur = sortedCurrencies(total);
+  const list = [...visible.filter((a) => !a.business), ...visible.filter((a) => a.business)];
 
   return (
     <section aria-label="Saldos" className="rounded-2xl border border-line bg-surface px-5 pt-4 pb-2">
@@ -48,7 +51,7 @@ export function SideBalances({
         )}
       </div>
       <p className="pt-0.5 pb-2 text-[12.5px] text-muted">
-        Total{" "}
+        {hasWork ? "Total personal" : "Total"}{" "}
         {cur.map((c, i) => (
           <span key={c}>
             {i > 0 && " y "}
@@ -57,10 +60,11 @@ export function SideBalances({
         ))}
       </p>
       <ul className="border-t border-line">
-        {visible.map((a) => {
+        {list.map((a, i) => {
           const on = selection !== null && isSelected(selection, a.id);
           return (
             <li key={a.id} className="border-b border-line last:border-b-0">
+              {a.business && !list[i - 1]?.business && <p className="kicker pt-3 pb-1">Trabajo</p>}
               <button
                 type="button"
                 onClick={() => onChange(on && selection?.length === 1 ? null : [a.id])}

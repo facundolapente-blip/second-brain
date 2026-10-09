@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { CaretDown, Check, Checks, GearSix } from "@phosphor-icons/react";
-import { balanceByCurrency, type AccountDTO, type Selection } from "@/lib/finance-logic";
+import { balanceByCurrency, scopeOf, type AccountDTO, type Selection } from "@/lib/finance-logic";
 import { cx, Sheet, type SheetHandle } from "@/components/ui";
 import { AccountAvatar, Balance, TotalsInline } from "./shared";
 
 /** Nombre corto de lo que se está mirando. */
 export function selectionLabel(accounts: AccountDTO[], sel: Selection): string {
-  if (sel === null) return "Todas las cuentas";
+  if (sel === null) return accounts.some((a) => a.business) ? "Cuentas personales" : "Todas las cuentas";
+  const work = accounts.filter((a) => a.business && !a.archived);
+  if (work.length > 1 && sel.length === work.length && work.every((a) => sel.includes(a.id))) return "Cuentas de trabajo";
   if (sel.length === 1) return accounts.find((a) => a.id === sel[0])?.name ?? "1 cuenta";
   return `${sel.length} cuentas`;
 }
@@ -32,15 +34,16 @@ export function AccountSwitcher({
 }) {
   const sheet = useRef<SheetHandle>(null);
   const visible = accounts.filter((a) => !a.archived);
-  const balance = balanceByCurrency(selection ? accounts : visible, selection);
-  const chosen = selection ? accounts.filter((a) => selection.includes(a.id)) : visible;
+  const personal = personalIds(visible);
+  const hasWork = visible.some((a) => a.business);
+  const balance = balanceByCurrency(selection ? accounts : visible, scopeOf(selection, accounts));
+  const chosen = selection ? accounts.filter((a) => selection.includes(a.id)) : visible.filter((a) => !a.business);
 
   function toggle(id: string) {
-    const current = selection ?? visible.map((a) => a.id);
+    const current = selection ?? personal;
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     if (next.length === 0) return; // siempre queda al menos una
-    const all = visible.every((a) => next.includes(a.id));
-    onChange(all ? null : next);
+    onChange(isAll(next, personal) ? null : next);
   }
 
   return (
@@ -80,7 +83,7 @@ export function AccountSwitcher({
       <Sheet ref={sheet} title="Cuentas">
         <ul className="grid divide-y divide-line border-y border-line">
           {visible.map((a) => {
-            const on = selection === null || selection.includes(a.id);
+            const on = selection === null ? !a.business : selection.includes(a.id);
             return (
               <li key={a.id} className="flex items-center gap-1">
                 <button
@@ -101,7 +104,10 @@ export function AccountSwitcher({
                   <AccountAvatar account={a} size={34} />
                   <span className="grid min-w-0 flex-1">
                     <span className={cx("truncate text-[15px]", on && "font-medium")}>{a.name}</span>
-                    <span className="font-mono text-[11px] text-muted">{a.currency}</span>
+                    <span className="font-mono text-[11px] text-muted">
+                      {a.currency}
+                      {a.business && " · Trabajo"}
+                    </span>
                   </span>
                   <Balance cents={a.balanceCents} currency={a.currency} className="font-mono text-[13.5px] font-medium" />
                 </button>
@@ -126,7 +132,7 @@ export function AccountSwitcher({
             disabled={selection === null}
             className="inline-flex h-11 items-center gap-2 rounded-[4px] px-2 text-sm font-medium text-accent-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
-            <Checks size={18} weight="bold" /> Seleccionar todas
+            <Checks size={18} weight="bold" /> {hasWork ? "Solo las personales" : "Seleccionar todas"}
           </button>
           <Link
             href="/gastos/cuentas"
@@ -138,6 +144,16 @@ export function AccountSwitcher({
       </Sheet>
     </>
   );
+}
+
+/** Ids de las cuentas personales (las que entran en "Todas"). */
+function personalIds(visible: AccountDTO[]): string[] {
+  return visible.filter((a) => !a.business).map((a) => a.id);
+}
+
+/** ¿Son exactamente las de "Todas"? */
+function isAll(ids: string[], personal: string[]): boolean {
+  return ids.length === personal.length && personal.every((id) => ids.includes(id));
 }
 
 /**
@@ -155,17 +171,21 @@ export function AccountChips({
   onChange: (s: Selection) => void;
 }) {
   const visible = accounts.filter((a) => !a.archived);
-  const [multi, setMulti] = useState(selection !== null && selection.length > 1);
+  const personal = personalIds(visible);
+  const work = visible.filter((a) => a.business);
+  const workIds = work.map((a) => a.id);
+  const onWork = work.length > 1 && selection !== null && isAll(selection, workIds);
+  const [multi, setMulti] = useState(selection !== null && selection.length > 1 && !onWork);
 
   function pick(id: string) {
     if (!multi) {
-      onChange(visible.length === 1 ? null : [id]);
+      onChange(personal.length === 1 && personal[0] === id ? null : [id]);
       return;
     }
-    const current = selection ?? visible.map((a) => a.id);
+    const current = selection ?? personal;
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     if (next.length === 0) return;
-    onChange(visible.every((a) => next.includes(a.id)) ? null : next);
+    onChange(isAll(next, personal) ? null : next);
   }
 
   const chip =
@@ -182,11 +202,27 @@ export function AccountChips({
         }}
         className={cx(chip, selection === null ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:text-fg")}
       >
-        Todas
+        {work.length ? "Personales" : "Todas"}
       </button>
-      {visible.map((a) => {
-        const on = selection !== null && selection.includes(a.id);
+      {[...visible.filter((a) => !a.business), ...work].map((a, i, list) => {
+        const on = selection !== null && selection.includes(a.id) && !onWork;
+        // Antes de la primera cuenta de trabajo, el botón que las junta.
+        const workChip = a.business && !list[i - 1]?.business && work.length > 1;
         return (
+          <Fragment key={a.id}>
+          {workChip && (
+            <button
+              type="button"
+              aria-pressed={onWork}
+              onClick={() => {
+                onChange(workIds);
+                setMulti(false);
+              }}
+              className={cx(chip, onWork ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-muted hover:text-fg")}
+            >
+              Trabajo
+            </button>
+          )}
           <button
             key={a.id}
             type="button"
@@ -208,6 +244,7 @@ export function AccountChips({
             )}
             {a.name}
           </button>
+          </Fragment>
         );
       })}
       <button

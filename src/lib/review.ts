@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { getDailyMetrics, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
-import { NOT_ADJUSTMENT } from "./finance";
+import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { REVIEW_TAG } from "./review-logic";
 
@@ -43,7 +43,7 @@ export async function getWeeklyReview(day: string) {
   const [{ days: all, habits }, txs, categories, tasksDone, tasksNext, review] = await Promise.all([
     getDailyMetrics(prevMonday, sunday),
     prisma.transaction.findMany({
-      where: { kind: "expense", date: { gte: toDbDate(monday), lte: toDbDate(sunday) }, ...NOT_ADJUSTMENT },
+      where: { kind: "expense", date: { gte: toDbDate(monday), lte: toDbDate(sunday) }, ...NOT_ADJUSTMENT, ...PERSONAL },
       select: { title: true, amount: true, categoryId: true, date: true, account: { select: { currency: true } } },
     }),
     prisma.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),

@@ -217,6 +217,16 @@ export function effects(tx: Pick<TxDTO, "kind" | "amountCents" | "accountId" | "
   return out;
 }
 
+/**
+ * Lo que se mira de verdad. "Todas" (null) son las cuentas personales: las de
+ * trabajo (`business`) solo entran si se eligen a mano. Sin cuentas de trabajo,
+ * sigue siendo null (todas).
+ */
+export function scopeOf(sel: Selection, accounts: Pick<AccountDTO, "id" | "business">[]): Selection {
+  if (sel) return sel;
+  return accounts.some((a) => a.business) ? accounts.filter((a) => !a.business).map((a) => a.id) : null;
+}
+
 export function isSelected(sel: Selection, accountId: string): boolean {
   return sel === null || sel.includes(accountId);
 }

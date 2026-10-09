@@ -60,20 +60,20 @@ export function ReportsView({
   categories: CategoryDTO[];
   rows: FlowRow[];
 }) {
-  const { selection, setSelection } = useSelection(accounts);
+  const { selection, scope, setSelection } = useSelection(accounts);
   const lk = useLookups(accounts, categories);
 
   const currencies = useMemo(() => {
-    const set = new Set(accounts.filter((a) => isSelected(selection, a.id) && !a.archived).map((a) => a.currency));
+    const set = new Set(accounts.filter((a) => isSelected(scope, a.id) && !a.archived).map((a) => a.currency));
     return [...set].sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)));
-  }, [accounts, selection]);
+  }, [accounts, scope]);
   const [pickedCurrency, setCurrency] = useState<string>("UYU");
   const currency = currencies.includes(pickedCurrency) ? pickedCurrency : (currencies[0] ?? "UYU");
   const [kind, setKind] = useState<"expense" | "income">("expense");
 
   const scoped = useMemo(
-    () => rows.filter((r) => isSelected(selection, r.accountId) && lk.currencyOf(r.accountId) === currency),
-    [rows, selection, lk, currency],
+    () => rows.filter((r) => isSelected(scope, r.accountId) && lk.currencyOf(r.accountId) === currency),
+    [rows, scope, lk, currency],
   );
   const yearMode = period.kind === "year";
   const year = yearMode ? period.year : month.slice(0, 4);

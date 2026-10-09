@@ -5,7 +5,7 @@ import { getHabitsWithLogs } from "./habits";
 import { dayState, type DayState } from "./habit-logic";
 import { wordCount } from "./journal-logic";
 import { toCents } from "./finance-logic";
-import { NOT_ADJUSTMENT } from "./finance";
+import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { isFreeBlock } from "./plan-logic";
 
@@ -47,7 +47,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     prisma.journalEntry.findMany({ where: { date: range }, select: { date: true, title: true, body: true, mood: true } }),
     prisma.account.findMany({ select: { id: true, currency: true } }),
     prisma.transaction.findMany({
-      where: { date: range, kind: { in: ["expense", "income"] }, ...NOT_ADJUSTMENT },
+      where: { date: range, kind: { in: ["expense", "income"] }, ...NOT_ADJUSTMENT, ...PERSONAL },
       select: { date: true, kind: true, amount: true, accountId: true, category: { select: { kind: true } } },
     }),
     prisma.planBlock.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),

@@ -5,7 +5,7 @@ import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, to
 import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayState, packAll, showsOn, type DayState } from "./habit-logic";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
-import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, runSchedules } from "./finance";
+import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL, runSchedules } from "./finance";
 import { budgetState, monthShare } from "./budget-logic";
 import { getRates, toUyu } from "./fx";
 import { toCents, type CurrencyTotals } from "./finance-logic";
@@ -79,6 +79,7 @@ export async function getDashboard() {
         kind: { in: ["expense", "income"] },
         date: { gte: toDbDate(monthBounds(prevMonth).from), lte: toDbDate(monthBounds(month).to) },
         ...NOT_ADJUSTMENT,
+        ...PERSONAL,
       },
       select: { date: true, kind: true, amount: true, accountId: true, categoryId: true, category: { select: { kind: true } } },
     }),
@@ -184,7 +185,8 @@ export async function getDashboard() {
   const balances: CurrencyTotals = {};
   let netWorth = 0;
   for (const a of accounts) {
-    if (a.archived) continue;
+    // Las cuentas de trabajo no suman a lo personal.
+    if (a.archived || a.business) continue;
     balances[a.currency] = (balances[a.currency] ?? 0) + a.balanceCents;
     netWorth += toUyu(a.balanceCents, a.currency, rates);
   }
@@ -279,6 +281,8 @@ export async function getDashboard() {
       topCategories,
       balances,
       netWorth,
+      /** Hay cuentas de trabajo: el saldo de arriba es solo el personal. */
+      hasWork: accounts.some((a) => a.business && !a.archived),
       // Presupuestos que se pasaron, están cerca del tope o van rápido.
       budgetAlerts: budgets
         .map((b) => {

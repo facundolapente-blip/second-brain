@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { addDays, fromDbDate, monthBounds, shiftMonth, toDbDate, todayISO } from "./dates";
 import { getDailyMetrics, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
-import { getCategoryBudgets, NOT_ADJUSTMENT } from "./finance";
+import { getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { wordCount } from "./journal-logic";
 import { summarize } from "./review";
@@ -23,7 +23,7 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
   const [{ days: all, habits }, txs, categories, budgets, entries, tasksDone, checkins] = await Promise.all([
     getDailyMetrics(prevFrom, to),
     prisma.transaction.findMany({
-      where: { kind: "expense", date: { gte: toDbDate(from), lte: toDbDate(to) }, ...NOT_ADJUSTMENT },
+      where: { kind: "expense", date: { gte: toDbDate(from), lte: toDbDate(to) }, ...NOT_ADJUSTMENT, ...PERSONAL },
       select: { title: true, amount: true, categoryId: true, date: true, account: { select: { currency: true } } },
     }),
     prisma.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),

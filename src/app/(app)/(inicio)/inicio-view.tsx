@@ -714,7 +714,7 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
           </ul>
         </div>
         <div className="grid content-start gap-2">
-          <p className="kicker">Saldo total</p>
+          <p className="kicker">{g.hasWork ? "Saldo personal" : "Saldo total"}</p>
           {Object.entries(g.balances)
             .sort(([a], [b]) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
             .map(([cur, cents]) => (

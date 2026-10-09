@@ -76,7 +76,7 @@ export function MovementsView({
   uncategorized: number;
 }) {
   const router = useRouter();
-  const { selection, setSelection } = useSelection(accounts);
+  const { selection, scope, setSelection } = useSelection(accounts);
   const lk = useLookups(accounts, categories);
   const form = useRef<TxSheetHandle>(null);
   const hasAccounts = accounts.some((a) => !a.archived);
@@ -135,9 +135,10 @@ export function MovementsView({
     );
   }
 
-  const visible = useMemo(() => txs.filter((t) => touchesSelection(t, selection)), [txs, selection]);
-  const groups = useMemo(() => groupByDay(visible, selection, lk.currencyOf), [visible, selection, lk]);
-  const net = useMemo(() => netByCurrency(visible, selection, lk.currencyOf), [visible, selection, lk]);
+  // "Todas" son las personales: lo de las cuentas de trabajo se ve solo si se eligen.
+  const visible = useMemo(() => txs.filter((t) => touchesSelection(t, scope)), [txs, scope]);
+  const groups = useMemo(() => groupByDay(visible, scope, lk.currencyOf), [visible, scope, lk]);
+  const net = useMemo(() => netByCurrency(visible, scope, lk.currencyOf), [visible, scope, lk]);
 
   // Ingresos y gastos del mes por moneda (sin transferencias), para el resumen.
   const flows = useMemo(() => {
@@ -155,8 +156,8 @@ export function MovementsView({
   }, [visible, lk]);
 
   const balance = useMemo(
-    () => balanceByCurrency(selection ? accounts : accounts.filter((a) => !a.archived), selection),
-    [accounts, selection],
+    () => balanceByCurrency(selection ? accounts : accounts.filter((a) => !a.archived), scope),
+    [accounts, selection, scope],
   );
   const showAccount = selection === null || selection.length > 1;
   const isCurrent = periodIncludes(period, today);
@@ -296,7 +297,7 @@ export function MovementsView({
                             <TxRow
                               tx={t}
                               lk={lk}
-                              selection={selection}
+                              selection={scope}
                               showAccount={showAccount}
                               onClick={() => form.current?.edit(t)}
                               onMenu={(e) => txMenu(e, t)}
