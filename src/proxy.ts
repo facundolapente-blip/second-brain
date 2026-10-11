@@ -1,13 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+import { auth } from "@/lib/auth";
 import { mailSinLogin } from "@/lib/dev-login";
 
 /**
- * Primer filtro: solo mira si hay cookie de sesión, sin tocar la base. NO es la
- * seguridad de verdad (una cookie se puede inventar): esa está en el layout de
- * (app) y en cada server action. Esto es para ir derecho al login.
+ * La puerta de toda la app: valida la sesión de verdad (contra la base) antes de
+ * dejar pasar una página o una API. No alcanza con el layout de (app): la página
+ * se dibuja en paralelo con el layout y sus datos salían en la respuesta aunque
+ * el layout redirigiera al login (pasaba con una cookie inventada). Las server
+ * actions igual vuelven a validar con `exigirSesion()`.
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (pathname === "/login" || pathname.startsWith("/api/auth")) return NextResponse.next();
@@ -15,7 +18,11 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/cron/")) return NextResponse.next();
   if (mailSinLogin()) return NextResponse.next();
 
-  if (getSessionCookie(request, { cookiePrefix: "sb" })) return NextResponse.next();
+  // Sin cookie ni se consulta la base; con cookie, se comprueba que la sesión exista y no haya vencido.
+  if (getSessionCookie(request, { cookiePrefix: "sb" })) {
+    const session = await auth.api.getSession({ headers: request.headers }).catch(() => null);
+    if (session?.user) return NextResponse.next();
+  }
 
   if (pathname.startsWith("/api")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });

@@ -62,7 +62,7 @@ Next.js 16 (App Router, sin `cacheComponents`: páginas `force-dynamic` + `reval
 
 **Cerrar sesión**: abajo del menú lateral (compu y cajón del celular), con segundo toque; borra las cachés `pages-*` del service worker. El service worker, sin señal, solo devuelve la copia de esa misma dirección (otro `?mes=` no cae en el mes guardado).
 
-**Auth**: límite de intentos de login guardado en la base (`AuthRateLimit`, `storage: "database"`: en memoria cada instancia de Vercel contaría aparte). `src/proxy.ts` solo mira la cookie; la validación real está en `(app)/layout.tsx` y en `exigirSesion()` al principio de cada server action. App de una sola persona: los datos **no** llevan `userId`.
+**Auth**: límite de intentos de login guardado en la base (`AuthRateLimit`, `storage: "database"`: en memoria cada instancia de Vercel contaría aparte). `src/proxy.ts` valida la sesión de verdad (`auth.api.getSession`, contra la base) en cada página y API; antes solo miraba que hubiera cookie y eso NO alcanzaba: la página se dibuja en paralelo con el layout de `(app)`, así que con una cookie inventada sus datos salían en la respuesta aunque el layout redirigiera al login (encontrado y cerrado el 2026-10-11). El layout y `exigirSesion()` al principio de cada server action siguen validando también. App de una sola persona: los datos **no** llevan `userId`.
 
 ## Hábitos
 
