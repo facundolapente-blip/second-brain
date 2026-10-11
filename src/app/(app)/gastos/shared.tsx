@@ -154,18 +154,22 @@ export function TotalsInline({
   className,
   align = "end",
   balance,
+  whole,
 }: {
   totals: CurrencyTotals;
   className?: string;
   align?: "start" | "end";
   balance?: boolean;
+  /** Total de un período: los pesos van redondeados (sin centavos sueltos). */
+  whole?: boolean;
 }) {
-  const cur = sortedCurrencies(totals);
+  const shown = whole ? Object.fromEntries(Object.entries(totals).map(([c, v]) => [c, c === "UYU" ? Math.round(v / 100) * 100 : v])) : totals;
+  const cur = sortedCurrencies(shown);
   if (cur.length === 0) return <span className={cx("tabular text-muted", className)}>{moneyCents(0)}</span>;
   return (
     <span className={cx("inline-flex flex-wrap gap-x-3", align === "end" ? "justify-end" : "justify-start", className)}>
       {cur.map((c) =>
-        balance ? <Balance key={c} cents={totals[c]} currency={c} /> : <Amount key={c} cents={totals[c]} currency={c} />,
+        balance ? <Balance key={c} cents={shown[c]} currency={c} /> : <Amount key={c} cents={shown[c]} currency={c} />,
       )}
     </span>
   );

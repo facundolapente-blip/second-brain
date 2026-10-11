@@ -13,7 +13,7 @@ import { prisma } from "./prisma";
  * Restaurar: `scripts/restaurar-respaldo.ts`.
  */
 
-const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit"]);
+const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit", "ActionReceipt"]);
 const PREFIX = "respaldos/";
 /** Se guardan los últimos 30 y, de antes, el último de cada mes durante un año. */
 const KEEP_DAILY = 30;

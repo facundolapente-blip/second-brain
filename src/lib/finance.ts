@@ -92,7 +92,9 @@ function toTxDTO(t: TxRow): TxDTO {
   };
 }
 
-const newestFirst = [{ date: "desc" }, { createdAt: "desc" }] satisfies Prisma.TransactionOrderByWithRelationInput[];
+// Con desempate por id: los importados comparten la hora de creación y, sin esto, el orden
+// dentro de un día cambiaba después de cada guardado.
+const newestFirst = [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }] satisfies Prisma.TransactionOrderByWithRelationInput[];
 
 /** Todas las cuentas (también archivadas) con su saldo actual. */
 export async function getAccounts(): Promise<AccountDTO[]> {

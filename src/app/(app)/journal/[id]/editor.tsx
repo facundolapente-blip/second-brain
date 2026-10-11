@@ -410,11 +410,15 @@ function TagEditor({
   const q = normalizeTag(text);
   const suggestions = allTags.filter((t) => !tags.includes(t) && (!q || t.includes(q))).slice(0, 8);
 
-  function add(raw: string) {
-    const t = normalizeTag(raw);
+  /** Agrega una o varias (pegadas con coma o saltos de línea) de una sola vez. */
+  function add(...raws: string[]) {
     setText("");
-    if (!t || tags.includes(t) || tags.length >= TAGS_MAX) return;
-    onChange([...tags, t]);
+    const next = [...tags];
+    for (const raw of raws) {
+      const t = normalizeTag(raw);
+      if (t && !next.includes(t) && next.length < TAGS_MAX) next.push(t);
+    }
+    if (next.length !== tags.length) onChange(next);
   }
 
   return (
@@ -437,8 +441,11 @@ function TagEditor({
           value={text}
           onChange={(e) => {
             const v = e.target.value;
-            if (/[,\n]/.test(v)) v.split(/[,\n]/).forEach((p, i, arr) => (i < arr.length - 1 ? add(p) : setText(p)));
-            else setText(v);
+            if (/[,\n]/.test(v)) {
+              const parts = v.split(/[,\n]/);
+              add(...parts.slice(0, -1));
+              setText(parts.at(-1) ?? "");
+            } else setText(v);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {

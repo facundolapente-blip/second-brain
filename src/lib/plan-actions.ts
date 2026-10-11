@@ -582,13 +582,15 @@ async function spawnNext(id: string) {
   await logActivity("created", "task", created.id, `${t.title} (se repite, para el ${next})`);
 }
 
-export async function addSubtask(taskId: string, title: string) {
+/** Agrega un paso y devuelve su id (la hoja lo usa para tildarlo o sacarlo enseguida). */
+export async function addSubtask(taskId: string, title: string): Promise<{ id: string } | undefined> {
   await exigirSesion();
   const tt = title.trim().slice(0, 200);
   if (!tt) return;
   const max = await prisma.planSubtask.aggregate({ where: { taskId }, _max: { order: true } });
-  await prisma.planSubtask.create({ data: { taskId, title: tt, order: (max._max.order ?? -1) + 1 } });
+  const created = await prisma.planSubtask.create({ data: { taskId, title: tt, order: (max._max.order ?? -1) + 1 }, select: { id: true } });
   refrescar();
+  return { id: created.id };
 }
 
 export async function toggleSubtask(id: string, done: boolean) {

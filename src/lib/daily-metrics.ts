@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
-import { addDays, fromDbDate, toDbDate } from "./dates";
+import { addDays, fromDbDate, toDbDate, startOfWeek } from "./dates";
 import { getHabitsWithLogs } from "./habits";
 import { dayState, type DayState } from "./habit-logic";
 import { wordCount } from "./journal-logic";
@@ -35,7 +35,54 @@ export type DayMetrics = {
   blocksTotal: number;
 };
 
-export type HabitRef = { id: string; name: string; icon: string; color: string };
+export type HabitRef = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  /** "X veces por semana": la meta de cada semana (null si es diario o de días fijos). */
+  weeklyTarget: number | null;
+  startDate: string;
+};
+
+/**
+ * Cuánto se hizo un hábito en un período (revisión, resumen). Los "X veces por
+ * semana" se miden contra su meta de cada semana (una semana cortada por el
+ * período cuenta la parte que le toca); el resto, contra los días que tocaban.
+ * `done` son las veces hechas; `pct` no pasa de 100 aunque una semana se pase.
+ */
+export function habitTotals(h: HabitRef, days: DayMetrics[]): { done: number; due: number; pct: number | null } {
+  if (!h.weeklyTarget) {
+    let done = 0;
+    let due = 0;
+    for (const d of days) {
+      if (!(h.id in d.habit)) continue;
+      due++;
+      if (d.habit[h.id]) done++;
+    }
+    return { done, due, pct: due ? Math.round((done / due) * 100) : null };
+  }
+  const weeks = new Map<string, { done: number; days: number }>();
+  for (const d of days) {
+    if (d.date < h.startDate) continue;
+    const w = startOfWeek(d.date);
+    const x = weeks.get(w) ?? { done: 0, days: 0 };
+    x.days++;
+    if (d.habit[h.id]) x.done++;
+    weeks.set(w, x);
+  }
+  let done = 0;
+  let due = 0;
+  let hit = 0;
+  for (const x of weeks.values()) {
+    // Semana entera: la meta; cortada por el período: la parte proporcional (al menos 1).
+    const target = x.days >= 7 ? h.weeklyTarget : Math.max(1, Math.round((h.weeklyTarget * x.days) / 7));
+    done += x.done;
+    due += target;
+    hit += Math.min(x.done, target);
+  }
+  return { done, due, pct: due ? Math.round((hit / due) * 100) : null };
+}
 
 const DUE: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pending"];
 
@@ -126,6 +173,13 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
 
   return {
     days: [...byDate.values()],
-    habits: habits.map((h) => ({ id: h.id, name: h.name, icon: h.icon, color: h.color })),
+    habits: habits.map((h) => ({
+      id: h.id,
+      name: h.name,
+      icon: h.icon,
+      color: h.color,
+      weeklyTarget: h.frequency === "weekly" ? h.timesPerWeek : null,
+      startDate: h.startDate,
+    })),
   };
 }

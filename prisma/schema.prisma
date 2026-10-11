@@ -667,3 +667,17 @@ model Attachment {
   @@index([journalEntryId])
   @@index([transactionId])
 }
+
+/// Recibo de una acción que no aguanta repetirse (crear, duplicar, pasar de semana):
+/// cada llamada lleva un id generado en el aparato; si la misma vuelve a llegar
+/// (la respuesta se cortó y la cola sin conexión la reintenta), se devuelve el
+/// resultado guardado en vez de hacerla otra vez. Se limpian a los 14 días.
+model ActionReceipt {
+  id        String   @id
+  name      String
+  /// Lo que devolvió la acción (null mientras corre).
+  result    Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

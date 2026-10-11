@@ -141,7 +141,7 @@ export function HabitDetail({
           </div>
         )}
         {tab === "editar" && (
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
+          <div className="grid lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
             <EditTab habit={habit} categories={categories} onSaved={() => changeTab("calendario")} />
             <TracksPanel habit={habit} today={today} />
           </div>
@@ -341,7 +341,7 @@ function CalendarTab({
 
   return (
     <>
-      <Panel className="lg:row-span-2">
+      <Panel className="xl:row-span-2">
         <CalendarMonth
           habit={habit}
           logs={logs}
@@ -804,7 +804,7 @@ function EditTab({
         <HabitFormBody initial={fromHabit(habit)} categories={categories} onSaved={onSaved} />
       </Panel>
       <Panel>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
           <Button
             variant="outline"
             disabled={pending}

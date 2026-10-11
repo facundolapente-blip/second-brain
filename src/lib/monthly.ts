@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { addDays, fromDbDate, monthBounds, shiftMonth, toDbDate, todayISO } from "./dates";
-import { getDailyMetrics, type DayMetrics } from "./daily-metrics";
+import { getDailyMetrics, habitTotals, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
 import { getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
@@ -23,8 +23,14 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
   const [{ days: all, habits }, txs, categories, budgets, entries, tasksDone, checkins] = await Promise.all([
     getDailyMetrics(prevFrom, to),
     prisma.transaction.findMany({
-      where: { kind: "expense", date: { gte: toDbDate(from), lte: toDbDate(to) }, ...NOT_ADJUSTMENT, ...PERSONAL },
-      select: { title: true, amount: true, categoryId: true, date: true, account: { select: { currency: true } } },
+      // Gastos y reintegros (ingresos con categoría de gasto): el reintegro resta de su categoría,
+      // igual que en el total, así categorías y total coinciden.
+      where: {
+        date: { gte: toDbDate(from), lte: toDbDate(to) },
+        AND: [NOT_ADJUSTMENT, { OR: [{ kind: "expense" }, { kind: "income", category: { kind: "expense" } }] }],
+        ...PERSONAL,
+      },
+      select: { title: true, kind: true, amount: true, categoryId: true, date: true, account: { select: { currency: true } } },
     }),
     prisma.category.findMany({ select: { id: true, name: true, color: true, icon: true } }),
     period.kind === "month" ? getCategoryBudgets(period.key) : Promise.resolve({ budgets: [] }),
@@ -45,16 +51,7 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
 
   // Hábitos: cuántas veces se hizo cada uno de las que tocaba.
   const perHabit = habits
-    .map((h) => {
-      let done = 0;
-      let due = 0;
-      for (const d of days) {
-        if (!(h.id in d.habit)) continue;
-        due++;
-        if (d.habit[h.id]) done++;
-      }
-      return { ...h, done, due, pct: due ? Math.round((done / due) * 100) : null };
-    })
+    .map((h) => ({ ...h, ...habitTotals(h, days) }))
     .filter((h) => h.due > 0)
     .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0) || b.done - a.done);
   const perfectDays = days.filter((d) => d.habitsDue > 0 && d.habitsDone === d.habitsDue).length;
@@ -65,9 +62,9 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
   const byCat = new Map<string | null, number>();
   let biggest: { title: string | null; cents: number; date: string } | null = null;
   for (const t of txs) {
-    const c = toUyu(toCents(t.amount), t.account.currency, rates);
+    const c = toUyu(toCents(t.amount), t.account.currency, rates) * (t.kind === "income" ? -1 : 1);
     byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + c);
-    if (!biggest || c > biggest.cents) biggest = { title: t.title, cents: c, date: fromDbDate(t.date) };
+    if (t.kind === "expense" && (!biggest || c > biggest.cents)) biggest = { title: t.title, cents: c, date: fromDbDate(t.date) };
   }
   const topCategories = [...byCat]
     .sort((a, b) => b[1] - a[1])

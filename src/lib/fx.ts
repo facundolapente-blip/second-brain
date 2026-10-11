@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "./prisma";
 
 /**
@@ -17,12 +18,28 @@ export type Rates = {
 
 const FALLBACK: Rates = { toUyu: { UYU: 1, USD: 40, EUR: 43.5, ARS: 0.04, BRL: 7.3 }, date: "2026-10-01", source: "fallback" };
 
-export async function getRates(): Promise<Rates> {
+const FRESH_MS = 6 * 3600 * 1000;
+
+/**
+ * La cotización guardada si tiene menos de 6 horas; si no, se pide afuera. (El
+ * `revalidate` de fetch no sirve acá: las páginas son dinámicas y Next no guarda
+ * nada, así que antes se pedía en cada carga.) Una vez por pedido (`cache`).
+ */
+export const getRates = cache(async (): Promise<Rates> => {
+  const saved = await prisma.appSetting.findUnique({ where: { key: "fx" } }).catch(() => null);
+  if (saved && Date.now() - saved.updatedAt.getTime() < FRESH_MS) {
+    try {
+      return { ...(JSON.parse(saved.value) as Rates), source: "saved" };
+    } catch {
+      // guardada rota: se pide de nuevo
+    }
+  }
+  return fetchRates(saved?.value ?? null);
+});
+
+async function fetchRates(savedValue: string | null): Promise<Rates> {
   try {
-    const res = await fetch("https://open.er-api.com/v6/latest/USD", {
-      next: { revalidate: 6 * 3600 },
-      signal: AbortSignal.timeout(4000),
-    });
+    const res = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store", signal: AbortSignal.timeout(4000) });
     if (res.ok) {
       const j = (await res.json()) as { result?: string; rates?: Record<string, number>; time_last_update_unix?: number };
       const uyu = j.rates?.UYU;
@@ -43,8 +60,13 @@ export async function getRates(): Promise<Rates> {
   } catch {
     // sin red o la API no respondió: se usa la guardada
   }
-  const saved = await prisma.appSetting.findUnique({ where: { key: "fx" } }).catch(() => null);
-  if (saved) return { ...(JSON.parse(saved.value) as Rates), source: "saved" };
+  if (savedValue) {
+    try {
+      return { ...(JSON.parse(savedValue) as Rates), source: "saved" };
+    } catch {
+      // sigue al respaldo
+    }
+  }
   return FALLBACK;
 }
 

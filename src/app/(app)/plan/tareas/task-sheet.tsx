@@ -215,13 +215,39 @@ function Subtasks({ task }: { task: TaskDTO }) {
   const [text, setText] = useState("");
   const [, start] = useSafeTransition();
   const done = items.filter((s) => s.done).length;
+  // Un paso recién agregado tiene un id provisional hasta que el servidor da el
+  // suyo. Si se tilda o se saca antes, el cambio espera ese id y se manda después.
+  const tmpSeq = useRef(0);
+  const realId = useRef(new Map<string, string>());
+  const waiting = useRef(new Map<string, { done?: boolean; deleted?: boolean }>());
 
   function add() {
     const t = text.trim();
     if (!t) return;
-    setItems((x) => [...x, { id: `tmp-${x.length}`, title: t, done: false }]);
+    const tmp = `tmp-${task.id}-${tmpSeq.current++}`;
+    setItems((x) => [...x, { id: tmp, title: t, done: false }]);
     setText("");
-    start(() => addSubtask(task.id, t));
+    start(async () => {
+      const r = await addSubtask(task.id, t);
+      const id = r && "id" in r ? r.id : null;
+      if (!id) return; // sin señal: quedó en la cola, se ve igual
+      realId.current.set(tmp, id);
+      setItems((x) => x.map((y) => (y.id === tmp ? { ...y, id } : y)));
+      const w = waiting.current.get(tmp);
+      waiting.current.delete(tmp);
+      if (w?.deleted) await deleteSubtask(id);
+      else if (w?.done !== undefined) await toggleSubtask(id, w.done);
+    });
+  }
+
+  /** Tilda o saca un paso; si todavía no tiene id del servidor, lo deja esperando. */
+  function sync(s: { id: string }, change: { done?: boolean; deleted?: boolean }) {
+    const id = realId.current.get(s.id) ?? s.id;
+    if (id.startsWith("tmp-")) {
+      waiting.current.set(id, { ...waiting.current.get(id), ...change });
+      return;
+    }
+    start(() => (change.deleted ? deleteSubtask(id) : toggleSubtask(id, !!change.done)));
   }
 
   return (
@@ -238,7 +264,7 @@ function Subtasks({ task }: { task: TaskDTO }) {
                 aria-pressed={s.done}
                 onClick={() => {
                   setItems((x) => x.map((y) => (y.id === s.id ? { ...y, done: !y.done } : y)));
-                  if (!s.id.startsWith("tmp-")) start(() => toggleSubtask(s.id, !s.done));
+                  sync(s, { done: !s.done });
                 }}
                 className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 text-left"
               >
@@ -257,7 +283,7 @@ function Subtasks({ task }: { task: TaskDTO }) {
                 aria-label={`Sacar ${s.title}`}
                 onClick={() => {
                   setItems((x) => x.filter((y) => y.id !== s.id));
-                  if (!s.id.startsWith("tmp-")) start(() => deleteSubtask(s.id));
+                  sync(s, { deleted: true });
                 }}
                 className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg"
               >

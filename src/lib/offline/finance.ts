@@ -5,31 +5,31 @@ import { saveTransaction as _saveTransaction, renameTransaction as _renameTransa
 import { isNetworkError, queueable } from "./queue";
 export type { ActionResult } from "../finance-actions";
 
-export const saveTransaction = queueable("finance.saveTransaction", _saveTransaction);
+export const saveTransaction = queueable("finance.saveTransaction", _saveTransaction, { once: true });
 export const renameTransaction = queueable("finance.renameTransaction", _renameTransaction, { key: (id) => id });
-export const duplicateTransaction = queueable("finance.duplicateTransaction", _duplicateTransaction);
+export const duplicateTransaction = queueable("finance.duplicateTransaction", _duplicateTransaction, { once: true });
 export const deleteTransaction = queueable("finance.deleteTransaction", _deleteTransaction);
 export const deleteInstallments = queueable("finance.deleteInstallments", _deleteInstallments);
 export const setTransactionCategory = queueable("finance.setTransactionCategory", _setTransactionCategory);
-export const saveAccount = queueable("finance.saveAccount", _saveAccount);
+export const saveAccount = queueable("finance.saveAccount", _saveAccount, { once: true });
 export const archiveAccount = queueable("finance.archiveAccount", _archiveAccount);
 export const deleteAccount = queueable("finance.deleteAccount", _deleteAccount);
 export const reorderAccounts = queueable("finance.reorderAccounts", _reorderAccounts);
-export const saveCategory = queueable("finance.saveCategory", _saveCategory);
+export const saveCategory = queueable("finance.saveCategory", _saveCategory, { once: true });
 export const deleteCategory = queueable("finance.deleteCategory", _deleteCategory);
 export const renameTemplate = queueable("finance.renameTemplate", _renameTemplate);
 export const deleteTemplate = queueable("finance.deleteTemplate", _deleteTemplate);
-export const saveSchedule = queueable("finance.saveSchedule", _saveSchedule);
+export const saveSchedule = queueable("finance.saveSchedule", _saveSchedule, { once: true });
 export const setScheduleActive = queueable("finance.setScheduleActive", _setScheduleActive);
 export const deleteSchedule = queueable("finance.deleteSchedule", _deleteSchedule);
 export const saveCategoryBudget = queueable("finance.saveCategoryBudget", _saveCategoryBudget);
-export const saveProject = queueable("finance.saveProject", _saveProject);
+export const saveProject = queueable("finance.saveProject", _saveProject, { once: true });
 export const archiveProject = queueable("finance.archiveProject", _archiveProject);
 export const deleteProject = queueable("finance.deleteProject", _deleteProject);
 export const setTransactionsProject = queueable("finance.setTransactionsProject", _setTransactionsProject);
 export const markAsAdjustment = queueable("finance.markAsAdjustment", _markAsAdjustment);
-export const convertToTransfer = queueable("finance.convertToTransfer", _convertToTransfer);
-export const adjustBalance = queueable("finance.adjustBalance", _adjustBalance);
+export const convertToTransfer = queueable("finance.convertToTransfer", _convertToTransfer, { once: true });
+export const adjustBalance = queueable("finance.adjustBalance", _adjustBalance, { once: true });
 /** Sin señal no hace nada (devuelve null). */
 export const suggestCategory: typeof _suggestCategory = (async (...args: Parameters<typeof _suggestCategory>) => {
   try {
@@ -40,14 +40,14 @@ export const suggestCategory: typeof _suggestCategory = (async (...args: Paramet
   }
 }) as typeof _suggestCategory;
 export const applySuggestions = queueable("finance.applySuggestions", _applySuggestions);
-export const quickAdd = queueable("finance.quickAdd", _quickAdd);
-export const saveDebt = queueable("finance.saveDebt", _saveDebt);
-export const settleDebt = queueable("finance.settleDebt", _settleDebt);
+export const quickAdd = queueable("finance.quickAdd", _quickAdd, { once: true });
+export const saveDebt = queueable("finance.saveDebt", _saveDebt, { once: true });
+export const settleDebt = queueable("finance.settleDebt", _settleDebt, { once: true });
 export const reopenDebt = queueable("finance.reopenDebt", _reopenDebt);
 export const deleteDebt = queueable("finance.deleteDebt", _deleteDebt);
-export const saveGoal = queueable("finance.saveGoal", _saveGoal);
-export const addToGoal = queueable("finance.addToGoal", _addToGoal);
+export const saveGoal = queueable("finance.saveGoal", _saveGoal, { once: true });
+export const addToGoal = queueable("finance.addToGoal", _addToGoal, { once: true });
 export const archiveGoal = queueable("finance.archiveGoal", _archiveGoal);
 export const deleteGoal = queueable("finance.deleteGoal", _deleteGoal);
-export const acceptFixed = queueable("finance.acceptFixed", _acceptFixed);
+export const acceptFixed = queueable("finance.acceptFixed", _acceptFixed, { once: true });
 export const ignoreFixed = queueable("finance.ignoreFixed", _ignoreFixed);

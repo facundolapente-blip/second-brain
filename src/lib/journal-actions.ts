@@ -107,7 +107,13 @@ async function syncCheckinMood(date: string, prev: number | null, mood: number |
   if (date > todayISO()) return;
   const d = toDbDate(date);
   if (mood === null) {
-    if (prev !== null) await prisma.dailyCheckin.updateMany({ where: { date: d, mood: prev }, data: { mood: null } });
+    if (prev !== null) {
+      await prisma.dailyCheckin.updateMany({ where: { date: d, mood: prev }, data: { mood: null } });
+      // Si el check-in quedó sin ningún dato, sobra (si no, contaría como check-in cargado).
+      await prisma.dailyCheckin.deleteMany({
+        where: { date: d, mood: null, energy: null, stress: null, sleepMin: null, weightG: null, steps: null, note: null },
+      });
+    }
   } else {
     await prisma.dailyCheckin.upsert({ where: { date: d }, create: { date: d, mood }, update: { mood } });
   }

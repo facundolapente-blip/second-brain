@@ -200,14 +200,15 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
     document.cookie = `${HOURS_TODO_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
   }
   const hours = Array.from({ length: TO - FROM }, (_, i) => FROM + i);
-  const cols = `3.5rem repeat(${days.length}, minmax(${days.length > 1 ? "9.5rem" : "0"}, 1fr))`;
+  // Columnas que se achican hasta 7,5rem: entran los 7 días desde ~1280 px (como Lista).
+  const cols = `3.5rem repeat(${days.length}, minmax(${days.length > 1 ? "7.5rem" : "0"}, 1fr))`;
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
       {/* Un solo contenedor con scroll (vertical y horizontal): la cabecera queda fija
           arriba y las columnas de días coinciden siempre con las de la grilla. */}
       <div className="max-h-[75dvh] overflow-auto">
       {/* Con un solo día (celular) la grilla usa todo el ancho; con 7, cada día tiene un mínimo. */}
-      <div className={days.length > 1 ? "min-w-[70rem]" : undefined}>
+      <div className={days.length > 1 ? "min-w-[56rem]" : undefined}>
       {/* Cabecera de días y los pendientes sin hora */}
       <div className="sticky top-0 z-10 grid border-b border-line bg-surface" style={{ gridTemplateColumns: cols }}>
         <button
@@ -242,7 +243,8 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                 if (id) onMove(id, d, null);
               }}
               className={cx(
-                "grid content-start gap-0.5 border-l border-line p-1.5",
+                // min-w-0: sin esto el título largo de un pendiente estira la celda y pisa el día de al lado.
+                "grid min-w-0 content-start gap-0.5 border-l border-line p-1.5",
                 d === today && "bg-[color-mix(in_oklab,var(--accent)_5%,transparent)]",
                 over === `${d}|` && "bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]",
               )}
@@ -258,7 +260,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                 )}
               </button>
               {!folded && todo.length > 0 && (
-                <ul className="grid">
+                <ul className="grid min-w-0">
                   {todo.map((b) => (
                     <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} />
                   ))}
@@ -393,7 +395,7 @@ function TodoRow({
         e.dataTransfer.setData(DRAG, b.id);
         e.dataTransfer.effectAllowed = "move";
       }}
-      className="flex min-h-9 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2"
+      className="flex min-h-9 min-w-0 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2"
       title="Arrastralo a una hora para agendarlo"
     >
       {free ? (

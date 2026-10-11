@@ -63,8 +63,8 @@ export function AnalysisView({
           </div>
         }
       />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
-        <Card title="Lo que se ve en tus datos" className="lg:col-span-12">
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+        <Card title="Lo que se ve en tus datos" className="xl:col-span-12">
           {insights.length === 0 ? (
             <p className="text-[14px] leading-relaxed text-muted">
               Todavía no aparece ninguna relación clara. Hace falta al menos 5 días de cada lado para comparar.
@@ -103,8 +103,8 @@ export function AnalysisView({
           </p>
         </Card>
 
-        <Card title="Semana a semana" className="lg:col-span-12">
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="Semana a semana" className="xl:col-span-12">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             <MiniBars
               title="Hábitos cumplidos"
               color="var(--c-habitos)"
@@ -242,7 +242,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
   const cell = (pct: number, color: string) => `color-mix(in oklab, ${color} ${Math.max(6, pct)}%, var(--surface-2))`;
 
   return (
-    <Card title="Por día de la semana" className="lg:col-span-6">
+    <Card title="Por día de la semana" className="xl:col-span-6">
       {best && worst && (
         <p className="text-[13.5px] leading-relaxed text-muted">
           Tu mejor día para los hábitos es el <strong className="font-medium text-fg">{WEEKDAY_NAMES[best.weekday].toLowerCase()}</strong> (
@@ -322,7 +322,7 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
 
   const f = focus ? corr[focus[0]][focus[1]] : null;
   return (
-    <Card title="Qué se mueve junto" className="lg:col-span-6">
+    <Card title="Qué se mueve junto" className="xl:col-span-6">
       <p className="tabular min-h-5 text-[12.5px] text-muted" aria-live="polite">
         {focus && f
           ? `${METRICS[focus[0]].label} y ${METRICS[focus[1]].label}: ${f.r === null ? `pocos datos (${f.n} días)` : `${f.r.toFixed(2)}, ${read(f.r)} · ${f.n} días`}`

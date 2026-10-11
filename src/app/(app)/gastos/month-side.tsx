@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Check } from "@phosphor-icons/react";
-import { moneyCents } from "@/lib/format";
+import { moneyWhole } from "@/lib/format";
 import { tone } from "@/lib/palette";
 import {
   balanceByCurrency,
@@ -125,7 +125,7 @@ export function CategorySpend({
     <section aria-label="Gasto por categoría" className="rounded-2xl border border-line bg-surface px-5 pt-4 pb-4">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Gasto por categoría</h2>
-        {cur && <span className="font-mono text-[12px] text-muted tabular">{moneyCents(total, cur)}</span>}
+        {cur && <span className="font-mono text-[12px] text-muted tabular">{moneyWhole(total, cur)}</span>}
       </div>
       {rows.length === 0 ? (
         <p className="py-4 text-[14px] text-muted">Sin gastos este mes en las cuentas elegidas.</p>
@@ -145,7 +145,7 @@ export function CategorySpend({
                     <span className="truncate">{cat?.name ?? "Sin clasificar"}</span>
                   </span>
                   <span className="shrink-0 font-mono text-[12.5px] tabular">
-                    {moneyCents(r.cents, cur)}
+                    {moneyWhole(r.cents, cur)}
                     <span className="ml-2 inline-block w-8 text-right text-muted">{Math.round((r.cents / total) * 100)}%</span>
                   </span>
                 </div>
@@ -163,7 +163,7 @@ export function CategorySpend({
               <div className="flex items-baseline justify-between gap-3 text-[13.5px] text-muted">
                 <span>Otras ({rows.length - TOP})</span>
                 <span className="font-mono text-[12.5px] tabular">
-                  {moneyCents(rest, cur)}
+                  {moneyWhole(rest, cur)}
                   <span className="ml-2 inline-block w-8 text-right">{Math.round((rest / total) * 100)}%</span>
                 </span>
               </div>

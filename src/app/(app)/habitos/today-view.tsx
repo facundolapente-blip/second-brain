@@ -63,7 +63,7 @@ export function TodayView({
         }
       />
 
-      <main className="mx-auto max-w-3xl lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:px-10 lg:pt-6">
+      <main className="mx-auto max-w-3xl lg:grid lg:max-w-6xl lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_340px] lg:px-10 lg:pt-6">
         <section className="min-w-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]">
         <DateStrip days={days} selected={selected} today={today} onSelect={setSelected} />
 

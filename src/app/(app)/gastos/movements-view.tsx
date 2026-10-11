@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { Menu } from "@/components/menu";
 import { formatShort } from "@/lib/dates";
-import { moneyCents } from "@/lib/format";
+import { moneyCents, moneyWhole } from "@/lib/format";
 import {
   balanceByCurrency,
   centsToInput,
@@ -216,7 +216,7 @@ export function MovementsView({
                   {Object.keys(net).length > 0 && (
                     <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted">
                       {netLabel}
-                      <TotalsInline totals={net} className="font-mono text-[13px] font-medium" />
+                      <TotalsInline totals={net} whole className="font-mono text-[13px] font-medium" />
                     </p>
                   )}
                 </div>
@@ -359,7 +359,7 @@ function FlowTile({ label, totals, kind }: { label: string; totals: Record<strin
         {label}
       </dt>
       <dd className="tabular grid font-mono text-[15px] font-medium">
-        {cur.length === 0 ? <span>{moneyCents(0)}</span> : cur.map((c) => <span key={c}>{moneyCents(totals[c], c)}</span>)}
+        {cur.length === 0 ? <span>{moneyCents(0)}</span> : cur.map((c) => <span key={c}>{moneyWhole(totals[c], c)}</span>)}
       </dd>
     </div>
   );

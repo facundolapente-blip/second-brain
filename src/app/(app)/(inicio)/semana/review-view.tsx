@@ -51,8 +51,8 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
           </>
         }
       />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
-        <section aria-label="Resumen de la semana" className="hero rise rounded-[22px] p-5 lg:col-span-12 lg:p-7">
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+        <section aria-label="Resumen de la semana" className="hero rise rounded-[22px] p-5 xl:col-span-12 lg:p-7">
           <p className="hero-sub text-[13px]">{r.isCurrent ? "Semana en curso, hasta hoy · comparada con la anterior hasta el mismo día" : "Comparado con la semana anterior"}</p>
           <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
             <Kpi label="Hábitos cumplidos" value={now.habitPct === null ? "–" : `${now.habitPct}%`}>
@@ -71,7 +71,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </section>
 
         {/* Reflexión */}
-        <section className="rise grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:col-span-12 lg:flex lg:items-center lg:p-5">
+        <section className="rise grid gap-3 rounded-[20px] border border-line bg-surface p-4 xl:col-span-12 lg:flex lg:items-center lg:p-5">
           <div className="grid gap-1 lg:flex-1">
             <h2 className="text-[15px] font-semibold">Tu reflexión</h2>
             <p className="text-[13.5px] text-muted">
@@ -95,7 +95,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </section>
 
         {/* Hábitos */}
-        <Card title="Hábitos" color="var(--c-habitos)" className="lg:col-span-7" href="/habitos">
+        <Card title="Hábitos" color="var(--c-habitos)" className="xl:col-span-7" href="/habitos">
           {habitsSorted.length === 0 ? (
             <p className="text-[14px] text-muted">Esta semana no tocaba ningún hábito.</p>
           ) : (
@@ -121,7 +121,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </Card>
 
         {/* Cómo te sentiste */}
-        <Card title="Cómo estuviste" color="var(--mod-inicio)" className="lg:col-span-5" href="/">
+        <Card title="Cómo estuviste" color="var(--mod-inicio)" className="xl:col-span-5" href="/">
           {!hasFeel ? (
             <p className="text-[14px] leading-relaxed text-muted">
               Sin check-ins esta semana. Cargalo en Inicio (ánimo, energía, estrés, sueño y peso) y acá vas a ver cómo
@@ -167,7 +167,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </Card>
 
         {/* Gastos */}
-        <Card title="Gastos" color="var(--c-gastos)" className="lg:col-span-7" href="/gastos">
+        <Card title="Gastos" color="var(--c-gastos)" className="xl:col-span-7" href="/gastos">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
             <p className="figure text-[30px]">{moneyWhole(now.spentCents)}</p>
             <p className="pb-1 text-[13px] text-muted">
@@ -188,7 +188,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
               </div>
             ))}
           </div>
-          <div className="grid gap-4 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <div className="grid gap-4 border-t border-line pt-3 sm:grid-cols-2">
             <ul className="grid content-start gap-2">
               {r.topCategories.map((c) => (
                 <li key={c.id ?? "none"} className="flex items-center gap-2.5 text-[13.5px]">
@@ -214,7 +214,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </Card>
 
         {/* Plan y journal */}
-        <Card title="Plan y journal" color="var(--c-plan)" className="lg:col-span-5" href="/plan">
+        <Card title="Plan y journal" color="var(--c-plan)" className="xl:col-span-5" href="/plan">
           <dl className="grid grid-cols-2 gap-2">
             <Mini
               label="Bloques hechos"

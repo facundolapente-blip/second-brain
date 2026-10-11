@@ -118,7 +118,7 @@ export function showsOn(h: HabitRule, logs: LogMap, iso: string): boolean {
 
 /**
  * Hábitos que tocan un día y cuántos ya están hechos: los mismos que muestra la
- * lista de Hoy (`showsOn`). Lo usan Hoy, su panel e Inicio (también "Tu semana"),
+ * lista de Hoy (`showsOn`), sin los salteados. Lo usan Hoy, su panel e Inicio (también "Tu semana"),
  * así las cifras coinciden en todos lados.
  */
 export function dayProgress(habits: (HabitRule & { id: string })[], logs: Record<string, LogMap>, iso: string, today: string): { done: number; total: number } {
@@ -127,6 +127,8 @@ export function dayProgress(habits: (HabitRule & { id: string })[], logs: Record
   for (const h of habits) {
     const l = logs[h.id] ?? {};
     if (iso < h.startDate || !showsOn(h, l, iso)) continue;
+    // Un salteado no cuenta (como en HabitNow): si no, nunca se llega a "Día completo".
+    if (l[iso]?.s === "skipped") continue;
     total++;
     if (dayState(h, l, iso, today) === "done") done++;
   }
