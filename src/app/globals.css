@@ -517,3 +517,98 @@ dialog.sheet::backdrop {
 @media (prefers-reduced-motion: reduce) {
   .plan-slide-next, .plan-slide-prev { animation: none; }
 }
+
+/* ─── Movimiento (2026-10-11) ───────────────────────────────────────────────
+   App de uso diario: el movimiento acusa recibo, explica qué se abrió o cambió y
+   no hace esperar. Las pantallas siguen sin animación de entrada y las listas no
+   se mueven al tildar (Facu: el movimiento lo confunde). Todo con la misma curva
+   de llegada y salidas más cortas que las entradas. Con movimiento reducido no hay
+   desplazamientos ni escalas: quedan fundidos cortos que siguen avisando. */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --dur-press: 110ms;
+  --dur-quick: 160ms;
+  --dur-state: 220ms;
+  /* Deja animar alto "auto" (secciones plegables con <details>). */
+  interpolate-size: allow-keywords;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Apretar: los botones y enlaces en píldora se hunden un poco (scale, no transform:
+     así no pisa un translate que ya tengan). */
+  :where(button, a, [role="button"]).rounded-full {
+    transition-property: scale, background-color, color, border-color, box-shadow, opacity;
+    transition-duration: var(--dur-press), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick);
+    transition-timing-function: var(--ease-out);
+  }
+  :where(button, a, [role="button"]).rounded-full:not(:disabled):active {
+    scale: 0.96;
+  }
+
+  /* Menús (tres puntitos y clic derecho): se abren desde donde se tocó. */
+  .menu-in {
+    animation: menu-in var(--dur-quick) var(--ease-out);
+  }
+  @keyframes menu-in {
+    from { opacity: 0; scale: 0.96; translate: 0 -4px; }
+  }
+
+  /* Hojas: el fondo también aparece en fundido (antes solo se apagaba al cerrar). */
+  dialog.sheet[open]::backdrop {
+    animation: backdrop-in 260ms var(--ease-out);
+  }
+  @keyframes backdrop-in {
+    from { opacity: 0; }
+  }
+
+  /* Aviso de abajo: se va bajando (antes desaparecía de golpe). */
+  .toast-out {
+    animation: toast-out var(--dur-quick) var(--ease-in) forwards;
+  }
+  @keyframes toast-out {
+    to { opacity: 0; translate: 0 10px; scale: 0.98; }
+  }
+
+  /* Algo que se despliega al tocarlo (detalle de una categoría, tareas, check-in). */
+  .reveal {
+    animation: reveal var(--dur-state) var(--ease-out);
+  }
+  @keyframes reveal {
+    from { opacity: 0; translate: 0 -6px; }
+  }
+
+  /* Secciones plegables con <details> ("Ver N más", filtros): abren y cierran en alto. */
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size var(--dur-state) var(--ease-out),
+      content-visibility var(--dur-state) allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+  }
+
+  /* Barras de progreso: cuando cambia el número, avanzan (al cargar no se mueven; los anillos ya lo hacían). */
+  .bar-anim {
+    transition: width 480ms var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Sin desplazamientos: lo que se abre o se va, en un fundido corto. */
+  .menu-in,
+  .reveal {
+    animation: fade-only 120ms ease-out;
+  }
+  .toast-out {
+    animation: fade-only-out 120ms ease-in forwards;
+  }
+  @keyframes fade-only {
+    from { opacity: 0; }
+  }
+  @keyframes fade-only-out {
+    to { opacity: 0; }
+  }
+}

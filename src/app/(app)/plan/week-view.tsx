@@ -475,6 +475,8 @@ export function BlockCard({
 }) {
   const free = isFreeBlock(b);
   const range = timeRange(b);
+  // La tilde aparece con un golpe corto, solo después de tocarla (no al cargar).
+  const [tapped, setTapped] = useState(false);
   return (
     <article
       className={cx(
@@ -512,7 +514,11 @@ export function BlockCard({
         const check = !free && (
           <button
             type="button"
-            onClick={onToggle}
+            onClick={() => {
+              navigator.vibrate?.(8);
+              setTapped(true);
+              onToggle();
+            }}
             aria-pressed={b.done}
             aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
             className={cx(
@@ -528,7 +534,7 @@ export function BlockCard({
                   : "border-fg/45 bg-transparent group-hover:border-fg/70",
               )}
             >
-              {b.done && <Check size={14} weight="bold" />}
+              {b.done && <Check size={14} weight="bold" className={tapped ? "mark-pop" : undefined} />}
             </span>
           </button>
         );

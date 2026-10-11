@@ -96,8 +96,15 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
   return (
-    <div className="grid auto-cols-fr grid-flow-col rounded-[5px] border border-line bg-surface-2 p-[3px]" role="radiogroup">
+    <div className="relative grid auto-cols-fr grid-flow-col rounded-[5px] border border-line bg-surface-2 p-[3px]" role="radiogroup">
+      {/* La marca de lo elegido se desliza a la opción nueva (las columnas son iguales). */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-[3px] left-[3px] rounded-[3px] bg-raised shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)] transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)] motion-reduce:transition-none"
+        style={{ width: `calc((100% - 6px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
+      />
       {options.map((o) => (
         <button
           type="button"
@@ -106,8 +113,8 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            "h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors",
-            value === o.value ? "bg-raised text-fg shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)]" : "text-muted hover:text-fg",
+            "relative h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors",
+            value === o.value ? "text-fg" : "text-muted hover:text-fg",
           )}
         >
           {o.label}

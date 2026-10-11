@@ -40,7 +40,10 @@ export function TasksBoard({
   columns?: TaskColumnWidths;
 }) {
   const [folded, setFolded] = useState(foldedInitial);
+  // Solo se anima al desplegarlas con un toque (no al cargar).
+  const [unfolded, setUnfolded] = useState(false);
   function toggleFold() {
+    setUnfolded(folded);
     const next = !folded;
     setFolded(next);
     document.cookie = `${TASKS_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
@@ -133,7 +136,7 @@ export function TasksBoard({
           <Plus size={15} weight="bold" /> Nueva tarea
         </Button>
       </div>
-      <div id="tareas-cuerpo" className={cx(folded && "max-lg:hidden")}>
+      <div id="tareas-cuerpo" className={cx(folded && "max-lg:hidden", unfolded && "reveal")}>
       <div
         role="tablist"
         aria-label="Vistas"

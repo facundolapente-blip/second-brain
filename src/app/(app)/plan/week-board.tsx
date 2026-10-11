@@ -387,6 +387,8 @@ function TodoRow({
 }) {
   const c = b.categoryId ? cats.get(b.categoryId) : null;
   const free = isFreeBlock(b);
+  // La tilde aparece con un golpe corto, solo después de tocarla.
+  const [tapped, setTapped] = useState(false);
   return (
     <li
       onContextMenu={(e) => onMenu?.(e, b)}
@@ -403,7 +405,11 @@ function TodoRow({
       ) : (
         <button
           type="button"
-          onClick={() => onToggle(b)}
+          onClick={() => {
+            navigator.vibrate?.(8);
+            setTapped(true);
+            onToggle(b);
+          }}
           aria-pressed={b.done}
           aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
           className="inline-flex size-8 shrink-0 items-center justify-center"
@@ -414,7 +420,7 @@ function TodoRow({
               b.done ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent" : "border-fg/45",
             )}
           >
-            {b.done && <Check size={12} weight="bold" />}
+            {b.done && <Check size={12} weight="bold" className={tapped ? "mark-pop" : undefined} />}
           </span>
         </button>
       )}

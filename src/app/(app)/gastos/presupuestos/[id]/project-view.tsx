@@ -111,7 +111,7 @@ export function ProjectView({
               {moneyCents(p.spentCents, p.currency)} <span className="hero-sub text-[18px]">de {moneyCents(p.amountCents, p.currency)}</span>
             </p>
             <span className="block h-2.5 overflow-hidden rounded-full bg-white/20">
-              <span className="block h-full rounded-full bg-white" style={{ width: `${pct}%` }} />
+              <span className="bar-anim block h-full rounded-full bg-white" style={{ width: `${pct}%` }} />
             </span>
             <p className="hero-sub text-[13px]">
               {st === "over"

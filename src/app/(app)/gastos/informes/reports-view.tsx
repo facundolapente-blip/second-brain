@@ -770,7 +770,7 @@ function CategoryDetail({
   const amount = (c: number) => (c < 0 ? `−${moneyCents(-c, currency)}` : moneyCents(c, currency));
 
   return (
-    <div id={id} className="grid gap-2 rounded-xl border border-line bg-surface-2/60 p-3 sm:ml-[44px]">
+    <div id={id} className="reveal grid gap-2 rounded-xl border border-line bg-surface-2/60 p-3 sm:ml-[44px]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[12.5px] text-muted">
           {rows.length === 1 ? "1 movimiento" : `${rows.length} movimientos`}

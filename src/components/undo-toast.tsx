@@ -35,17 +35,22 @@ export function UndoToast() {
   const [msg, setMsg] = useState<{ label: string; key: number; done?: string; error?: boolean } | null>(null);
   const [pending, start] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Sale con una animación corta antes de desaparecer.
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     const h = (e: Event) => {
+      setLeaving(false);
       setMsg({ label: (e as CustomEvent<string>).detail, key: Date.now() });
     };
     const he = (e: Event) => {
       const text = (e as CustomEvent<string>).detail;
+      setLeaving(false);
       setMsg({ label: text, done: text, error: true, key: Date.now() });
     };
     const hi = (e: Event) => {
       const text = (e as CustomEvent<string>).detail;
+      setLeaving(false);
       setMsg({ label: text, done: text, key: Date.now() });
     };
     window.addEventListener(EVENT, h);
@@ -61,7 +66,13 @@ export function UndoToast() {
   useEffect(() => {
     clearTimeout(timer.current);
     if (!msg || pending) return;
-    timer.current = setTimeout(() => setMsg(null), msg.error ? 5000 : msg.done ? 2500 : MS);
+    timer.current = setTimeout(
+      () => {
+        setLeaving(true);
+        timer.current = setTimeout(() => setMsg(null), 170);
+      },
+      msg.error ? 5000 : msg.done ? 2500 : MS,
+    );
     return () => clearTimeout(timer.current);
   }, [msg, pending]);
 
@@ -71,7 +82,8 @@ export function UndoToast() {
       role={msg.error ? "alert" : "status"}
       key={msg.key}
       className={cx(
-        "toast-in fixed inset-x-4 bottom-[calc(92px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-sm items-center gap-3 bg-[var(--text)] py-2 pr-2 pl-5 text-[14px] text-[var(--bg)] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] lg:bottom-6 print:hidden",
+        leaving ? "toast-out" : "toast-in",
+        "fixed inset-x-4 bottom-[calc(92px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-sm items-center gap-3 bg-[var(--text)] py-2 pr-2 pl-5 text-[14px] text-[var(--bg)] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] lg:bottom-6 print:hidden",
         msg.error ? "rounded-2xl pr-5" : "rounded-full",
       )}
     >
@@ -83,9 +95,14 @@ export function UndoToast() {
           disabled={pending}
           onClick={() =>
             start(async () => {
-              const r = await undoLastDelete();
-              setMsg((m) => m && { ...m, done: r.ok ? "Listo, volvió a su lugar" : r.error });
-              router.refresh();
+              try {
+                const r = await undoLastDelete();
+                setMsg((m) => m && { ...m, done: r.ok ? "Listo, volvió a su lugar" : r.error });
+                router.refresh();
+              } catch {
+                // Sin señal o sesión vencida: que no mande la pantalla a "No se pudo cargar".
+                setMsg((m) => m && { ...m, done: "No se pudo deshacer (sin conexión). Está en Historial y papelera.", error: true });
+              }
             })
           }
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[color-mix(in_oklab,var(--bg)_16%,transparent)] px-3.5 font-medium transition-colors hover:bg-[color-mix(in_oklab,var(--bg)_26%,transparent)] disabled:opacity-60"

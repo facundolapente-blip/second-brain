@@ -31,8 +31,8 @@ export function Menu({ trigger, items, align = "right" }: { trigger: (toggle: ()
         <div
           role="menu"
           className={cx(
-            "absolute top-full z-30 mt-1 min-w-48 overflow-hidden rounded-[6px] border border-line-strong bg-surface py-1 shadow-[0_10px_30px_-16px_rgba(var(--shadow-tint),0.35)]",
-            align === "right" ? "right-0" : "left-0",
+            "menu-in absolute top-full z-30 mt-1 min-w-48 overflow-hidden rounded-[6px] border border-line-strong bg-surface py-1 shadow-[0_10px_30px_-16px_rgba(var(--shadow-tint),0.35)]",
+            align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left",
           )}
         >
           {items.map((it) => (

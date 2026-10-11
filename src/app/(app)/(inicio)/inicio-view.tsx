@@ -355,7 +355,7 @@ function PlanToday({ d }: { d: Dashboard }) {
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
             <div
-              className="h-full rounded-full bg-[var(--c-plan)] transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+              className="bar-anim h-full rounded-full bg-[var(--c-plan)] transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
               style={{ width: `${pct(doneN, real.length)}%` }}
             />
           </div>

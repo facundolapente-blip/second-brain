@@ -267,7 +267,7 @@ export function BudgetsView({
                           <span className="tabular text-[13px] text-muted">de {moneyCents(p.amountCents, p.currency)}</span>
                         </span>
                         <span className="h-2 overflow-hidden rounded-full bg-surface-3">
-                          <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: STATE_TONE[st].bar }} />
+                          <span className="bar-anim block h-full rounded-full" style={{ width: `${pct}%`, background: STATE_TONE[st].bar }} />
                         </span>
                         <span className={cx("text-[12.5px]", STATE_TONE[st].text)}>
                           {p.spentCents <= p.amountCents
@@ -332,7 +332,7 @@ function Meter({
   return (
     <span className={cx("relative block h-2.5 rounded-full", onHero ? "bg-white/20" : "bg-surface-3")}>
       <span
-        className="block h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="bar-anim block h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
         style={{ width: `${pct}%`, background: onHero ? "white" : STATE_TONE[state].bar }}
       />
       {share !== null && (

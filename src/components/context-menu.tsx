@@ -120,7 +120,12 @@ export function ContextMenuHost() {
       onKeyDown={renaming ? undefined : onMenuKey}
       onContextMenu={(e) => e.preventDefault()}
       style={{ left: pos?.left ?? open.x, top: pos?.top ?? open.y, visibility: pos ? "visible" : "hidden" }}
-      className="fixed z-[60] min-w-52 overflow-hidden rounded-xl border border-line-strong bg-surface py-1 shadow-[0_14px_36px_-14px_rgba(var(--shadow-tint),0.45)] print:hidden"
+      // Se abre desde el punto donde se hizo clic (o desde la esquina que quedó más cerca si se corrió).
+      className={cx(
+        "fixed z-[60] min-w-52 overflow-hidden rounded-xl border border-line-strong bg-surface py-1 shadow-[0_14px_36px_-14px_rgba(var(--shadow-tint),0.45)] print:hidden",
+        pos && "menu-in",
+        pos && (pos.top < open.y ? "origin-bottom-left" : "origin-top-left"),
+      )}
     >
       {renaming && "schedule" in renaming ? (
         <ScheduleForm item={renaming} onDone={() => setOpen(null)} />

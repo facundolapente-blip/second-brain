@@ -53,6 +53,8 @@ export function CheckinCard({
   const filled = countFilled(cur);
   // Con el de hoy completo arranca plegado: una línea con lo cargado.
   const [open, setOpen] = useState(() => countFilled(today) < 5);
+  // Solo se anima al desplegarlo con un toque (no al cargar Inicio).
+  const [unfolded, setUnfolded] = useState(false);
   const summary = [
     MOODS.find((m) => m.value === cur.mood)?.label,
     cur.energy ? `Energía ${ENERGY_LABELS[cur.energy - 1].toLowerCase()}` : null,
@@ -116,7 +118,10 @@ export function CheckinCard({
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            setUnfolded(!open);
+            setOpen((o) => !o);
+          }}
           aria-expanded={open}
           aria-controls="checkin-cuerpo"
           className="-my-2 -ml-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
@@ -158,7 +163,10 @@ export function CheckinCard({
           {summary}
         </button>
       )}
-      <div id="checkin-cuerpo" className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", !open && "hidden")}>
+      <div
+        id="checkin-cuerpo"
+        className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", !open && "hidden", unfolded && "reveal")}
+      >
         <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label}>
           <div className="grid grid-cols-5 gap-1.5">
             {MOODS.map((m) => {

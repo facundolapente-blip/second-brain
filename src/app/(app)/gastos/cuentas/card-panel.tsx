@@ -40,7 +40,7 @@ export function CardPanel({ card, today }: { card: CardSummary; today: string })
 
       {used !== null && (
         <div className="grid gap-1">
-          <span className="h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Usaste el ${Math.round(used * 100)}% del límite`}>
+          <span className="bar-anim h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Usaste el ${Math.round(used * 100)}% del límite`}>
             <span
               className={cx("block h-full rounded-full", used > 0.9 ? "bg-danger" : "bg-[var(--c-gastos)]")}
               style={{ width: `${used * 100}%` }}

@@ -190,7 +190,7 @@ export function ObjectivesView({
                   )}
                   {pct !== null && (
                     <div className="h-[3px] overflow-hidden bg-line" aria-hidden>
-                      <div className="h-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
+                      <div className="bar-anim h-full bg-[var(--st-done-line)]" style={{ width: `${pct}%` }} />
                     </div>
                   )}
                   <ul className="grid border-t border-line lg:[&>li:last-child>button]:border-b-0">
@@ -594,7 +594,7 @@ function ObjectivesSummary({ krs, today }: { krs: KeyResultDTO[]; today: string 
         <dt className="hero-sub font-mono text-[11px] tracking-[0.08em] uppercase">Avance promedio</dt>
         <dd className="figure pt-1 text-[36px]">{avg}%</dd>
         <dd className="mt-1 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--hero-fg)_18%,transparent)]" aria-hidden>
-          <span className="block h-full rounded-full bg-[var(--hero-fg)]" style={{ width: `${avg}%` }} />
+          <span className="bar-anim block h-full rounded-full bg-[var(--hero-fg)]" style={{ width: `${avg}%` }} />
         </dd>
       </div>
       {tiles.map((t) => (

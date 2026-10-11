@@ -92,7 +92,7 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
                     </div>
                     <span className="h-2.5 overflow-hidden rounded-full bg-surface-3">
                       <span
-                        className="block h-full rounded-full transition-[width] duration-700"
+                        className="bar-anim block h-full rounded-full transition-[width] duration-700"
                         style={{ width: `${pct}%`, background: pct >= 100 ? "var(--st-done-line)" : "var(--accent)" }}
                       />
                     </span>
