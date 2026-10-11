@@ -62,13 +62,19 @@ function blockDTO(b: BlockRow): BlockDTO {
 }
 
 /** Bloques de la semana (lunes a domingo) que contiene `day`. */
-export async function getWeek(day: string) {
-  const monday = startOfWeek(day);
+/**
+ * Siete días de bloques. Sin `start`, la semana de lunes a domingo de `day`; con
+ * `start`, siete días corridos desde ese día (avanzar de a un día). `monday` es
+ * siempre el lunes de la semana del primer día (lo usan "pasar/copiar la semana").
+ */
+export async function getWeek(day: string, start?: string) {
+  const monday = startOfWeek(start ?? day);
+  const from = start ?? monday;
   const rows = await prisma.planBlock.findMany({
-    where: { date: { gte: toDbDate(monday), lte: toDbDate(addDays(monday, 6)) } },
+    where: { date: { gte: toDbDate(from), lte: toDbDate(addDays(from, 6)) } },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
-  return { monday, blocks: rows.map(blockDTO), today: todayISO() };
+  return { monday, start: from, blocks: rows.map(blockDTO), today: todayISO() };
 }
 
 export async function getTasks(): Promise<TaskDTO[]> {

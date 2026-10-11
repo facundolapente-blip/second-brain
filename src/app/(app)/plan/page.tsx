@@ -3,16 +3,17 @@ import { isISODate, todayISO } from "@/lib/dates";
 import { getPlanCategories, getTasks, getWeek } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { WeekView } from "./week-view";
-import { HOURS_TODO_FOLD_COOKIE, parseTaskColumns, PLAN_VIEW_COOKIE, TASKS_FOLD_COOKIE } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, parseTaskColumns, PLAN_STEP_COOKIE, PLAN_VIEW_COOKIE, TASKS_FOLD_COOKIE } from "@/lib/plan-logic";
 import { TasksBoard } from "./tareas/tasks-view";
 
 export const metadata = { title: "Plan semanal" };
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
-  const { semana } = await searchParams;
+  const { semana, desde } = await searchParams;
   const day = isISODate(semana) ? semana : todayISO();
-  const [{ monday, blocks, today }, categories, tasks, manual, jar, columns] = await Promise.all([
-    getWeek(day),
+  // `desde`: siete días corridos desde ese día (las flechas de a un día).
+  const [{ monday, start, blocks, today }, categories, tasks, manual, jar, columns] = await Promise.all([
+    getWeek(day, isISODate(desde) ? desde : undefined),
     getPlanCategories(),
     getTasks(),
     prisma.appSetting.findUnique({ where: { key: "tareas_orden_manual" } }),
@@ -21,8 +22,10 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   ]);
   return (
     <WeekView
-      key={monday}
+      key={start}
       monday={monday}
+      start={start}
+      step={jar.get(PLAN_STEP_COOKIE)?.value === "dia" ? "dia" : "semana"}
       today={today}
       blocks={blocks}
       categories={categories}

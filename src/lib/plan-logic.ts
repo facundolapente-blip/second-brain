@@ -111,6 +111,9 @@ export const HOURS_TODO_FOLD_COOKIE = "plan_pendientes_plegados";
 /** Cookie con las tareas plegadas en el celular (se recuerda entre visitas). */
 export const TASKS_FOLD_COOKIE = "plan_tareas_plegadas";
 
+/** Cookie con el paso de las flechas de la semana ("dia" o "semana"). */
+export const PLAN_STEP_COOKIE = "plan_paso";
+
 /** Cookie con la vista de la semana elegida ("lista" u "horas"). */
 export const PLAN_VIEW_COOKIE = "plan_vista";
 

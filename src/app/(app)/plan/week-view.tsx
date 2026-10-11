@@ -7,11 +7,11 @@ import { showContextMenu } from "@/components/context-menu";
 import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
-import { useOptimistic, useRef, useState, useMemo } from "react";
+import { useEffect, useOptimistic, useRef, useState, useMemo } from "react";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
-import { addDays, formatShort, weekday } from "@/lib/dates";
-import { isFreeBlock, sortBlocks, timeRange, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type TaskDTO, sortKeyAt, PLAN_VIEW_COOKIE } from "@/lib/plan-logic";
+import { addDays, formatShort, startOfWeek, weekday } from "@/lib/dates";
+import { isFreeBlock, sortBlocks, timeRange, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type TaskDTO, sortKeyAt, PLAN_STEP_COOKIE, PLAN_VIEW_COOKIE } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
@@ -23,8 +23,19 @@ import { BoardHours, BoardList } from "./week-board";
 
 const SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
+// Primer día de lo que se miraba antes: para saber hacia qué lado deslizar al
+// avanzar o retroceder (vive entre navegaciones, sin recargar la página).
+let lastStart: string | null = null;
+
+/** Preferencias del Plan que lee el servidor al dibujar (un año, solo en /plan). */
+function savePref(name: string, value: string) {
+  document.cookie = `${name}=${value}; path=/plan; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+}
+
 export function WeekView({
   monday,
+  start = monday,
+  step: initialStep = "semana",
   today,
   blocks: initialBlocks,
   categories,
@@ -40,14 +51,28 @@ export function WeekView({
   /** Pendientes sin hora plegados en la vista por horas (cookie). */
   todoFolded?: boolean;
   monday: string;
+  /** Primer día que se ve (el lunes, o cualquier día si se avanza de a uno). */
+  start?: string;
+  /** Lo que avanzan las flechas: un día o una semana (cookie). */
+  step?: "dia" | "semana";
   today: string;
   blocks: BlockDTO[];
   categories: CategoryDTO[];
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
 }) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const isThisWeek = days.includes(today);
-  const [selected, setSelected] = useState(isThisWeek ? today : monday);
+  const [selected, setSelected] = useState(isThisWeek ? today : start);
+  // Hacia dónde se movió: adelante desliza desde la derecha, atrás desde la izquierda.
+  const [slide] = useState(() => (lastStart && lastStart !== start ? (start > lastStart ? "plan-slide-next" : "plan-slide-prev") : ""));
+  useEffect(() => {
+    lastStart = start;
+  }, [start]);
+  const [step, setStepState] = useState<"dia" | "semana">(initialStep);
+  const setStep = (s: "dia" | "semana") => {
+    setStepState(s);
+    savePref(PLAN_STEP_COOKIE, s);
+  };
   // Cambios optimistas: tildar o mover (día y hora).
   // Lo hecho sin conexión (todavía sin subir) ya se ve.
   const pendingOps = usePendingActions();
@@ -59,7 +84,7 @@ export function WeekView({
   // La vista elegida se recuerda (al recargar o cambiar de semana sigue igual).
   const setView = (v: "lista" | "horas") => {
     setViewState(v);
-    document.cookie = `${PLAN_VIEW_COOKIE}=${v}; path=/plan; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    savePref(PLAN_VIEW_COOKIE, v);
   };
   const [, startTransition] = useSafeTransition();
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
@@ -67,7 +92,8 @@ export function WeekView({
   const cats = categoryMap(categories);
 
   const byDay = new Map(days.map((d) => [d, sortBlocks(blocks.filter((b) => b.date === d))]));
-  const work = blocks.filter((b) => !isFreeBlock(b));
+  // Solo lo que está en los días que se ven (un bloque recién pasado a otra semana deja de contar enseguida).
+  const work = blocks.filter((b) => !isFreeBlock(b) && days.includes(b.date));
   const doneCount = work.filter((b) => b.done).length;
 
   function toggle(b: BlockDTO) {
@@ -157,8 +183,13 @@ export function WeekView({
   }
   const boardProps = { days, today, byDay, cats, onToggle: toggle, onEdit: openEdit, onNew: openNew, onMove: move, onMenu: blockMenu, onDropTask: dropTask };
 
-  const prev = addDays(monday, -7);
-  const next = addDays(monday, 7);
+  // Las flechas avanzan un día o una semana. Si se ve de lunes a domingo, la dirección
+  // sigue siendo ?semana=; si no, ?desde= (siete días corridos desde ese día).
+  const hrefFrom = (d: string) => (step === "semana" && d === startOfWeek(d) ? `/plan?semana=${d}` : `/plan?desde=${d}`);
+  const n = step === "dia" ? 1 : 7;
+  const prev = hrefFrom(addDays(start, -n));
+  const next = hrefFrom(addDays(start, n));
+  const unit = step === "dia" ? "Día" : "Semana";
 
   return (
     <>
@@ -212,26 +243,51 @@ export function WeekView({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 lg:pt-5">
           <div className="flex items-center gap-1">
             <Link
-              href={`/plan?semana=${prev}`}
-              aria-label="Semana anterior"
-              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg hover:bg-surface-2"
+              href={prev}
+              aria-label={`${unit} anterior`}
+              title={`${unit} anterior`}
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
             >
               <CaretLeft size={18} />
             </Link>
-            <h2 className="display min-w-40 text-center text-[21px]">
-              {formatShort(monday)} al {formatShort(addDays(monday, 6))}
+            <h2 className="overflow-hidden text-center">
+              <span key={start} className={cx("display inline-block min-w-40 text-[21px]", slide)}>
+                {formatShort(days[0])} al {formatShort(days[6])}
+              </span>
             </h2>
             <Link
-              href={`/plan?semana=${next}`}
-              aria-label="Semana siguiente"
-              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg hover:bg-surface-2"
+              href={next}
+              aria-label={`${unit} siguiente`}
+              title={`${unit} siguiente`}
+              className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
             >
               <CaretRight size={18} />
             </Link>
           </div>
+          {/* Qué avanzan las flechas (se recuerda). */}
+          <div role="radiogroup" aria-label="Las flechas avanzan" className="inline-flex rounded-full bg-surface-2 p-1">
+            {(["dia", "semana"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={step === s}
+                onClick={() => setStep(s)}
+                className={cx(
+                  "h-8 rounded-full px-3 text-[13px] font-medium transition-colors",
+                  step === s ? "bg-raised text-fg shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)]" : "text-muted hover:text-fg",
+                )}
+              >
+                {s === "dia" ? "Día" : "Semana"}
+              </button>
+            ))}
+          </div>
           {!isThisWeek && (
-            <Link href="/plan" className="inline-flex min-h-11 items-center text-sm font-medium text-accent-fg hover:underline">
-              Esta semana
+            <Link
+              href={step === "dia" ? `/plan?desde=${today}` : "/plan"}
+              className="inline-flex min-h-11 items-center text-sm font-medium text-accent-fg hover:underline"
+            >
+              {step === "dia" ? "Hoy" : "Esta semana"}
             </Link>
           )}
           {work.length > 0 && (
@@ -253,7 +309,7 @@ export function WeekView({
 
         {/* Celular: tira de días + lista del día elegido */}
         <div className="lg:hidden">
-          <div className="grid grid-cols-7 gap-1 border-y border-line py-2 mb-5" role="tablist" aria-label="Días">
+          <div className={cx("grid grid-cols-7 gap-1 border-y border-line py-2 mb-5", slide)} role="tablist" aria-label="Días">
             {days.map((d) => {
               const active = d === selected;
               const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
@@ -318,11 +374,13 @@ export function WeekView({
           <div className="mb-3 flex justify-end">
             <ViewToggle view={view} onChange={setView} />
           </div>
-          {view === "lista" ? (
-            <BoardList {...boardProps} />
-          ) : (
-            <BoardHours {...boardProps} todoFolded={todoFolded} />
-          )}
+          <div className={slide}>
+            {view === "lista" ? (
+              <BoardList {...boardProps} />
+            ) : (
+              <BoardHours {...boardProps} todoFolded={todoFolded} />
+            )}
+          </div>
         </div>
       </main>
 
