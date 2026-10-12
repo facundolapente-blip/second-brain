@@ -2,6 +2,7 @@
 
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { useSaveOnDismiss } from "@/components/save-on-dismiss";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { deleteBlock, passToNextWeek, saveBlock, duplicateBlock } from "@/lib/offline/plan";
 import { ArrowArcRight, CopySimple } from "@phosphor-icons/react";
@@ -21,6 +22,8 @@ export const BlockSheet = forwardRef<
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<BlockDraft>({ date: "" });
   const [key, setKey] = useState(0);
+  // Cerrar la hoja (afuera, X, Escape, arrastrar) guarda lo cambiado: lo registra el formulario.
+  const dismiss = useRef<(() => void) | null>(null);
 
   useImperativeHandle(ref, () => ({
     open(d) {
@@ -31,9 +34,12 @@ export const BlockSheet = forwardRef<
   }));
 
   return (
-    <Sheet ref={sheet} title={draft.id ? "Editar bloque" : "Nuevo bloque"}>
+    <Sheet ref={sheet} title={draft.id ? "Editar bloque" : "Nuevo bloque"} onDismiss={() => dismiss.current?.()}>
       <BlockForm
         key={key}
+        registerDismiss={(fn) => {
+          dismiss.current = fn;
+        }}
         initial={draft}
         categories={categories}
         tasks={tasks}
@@ -48,13 +54,17 @@ function BlockForm({
   categories,
   tasks,
   onDone,
+  registerDismiss,
 }: {
   initial: BlockDraft;
   categories: CategoryDTO[];
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
   onDone: () => void;
+  registerDismiss: (fn: () => void) => void;
 }) {
   const [state, action, pending] = useActionState(safeForm(saveBlock), null);
+  const { form, onDismiss } = useSaveOnDismiss(state);
+  useEffect(() => registerDismiss(onDismiss));
   const [title, setTitle] = useState(initial.title ?? "");
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
   const [priority, setPriority] = useState(initial.priority ?? 0);
@@ -67,7 +77,7 @@ function BlockForm({
   const openTasks = tasks.filter((t) => t.status !== "done" || t.id === initial.taskId);
 
   return (
-    <form action={action} className="grid gap-5">
+    <form ref={form} action={action} className="grid gap-5">
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="categoryId" value={categoryId} />
 

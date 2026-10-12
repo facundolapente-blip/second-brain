@@ -3,6 +3,7 @@
 import { useNewIds } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { useSaveOnDismiss } from "@/components/save-on-dismiss";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { CalendarPlus, Check, Link as LinkIcon, PencilSimple, Plus, X, CopySimple } from "@phosphor-icons/react";
 import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask, duplicateTask } from "@/lib/offline/plan";
@@ -21,6 +22,8 @@ export const TaskSheet = forwardRef<
   const sheet = useRef<SheetHandle>(null);
   const [task, setTask] = useState<TaskDTO | undefined>();
   const [key, setKey] = useState(0);
+  // Cerrar la hoja (afuera, X, Escape, arrastrar) guarda lo cambiado: lo registra el formulario.
+  const dismiss = useRef<(() => void) | null>(null);
   useImperativeHandle(ref, () => ({
     open(t) {
       setTask(t);
@@ -29,10 +32,13 @@ export const TaskSheet = forwardRef<
     },
   }));
   return (
-    <Sheet ref={sheet} wide title={task ? "Editar tarea" : "Nueva tarea"}>
+    <Sheet ref={sheet} wide title={task ? "Editar tarea" : "Nueva tarea"} onDismiss={() => dismiss.current?.()}>
       <TaskForm
         key={key}
         task={task}
+        registerDismiss={(fn) => {
+          dismiss.current = fn;
+        }}
         categories={categories}
         onDone={() => sheet.current?.close()}
         onSchedule={(t) => {
@@ -49,13 +55,17 @@ function TaskForm({
   categories,
   onDone,
   onSchedule,
+  registerDismiss,
 }: {
   task?: TaskDTO;
   categories: CategoryDTO[];
   onDone: () => void;
   onSchedule: (t: TaskDTO) => void;
+  registerDismiss: (fn: () => void) => void;
 }) {
   const [state, action, pending] = useActionState(safeForm(saveTask), null);
+  const { form, onDismiss } = useSaveOnDismiss(state);
+  useEffect(() => registerDismiss(onDismiss));
   const [categoryId, setCategoryId] = useState(task?.categoryId ?? "");
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "todo");
   const [priority, setPriority] = useState(task?.priority ?? 1);
@@ -66,7 +76,7 @@ function TaskForm({
   }, [state]);
 
   return (
-    <form action={action} className="grid gap-5">
+    <form ref={form} action={action} className="grid gap-5">
       {task && <input type="hidden" name="id" value={task.id} />}
       <input type="hidden" name="categoryId" value={categoryId} />
 

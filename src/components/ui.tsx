@@ -168,8 +168,10 @@ export const Sheet = forwardRef<
     defaultOpen?: boolean;
     /** Más ancha en pantalla grande (formularios largos). */
     wide?: boolean;
+    /** Al cerrarla la persona (afuera, X, Escape, arrastrar), antes de cerrar: p. ej. guardar. No corre con `close()` del handle. */
+    onDismiss?: () => void;
   }
->(function Sheet({ title, children, onClose, defaultOpen, wide }, ref) {
+>(function Sheet({ title, children, onClose, defaultOpen, wide, onDismiss }, ref) {
   const dlg = useRef<HTMLDialogElement>(null);
   const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
@@ -198,6 +200,13 @@ export const Sheet = forwardRef<
       d.close();
       reset(d);
     }, 170);
+  }
+  /** Cierre pedido por la persona: primero `onDismiss` (si la hoja sigue abierta). */
+  function dismiss() {
+    const d = dlg.current;
+    if (!d?.open || d.classList.contains("closing")) return;
+    onDismiss?.();
+    close();
   }
   useImperativeHandle(ref, () => ({ open, close }));
   useEffect(() => {
@@ -228,6 +237,7 @@ export const Sheet = forwardRef<
       if (!g || !d) return;
       const fast = g.dy / Math.max(1, e.timeStamp - g.t) > 0.6;
       if (g.dy > 90 || (fast && g.dy > 24)) {
+        onDismiss?.();
         d.style.transition = "transform 170ms cubic-bezier(0.4, 0, 1, 1)";
         d.style.transform = "translateY(100%)";
         clearTimeout(closing.current);
@@ -249,13 +259,13 @@ export const Sheet = forwardRef<
       onClose={onClose}
       onCancel={(e) => {
         e.preventDefault();
-        close();
+        dismiss();
       }}
       onPointerDown={(e) => {
         downOnBackdrop.current = e.target === dlg.current;
       }}
       onClick={(e) => {
-        if (e.target === dlg.current && downOnBackdrop.current) close();
+        if (e.target === dlg.current && downOnBackdrop.current) dismiss();
         downOnBackdrop.current = false;
       }}
     >
@@ -265,7 +275,7 @@ export const Sheet = forwardRef<
         </div>
       <div className="flex items-center justify-between border-b border-line py-3 pr-3 pl-5 max-sm:pt-1.5">
         <h2 className="display truncate text-[22px]">{title}</h2>
-        <IconButton label="Cerrar" type="button" onClick={close}>
+        <IconButton label="Cerrar" type="button" onClick={dismiss}>
           <X size={18} />
         </IconButton>
       </div>
