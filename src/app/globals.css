@@ -481,7 +481,8 @@ dialog.sheet::backdrop {
 .prose-serif {
   font-family: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
   text-wrap: pretty;
-  hyphens: auto;
+  /* Sin cortar palabras con guion: la que no entra pasa entera al renglón siguiente. */
+  hyphens: manual;
 }
 
 /* Imprimir / guardar como PDF (Resumen del mes): sin menú ni botones, con los colores tal cual. */

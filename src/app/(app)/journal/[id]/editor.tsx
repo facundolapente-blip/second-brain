@@ -257,7 +257,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             }}
             placeholder="Título (opcional)"
             aria-label="Título"
-            className="display autogrow w-full resize-none bg-transparent text-[32px] leading-[1.12] text-balance outline-none! placeholder:text-faint lg:text-[40px]"
+            className="display autogrow w-full resize-none bg-transparent text-[32px] leading-[1.12] text-wrap outline-none! placeholder:text-faint lg:text-[40px]"
           />
           <textarea
             ref={bodyRef}
@@ -268,7 +268,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             }}
             placeholder="Contá cómo estuvo tu día."
             aria-label="Texto de la entrada"
-            className="prose-serif autogrow min-h-[50dvh] w-full resize-none bg-transparent text-[19px] leading-[1.75] text-fg outline-none! placeholder:text-faint lg:text-[21px]"
+            className="prose-serif autogrow min-h-[50dvh] w-full resize-none bg-transparent text-[19px] leading-[1.75] text-wrap! text-fg outline-none! placeholder:text-faint lg:text-[21px]"
           />
         </div>
 
