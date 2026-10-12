@@ -53,7 +53,7 @@ function groupsOf(visible: TaskDTO[], matching: TaskDTO[]) {
  * Muestra las primeras 6 y el resto con "Ver todas".
  */
 /** Vista y "Ver todas" del tablero: viven mientras la app está abierta (cambiar de semana no los pierde). */
-const savedBoard: { view: TaskView; all: boolean } = { view: "todo", all: false };
+const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths } = { view: "todo", all: false };
 
 export function TasksBoard({
   tasks,
@@ -84,6 +84,15 @@ export function TasksBoard({
   // La vista y "Ver todas" sobreviven al cambio de semana (la página vuelve a montar el tablero).
   const [view, setViewState] = useState<TaskView>(() => savedBoard.view);
   const [all, setAllState] = useState(() => savedBoard.all);
+  // Anchos de columna: uno solo para todas las vistas (se guardan al soltar y sobreviven al cambio de vista y de semana).
+  const [widths, setWidths] = useState<TaskColumnWidths>(() => savedBoard.widths ?? columns);
+  function resize(k: TaskColumnKey, w: number | null, save: boolean) {
+    const next = { ...widths };
+    if (w === null) delete next[k];
+    else next[k] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, w)));
+    setWidths(next);
+    if (save) quiet(saveTaskColumns(next));
+  }
   // Cambiar de vista: fundido corto (solo después de tocar, no al cargar).
   const [swapped, setSwapped] = useState(false);
   const setView = (v: TaskView) => {
@@ -94,7 +103,8 @@ export function TasksBoard({
   useEffect(() => {
     savedBoard.view = view;
     savedBoard.all = all;
-  }, [view, all]);
+    savedBoard.widths = widths;
+  }, [view, all, widths]);
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
@@ -211,7 +221,7 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} columns={columns} />
+          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} widths={widths} onResize={resize} />
           {/* Celular: la misma agrupación, con la fecha a la izquierda. */}
           <ul className="grid border-t border-line lg:hidden">
             {groups.map((g) => (
@@ -413,11 +423,13 @@ function TaskTable({
   onOpen,
   onMenu,
   fresh,
-  columns,
+  widths,
+  onResize: resize,
 }: {
   groups: ReturnType<typeof groupsOf>;
-  /** Anchos guardados; se cambian arrastrando el borde del encabezado. */
-  columns: TaskColumnWidths;
+  /** Anchos guardados (los mismos en todas las vistas); se cambian arrastrando el borde del encabezado. */
+  widths: TaskColumnWidths;
+  onResize: (k: TaskColumnKey, w: number | null, save: boolean) => void;
   /** Filas recién aparecidas: entran con un fundido. */
   fresh?: Set<string>;
   cats: Map<string, CategoryDTO>;
@@ -425,16 +437,8 @@ function TaskTable({
   onOpen: (t: TaskDTO) => void;
   onMenu: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
-  const [widths, setWidths] = useState<TaskColumnWidths>(columns);
   const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
   const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0) + TASK_PROGRESS_MIN;
-  function resize(k: TaskColumnKey, w: number | null, save: boolean) {
-    const next = { ...widths };
-    if (w === null) delete next[k];
-    else next[k] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, w)));
-    setWidths(next);
-    if (save) quiet(saveTaskColumns(next));
-  }
   // Orden de las columnas en pantalla: Progreso (sin ancho propio) va antes de Agendada.
   const cols = [...TASK_COLUMNS.slice(0, 5).map((c) => c.key), "progress" as const, "scheduled" as const];
   const head = (k: (typeof cols)[number]) =>

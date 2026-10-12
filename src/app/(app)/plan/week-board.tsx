@@ -230,8 +230,8 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
     setFolded(next);
     document.cookie = `${HOURS_TODO_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
   }
-  // La grilla arranca a las 6, o antes si algún bloque de estos días empieza más temprano.
-  const from = Math.min(FROM, ...days.flatMap((d) => byDay.get(d)!.filter((b) => b.startTime).map((b) => Math.floor(mins(b.startTime!) / 60))));
+  // La grilla arranca a las 6, o antes si algún bloque de estos días empieza más temprano (los "Libre" no cuentan).
+  const from = Math.min(FROM, ...days.flatMap((d) => byDay.get(d)!.filter((b) => b.startTime && !isFreeBlock(b)).map((b) => Math.floor(mins(b.startTime!) / 60))));
   const hours = Array.from({ length: TO - from }, (_, i) => from + i);
   // Minuto de inicio según la altura del puntero en la columna: el borde de arriba
   // de la tarjeta arrastrada (no el puntero), redondeado a 15 minutos.
@@ -262,10 +262,11 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
           <span className="sr-only">{folded ? "Mostrar pendientes" : "Plegar pendientes"}</span>
         </button>
         {days.map((d) => {
-          // Pendientes del día: primero los que faltan, después los hechos.
-          const untimed = byDay.get(d)!.filter((b) => !b.startTime);
+          // Pendientes del día: primero los que faltan, después los hechos. Un "Libre" sin hora
+          // no es un pendiente: en Por horas no se muestra (pedido de Facu; en Lista sigue).
+          const untimed = byDay.get(d)!.filter((b) => !b.startTime && !isFreeBlock(b));
           const todo = [...untimed.filter((b) => !b.done), ...untimed.filter((b) => b.done)];
-          const left = untimed.filter((b) => !b.done && !isFreeBlock(b)).length;
+          const left = untimed.filter((b) => !b.done).length;
           return (
             <div
               key={d}
