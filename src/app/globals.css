@@ -658,6 +658,8 @@ dialog.sheet::backdrop {
    invisible (fuera del Tab). Uso: <div class="fold" data-open> con un solo hijo. */
 .fold {
   display: grid;
+  /* minmax(0, 1fr): sin esto, algo ancho adentro (la tabla de tareas) estira la columna y la página. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 1fr;
   transition:
     grid-template-rows var(--dur-state) var(--ease-out),
@@ -666,6 +668,7 @@ dialog.sheet::backdrop {
 }
 .fold > * {
   min-height: 0;
+  min-width: 0;
   overflow: clip;
 }
 .fold[data-closed] {

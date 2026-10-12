@@ -37,7 +37,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
   }
 
   return (
-    <div className={cx("grid gap-1.5", className)}>
+    <div className={cx("grid grid-cols-1 gap-1.5", className)}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
