@@ -40,11 +40,19 @@ import { CategoryTag, PriorityTag } from "../plan/plan-ui";
 
 const WD = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-/** "$ 1,2 k" para que entre en una celda chica. */
+/** "$ 1,2 k" para que entre en una celda chica (un día con más reintegros que gastos, con "−"). */
 function compact(cents: number) {
-  const v = cents / 100;
-  if (v < 1000) return `$${Math.round(v)}`;
-  return `$${shortNumber(v)}`;
+  const sign = cents < 0 ? "−" : "";
+  const v = Math.abs(cents) / 100;
+  if (v < 1000) return `${sign}${Math.round(v)}`;
+  return `${sign}${shortNumber(v)}`;
+}
+
+/** "+12%", "−8%" o "Igual que" cuando no cambia (antes salía "−0%"). */
+function deltaLabel(delta: number, rest: string) {
+  const p = Math.round(delta * 100);
+  if (p === 0) return `Igual que ${rest}`;
+  return `${p > 0 ? "+" : "−"}${Math.abs(p)}% vs. ${rest}`;
 }
 
 function pct(a: number, b: number) {
@@ -109,7 +117,7 @@ export function InicioView({ d }: { d: Dashboard }) {
               sub={
                 delta === null
                   ? "Sin datos del mes anterior"
-                  : `${delta > 0 ? "+" : "−"}${Math.abs(Math.round(delta * 100))}% vs. ${prevName} a esta altura`
+                  : deltaLabel(delta, `${prevName} a esta altura`)
               }
             />
             <Kpi
@@ -117,8 +125,8 @@ export function InicioView({ d }: { d: Dashboard }) {
               icon={CalendarCheck}
               color="var(--c-plan)"
               label="Plan de la semana"
-              value={`${d.plan.weekDone} de ${d.plan.weekTotal}`}
-              sub={`${pct(d.plan.weekDone, d.plan.weekTotal)}% de los bloques hechos`}
+              value={d.plan.weekTotal ? `${d.plan.weekDone} de ${d.plan.weekTotal}` : "–"}
+              sub={d.plan.weekTotal ? `${pct(d.plan.weekDone, d.plan.weekTotal)}% de los bloques hechos` : "Sin bloques esta semana"}
             />
           </div>
         </section>
@@ -126,7 +134,9 @@ export function InicioView({ d }: { d: Dashboard }) {
         {/* Primero lo que se hace en el día; el check-in, que se completa una vez, después. */}
         <HabitsToday d={d} />
         <PlanToday d={d} />
-        <CheckinCard today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} />
+        {/* key: al cambiar de día (el Shell refresca sin desmontar) arranca de nuevo con
+            las fechas nuevas; lo pendiente se manda al desmontar, con su fecha vieja. */}
+        <CheckinCard key={d.today} today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} />
         <WeekMix d={d} />
         <GastosCard d={d} delta={delta} prevName={prevName} />
         <JournalCard d={d} />
@@ -163,15 +173,23 @@ function Summary({ d }: { d: Dashboard }) {
       (doneToday === dueToday
         ? `Completaste ${dueToday === 1 ? "el hábito" : `los ${dueToday} hábitos`} de hoy`
         : `Llevás ${doneToday} de ${dueToday} ${dueToday === 1 ? "hábito" : "hábitos"} de hoy`) +
-        (skipped ? ` (${skipped} salteados)` : ""),
+        (skipped ? ` (${skipped} ${skipped === 1 ? "salteado" : "salteados"})` : ""),
     );
   } else if (skipped) {
     parts.push(`Hoy salteaste ${skipped === 1 ? "el único hábito" : `los ${skipped} hábitos`}`);
   }
   const pending = d.plan.today.filter((b) => !b.done && !isFreeBlock(b)).length;
-  if (d.plan.today.length) parts.push(pending ? `te quedan ${pending} bloques en el plan` : "el plan de hoy está hecho");
+  if (d.plan.today.some((b) => !isFreeBlock(b)))
+    parts.push(pending ? `te ${pending === 1 ? "queda 1 bloque" : `quedan ${pending} bloques`} en el plan` : "el plan de hoy está hecho");
   const weekSpent = d.week.reduce((n, w) => n + w.spentCents, 0);
-  parts.push(`esta semana gastaste ${moneyCents(weekSpent)}`);
+  // Los reintegros restan: si superan a los gastos, decirlo (moneyCents no lleva signo).
+  parts.push(
+    weekSpent > 0
+      ? `esta semana gastaste ${moneyCents(weekSpent)}`
+      : weekSpent < 0
+        ? `esta semana los reintegros superaron a los gastos por ${moneyCents(weekSpent)}`
+        : "esta semana no gastaste nada",
+  );
   const s = parts.join(", ").replace(/, ([^,]*)$/, " y $1");
   return (
     <>
@@ -351,7 +369,7 @@ function PlanToday({ d }: { d: Dashboard }) {
         <div className="grid gap-1.5">
           <div className="flex items-baseline justify-between text-[13px] text-muted">
             <span>
-              <span className="figure text-[22px] text-fg">{doneN}</span> de {real.length} bloques hechos
+              <span className="figure text-[22px] text-fg">{doneN}</span> de {real.length} {real.length === 1 ? "bloque hecho" : "bloques hechos"}
             </span>
             <span className="tabular">{pct(doneN, real.length)}%</span>
           </div>
@@ -522,7 +540,7 @@ function WeekMix({ d }: { d: Dashboard }) {
       label: "Gastos",
       color: "var(--c-gastos)",
       href: "/gastos",
-      aria: (w) => `gastaste ${moneyCents(w.spentCents)}`,
+      aria: (w) => (w.spentCents < 0 ? `reintegros por ${moneyCents(w.spentCents)} más que gastos` : `gastaste ${moneyCents(w.spentCents)}`),
       cell: (w, future) =>
         future ? (
           <Dash />
@@ -531,7 +549,7 @@ function WeekMix({ d }: { d: Dashboard }) {
             <span className="flex h-9 w-3 items-end overflow-hidden rounded-full bg-surface-2">
               <span
                 className="w-full rounded-full bg-[var(--c-gastos)]"
-                style={{ height: `${w.spentCents ? Math.max(8, (w.spentCents / maxSpent) * 100) : 0}%` }}
+                style={{ height: `${w.spentCents > 0 ? Math.max(8, (w.spentCents / maxSpent) * 100) : 0}%` }}
               />
             </span>
             <span className="tabular text-[10.5px] text-muted">{w.spentCents ? compact(w.spentCents) : "$0"}</span>
@@ -683,11 +701,19 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
           <p
             className={cx(
               "mb-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-medium",
-              delta > 0 ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
+              Math.round(delta * 100) === 0
+                ? "bg-surface-2 text-muted"
+                : delta > 0
+                  ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]"
+                  : "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
             )}
           >
-            {delta > 0 ? <ArrowUpRight size={13} weight="bold" aria-hidden /> : <ArrowDownRight size={13} weight="bold" aria-hidden />}
-            {Math.abs(Math.round(delta * 100))}% vs. {prevName} al mismo día
+            {Math.round(delta * 100) === 0 ? null : delta > 0 ? (
+              <ArrowUpRight size={13} weight="bold" aria-hidden />
+            ) : (
+              <ArrowDownRight size={13} weight="bold" aria-hidden />
+            )}
+            {Math.round(delta * 100) === 0 ? `Igual que ${prevName} al mismo día` : `${Math.abs(Math.round(delta * 100))}% vs. ${prevName} al mismo día`}
           </p>
         )}
         <div className="mb-1 ml-auto text-right text-[13px] text-muted">
@@ -876,8 +902,8 @@ function JournalCard({ d }: { d: Dashboard }) {
     <Card title="Journal" href="/journal" hrefLabel="Entradas" color="var(--c-journal)" className="lg:col-span-5" i={5}>
       <div className="grid grid-cols-3 gap-2">
         <Stat value={j.streak} label={j.streak === 1 ? "día de racha" : "días de racha"} />
-        <Stat value={j.monthWritten} label="días este mes" />
-        <Stat value={j.total} label="días escritos" />
+        <Stat value={j.monthWritten} label={j.monthWritten === 1 ? "día este mes" : "días este mes"} />
+        <Stat value={j.total} label={j.total === 1 ? "día escrito" : "días escritos"} />
       </div>
       {j.last && (
         <Link
@@ -923,7 +949,8 @@ function Constancia({ d }: { d: Dashboard }) {
   const habitByDay = new Map(d.habits.history.map((h) => [h.date, h]));
   const wrote = new Set(d.journal.days);
   const weeks = Math.ceil((daysBetween(d.heatFrom, d.today) + 1) / 7);
-  const habitDays = d.habits.history.filter((h) => h.due > 0);
+  // Hoy, sin terminar, no baja el promedio: entra solo si ya está completo.
+  const habitDays = d.habits.history.filter((h) => h.due > 0 && (h.date < d.today || h.done >= h.due));
   const habitAvg = habitDays.length ? Math.round((habitDays.reduce((n, h) => n + h.done / h.due, 0) / habitDays.length) * 100) : 0;
   const wroteN = d.journal.days.length;
 

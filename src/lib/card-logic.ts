@@ -47,6 +47,8 @@ export type CardMove = {
   /** Pago a la tarjeta (transferencia que entra). */
   paymentCents: number;
   installment: boolean;
+  /** Ajuste de saldo: mueve la deuda pero no es una compra del resumen. */
+  adjustment?: boolean;
 };
 
 export type Statement = { from: string; closing: string; due: string; amountCents: number };
@@ -58,16 +60,20 @@ export type CardSummary = {
   /** Lo que se debe hoy (con las cuotas que faltan). */
   debtCents: number;
   limitCents: number | null;
-  /** El último resumen cerrado: cuánto fue, cuánto se pagó desde el cierre y cuánto falta. */
-  last: (Statement & { paidCents: number; leftCents: number }) | null;
-  /** El resumen en curso (cierra en el próximo cierre). */
+  /**
+   * El último resumen cerrado. `amountCents` = lo que se debía al cierre (con lo que quedó
+   * sin pagar de antes), `chargesCents` = lo comprado en ese período, `paidCents` = lo pagado
+   * desde el cierre y `leftCents` = lo que falta pagar.
+   */
+  last: (Statement & { chargesCents: number; paidCents: number; leftCents: number }) | null;
+  /** El resumen en curso (cierra en el próximo cierre): lo que se debe aparte del último resumen. */
   current: Statement | null;
   /** Cuotas que caen después del resumen en curso. */
   pending: { count: number; cents: number; lastDate: string | null };
 };
 
 const sumCharges = (moves: CardMove[], from: string, to: string) =>
-  moves.filter((m) => m.date > from && m.date <= to).reduce((n, m) => n + m.chargeCents, 0);
+  moves.filter((m) => !m.adjustment && m.date > from && m.date <= to).reduce((n, m) => n + m.chargeCents, 0);
 
 export function summarizeCard(
   card: { id: string; name: string; currency: string; balanceCents: number; closingDay: number | null; dueDay: number | null; limitCents: number | null },
@@ -90,18 +96,33 @@ export function summarizeCard(
       pending: { count: future.length, cents: future.reduce((n, m) => n + m.chargeCents, 0), lastDate: future.at(-1)?.date ?? null },
     };
   }
+  // La deuda al final de un día: el saldo de hoy (que ya tiene todo, también las cuotas
+  // futuras) sin lo que tiene fecha posterior. Los pagos hechos antes del cierre ya bajan
+  // la deuda de ese cierre, y lo que quedó sin pagar de un resumen viejo sigue en el nuevo.
+  const debtAt = (day: string) =>
+    Math.max(0, -(card.balanceCents - moves.filter((m) => m.date > day).reduce((n, m) => n + m.paymentCents - m.chargeCents, 0)));
   const due = card.dueDay ?? card.closingDay;
   const nextC = nextClosing(today, card.closingDay);
   const lastC = previousClosing(nextC, card.closingDay);
   const beforeC = previousClosing(lastC, card.closingDay);
-  const lastAmount = sumCharges(moves, beforeC, lastC);
+  const atClosing = debtAt(lastC);
   // Lo pagado después del último cierre (hasta hoy) va contra ese resumen.
   const paid = moves.filter((m) => m.date > lastC && m.date <= today).reduce((n, m) => n + m.paymentCents, 0);
+  const left = Math.max(0, Math.min(atClosing - paid, debtAt(today)));
   const future = moves.filter((m) => m.installment && m.date > nextC).sort((a, b) => a.date.localeCompare(b.date));
   return {
     ...base,
-    last: { from: addDays(beforeC, 1), closing: lastC, due: dueAfter(lastC, due), amountCents: lastAmount, paidCents: paid, leftCents: Math.max(0, lastAmount - paid) },
-    current: { from: addDays(lastC, 1), closing: nextC, due: dueAfter(nextC, due), amountCents: sumCharges(moves, lastC, nextC) },
+    last: {
+      from: addDays(beforeC, 1),
+      closing: lastC,
+      due: dueAfter(lastC, due),
+      amountCents: atClosing,
+      chargesCents: sumCharges(moves, beforeC, lastC),
+      paidCents: paid,
+      leftCents: left,
+    },
+    // Hasta el próximo cierre: una cuota que cae antes del cierre ya va en este resumen.
+    current: { from: addDays(lastC, 1), closing: nextC, due: dueAfter(nextC, due), amountCents: Math.max(0, debtAt(nextC) - left) },
     pending: { count: future.length, cents: future.reduce((n, m) => n + m.chargeCents, 0), lastDate: future.at(-1)?.date ?? null },
   };
 }

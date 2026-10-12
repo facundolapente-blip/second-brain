@@ -16,3 +16,6 @@ export const THEME_COOKIE = "sb_tema";
 export function themeFromCookie(v: string | undefined): Theme {
   return v === "oscuro" || v === "noche" ? "oscuro" : "claro";
 }
+
+/** Color de la barra del navegador / de estado para cada tema (el fondo de Inicio). */
+export const THEME_COLOR: Record<Theme, string> = { claro: "#eef2ec", oscuro: "#141413" };

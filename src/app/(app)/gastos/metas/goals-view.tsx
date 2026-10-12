@@ -64,7 +64,9 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
         ) : (
           <ul className="grid gap-3 lg:grid-cols-2">
             {active.map((g, i) => {
-              const pct = g.targetCents ? Math.min(100, Math.round((g.savedCents / g.targetCents) * 100)) : 0;
+              // Hacia abajo: 99,6% no es "100%" ni "¡Llegaste!" (eso solo con lo juntado completo).
+              const reached = g.targetCents > 0 && g.savedCents >= g.targetCents;
+              const pct = g.targetCents ? Math.min(100, Math.floor((g.savedCents / g.targetCents) * 100)) : 0;
               const monthly = perMonth(g, today);
               const acc = g.accountId ? accounts.find((a) => a.id === g.accountId) : null;
               const left = g.deadline ? diffDays(g.deadline, today) : null;
@@ -93,18 +95,18 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
                     <span className="h-2.5 overflow-hidden rounded-full bg-surface-3">
                       <span
                         className="bar-anim block h-full rounded-full transition-[width] duration-700"
-                        style={{ width: `${pct}%`, background: pct >= 100 ? "var(--st-done-line)" : "var(--accent)" }}
+                        style={{ width: `${pct}%`, background: reached ? "var(--st-done-line)" : "var(--accent)" }}
                       />
                     </span>
-                    <p className={cx("text-[13px]", pct >= 100 ? "text-[var(--st-done-fg)]" : "text-muted")}>
-                      {pct >= 100
+                    <p className={cx("text-[13px]", reached ? "text-[var(--st-done-fg)]" : "text-muted")}>
+                      {reached
                         ? "¡Llegaste!"
                         : monthly
                           ? `Te faltan ${moneyCents(g.targetCents - g.savedCents, g.currency)}: juntá ${moneyCents(monthly, g.currency)} por mes.`
                           : `Te faltan ${moneyCents(g.targetCents - g.savedCents, g.currency)}.`}
                     </p>
                   </div>
-                  {!g.accountId && pct < 100 && (
+                  {!g.accountId && !reached && (
                     <Button
                       size="sm"
                       variant="outline"

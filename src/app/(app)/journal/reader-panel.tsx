@@ -23,9 +23,9 @@ export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: 
   return (
     <article
       aria-label="Entrada elegida"
-      className="reveal rounded-2xl border border-line bg-surface"
+      className="reveal min-w-0 rounded-2xl border border-line bg-surface"
     >
-      <div className="flex items-center gap-2 border-b border-line py-2.5 pr-2.5 pl-7">
+      <div className="flex min-w-0 items-center gap-2 border-b border-line py-2.5 pr-2.5 pl-7">
         <p className="kicker min-w-0 flex-1 truncate">
           {entry.title ? formatLong(entry.date) : entry.date.slice(0, 4)}
           <span aria-hidden> · </span>
@@ -33,7 +33,7 @@ export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: 
         </p>
         <Link
           href={`/journal/${entry.id}`}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
         >
           <PencilSimple size={15} aria-hidden /> Editar
         </Link>
@@ -42,7 +42,7 @@ export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: 
           scroll={false}
           aria-label="Cerrar lectura"
           title="Cerrar lectura"
-          className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
+          className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
         >
           <X size={17} aria-hidden />
         </Link>

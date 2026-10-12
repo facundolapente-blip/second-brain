@@ -30,6 +30,11 @@ export type HabitRule = {
   startDate: string;
   /** Día en que arranca la semana para "X veces por semana": 1 = lunes, 0 = domingo. */
   weekStart: number;
+  /**
+   * Último día de una pista cerrada (solo en `trackRule`): después no toca nada y
+   * la última semana se prorratea con los días que tuvo.
+   */
+  trackEnd?: string;
 };
 
 /** `none` = el día solo tiene una nota, sin marca. */
@@ -57,7 +62,7 @@ export function frequencyLabel(h: Pick<HabitRule, "frequency" | "weekdays" | "ti
 
 /** ¿Se puede marcar ese día? En "X veces por semana" cualquier día vale. */
 export function isScheduled(h: HabitRule, iso: string): boolean {
-  if (iso < h.startDate) return false;
+  if (iso < h.startDate || (h.trackEnd !== undefined && iso > h.trackEnd)) return false;
   if (h.frequency === "weekdays") return h.weekdays.includes(weekday(iso));
   return true;
 }
@@ -85,23 +90,49 @@ export function weekDoneCount(h: HabitRule, logs: LogMap, iso: string): number {
 
 /**
  * Meta de una semana. Los salteados no la bajan (así lo hace HabitNow); la
- * semana en que arrancó el hábito exige como mucho los días que tuvo.
+ * semana en que arrancó el hábito (y la última de una pista cerrada) exige como
+ * mucho los días que tuvo.
  */
 function weekNeed(h: HabitRule, first: string): number {
   let available = 0;
-  for (let i = 0; i < 7; i++) if (addDays(first, i) >= h.startDate) available++;
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(first, i);
+    if (d >= h.startDate && (h.trackEnd === undefined || d <= h.trackEnd)) available++;
+  }
   return Math.min(h.timesPerWeek, available);
+}
+
+/** ¿La pista ya terminó para `today`? (Solo las cerradas tienen fin.) */
+function trackOver(h: HabitRule, today: string): boolean {
+  return h.trackEnd !== undefined && h.trackEnd < today;
+}
+
+/**
+ * En "X veces por semana": cuántas se hicieron en la semana del hábito que
+ * contiene a `iso` y cuál es la meta (la primera semana, prorrateada). null en
+ * los demás hábitos o antes de que empiece.
+ */
+export function weekProgress(h: HabitRule, logs: LogMap, iso: string): { done: number; need: number } | null {
+  if (h.frequency !== "weekly") return null;
+  const first = periodStart(h, iso);
+  const need = weekNeed(h, first);
+  if (need === 0) return null;
+  return { done: weekDoneCount(h, logs, first), need };
 }
 
 function weekMet(h: HabitRule, logs: LogMap, first: string): boolean {
   return weekDoneCount(h, logs, first) >= weekNeed(h, first);
 }
 
-/** Recorre las semanas del hábito, de la primera a la actual. */
+/**
+ * Recorre las semanas del hábito, de la primera a la actual (en una pista cerrada,
+ * hasta la de su último día, y ninguna queda "en curso").
+ */
 function* weeks(h: HabitRule, today: string) {
-  const current = periodStart(h, today);
-  for (let first = periodStart(h, h.startDate); first <= current; first = addDays(first, 7)) {
-    yield { first, current: first === current };
+  const over = trackOver(h, today);
+  const last = periodStart(h, over ? h.trackEnd! : today);
+  for (let first = periodStart(h, h.startDate); first <= last; first = addDays(first, 7)) {
+    yield { first, current: !over && first === last };
   }
 }
 
@@ -129,8 +160,11 @@ export function dayProgress(habits: (HabitRule & { id: string })[], logs: Record
     if (iso < h.startDate || !showsOn(h, l, iso)) continue;
     // Un salteado no cuenta (como en HabitNow): si no, nunca se llega a "Día completo".
     if (l[iso]?.s === "skipped") continue;
+    const state = dayState(h, l, iso, today);
+    // Un fallado en una semana que igual llegó a la meta ("missed"): ese día no hacía falta.
+    if (state === "missed") continue;
     total++;
-    if (dayState(h, l, iso, today) === "done") done++;
+    if (state === "done") done++;
   }
   return { done, total };
 }
@@ -157,8 +191,8 @@ export function dayState(h: HabitRule, logs: LogMap, iso: string, today: string)
   if (weekly) {
     const first = periodStart(h, iso);
     if (weekMet(h, logs, first)) return "idle";
-    // Un día sin marcar solo cuenta como falla cuando la semana ya terminó.
-    if (addDays(first, 6) >= today) return iso === today ? "pending" : "idle";
+    // Un día sin marcar solo cuenta como falla cuando la semana (o la pista) ya terminó.
+    if (addDays(first, 6) >= today && !trackOver(h, today)) return iso === today ? "pending" : "idle";
     return "unmarked";
   }
   return iso === today ? "pending" : "unmarked";
@@ -175,8 +209,9 @@ export function dayState(h: HabitRule, logs: LogMap, iso: string, today: string)
 export function currentStreak(h: HabitRule, logs: LogMap, today: string): number {
   if (h.frequency === "weekly") {
     let n = 0;
-    let first = periodStart(h, today);
-    let isCurrent = true;
+    const over = trackOver(h, today);
+    let first = periodStart(h, over ? h.trackEnd! : today);
+    let isCurrent = !over;
     while (addDays(first, 6) >= h.startDate) {
       if (weekMet(h, logs, first)) n++;
       else if (!isCurrent) break;
@@ -233,6 +268,14 @@ export function habitScore(h: HabitRule, logs: LogMap, today: string): number {
   return den === 0 ? 0 : Math.round((num / den) * 100);
 }
 
+/**
+ * ¿El puntaje ya mide algo? (Días o semanas que cuentan.) Un hábito creado hoy
+ * sin hacer tiene 0 sin haber fallado nada: no entra en promedios.
+ */
+export function hasScore(h: HabitRule, logs: LogMap, today: string): boolean {
+  return scoreParts(h, logs, today).den > 0;
+}
+
 function scoreParts(h: HabitRule, logs: LogMap, today: string) {
   let num = 0;
   let den = 0;
@@ -285,6 +328,8 @@ export function periodSummary(h: HabitRule, logs: LogMap, today: string) {
   if (h.frequency === "weekly") {
     for (const w of weeks(h, today)) {
       if (weekNeed(h, w.first) === 0) continue;
+      // Un hábito que todavía no empezó (arranca más adelante esta semana) no tiene semanas.
+      if (h.startDate > today) continue;
       // Como HabitNow: la semana en curso sin completar ya cuenta como incompleta.
       if (weekMet(h, logs, w.first)) achieved++;
       else missed++;
@@ -346,7 +391,15 @@ function pick(logs: LogMap, from: string, to: string | null): LogMap {
 }
 
 function trackRule(h: HabitRule, t: PastTrack): HabitRule {
-  return { ...h, ...t };
+  return { ...h, ...t, trackEnd: t.endDate };
+}
+
+/**
+ * Una pista cerrada se evalúa como si "hoy" fuera el día siguiente a su fin: el
+ * último día (o semana) ya terminó, no queda en curso.
+ */
+function afterEnd(t: PastTrack) {
+  return addDays(t.endDate, 1);
 }
 
 /** Estadísticas de la pista actual, de una vieja o de todas juntas. */
@@ -374,29 +427,30 @@ export function trackStats(
     const t = tracks[view];
     const r = trackRule(h, t);
     const logs = pick(allLogs, t.startDate, t.endDate);
+    const end = afterEnd(t);
     return {
-      score: habitScore(r, logs, t.endDate),
-      streak: currentStreak(r, logs, t.endDate),
-      best: bestStreak(r, logs, t.endDate),
+      score: habitScore(r, logs, end),
+      streak: currentStreak(r, logs, end),
+      best: bestStreak(r, logs, end),
       counts: doneCounts(r, logs, today),
-      periods: periodSummary(r, logs, t.endDate),
+      periods: periodSummary(r, logs, end),
       logs,
-      stateOf: (iso) => (iso > t.endDate ? "idle" : dayState(r, logs, iso, t.endDate)),
+      stateOf: (iso) => (iso > t.endDate ? "idle" : dayState(r, logs, iso, end)),
       from: t.startDate,
     };
   }
 
   // Todas: cada pista se evalúa con su propia configuración y se suman.
   const parts = [
-    ...tracks.map((t) => ({ r: trackRule(h, t), end: t.endDate })),
-    { r: h, end: today },
+    ...tracks.map((t) => ({ r: trackRule(h, t), end: afterEnd(t), last: t.endDate })),
+    { r: h, end: today, last: null },
   ];
   let num = 0;
   let den = 0;
   let best = 0;
   const periods = { achieved: 0, missed: 0 };
-  for (const { r, end } of parts) {
-    const logs = pick(allLogs, r.startDate, end);
+  for (const { r, end, last } of parts) {
+    const logs = pick(allLogs, r.startDate, last);
     const sp = scoreParts(r, logs, end);
     num += sp.num;
     den += sp.den;
@@ -417,7 +471,7 @@ export function trackStats(
       if (iso >= h.startDate) return dayState(h, current, iso, today);
       const t = tracks.find((x) => iso >= x.startDate && iso <= x.endDate);
       if (!t) return "before";
-      return dayState(trackRule(h, t), pick(allLogs, t.startDate, t.endDate), iso, t.endDate);
+      return dayState(trackRule(h, t), pick(allLogs, t.startDate, t.endDate), iso, afterEnd(t));
     },
     from: tracks[0]?.startDate ?? h.startDate,
   };
@@ -502,4 +556,39 @@ export function cleanDays(h: Pick<HabitRule, "startDate">, logs: LogMap, today: 
   }
   const current = Math.max(0, diffDaysUtc(today, from) + (from <= today ? 1 : 0));
   return { current, best: Math.max(best, current) };
+}
+
+// ─── Cifras de un día fuera de Hábitos ──────────────────────────────────────
+
+/**
+ * Cómo cuenta un hábito en las cifras de un día (Inicio, Revisión, Análisis,
+ * resúmenes): la misma regla de `dayProgress` (lo que muestra la lista de Hoy,
+ * sin salteados), de a un hábito, así todas las pantallas dan lo mismo.
+ *  - done    hecho
+ *  - open    toca y todavía se puede hacer: hoy sin marcar, o un "X veces por
+ *            semana" en una semana que no terminó (cuenta como no hecho, pero no
+ *            es un "no" todavía)
+ *  - missed  tocaba y no se hizo
+ *  - null    no cuenta ese día
+ * Un hábito archivado cuenta hasta el día antes de archivarse (ese día, solo si
+ * quedó marcado y ya pasó), con sus números congelados ahí.
+ */
+export type HabitDayMark = "done" | "open" | "missed";
+
+export function habitDayMark(
+  h: HabitRule & { id: string; archivedOn?: string | null },
+  logs: LogMap,
+  iso: string,
+  today: string,
+): HabitDayMark | null {
+  const archived = h.archivedOn ?? null;
+  if (archived && (iso > archived || (iso === archived && (!logs[iso] || iso >= today)))) return null;
+  const now = archived && archived < today ? archived : today;
+  const { done, total } = dayProgress([h], { [h.id]: logs }, iso, now);
+  if (!total) return null;
+  if (done) return "done";
+  if (archived || logs[iso]?.s === "failed") return "missed";
+  if (iso >= now) return "open";
+  if (h.frequency === "weekly" && addDays(periodStart(h, iso), 6) >= now) return "open";
+  return "missed";
 }

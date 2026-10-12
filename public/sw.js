@@ -3,10 +3,18 @@
  * - Archivos de la app (/_next/static, íconos): primero la copia guardada (no cambian).
  * - Páginas y datos de la app: primero la red; si no hay señal, la última copia.
  * Nunca guarda nada de /api ni de /login.
+ * Al activar una VERSION nueva se borran las cachés de las anteriores; además la
+ * de archivos tiene tope (MAX_STATIC), porque cada publicación agrega archivos.
  */
-const VERSION = "sb-v2";
+const VERSION = "sb-v3";
 /** Cuántas pantallas guardadas como máximo (las más viejas se van). */
 const MAX_PAGES = 80;
+/**
+ * Cuántos archivos de la app como máximo. Cada versión publicada trae archivos
+ * nuevos (con otro nombre) y VERSION no cambia en cada publicación: sin tope la
+ * caché crecía para siempre. Se van los que hace más que no se usan.
+ */
+const MAX_STATIC = 400;
 const STATIC = `static-${VERSION}`;
 /** Fotos que llegan por "Compartir" hasta que /compartir las sube (sin versión: la lee la página). */
 const SHARE = "compartido";
@@ -43,9 +51,21 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.open(STATIC).then(async (cache) => {
         const hit = await cache.match(req);
-        if (hit) return hit;
+        if (hit) {
+          // Se vuelve a poner al final (una vez por arranque del service worker):
+          // así el tope saca primero lo que ya no usa ninguna pantalla.
+          if (!touched.has(req.url)) {
+            touched.add(req.url);
+            const copy = hit.clone();
+            event.waitUntil(cache.delete(req).then(() => cache.put(req, copy)));
+          }
+          return hit;
+        }
         const res = await fetch(req);
-        if (res.ok) cache.put(req, res.clone());
+        if (res.ok) {
+          touched.add(req.url);
+          event.waitUntil(cache.put(req, res.clone()).then(() => trim(cache, MAX_STATIC)));
+        }
         return res;
       }),
     );
@@ -63,7 +83,7 @@ self.addEventListener("fetch", (event) => {
         const res = await fetch(req);
         // Solo se guardan respuestas buenas que no terminaron en el login.
         if (res.ok && !res.redirected) {
-          event.waitUntil(cache.put(req, res.clone()).then(() => trim(cache)));
+          event.waitUntil(cache.put(req, res.clone()).then(() => trim(cache, MAX_PAGES)));
         }
         return res;
       } catch {
@@ -84,9 +104,13 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-async function trim(cache) {
+/** Archivos de la app ya re-ubicados al final de la caché en este arranque. */
+const touched = new Set();
+
+/** Deja como mucho `max` entradas (las primeras de la lista son las más viejas). */
+async function trim(cache, max) {
   const keys = await cache.keys();
-  for (let i = 0; i < keys.length - MAX_PAGES; i++) await cache.delete(keys[i]);
+  for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
 /** Guarda las fotos compartidas y abre /compartir con el texto en la URL. */

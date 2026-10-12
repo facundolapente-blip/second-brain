@@ -66,6 +66,11 @@ const dateFmt = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo
 const dayFmt = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", weekday: "long", day: "numeric", month: "long" });
 const when = (iso: string) => dateFmt.format(new Date(iso)).replace(".", "");
 const daysLeft = (iso: string) => Math.max(0, 30 - Math.floor((Date.now() - Date.parse(iso)) / 86_400_000));
+/** "se va en 3 días", "se va en 1 día", "se va hoy". */
+function leavesIn(iso: string) {
+  const n = daysLeft(iso);
+  return n === 0 ? "se va hoy" : n === 1 ? "se va en 1 día" : `se va en ${n} días`;
+}
 
 /** Historial de toda la app: la papelera (lo borrado, para restaurar) y la actividad. */
 export function HistoryLog({
@@ -179,14 +184,15 @@ export function HistoryLog({
                   <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
                     <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: MODULE_COLOR[t.module] }} />
                     <span className="grid min-w-0 flex-1">
-                      <span className="truncate text-[14.5px] font-medium">{t.label}</span>
+                      <span className="line-clamp-2 text-[14.5px] font-medium break-words" title={t.label}>{t.label}</span>
                       <span className="text-[12px] text-muted">
-                        {KIND[t.kind] ?? t.kind} · borrado {when(t.deletedAt)} · se va en {daysLeft(t.deletedAt)} días
+                        {KIND[t.kind] ?? t.kind} · borrado {when(t.deletedAt)} · {leavesIn(t.deletedAt)}
                       </span>
                     </span>
-                    <span className="flex gap-1.5">
-                      <Button size="sm" disabled={pending} onClick={() => restore(t)}>
-                        <ArrowCounterClockwise size={14} aria-hidden /> Restaurar
+                    <span className="flex shrink-0 gap-1.5">
+                      {/* En el celular, solo el ícono: con el texto, el nombre quedaba en diez letras. */}
+                      <Button size="sm" disabled={pending} onClick={() => restore(t)} aria-label={`Restaurar ${t.label}`} title="Restaurar" className="max-sm:w-9 max-sm:px-0">
+                        <ArrowCounterClockwise size={14} aria-hidden /> <span className="max-sm:hidden">Restaurar</span>
                       </Button>
                       <ConfirmButton confirmLabel="¿Seguro?" onConfirm={() => start(() => purgeItem(t.id))}>
                         <TrashSimple size={14} aria-hidden />

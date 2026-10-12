@@ -177,7 +177,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
                       key={m.value}
                       style={{ ...tone(m.color), flexGrow: s.moodCounts[i] }}
                       className="bg-tone-solid"
-                      title={`${m.label}: ${s.moodCounts[i]}`}
+                      title={`${m.label}: ${days(s.moodCounts[i])}`}
                     />
                   ) : null,
                 )}
@@ -226,8 +226,8 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
                 <span className="kicker">palabras</span>
                 <span className="mt-3 flex items-center gap-2 font-serif text-[18px]">
                   <span className="min-w-0 flex-1 truncate first-letter:uppercase">
+                    {/* formatLong ya trae el año cuando no es el actual. */}
                     {s.longest.title || formatLong(s.longest.date)}
-                    {!s.longest.title && ` de ${s.longest.date.slice(0, 4)}`}
                   </span>
                   <ArrowRight size={16} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
                 </span>

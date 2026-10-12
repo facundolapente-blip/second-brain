@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
-import { addDays, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
+import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
 
@@ -44,8 +44,9 @@ export async function writeOnDay(date?: string, nueva = false) {
   await exigirSesion();
   const day = isISODate(date) ? date : todayISO();
   if (!nueva) {
+    // La reflexión semanal no es "la entrada del día": "Escribir hoy" no la abre.
     const existing = await prisma.journalEntry.findFirst({
-      where: { date: toDbDate(day) },
+      where: { date: toDbDate(day), NOT: { tags: { has: REVIEW_TAG } } },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
@@ -82,15 +83,26 @@ export async function saveEntry(id: string, input: EntryInput): Promise<SaveResu
     return { ok: false, error: "El texto es demasiado largo." };
   }
   const title = typeof input.title === "string" ? input.title.trim().slice(0, TITLE_MAX) || null : null;
+  // Un texto de puros espacios es una entrada vacía: se guarda "" para que el
+  // criterio de la base (`NOT_EMPTY`, `limpiarVacias`) la vea vacía. El texto normal no se recorta.
+  const body = input.body.trim() ? input.body : "";
   const mood = isMood(input.mood) ? input.mood : null;
   try {
-    const prev = await prisma.journalEntry.findUnique({ where: { id }, select: { mood: true } });
+    const prev = await prisma.journalEntry.findUnique({ where: { id }, select: { mood: true, date: true } });
     const e = await prisma.journalEntry.update({
       where: { id },
-      data: { date: toDbDate(input.date), title, body: input.body, mood, tags: normalizeTags(input.tags) },
+      data: { date: toDbDate(input.date), title, body, mood, tags: normalizeTags(input.tags) },
       select: { updatedAt: true },
     });
-    if (prev && prev.mood !== mood) await syncCheckinMood(input.date, prev.mood, mood);
+    if (prev) {
+      const prevDate = fromDbDate(prev.date);
+      if (prevDate !== input.date) {
+        // Cambió de día: el ánimo se va con la entrada (uno solo por día).
+        await moveCheckinMood(id, prevDate, input.date, prev.mood, mood);
+      } else if (prev.mood !== mood) {
+        await syncCheckinMood(input.date, prev.mood, mood);
+      }
+    }
     refrescar();
     return { ok: true, savedAt: e.updatedAt.toISOString() };
   } catch (e) {
@@ -107,15 +119,41 @@ async function syncCheckinMood(date: string, prev: number | null, mood: number |
   if (date > todayISO()) return;
   const d = toDbDate(date);
   if (mood === null) {
-    if (prev !== null) {
-      await prisma.dailyCheckin.updateMany({ where: { date: d, mood: prev }, data: { mood: null } });
-      // Si el check-in quedó sin ningún dato, sobra (si no, contaría como check-in cargado).
-      await prisma.dailyCheckin.deleteMany({
-        where: { date: d, mood: null, energy: null, stress: null, sleepMin: null, weightG: null, steps: null, note: null },
-      });
-    }
+    if (prev !== null) await clearCheckinMood(d, prev);
   } else {
     await prisma.dailyCheckin.upsert({ where: { date: d }, create: { date: d, mood }, update: { mood } });
+  }
+  revalidatePath("/");
+}
+
+/** Saca el ánimo del check-in de ese día si era ese; si el check-in queda sin ningún dato, sobra. */
+async function clearCheckinMood(d: Date, mood: number) {
+  await prisma.dailyCheckin.updateMany({ where: { date: d, mood }, data: { mood: null } });
+  // Si el check-in quedó sin ningún dato, sobra (si no, contaría como check-in cargado).
+  await prisma.dailyCheckin.deleteMany({
+    where: { date: d, mood: null, energy: null, stress: null, sleepMin: null, weightG: null, steps: null, note: null },
+  });
+}
+
+/**
+ * La entrada pasó de `from` a `to`: el día viejo pierde el ánimo del check-in
+ * solo si era el de esta entrada y no queda otra entrada ese día con el mismo;
+ * el día nuevo lo toma si su check-in no tenía ánimo.
+ */
+async function moveCheckinMood(id: string, from: string, to: string, prevMood: number | null, mood: number | null) {
+  const today = todayISO();
+  if (prevMood !== null && from <= today) {
+    const other = await prisma.journalEntry.findFirst({
+      where: { date: toDbDate(from), mood: prevMood, id: { not: id } },
+      select: { id: true },
+    });
+    if (!other) await clearCheckinMood(toDbDate(from), prevMood);
+  }
+  if (mood !== null && to <= today) {
+    const d = toDbDate(to);
+    const checkin = await prisma.dailyCheckin.findUnique({ where: { date: d }, select: { mood: true } });
+    if (!checkin) await prisma.dailyCheckin.create({ data: { date: d, mood } });
+    else if (checkin.mood === null) await prisma.dailyCheckin.update({ where: { date: d }, data: { mood } });
   }
   revalidatePath("/");
 }
@@ -128,7 +166,10 @@ export async function shareToJournal(text: string): Promise<{ id: string }> {
   await exigirSesion();
   const day = todayISO();
   const clean = String(text ?? "").trim().slice(0, 5000);
-  const existing = await prisma.journalEntry.findFirst({ where: { date: toDbDate(day) }, orderBy: { createdAt: "asc" } });
+  const existing = await prisma.journalEntry.findFirst({
+    where: { date: toDbDate(day), NOT: { tags: { has: REVIEW_TAG } } },
+    orderBy: { createdAt: "asc" },
+  });
   if (existing) {
     if (clean) {
       const body = existing.body.trim() ? `${existing.body.trimEnd()}
@@ -159,12 +200,16 @@ export async function discardIfEmpty(id: string) {
   }
 }
 
-export async function deleteEntry(id: string) {
+/**
+ * Manda la entrada a la papelera. No redirige: el editor avisa "Entrada borrada ·
+ * Deshacer" recién cuando terminó (si no, un Deshacer rápido restauraba otra cosa) y vuelve solo.
+ */
+export async function deleteEntry(id: string): Promise<{ ok: true }> {
   await exigirSesion();
   if (!validId(id)) throw new Error("Entrada inválida");
   await trashAndDelete("journal", id);
   refrescar();
-  redirect("/journal");
+  return { ok: true };
 }
 
 /**
@@ -176,8 +221,10 @@ export async function writeWeeklyReview(monday: string) {
   if (!isISODate(monday)) throw new Error("Fecha inválida");
   const sunday = addDays(startOfWeek(monday), 6);
   const existing = await prisma.journalEntry.findFirst({
-    where: { tags: { has: REVIEW_TAG }, date: { gte: toDbDate(startOfWeek(monday)), lte: toDbDate(addDays(sunday, 1)) } },
+    // Solo de lunes a domingo (la del lunes siguiente es de esa otra semana).
+    where: { tags: { has: REVIEW_TAG }, date: { gte: toDbDate(startOfWeek(monday)), lte: toDbDate(sunday) } },
     select: { id: true },
+    orderBy: { createdAt: "asc" },
   });
   if (existing) redirect(`/journal/${existing.id}`);
   // Si la semana todavía no terminó, la reflexión queda en hoy.

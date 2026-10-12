@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowBendUpRight, Check, X } from "@phosphor-icons/react";
-import { dayState, nextStatus, type LogMap } from "@/lib/habit-logic";
+import { dayState, nextStatus, periodStart, weekProgress, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { HabitDTO } from "@/lib/habits";
 import { Sortable, SortableItem } from "@/components/sortable";
@@ -82,8 +82,9 @@ export function HabitDayRows({
                       </span>
                     )}
                   </span>
-                  <span>
+                  <span className="flex min-w-0 items-center gap-2">
                     <HabitBadge habit={h} compact />
+                    <WeekCount habit={h} logs={hLogs} day={day} today={today} />
                   </span>
                 </span>
               </button>
@@ -101,6 +102,18 @@ export function HabitDayRows({
         })}
       </ul>
     </Sortable>
+  );
+}
+
+/** "2/4 esta semana" en los "X veces por semana": hechas en la semana del hábito sobre la meta. */
+export function WeekCount({ habit, logs, day, today, className }: { habit: HabitDTO; logs: LogMap; day: string; today: string; className?: string }) {
+  const wp = weekProgress(habit, logs, day);
+  if (!wp) return null;
+  const thisWeek = periodStart(habit, day) === periodStart(habit, today);
+  return (
+    <span className={cx("tabular min-w-0 truncate font-mono text-[11px] leading-none text-muted lg:text-[12px]", className)}>
+      {wp.done}/{wp.need} {thisWeek ? "esta semana" : "esa semana"}
+    </span>
   );
 }
 

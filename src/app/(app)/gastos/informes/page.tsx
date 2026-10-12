@@ -1,5 +1,6 @@
 import { shiftMonth, todayISO } from "@/lib/dates";
-import { getAccounts, getCategories, getFlowRows } from "@/lib/finance";
+import { getAccounts, getCategories, getFlowRows, getReportRate } from "@/lib/finance";
+import { getRates } from "@/lib/fx";
 import { periodFromParams } from "@/lib/finance-logic";
 import { ReportsView } from "./reports-view";
 
@@ -19,10 +20,12 @@ export default async function InformesPage({ searchParams }: PageProps<"/gastos/
     ? Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`)
     : Array.from({ length: SPAN }, (_, i) => shiftMonth(month, i - SPAN + 1));
   const fromMonth = year ? `${Number(year) - 1}-01` : months[0];
-  const [accounts, categories, rows] = await Promise.all([
+  const [accounts, categories, rows, reportRate, rates] = await Promise.all([
     getAccounts(),
     getCategories(),
     getFlowRows(fromMonth, months[months.length - 1]),
+    getReportRate(),
+    getRates(),
   ]);
   return (
     <ReportsView
@@ -33,6 +36,8 @@ export default async function InformesPage({ searchParams }: PageProps<"/gastos/
       accounts={accounts}
       categories={categories}
       rows={rows}
+      reportRate={reportRate}
+      todayRates={rates.toUyu}
     />
   );
 }

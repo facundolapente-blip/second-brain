@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { addDays, formatLong, startOfWeek, weekday } from "@/lib/dates";
-import { currentStreak, dayProgress, habitScore, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
+import { currentStreak, dayProgress, habitScore, hasScore, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { HabitDTO } from "@/lib/habits";
 import { cx } from "@/components/ui";
@@ -35,7 +35,8 @@ export function TodayPanel({
     .sort((a, b) => b.n - a.n || a.h.name.localeCompare(b.h.name, "es"))
     .slice(0, 5);
 
-  const scores = habits.map((h) => habitScore(h, logs[h.id] ?? {}, today));
+  // Solo los que ya tienen días (o semanas) que cuenten: uno creado hoy no baja el promedio.
+  const scores = habits.filter((h) => hasScore(h, logs[h.id] ?? {}, today)).map((h) => habitScore(h, logs[h.id] ?? {}, today));
   const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
 
   return (

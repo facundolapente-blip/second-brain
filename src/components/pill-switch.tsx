@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { cx } from "./ui";
+import { cx, radioKeyTarget } from "./ui";
 
 /**
  * Selector en píldora (dos a cuatro opciones del mismo ancho) con una marca que
  * se desliza a la opción elegida, como `Segmented` pero redondo. Con `hrefOf`
  * cada opción es un enlace (cambia la dirección) y la marca se mueve al tocar,
- * sin esperar a que llegue la página nueva.
+ * sin esperar a que llegue la página nueva. Teclado de grupo de radios: Tab entra
+ * solo a lo elegido y las flechas cambian la opción (con enlaces, navegan).
  */
 export function PillSwitch<T extends string>({
   label,
@@ -42,10 +44,21 @@ export function PillSwitch<T extends string>({
     setFrom(value);
     setPicked(null);
   }
+  const router = useRouter();
   const current = picked ?? value;
   const index = Math.max(0, options.findIndex((o) => o.value === current));
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const to = radioKeyTarget(e, index, options.length);
+    if (to === null) return;
+    const v = options[to].value;
+    if (hrefOf) {
+      setPicked(v);
+      router.push(hrefOf(v), { scroll: false });
+    } else onChange?.(v);
+    e.currentTarget.querySelectorAll<HTMLElement>("[role=radio]")[to]?.focus();
+  }
   return (
-    <div role="radiogroup" aria-label={label} className={cx("relative inline-grid auto-cols-fr grid-flow-col rounded-full p-1", track, className)}>
+    <div role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className={cx("relative inline-grid auto-cols-fr grid-flow-col rounded-full p-1", track, className)}>
       <span
         aria-hidden
         className={cx(
@@ -58,11 +71,11 @@ export function PillSwitch<T extends string>({
         const active = current === o.value;
         const cls = cx("relative z-[1] inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-colors duration-[var(--dur-quick)]", item, active ? on : off);
         return hrefOf ? (
-          <Link key={o.value} href={hrefOf(o.value)} role="radio" aria-checked={active} onClick={() => setPicked(o.value)} className={cls} scroll={false}>
+          <Link key={o.value} href={hrefOf(o.value)} role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => setPicked(o.value)} className={cls} scroll={false}>
             {o.label}
           </Link>
         ) : (
-          <button key={o.value} type="button" role="radio" aria-checked={active} onClick={() => onChange?.(o.value)} className={cls}>
+          <button key={o.value} type="button" role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => onChange?.(o.value)} className={cls}>
             {o.label}
           </button>
         );

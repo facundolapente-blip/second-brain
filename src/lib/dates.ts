@@ -23,8 +23,14 @@ export function dayOfInstant(d: Date): string {
   return isoFmt.format(d);
 }
 
+/**
+ * Día real YYYY-MM-DD. Hace ida y vuelta: `Date.parse("2026-02-30")` es válido en V8
+ * (lo corre al 2 de marzo), y con eso `/plan?desde=2026-02-30` rompía la pantalla.
+ */
 export function isISODate(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00.000Z`);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
 export function toDbDate(iso: string): Date {

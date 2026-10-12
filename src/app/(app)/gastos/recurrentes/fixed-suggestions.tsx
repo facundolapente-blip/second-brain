@@ -49,7 +49,7 @@ export function FixedSuggestions({
                 <CategoryAvatar category={lk.category(s.categoryId)} />
                 <span className="grid min-w-0">
                   <span className="truncate text-[14.5px] font-medium">{s.title}</span>
-                  <span className="truncate text-[12.5px] text-muted">
+                  <span className="text-[12.5px] text-pretty text-muted">
                     {moneyCents(s.amountCents, account?.currency ?? "UYU")} · cerca del día {s.day} · {s.months} meses
                     {account ? ` · ${account.name}` : ""} · último {formatShort(s.lastDate)}
                   </span>

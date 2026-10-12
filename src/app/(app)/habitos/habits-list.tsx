@@ -32,8 +32,9 @@ import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
 import { DayCircle, DaySheet, HabitBadge, useDayTap, useHabitLogs, useHabitOrder, type DaySheetHandle, type MarkFn } from "./habit-ui";
 import { Sortable, SortableItem } from "@/components/sortable";
-import { HabitForm, type HabitFormHandle } from "./habit-form";
+import { HabitForm, hasMarks, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
+import { WeekCount } from "./day-rows";
 
 export function HabitsList({
   habits,
@@ -180,7 +181,7 @@ export function HabitsList({
               today={today}
               mark={mark}
               onDetail={(habit, date) => daySheet.current?.show(habit, date)}
-              onEdit={() => form.current?.edit(h)}
+              onEdit={() => form.current?.edit(h, hasMarks(logs[h.id], h.startDate))}
             />
             </SortableItem>
           ))}
@@ -226,8 +227,9 @@ function HabitCard({
       <div className="flex items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1">
           <h2 className="display truncate text-[19px] lg:text-[22px]">{habit.name}</h2>
-          <span>
+          <span className="flex min-w-0 items-center gap-2">
             <HabitBadge habit={habit} />
+            <WeekCount habit={habit} logs={logs} day={today} today={today} />
           </span>
         </div>
         <HabitAvatar icon={habit.icon} color={habit.color} className="size-8 lg:size-[38px]" />

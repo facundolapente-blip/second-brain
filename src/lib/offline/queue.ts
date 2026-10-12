@@ -57,12 +57,12 @@ function write(ops: QueuedOp[]) {
  * servidor ya no conoce la acción vieja. No es culpa de lo pendiente: se
  * recarga la página (una vez por minuto, como mucho) y se vuelve a intentar.
  */
-function isStaleDeploy(e: unknown): boolean {
+export function isStaleDeploy(e: unknown): boolean {
   const n = e instanceof Error ? e.name : "";
   const m = e instanceof Error ? e.message : String(e ?? "");
   return n === "UnrecognizedActionError" || /server action.*(not found|was not found)|failed to find server action/i.test(m);
 }
-function reloadForNewVersion() {
+export function reloadForNewVersion() {
   try {
     const last = Number(sessionStorage.getItem("sb_recarga_version") ?? 0);
     if (Date.now() - last < 60_000) return;
@@ -74,7 +74,7 @@ function reloadForNewVersion() {
 }
 
 /** La sesión venció: lo pendiente espera a que se vuelva a entrar (no se descarta). */
-function isSessionExpired(e: unknown): boolean {
+export function isSessionExpired(e: unknown): boolean {
   return /sesi[oó]n vencida/i.test(e instanceof Error ? e.message : String(e ?? ""));
 }
 
@@ -147,6 +147,13 @@ export function queueable<F extends (...args: any[]) => Promise<any>>(name: stri
     const key = opts?.key ? `${name}:${opts.key(...args)}` : undefined;
     const opId = opts?.once ? newOpId() : undefined;
     if (typeof navigator !== "undefined" && !navigator.onLine) return enqueue(name, args, key, opId);
+    if (key) {
+      // Lo nuevo gana: si quedaba pendiente uno con la misma clave, ya no se sube
+      // (si no, al volver la señal la cola mandaría el valor viejo después de este).
+      if (read().some((o) => o.key === key)) write(read().filter((o) => o.key !== key));
+      // Y si la cola justo lo está mandando, se espera a que termine para llegar después.
+      if (inFlight && inFlight.key === key) await inFlight.done;
+    }
     try {
       return opId ? await runOnce(opId, name, args) : await fn(...args);
     } catch (e) {
@@ -182,11 +189,14 @@ export function subscribePending(fn: () => void) {
 }
 
 let flushing = false;
+/** Lo que la cola está mandando en este momento (para que una llamada nueva con la misma clave llegue después). */
+let inFlight: { key?: string; done: Promise<unknown> } | null = null;
 
 /**
  * Manda lo pendiente en orden. Si se corta la señal, para y queda para después;
- * si el servidor rechaza algo (ya no existe), se reintenta dos veces y se descarta.
- * Devuelve cuántas se mandaron.
+ * si el servidor rechaza algo (ya no existe), también para (lo de atrás no se
+ * adelanta) y se reintenta en la próxima vuelta; al tercer rechazo se descarta y
+ * sigue con lo demás. Devuelve cuántas se mandaron.
  */
 export async function flushActions(): Promise<number> {
   if (flushing || typeof navigator === "undefined" || !navigator.onLine) return 0;
@@ -196,12 +206,22 @@ export async function flushActions(): Promise<number> {
   let sent = 0;
   try {
     for (const op of ops) {
+      // Una llamada nueva con la misma clave pudo sacarla mientras se subía lo anterior.
+      if (!read().some((o) => o.id === op.id)) continue;
       const fn = registry.get(op.name);
       let drop = false;
       try {
         const args = op.args.map(deserialize);
-        if (op.opId) await runOnce(op.opId, op.name, args);
-        else if (fn) await fn(...args);
+        const run = op.opId ? runOnce(op.opId, op.name, args) : fn ? fn(...args) : Promise.resolve();
+        inFlight = { key: op.key, done: run.catch(() => undefined) };
+        let result: unknown;
+        try {
+          result = await run;
+        } finally {
+          inFlight = null;
+        }
+        // La primera vez que se mandó todavía corre en el servidor (`runOnce`): queda para la próxima vuelta.
+        if (result && typeof result === "object" && "running" in result && result.running === true) break;
         drop = true;
         if (fn || op.opId) sent++;
       } catch (e) {
@@ -218,7 +238,11 @@ export async function flushActions(): Promise<number> {
         if ((op.tries ?? 0) >= 2) {
           drop = true;
           notifyError("Un cambio pendiente no se pudo subir (el servidor lo rechazó) y se descartó.");
-        } else write(read().map((o) => (o.id === op.id ? { ...o, tries: (o.tries ?? 0) + 1 } : o)));
+        } else {
+          write(read().map((o) => (o.id === op.id ? { ...o, tries: (o.tries ?? 0) + 1 } : o)));
+          // Se reintenta en la próxima vuelta; lo de atrás espera para no llegar antes.
+          break;
+        }
       }
       if (drop) write(read().filter((o) => o.id !== op.id));
     }

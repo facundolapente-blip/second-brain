@@ -7,12 +7,12 @@ import { addDays, fromDbDate, isISODate, shiftMonth, todayISO, toDbDate } from "
 import { isFrequency, nextOnOrAfter } from "./schedule-logic";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { calibrarSaldos } from "./importers/gastos-saldos";
-import { FIXED_IGNORED, getClassifier } from "./finance";
+import { FIXED_IGNORED, getClassifier, REPORT_RATE } from "./finance";
 import { logActivity, trashAndDelete } from "./trash";
 import { parseQuick } from "./smart-logic";
 import { dayIn, installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
-import { ACCOUNT_TYPES, CURRENCIES } from "./format";
+import { ACCOUNT_TYPES, CURRENCIES, moneyCents } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
@@ -98,7 +98,7 @@ export async function saveTransaction(_prev: ActionResult | null, fd: FormData):
 
   // Compra en cuotas con tarjeta: una por mes, cada una en su resumen.
   const count = Number(texto(fd, "installments", 2));
-  if (!id && kind === "expense" && account.type === "card" && Number.isInteger(count) && count >= 2 && count <= 36) {
+  if (!id && kind === "expense" && account.type === "card" && Number.isInteger(count) && count >= 2 && count <= 24) {
     const group = crypto.randomUUID();
     const parts = splitInstallments(amount, count);
     const rows = parts.map((cents, i) => ({
@@ -463,8 +463,12 @@ export async function deleteSchedule(id: string) {
 
 // ─── Presupuestos ───────────────────────────────────────────────────────────
 
-/** Pone (o cambia) el presupuesto mensual de una categoría de gasto. Vacío o 0 lo saca. */
-export async function saveCategoryBudget(categoryId: string, raw: string): Promise<ActionResult> {
+/**
+ * Pone (o cambia) el presupuesto mensual de una categoría de gasto. Vacío o 0 lo saca.
+ * `rollover`: pasar lo que sobra al mes siguiente (se cuenta desde el mes en que se activa;
+ * apagarlo borra el arrastre). Sin el parámetro, el arrastre queda como estaba.
+ */
+export async function saveCategoryBudget(categoryId: string, raw: string, rollover?: boolean): Promise<ActionResult> {
   await exigirSesion();
   const cat = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!cat || cat.kind !== "expense") return { ok: false, error: "Esa categoría no es de gastos." };
@@ -476,10 +480,17 @@ export async function saveCategoryBudget(categoryId: string, raw: string): Promi
   const cents = parseAmount(raw);
   if (cents === null) return { ok: false, error: "Escribí un monto mayor a cero." };
   const amount = centsToDecimalString(cents);
+  const prev = await prisma.categoryBudget.findUnique({ where: { categoryId }, select: { rollover: true, rolloverSince: true } });
+  const roll =
+    rollover === undefined
+      ? {}
+      : rollover
+        ? { rollover: true, rolloverSince: prev?.rollover && prev.rolloverSince ? prev.rolloverSince : toDbDate(`${todayISO().slice(0, 7)}-01`) }
+        : { rollover: false, rolloverSince: null };
   await prisma.categoryBudget.upsert({
     where: { categoryId },
-    create: { categoryId, amount },
-    update: { amount },
+    create: { categoryId, amount, ...roll },
+    update: { amount, ...roll },
   });
   refrescar();
   return { ok: true };
@@ -637,25 +648,87 @@ export async function suggestCategory(title: string, kind: string): Promise<stri
 export async function applySuggestions(pairs: { id: string; categoryId: string }[]) {
   await exigirSesion();
   if (!Array.isArray(pairs) || pairs.length > 1000) return;
-  const cats = new Map((await prisma.category.findMany({ select: { id: true, kind: true } })).map((c) => [c.id, c.kind]));
+  // Todo de una vez: antes eran dos consultas por movimiento (hasta ~2.000) y podía pasar
+  // el tiempo de una función de Vercel. Ahora una lectura y un updateMany por categoría.
+  const [cats, txs] = await Promise.all([
+    prisma.category.findMany({ where: { isAdjustment: false }, select: { id: true, kind: true, name: true } }),
+    prisma.transaction.findMany({
+      where: { id: { in: pairs.map((p) => String(p?.id)) }, categoryId: null },
+      select: { id: true, kind: true },
+    }),
+  ]);
+  const catById = new Map(cats.map((c) => [c.id, c]));
+  const kindOf = new Map(txs.map((t) => [t.id, t.kind]));
+  const byCat = new Map<string, string[]>();
   for (const p of pairs) {
-    const tx = await prisma.transaction.findUnique({ where: { id: String(p.id) }, select: { kind: true, categoryId: true } });
-    if (!tx || tx.categoryId || cats.get(String(p.categoryId)) !== tx.kind) continue;
-    await prisma.transaction.update({ where: { id: String(p.id) }, data: { categoryId: String(p.categoryId) } });
+    const id = String(p?.id);
+    const cat = catById.get(String(p?.categoryId));
+    // Solo los que siguen sin clasificar y con una categoría de su tipo.
+    if (!cat || kindOf.get(id) !== cat.kind) continue;
+    byCat.set(cat.id, [...(byCat.get(cat.id) ?? []), id]);
+  }
+  if (!byCat.size) return;
+  await prisma.$transaction(
+    [...byCat].map(([categoryId, ids]) =>
+      prisma.transaction.updateMany({ where: { id: { in: ids }, categoryId: null }, data: { categoryId } }),
+    ),
+  );
+  for (const [categoryId, ids] of byCat) {
+    await logActivity(
+      "updated",
+      "transaction",
+      null,
+      `${ids.length === 1 ? "1 movimiento clasificado" : `${ids.length} movimientos clasificados`} como ${catById.get(categoryId)!.name} (sugerencias)`,
+    );
   }
   refrescar();
+}
+
+/** Lo que necesita la vista previa de la carga rápida: categorías y la última cuenta usada por moneda. */
+export async function quickAddContext(): Promise<{
+  categories: { id: string; name: string; kind: "expense" | "income" }[];
+  lastAccount: Record<string, string>;
+}> {
+  await exigirSesion();
+  const [cats, recent] = await Promise.all([
+    prisma.category.findMany({
+      where: { archivedAt: null, isAdjustment: false },
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, kind: true },
+    }),
+    prisma.transaction.findMany({
+      where: { account: { archivedAt: null } },
+      orderBy: { createdAt: "desc" },
+      distinct: ["accountId"],
+      take: 40,
+      select: { accountId: true, account: { select: { currency: true } } },
+    }),
+  ]);
+  const lastAccount: Record<string, string> = {};
+  for (const t of recent) lastAccount[t.account.currency] ??= t.accountId;
+  return {
+    categories: cats.map((c) => ({ id: c.id, name: c.name, kind: c.kind === "income" ? "income" : "expense" })),
+    lastAccount,
+  };
 }
 
 /**
  * Carga rápida escribiendo: "350 almuerzo itau", "+2450 disco santander ayer".
  * Sin cuenta en el texto usa la del último movimiento cargado de esa moneda.
+ * `picked`: cuenta o categoría elegidas a mano en la vista previa (categoryId null =
+ * sin clasificar); lo que no se elige se detecta como siempre.
  */
-export async function quickAdd(text: string): Promise<ActionResult & { summary?: string }> {
+export async function quickAdd(
+  text: string,
+  picked?: { accountId?: string | null; categoryId?: string | null },
+): Promise<ActionResult & { summary?: string }> {
   await exigirSesion();
   const accounts = await prisma.account.findMany({ where: { archivedAt: null }, select: { id: true, name: true, currency: true } });
   const p = parseQuick(String(text ?? "").slice(0, 200), accounts);
   if (!p) return { ok: false, error: "Poné al menos un monto, por ejemplo: 350 almuerzo itau" };
-  let accountId = p.accountId;
+  const pickedAccount = picked?.accountId ? accounts.find((a) => a.id === String(picked.accountId)) : undefined;
+  if (picked?.accountId && !pickedAccount) return { ok: false, error: "Esa cuenta ya no está (¿la archivaste?)." };
+  let accountId = pickedAccount?.id ?? p.accountId;
   if (!accountId) {
     const last = await prisma.transaction.findFirst({
       where: { account: { archivedAt: null, ...(p.currency ? { currency: p.currency } : {}) } },
@@ -666,8 +739,19 @@ export async function quickAdd(text: string): Promise<ActionResult & { summary?:
   }
   if (!accountId) return { ok: false, error: "Creá una cuenta primero." };
   const acc = accounts.find((a) => a.id === accountId)!;
-  const classify = await getClassifier();
-  const categoryId = p.title ? (classify(p.title, p.kind)?.categoryId ?? null) : null;
+  let categoryId: string | null = null;
+  if (picked && picked.categoryId !== undefined) {
+    if (picked.categoryId) {
+      const cat = await prisma.category.findUnique({ where: { id: String(picked.categoryId) } });
+      // Un ingreso con categoría de gasto es un reintegro; los ajustes no se eligen acá.
+      const ok = !!cat && !cat.isAdjustment && (cat.kind === p.kind || (p.kind === "income" && cat.kind === "expense"));
+      if (!ok) return { ok: false, error: "Esa categoría no va con este movimiento." };
+      categoryId = cat.id;
+    }
+  } else {
+    const classify = await getClassifier();
+    categoryId = p.title ? (classify(p.title, p.kind)?.categoryId ?? null) : null;
+  }
   const date = addDays(todayISO(), -p.daysAgo);
   const tx = await prisma.transaction.create({
     data: {
@@ -682,7 +766,7 @@ export async function quickAdd(text: string): Promise<ActionResult & { summary?:
   });
   refrescar();
   await logActivity("created", "transaction", tx.id, `${p.kind === "income" ? "Ingreso" : "Gasto"} ${centsToDecimalString(p.amountCents)} ${acc.currency}${p.title ? ` · ${p.title}` : ""} (carga rápida)`);
-  const what = `${p.kind === "income" ? "Ingreso" : "Gasto"} de ${centsToDecimalString(p.amountCents)} ${acc.currency} en ${acc.name}`;
+  const what = `${p.kind === "income" ? "Ingreso" : "Gasto"} de ${moneyCents(p.amountCents, acc.currency)} en ${acc.name}`;
   const when = p.daysAgo ? (p.daysAgo === 1 ? " · ayer" : " · anteayer") : "";
   return { ok: true, id: tx.id, summary: `${what} · ${tx.category ? tx.category.name : "sin clasificar"}${when}` };
 }
@@ -724,6 +808,7 @@ export async function settleDebt(id: string, accountId: string | null, categoryI
   if (accountId) {
     const acc = await prisma.account.findUnique({ where: { id: accountId } });
     if (!acc) return { ok: false, error: "Elegí una cuenta." };
+    if (acc.currency !== d.currency) return { ok: false, error: `La cuenta tiene que ser en ${d.currency}, como la deuda.` };
     const kind = d.direction === "owed_to_me" ? "income" : "expense";
     const cat = categoryId ? await prisma.category.findUnique({ where: { id: categoryId } }) : null;
     const okCat = !!cat && !cat.isAdjustment && (cat.kind === kind || (kind === "income" && cat.kind === "expense"));
@@ -746,9 +831,16 @@ export async function settleDebt(id: string, accountId: string | null, categoryI
   return { ok: true };
 }
 
+/**
+ * Vuelve a abrir una deuda saldada. El movimiento que se cargó al saldarla va a la
+ * papelera (se puede deshacer): si no, al saldarla de nuevo quedaba el ingreso duplicado.
+ */
 export async function reopenDebt(id: string) {
   await exigirSesion();
-  await prisma.debt.update({ where: { id }, data: { settledAt: null } });
+  const d = await prisma.debt.findUnique({ where: { id }, select: { settleTxId: true } });
+  if (!d) return;
+  if (d.settleTxId) await trashAndDelete("transaction", d.settleTxId);
+  await prisma.debt.update({ where: { id }, data: { settledAt: null, settleTxId: null } });
   refrescar();
 }
 
@@ -848,6 +940,17 @@ export async function acceptFixed(input: { key: string; title: string; accountId
   await logActivity("created", "schedule", created.id, `${created.title} (detectado como fijo)`);
   revalidatePath("/gastos", "layout");
   return { ok: true as const };
+}
+
+/** La cotización de "Todo en pesos" en Informes (pesos por dólar). */
+export async function saveReportRate(rate: number): Promise<ActionResult> {
+  await exigirSesion();
+  const n = Math.round(Number(rate) * 10000) / 10000;
+  if (!Number.isFinite(n) || n <= 0 || n > 100000) return { ok: false, error: "Escribí una cotización válida." };
+  const value = String(n);
+  await prisma.appSetting.upsert({ where: { key: REPORT_RATE }, create: { key: REPORT_RATE, value }, update: { value } });
+  revalidatePath("/gastos/informes");
+  return { ok: true };
 }
 
 /** "No es fijo": la sugerencia no vuelve a aparecer. */

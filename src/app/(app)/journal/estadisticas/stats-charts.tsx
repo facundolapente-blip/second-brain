@@ -253,28 +253,61 @@ export function MonthColumns({
   );
 }
 
-/** Barras horizontales por día de la semana, valor al final de cada una. */
+const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+/**
+ * Días escritos por día de la semana: barras horizontales sobre una línea base,
+ * porcentaje al final. Un día sin nada no dibuja barra.
+ */
 export function WeekdayBars({ values }: { values: number[] }) {
-  const labels = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
   const max = Math.max(1, ...values);
-  const total = values.reduce((a, b) => a + b, 0) || 1;
-  const top = values.indexOf(Math.max(...values));
+  const sum = values.reduce((a, b) => a + b, 0);
+  const total = sum || 1;
+  const top = sum ? values.indexOf(Math.max(...values)) : -1;
+  const pct = (v: number) => Math.round((v / total) * 100);
+  const daysLabel = (v: number) => (v === 1 ? "1 día" : `${nf.format(v)} días`);
   return (
-    <ul className="grid gap-2">
-      {values.map((v, i) => (
-        <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)_3rem] items-center gap-3 border-b border-line py-1.5 text-[14px] last:border-b-0">
-          <span className={cx(i === top ? "font-medium text-fg" : "text-muted")}>{labels[i]}</span>
-          <span className="block h-2.5">
-            <span
-              className={cx("block h-2.5 rounded-r-[4px]", i === top ? "bg-accent" : "bg-[color-mix(in_oklab,var(--accent)_40%,var(--surface))]")}
-              style={{ width: `${Math.max(2, (v / max) * 100)}%` }}
-            />
-          </span>
-          <span className="text-right font-mono text-[12px] text-muted tabular" title={`${v} entradas`}>
-            {Math.round((v / total) * 100)}%
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="grid gap-2">
+      <ul className="grid gap-2">
+        {values.map((v, i) => (
+          <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)_3rem] items-center gap-3 border-b border-line py-1.5 text-[14px] last:border-b-0">
+            <span className={cx(i === top ? "font-medium text-fg" : "text-muted")}>{WEEKDAYS[i]}</span>
+            {/* Línea base a la izquierda: el 0 se lee como "nada", no como una barra mínima. */}
+            <span className="block h-2.5 border-l border-line-strong">
+              {v > 0 && (
+                <span
+                  className={cx("bar-anim block h-2.5 rounded-r-[4px]", i === top ? "bg-accent" : "bg-[color-mix(in_oklab,var(--accent)_40%,var(--surface))]")}
+                  style={{ width: `${(v / max) * 100}%` }}
+                />
+              )}
+            </span>
+            <span className="text-right font-mono text-[12px] text-muted tabular" title={daysLabel(v)}>
+              {pct(v)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+      <details className="text-sm">
+        <summary className="kicker inline-flex min-h-11 cursor-pointer items-center select-none hover:text-fg">Ver como tabla</summary>
+        <table className="mt-1 w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-muted">
+              <th className="py-1.5 font-normal">Día</th>
+              <th className="py-1.5 text-right font-normal">Días escritos</th>
+              <th className="py-1.5 text-right font-normal">Del total</th>
+            </tr>
+          </thead>
+          <tbody className="tabular">
+            {values.map((v, i) => (
+              <tr key={i} className="border-t border-line">
+                <td className="py-1.5">{WEEKDAYS[i]}</td>
+                <td className="py-1.5 text-right">{nf.format(v)}</td>
+                <td className="py-1.5 text-right">{pct(v)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </div>
   );
 }

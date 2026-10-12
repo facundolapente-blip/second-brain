@@ -132,7 +132,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
             </div>
           </details>
 
-          <SlideOnChange k={month}><div className="grid grid-cols-7 justify-items-center gap-y-1 lg:gap-y-2">
+          <SlideOnChange k={month}><div className="grid grid-cols-7 justify-items-center gap-x-0.5 gap-y-1 lg:gap-y-2">
             {WEEK_HEAD.map((w) => (
               <span key={w} aria-hidden className="kicker pb-1">
                 {w}
@@ -154,7 +154,8 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   aria-current={isSel ? "date" : undefined}
                   style={info ? tone(info.color) : undefined}
                   className={cx(
-                    "tabular relative inline-flex size-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200 motion-reduce:transition-none lg:size-14 lg:text-[16px]",
+                    // Tamaño relativo a la columna: en compus angostas (1024 px) las columnas miden ~40 px y un círculo fijo de 56 se encimaba.
+                    "tabular relative inline-flex aspect-square w-full max-w-11 items-center justify-center rounded-full text-[15px] transition-[background-color,box-shadow] duration-200 motion-reduce:transition-none lg:max-w-14 lg:text-[16px]",
                     list
                       ? info
                         ? "bg-tone font-semibold text-tone-fg ring-2 ring-inset ring-[var(--tone-solid)]"

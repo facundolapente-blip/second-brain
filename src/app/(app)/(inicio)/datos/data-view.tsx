@@ -24,6 +24,8 @@ type Stats = {
 };
 
 const nf = new Intl.NumberFormat("es-UY");
+/** "1 entrada", "1.234 entradas". */
+const count = (n: number, one: string, many: string) => `${nf.format(n)} ${n === 1 ? one : many}`;
 
 export function DataView({ stats, backups }: { stats: Stats; backups: React.ReactNode }) {
   return (
@@ -53,7 +55,7 @@ export function DataView({ stats, backups }: { stats: Stats; backups: React.Reac
               color="var(--c-journal)"
               accept=".pdf,.docx,.txt"
               how="En My Diary: Exportar en PDF (o Word). Desde PDF solo se agregan las entradas que faltan."
-              status={`${nf.format(stats.entries)} entradas${stats.lastEntry ? `, la última del ${formatShort(stats.lastEntry)}` : ""}`}
+              status={`${count(stats.entries, "entrada", "entradas")}${stats.lastEntry ? `, la última del ${formatShort(stats.lastEntry)}` : ""}`}
             />
             <ImportCard
               kind="gastos"
@@ -62,10 +64,10 @@ export function DataView({ stats, backups }: { stats: Stats; backups: React.Reac
               color="var(--c-gastos)"
               accept=".csv"
               how="Exportá el CSV de la app. Las transferencias no vienen en el export: cargalas acá a mano."
-              status={`${nf.format(stats.txs)} movimientos${stats.lastTx ? `, el último del ${formatShort(stats.lastTx)}` : ""}`}
+              status={`${count(stats.txs, "movimiento", "movimientos")}${stats.lastTx ? `, el último del ${formatShort(stats.lastTx)}` : ""}`}
             />
             <HealthImport
-              status={stats.stepDays ? `Pasos de ${nf.format(stats.stepDays)} días${stats.lastSteps ? `, el último del ${formatShort(stats.lastSteps)}` : ""}` : "Todavía sin datos"}
+              status={stats.stepDays ? `Pasos de ${count(stats.stepDays, "día", "días")}${stats.lastSteps ? `, el último del ${formatShort(stats.lastSteps)}` : ""}` : "Todavía sin datos"}
             />
           </div>
         </section>
@@ -74,8 +76,8 @@ export function DataView({ stats, backups }: { stats: Stats; backups: React.Reac
           <div className="grid gap-1">
             <h2 className="text-[15px] font-semibold">Descargar tus datos</h2>
             <p className="text-[13.5px] text-muted">
-              Una copia tuya, para guardar o abrir en otro lado. Incluye {nf.format(stats.checkins)} check-ins y{" "}
-              {nf.format(stats.blocks)} bloques del plan.
+              Una copia tuya, para guardar o abrir en otro lado. Incluye {count(stats.checkins, "check-in", "check-ins")} y{" "}
+              {count(stats.blocks, "bloque", "bloques")} del plan.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
@@ -177,7 +179,7 @@ function Download({ href, title, sub }: { href: string; title: string; sub: stri
       </span>
       <span className="grid min-w-0">
         <span className="text-[14px] font-medium">{title}</span>
-        <span className="truncate text-[12px] text-muted">{sub}</span>
+        <span className="text-[12px] leading-snug text-muted">{sub}</span>
       </span>
     </a>
   );

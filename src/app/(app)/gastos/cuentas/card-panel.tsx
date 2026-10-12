@@ -69,7 +69,7 @@ export function CardPanel({ card, today }: { card: CardSummary; today: string })
               <dd className="figure text-[22px]">{m(last.leftCents)}</dd>
               <dd className="text-[11.5px] opacity-80">
                 {last.leftCents === 0
-                  ? last.amountCents > 0
+                  ? last.amountCents > 0 || last.chargesCents > 0
                     ? "Pago hecho"
                     : "Sin consumos"
                   : `${dueIn !== null && dueIn < 0 ? "Venció" : "Vence"} el ${formatShort(last.due)}${last.paidCents > 0 ? ` · pagaste ${m(last.paidCents)} de ${m(last.amountCents)}` : ""}`}

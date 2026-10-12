@@ -73,12 +73,27 @@ export const KIND_LABEL: Record<TrashKind, string> = {
 
 // ─── Actividad ──────────────────────────────────────────────────────────────
 
-export async function logActivity(action: string, kind: TrashKind | "import" | "checkin", entityId: string | null, label: string) {
+/**
+ * Registra algo en la actividad. Suelto, si falla no pasa nada; con `db` de una
+ * transacción va adentro (sin `.catch`: un error en una transacción la deja inservible).
+ */
+export async function logActivity(
+  action: string,
+  kind: TrashKind | "import" | "checkin",
+  entityId: string | null,
+  label: string,
+  db?: Prisma.TransactionClient,
+) {
   const mod: Module | "datos" = kind === "import" ? "datos" : kind === "checkin" ? "habitos" : MODULE[kind];
-  await prisma.activity.create({ data: { action, kind, entityId, label: label.slice(0, 200), module: mod } }).catch(() => {});
+  const data = { action, kind, entityId, label: label.slice(0, 200), module: mod };
+  if (db) await db.activity.create({ data });
+  else await prisma.activity.create({ data }).catch(() => {});
 }
 
 // ─── Fotos ──────────────────────────────────────────────────────────────────
+
+/** Cliente de la base: el de siempre o el de una transacción. */
+type Db = Prisma.TransactionClient;
 
 type Snap = { row: Record<string, unknown>; [k: string]: unknown };
 type Snapshot = { label: string; data: Snap; module?: Module };
@@ -86,10 +101,10 @@ type Snapshot = { label: string; data: Snap; module?: Module };
 const kindName: Record<string, string> = { expense: "Gasto", income: "Ingreso", transfer: "Transferencia" };
 
 /** Junta la foto y una etiqueta legible. Null si ya no existe. */
-async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
+async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot | null> {
   switch (kind) {
     case "transaction": {
-      const t = await prisma.transaction.findUnique({ where: { id }, include: { account: true, attachments: true } });
+      const t = await db.transaction.findUnique({ where: { id }, include: { account: true, attachments: true } });
       if (!t) return null;
       const { account, attachments, ...row } = t;
       return {
@@ -98,17 +113,17 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
       };
     }
     case "account": {
-      const a = await prisma.account.findUnique({ where: { id } });
+      const a = await db.account.findUnique({ where: { id } });
       return a ? { label: `${a.name} (${a.currency})`, data: { row: a } } : null;
     }
     case "category": {
-      const c = await prisma.category.findUnique({ where: { id }, include: { budget: true } });
+      const c = await db.category.findUnique({ where: { id }, include: { budget: true } });
       if (!c) return null;
       const { budget, ...row } = c;
       const [txIds, tplIds, schIds] = await Promise.all([
-        prisma.transaction.findMany({ where: { categoryId: id }, select: { id: true } }),
-        prisma.txTemplate.findMany({ where: { categoryId: id }, select: { id: true } }),
-        prisma.scheduledTransaction.findMany({ where: { categoryId: id }, select: { id: true } }),
+        db.transaction.findMany({ where: { categoryId: id }, select: { id: true } }),
+        db.txTemplate.findMany({ where: { categoryId: id }, select: { id: true } }),
+        db.scheduledTransaction.findMany({ where: { categoryId: id }, select: { id: true } }),
       ]);
       return {
         label: `${c.name} (${txIds.length} movimientos)`,
@@ -116,49 +131,49 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
       };
     }
     case "template": {
-      const t = await prisma.txTemplate.findUnique({ where: { id } });
+      const t = await db.txTemplate.findUnique({ where: { id } });
       return t ? { label: t.name, data: { row: t } } : null;
     }
     case "schedule": {
-      const s = await prisma.scheduledTransaction.findUnique({ where: { id }, include: { account: true } });
+      const s = await db.scheduledTransaction.findUnique({ where: { id }, include: { account: true } });
       if (!s) return null;
       const { account, ...row } = s;
-      const txIds = await prisma.transaction.findMany({ where: { scheduleId: id }, select: { id: true } });
+      const txIds = await db.transaction.findMany({ where: { scheduleId: id }, select: { id: true } });
       return {
         label: `${s.title ?? "Recurrente"} · ${moneyCents(toCents(s.amount), account.currency)}`,
         data: { row, txIds: txIds.map((x) => x.id) },
       };
     }
     case "project": {
-      const p = await prisma.budgetProject.findUnique({ where: { id } });
+      const p = await db.budgetProject.findUnique({ where: { id } });
       if (!p) return null;
-      const txIds = await prisma.transaction.findMany({ where: { projectId: id }, select: { id: true } });
+      const txIds = await db.transaction.findMany({ where: { projectId: id }, select: { id: true } });
       return { label: `${p.name} · ${moneyCents(toCents(p.amount), p.currency)}`, data: { row: p, txIds: txIds.map((x) => x.id) } };
     }
     case "debt": {
-      const d = await prisma.debt.findUnique({ where: { id } });
+      const d = await db.debt.findUnique({ where: { id } });
       return d
         ? { label: `${d.person}: ${d.direction === "i_owe" ? "le debés" : "te debe"} ${moneyCents(toCents(d.amount), d.currency)}`, data: { row: d } }
         : null;
     }
     case "goal": {
-      const g = await prisma.savingsGoal.findUnique({ where: { id } });
+      const g = await db.savingsGoal.findUnique({ where: { id } });
       return g ? { label: `${g.name} · ${moneyCents(toCents(g.target), g.currency)}`, data: { row: g } } : null;
     }
     case "habit": {
-      const h = await prisma.habit.findUnique({ where: { id }, include: { tracks: true, logs: true } });
+      const h = await db.habit.findUnique({ where: { id }, include: { tracks: true, logs: true } });
       if (!h) return null;
       const { tracks, logs, ...row } = h;
       return { label: `${h.name} (${logs.length} marcas)`, data: { row, tracks, logs } };
     }
     case "habitCategory": {
-      const c = await prisma.habitCategory.findUnique({ where: { id } });
+      const c = await db.habitCategory.findUnique({ where: { id } });
       if (!c) return null;
-      const habitIds = await prisma.habit.findMany({ where: { categoryId: id }, select: { id: true } });
+      const habitIds = await db.habit.findMany({ where: { categoryId: id }, select: { id: true } });
       return { label: c.name, data: { row: c, habitIds: habitIds.map((x) => x.id) } };
     }
     case "journal": {
-      const e = await prisma.journalEntry.findUnique({ where: { id }, include: { attachments: true } });
+      const e = await db.journalEntry.findUnique({ where: { id }, include: { attachments: true } });
       if (!e) return null;
       const { attachments, ...row } = e;
       const start = (e.title || e.body.trim().split(/\s+/).slice(0, 8).join(" ")) || (attachments.length ? "fotos" : "sin texto");
@@ -168,7 +183,7 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
       };
     }
     case "photo": {
-      const a = await prisma.attachment.findUnique({
+      const a = await db.attachment.findUnique({
         where: { id },
         include: { journalEntry: { select: { date: true, title: true } }, transaction: { select: { title: true, date: true } } },
       });
@@ -184,22 +199,22 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
       };
     }
     case "block": {
-      const b = await prisma.planBlock.findUnique({ where: { id } });
+      const b = await db.planBlock.findUnique({ where: { id } });
       return b ? { label: `${b.title} (${formatShort(fromDbDate(b.date))}${b.startTime ? ` ${b.startTime}` : ""})`, data: { row: b } } : null;
     }
     case "task": {
-      const t = await prisma.planTask.findUnique({ where: { id }, include: { subtasks: true } });
+      const t = await db.planTask.findUnique({ where: { id }, include: { subtasks: true } });
       if (!t) return null;
       const { subtasks, ...row } = t;
-      const blockIds = await prisma.planBlock.findMany({ where: { taskId: id }, select: { id: true } });
+      const blockIds = await db.planBlock.findMany({ where: { taskId: id }, select: { id: true } });
       return { label: t.title, data: { row, subtasks, blockIds: blockIds.map((x) => x.id) } };
     }
     case "keyResult": {
-      const k = await prisma.planKeyResult.findUnique({ where: { id } });
+      const k = await db.planKeyResult.findUnique({ where: { id } });
       return k ? { label: k.title, data: { row: k } } : null;
     }
     case "objective": {
-      const o = await prisma.planObjective.findUnique({ where: { id }, include: { keyResults: true } });
+      const o = await db.planObjective.findUnique({ where: { id }, include: { keyResults: true } });
       if (!o) return null;
       const { keyResults, ...row } = o;
       return { label: `${o.title} (${o.year}, ${keyResults.length} resultados clave)`, data: { row, keyResults } };
@@ -207,57 +222,66 @@ async function snapshot(kind: TrashKind, id: string): Promise<Snapshot | null> {
   }
 }
 
-async function remove(kind: TrashKind, id: string) {
+async function remove(kind: TrashKind, id: string, db: Db) {
   const del: Record<TrashKind, () => Promise<unknown>> = {
-    transaction: () => prisma.transaction.deleteMany({ where: { id } }),
-    account: () => prisma.account.deleteMany({ where: { id } }),
-    category: () => prisma.category.deleteMany({ where: { id } }),
-    template: () => prisma.txTemplate.deleteMany({ where: { id } }),
-    schedule: () => prisma.scheduledTransaction.deleteMany({ where: { id } }),
-    project: () => prisma.budgetProject.deleteMany({ where: { id } }),
-    debt: () => prisma.debt.deleteMany({ where: { id } }),
-    goal: () => prisma.savingsGoal.deleteMany({ where: { id } }),
-    habit: () => prisma.habit.deleteMany({ where: { id } }),
-    habitCategory: () => prisma.habitCategory.deleteMany({ where: { id } }),
-    journal: () => prisma.journalEntry.deleteMany({ where: { id } }),
-    block: () => prisma.planBlock.deleteMany({ where: { id } }),
-    task: () => prisma.planTask.deleteMany({ where: { id } }),
-    keyResult: () => prisma.planKeyResult.deleteMany({ where: { id } }),
-    photo: () => prisma.attachment.deleteMany({ where: { id } }),
+    transaction: () => db.transaction.deleteMany({ where: { id } }),
+    account: () => db.account.deleteMany({ where: { id } }),
+    category: () => db.category.deleteMany({ where: { id } }),
+    template: () => db.txTemplate.deleteMany({ where: { id } }),
+    schedule: () => db.scheduledTransaction.deleteMany({ where: { id } }),
+    project: () => db.budgetProject.deleteMany({ where: { id } }),
+    debt: () => db.debt.deleteMany({ where: { id } }),
+    goal: () => db.savingsGoal.deleteMany({ where: { id } }),
+    habit: () => db.habit.deleteMany({ where: { id } }),
+    habitCategory: () => db.habitCategory.deleteMany({ where: { id } }),
+    journal: () => db.journalEntry.deleteMany({ where: { id } }),
+    block: () => db.planBlock.deleteMany({ where: { id } }),
+    task: () => db.planTask.deleteMany({ where: { id } }),
+    keyResult: () => db.planKeyResult.deleteMany({ where: { id } }),
+    photo: () => db.attachment.deleteMany({ where: { id } }),
     objective: async () => {
-      await prisma.planKeyResult.deleteMany({ where: { objectiveId: id } });
-      await prisma.planObjective.deleteMany({ where: { id } });
+      await db.planKeyResult.deleteMany({ where: { objectiveId: id } });
+      await db.planObjective.deleteMany({ where: { id } });
     },
   };
   await del[kind]();
 }
 
-/** Manda algo a la papelera (foto + registro) y lo borra. */
+/**
+ * Manda algo a la papelera (foto + registro) y lo borra, todo en una transacción:
+ * no puede quedar borrado sin su foto en la papelera, ni en la papelera sin borrar.
+ * (Los archivos de fotos siguen en el almacén hasta que se vacía la papelera.)
+ */
 export async function trashAndDelete(kind: TrashKind, id: string): Promise<boolean> {
-  const snap = await snapshot(kind, id);
-  if (!snap) return false;
-  await prisma.trashItem.create({
-    data: { kind, entityId: id, label: snap.label, module: snap.module ?? MODULE[kind], data: snap.data as unknown as Prisma.InputJsonValue },
-  });
-  await remove(kind, id);
-  await logActivity("deleted", kind, id, snap.label);
-  return true;
+  return prisma.$transaction(
+    async (tx) => {
+      const snap = await snapshot(kind, id, tx);
+      if (!snap) return false;
+      await tx.trashItem.create({
+        data: { kind, entityId: id, label: snap.label, module: snap.module ?? MODULE[kind], data: snap.data as unknown as Prisma.InputJsonValue },
+      });
+      await remove(kind, id, tx);
+      await logActivity("deleted", kind, id, snap.label, tx);
+      return true;
+    },
+    { maxWait: 10_000, timeout: 60_000 },
+  );
 }
 
 // ─── Restaurar ──────────────────────────────────────────────────────────────
 
-const exists = {
-  account: async (id: unknown) => typeof id === "string" && !!(await prisma.account.findUnique({ where: { id }, select: { id: true } })),
-  category: async (id: unknown) => typeof id === "string" && !!(await prisma.category.findUnique({ where: { id }, select: { id: true } })),
-  project: async (id: unknown) => typeof id === "string" && !!(await prisma.budgetProject.findUnique({ where: { id }, select: { id: true } })),
+const existsIn = (db: Db) => ({
+  account: async (id: unknown) => typeof id === "string" && !!(await db.account.findUnique({ where: { id }, select: { id: true } })),
+  category: async (id: unknown) => typeof id === "string" && !!(await db.category.findUnique({ where: { id }, select: { id: true } })),
+  project: async (id: unknown) => typeof id === "string" && !!(await db.budgetProject.findUnique({ where: { id }, select: { id: true } })),
   schedule: async (id: unknown) =>
-    typeof id === "string" && !!(await prisma.scheduledTransaction.findUnique({ where: { id }, select: { id: true } })),
-  habitCategory: async (id: unknown) => typeof id === "string" && !!(await prisma.habitCategory.findUnique({ where: { id }, select: { id: true } })),
-  planCategory: async (id: unknown) => typeof id === "string" && !!(await prisma.planCategory.findUnique({ where: { id }, select: { id: true } })),
-  task: async (id: unknown) => typeof id === "string" && !!(await prisma.planTask.findUnique({ where: { id }, select: { id: true } })),
-  habit: async (id: unknown) => typeof id === "string" && !!(await prisma.habit.findUnique({ where: { id }, select: { id: true } })),
-  objective: async (id: unknown) => typeof id === "string" && !!(await prisma.planObjective.findUnique({ where: { id }, select: { id: true } })),
-};
+    typeof id === "string" && !!(await db.scheduledTransaction.findUnique({ where: { id }, select: { id: true } })),
+  habitCategory: async (id: unknown) => typeof id === "string" && !!(await db.habitCategory.findUnique({ where: { id }, select: { id: true } })),
+  planCategory: async (id: unknown) => typeof id === "string" && !!(await db.planCategory.findUnique({ where: { id }, select: { id: true } })),
+  task: async (id: unknown) => typeof id === "string" && !!(await db.planTask.findUnique({ where: { id }, select: { id: true } })),
+  habit: async (id: unknown) => typeof id === "string" && !!(await db.habit.findUnique({ where: { id }, select: { id: true } })),
+  objective: async (id: unknown) => typeof id === "string" && !!(await db.planObjective.findUnique({ where: { id }, select: { id: true } })),
+});
 
 const ids = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 /** Si lo que apuntaba ya no existe, queda en null (en vez de fallar). */
@@ -265,8 +289,12 @@ async function orNull(check: (id: unknown) => Promise<boolean>, v: unknown) {
   return (await check(v)) ? (v as string) : null;
 }
 
-/** Vuelve a crear lo borrado. Devuelve un error legible si no se puede. */
-export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<string | null> {
+/**
+ * Vuelve a crear lo borrado. Devuelve un error legible si no se puede. Con `db`
+ * de una transacción (`restoreItem`) es todo o nada: no queda a medias.
+ */
+export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = prisma): Promise<string | null> {
+  const exists = existsIn(db);
   // Prisma acepta los strings ISO y los números en texto tal como quedaron en el JSON.
   // La foto es JSON: se recrea tal cual (mismos campos e id).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -281,11 +309,11 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
         ["projectId", "project", "el presupuesto puntual"],
       ] as const) {
         const ref = row[field];
-        if (ref && (await prisma.trashItem.findFirst({ where: { kind: kindName, entityId: ref }, select: { id: true } }))) {
+        if (ref && (await db.trashItem.findFirst({ where: { kind: kindName, entityId: ref }, select: { id: true } }))) {
           return `Restaurá primero ${what} (también está en la papelera), así el movimiento vuelve con ella.`;
         }
       }
-      await prisma.transaction.create({
+      await db.transaction.create({
         data: {
           ...row,
           categoryId: await orNull(exists.category, row.categoryId),
@@ -293,22 +321,23 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
           scheduleId: await orNull(exists.schedule, row.scheduleId),
         },
       });
-      await restoreAttachments(data);
+      await restoreAttachments(data, db);
       return null;
     }
     case "account":
-      await prisma.account.create({ data: row });
+      await db.account.create({ data: row });
       return null;
     case "category": {
-      await prisma.category.create({ data: row });
-      await prisma.transaction.updateMany({ where: { id: { in: ids(data.txIds) } }, data: { categoryId: row.id } });
-      await prisma.txTemplate.updateMany({ where: { id: { in: ids(data.tplIds) } }, data: { categoryId: row.id } });
-      await prisma.scheduledTransaction.updateMany({ where: { id: { in: ids(data.schIds) } }, data: { categoryId: row.id } });
-      if (data.budget) await prisma.categoryBudget.create({ data: data.budget as never }).catch(() => {});
+      await db.category.create({ data: row });
+      await db.transaction.updateMany({ where: { id: { in: ids(data.txIds) } }, data: { categoryId: row.id } });
+      await db.txTemplate.updateMany({ where: { id: { in: ids(data.tplIds) } }, data: { categoryId: row.id } });
+      await db.scheduledTransaction.updateMany({ where: { id: { in: ids(data.schIds) } }, data: { categoryId: row.id } });
+      // Sin `.catch`: dentro de una transacción un error la deja inservible; si ya hay uno, no se pisa.
+      if (data.budget) await db.categoryBudget.createMany({ data: [data.budget as never], skipDuplicates: true });
       return null;
     }
     case "template":
-      await prisma.txTemplate.create({
+      await db.txTemplate.create({
         data: {
           ...row,
           accountId: await orNull(exists.account, row.accountId),
@@ -319,54 +348,54 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
       return null;
     case "schedule": {
       if (!(await exists.account(row.accountId))) return "La cuenta de ese recurrente ya no existe.";
-      await prisma.scheduledTransaction.create({
+      await db.scheduledTransaction.create({
         data: {
           ...row,
           toAccountId: await orNull(exists.account, row.toAccountId),
           categoryId: await orNull(exists.category, row.categoryId),
         },
       });
-      await prisma.transaction.updateMany({ where: { id: { in: ids(data.txIds) } }, data: { scheduleId: row.id } });
+      await db.transaction.updateMany({ where: { id: { in: ids(data.txIds) } }, data: { scheduleId: row.id } });
       return null;
     }
     case "project":
-      await prisma.budgetProject.create({ data: row });
-      await prisma.transaction.updateMany({ where: { id: { in: ids(data.txIds) } }, data: { projectId: row.id } });
+      await db.budgetProject.create({ data: row });
+      await db.transaction.updateMany({ where: { id: { in: ids(data.txIds) } }, data: { projectId: row.id } });
       return null;
     case "debt":
-      await prisma.debt.create({ data: row });
+      await db.debt.create({ data: row });
       return null;
     case "goal":
-      await prisma.savingsGoal.create({ data: { ...row, accountId: await orNull(exists.account, row.accountId) } });
+      await db.savingsGoal.create({ data: { ...row, accountId: await orNull(exists.account, row.accountId) } });
       return null;
     case "habit": {
-      await prisma.habit.create({ data: { ...row, categoryId: await orNull(exists.habitCategory, row.categoryId) } });
+      await db.habit.create({ data: { ...row, categoryId: await orNull(exists.habitCategory, row.categoryId) } });
       const tracks = (data.tracks as never[]) ?? [];
-      if (tracks.length) await prisma.habitTrack.createMany({ data: tracks });
+      if (tracks.length) await db.habitTrack.createMany({ data: tracks });
       const logs = (data.logs as never[]) ?? [];
-      for (let i = 0; i < logs.length; i += 1000) await prisma.habitLog.createMany({ data: logs.slice(i, i + 1000), skipDuplicates: true });
+      for (let i = 0; i < logs.length; i += 1000) await db.habitLog.createMany({ data: logs.slice(i, i + 1000), skipDuplicates: true });
       return null;
     }
     case "habitCategory":
-      await prisma.habitCategory.create({ data: row });
-      await prisma.habit.updateMany({ where: { id: { in: ids(data.habitIds) } }, data: { categoryId: row.id } });
+      await db.habitCategory.create({ data: row });
+      await db.habit.updateMany({ where: { id: { in: ids(data.habitIds) } }, data: { categoryId: row.id } });
       return null;
     case "journal":
-      await prisma.journalEntry.create({ data: row });
-      await restoreAttachments(data);
+      await db.journalEntry.create({ data: row });
+      await restoreAttachments(data, db);
       return null;
     case "photo": {
-      if (row.journalEntryId && !(await prisma.journalEntry.findUnique({ where: { id: row.journalEntryId }, select: { id: true } }))) {
+      if (row.journalEntryId && !(await db.journalEntry.findUnique({ where: { id: row.journalEntryId }, select: { id: true } }))) {
         return "La entrada de esa foto ya no existe: restaurá primero la entrada.";
       }
-      if (row.transactionId && !(await prisma.transaction.findUnique({ where: { id: row.transactionId }, select: { id: true } }))) {
+      if (row.transactionId && !(await db.transaction.findUnique({ where: { id: row.transactionId }, select: { id: true } }))) {
         return "El movimiento de ese comprobante ya no existe: restaurá primero el movimiento.";
       }
-      await prisma.attachment.create({ data: row });
+      await db.attachment.create({ data: row });
       return null;
     }
     case "block": {
-      await prisma.planBlock.create({
+      await db.planBlock.create({
         data: {
           ...row,
           categoryId: await orNull(exists.planCategory, row.categoryId),
@@ -378,27 +407,27 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap): Promise<stri
       return null;
     }
     case "task":
-      await prisma.planTask.create({ data: { ...row, categoryId: await orNull(exists.planCategory, row.categoryId) } });
+      await db.planTask.create({ data: { ...row, categoryId: await orNull(exists.planCategory, row.categoryId) } });
       const subtasks = (data.subtasks as never[]) ?? [];
-      if (subtasks.length) await prisma.planSubtask.createMany({ data: subtasks });
-      await prisma.planBlock.updateMany({ where: { id: { in: ids(data.blockIds) } }, data: { taskId: row.id } });
+      if (subtasks.length) await db.planSubtask.createMany({ data: subtasks });
+      await db.planBlock.updateMany({ where: { id: { in: ids(data.blockIds) } }, data: { taskId: row.id } });
       return null;
     case "keyResult":
-      await prisma.planKeyResult.create({ data: { ...row, objectiveId: await orNull(exists.objective, row.objectiveId) } });
+      await db.planKeyResult.create({ data: { ...row, objectiveId: await orNull(exists.objective, row.objectiveId) } });
       return null;
     case "objective": {
-      await prisma.planObjective.create({ data: row });
+      await db.planObjective.create({ data: row });
       const krs = (data.keyResults as never[]) ?? [];
-      if (krs.length) await prisma.planKeyResult.createMany({ data: krs, skipDuplicates: true });
+      if (krs.length) await db.planKeyResult.createMany({ data: krs, skipDuplicates: true });
       return null;
     }
   }
 }
 
 /** Las fotos de una entrada o un movimiento vuelven con él. */
-async function restoreAttachments(data: Snap) {
+async function restoreAttachments(data: Snap, db: Db) {
   const list = Array.isArray(data.attachments) ? (data.attachments as never[]) : [];
-  if (list.length) await prisma.attachment.createMany({ data: list, skipDuplicates: true });
+  if (list.length) await db.attachment.createMany({ data: list, skipDuplicates: true });
 }
 
 /** Los archivos de fotos que guarda un elemento de la papelera. */

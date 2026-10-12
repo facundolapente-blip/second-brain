@@ -19,6 +19,26 @@ import * as habit from "./habit-actions";
 const MODULES: Record<string, Record<string, (...args: any[]) => Promise<unknown>>> = { plan, finance, habit };
 
 const DONE_WITHOUT_RESULT = { ok: true, repeated: true };
+/**
+ * La primera llamada con ese id todavía corre (el reintento llegó antes de que
+ * terminara). Tiene forma de "guardado pendiente" (`QUEUED`): la cola no lo
+ * descarta, lo vuelve a mandar en la próxima vuelta (`flushActions`).
+ */
+const STILL_RUNNING = { ok: true, queued: true, running: true };
+/** Más que esto corriendo es que la función se cortó a la mitad: se da por hecha. */
+const MAX_RUN_MS = 5 * 60_000;
+
+type ReceiptState = { kind: "gone" } | { kind: "running" } | { kind: "done"; result: unknown };
+
+async function receiptState(opId: string): Promise<ReceiptState> {
+  const prev = await prisma.actionReceipt.findUnique({ where: { id: opId } });
+  if (!prev) return { kind: "gone" };
+  if (prev.result !== null) return { kind: "done", result: prev.result };
+  // null en JSON = terminó sin devolver nada; NULL de la base = todavía corre.
+  const running = await prisma.actionReceipt.count({ where: { id: opId, result: { equals: Prisma.DbNull } } });
+  if (running && Date.now() - prev.createdAt.getTime() < MAX_RUN_MS) return { kind: "running" };
+  return { kind: "done", result: DONE_WITHOUT_RESULT };
+}
 
 export async function runOnce(opId: string, name: string, args: unknown[]): Promise<unknown> {
   await exigirSesion();
@@ -29,14 +49,23 @@ export async function runOnce(opId: string, name: string, args: unknown[]): Prom
   if (!Array.isArray(args)) throw new Error("Acción inválida");
 
   // Se anota primero: si ya estaba, es una repetición (o la primera todavía corre).
-  try {
-    await prisma.actionReceipt.create({ data: { id: opId, name: `${mod}.${fnName}` } });
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      const prev = await prisma.actionReceipt.findUnique({ where: { id: opId } });
-      return (prev?.result as unknown) ?? DONE_WITHOUT_RESULT;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await prisma.actionReceipt.create({ data: { id: opId, name: `${mod}.${fnName}` } });
+      break;
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
     }
-    throw e;
+    // Repetida: se espera un poco a que la primera termine y se devuelve lo que dio.
+    let state = await receiptState(opId);
+    for (let i = 0; state.kind === "running" && i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 400));
+      state = await receiptState(opId);
+    }
+    if (state.kind === "done") return state.result ?? DONE_WITHOUT_RESULT;
+    if (state.kind === "running") return STILL_RUNNING;
+    // La primera falló y borró su recibo: esta la hace (una vez más, como mucho).
+    if (attempt >= 1) return STILL_RUNNING;
   }
 
   try {

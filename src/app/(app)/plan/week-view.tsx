@@ -13,7 +13,7 @@ import { PillSwitch } from "@/components/pill-switch";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
 import { addDays, formatShort, startOfWeek, weekday } from "@/lib/dates";
-import { isFreeBlock, sortBlocks, timeRange, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type TaskDTO, sortKeyAt, PLAN_STEP_COOKIE, PLAN_VIEW_COOKIE } from "@/lib/plan-logic";
+import { isFreeBlock, sortBlocks, timeRange, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type TaskDTO, placeAt, type SortKeyPatch, PLAN_STEP_COOKIE, PLAN_VIEW_COOKIE } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
@@ -118,14 +118,28 @@ export function WeekView({
     });
   }
   const openNew = (date: string, startTime?: string) => sheet.current?.open(startTime ? { date, startTime } : { date });
-  function move(id: string, date: string, startTime?: string | null, sortKey?: number) {
+  // `others`: vecinos sin hora que se renumeran cuando no había lugar entre ellos (`placeAt`).
+  function move(id: string, date: string, startTime?: string | null, sortKey?: number, others?: SortKeyPatch[]) {
     const b = blocks.find((x) => x.id === id);
     if (!b) return;
     const sameSpot = b.date === date && (startTime === undefined || startTime === b.startTime);
-    if (sameSpot && (sortKey === undefined || sortKey === b.sortKey)) return;
+    if (sameSpot && (sortKey === undefined || sortKey === b.sortKey) && !others?.length) return;
+    // Lo optimista sigue las reglas del servidor: a otra hora conserva la duración y
+    // a una semana posterior llega sin tildar.
+    const later = startOfWeek(date) > startOfWeek(b.date);
+    let endTime = b.endTime;
+    if (startTime === null) endTime = null;
+    else if (startTime && b.startTime && b.endTime) {
+      const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+      const e = Math.min(23 * 60 + 59, m(startTime) + m(b.endTime) - m(b.startTime));
+      endTime = e > m(startTime) ? `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}` : null;
+    }
     startTransition(async () => {
-      applyDone({ id, date, ...(startTime !== undefined ? { startTime } : {}), ...(sortKey !== undefined ? { sortKey } : {}) });
-      await moveBlock(id, date, startTime, sortKey);
+      applyDone({ id, date, endTime, ...(later ? { done: false } : {}), ...(startTime !== undefined ? { startTime } : {}), ...(sortKey !== undefined ? { sortKey } : {}) });
+      for (const [oid, key] of others ?? []) applyDone({ id: oid, sortKey: key });
+      // La hora va siempre explícita: sin señal la llamada se guarda como JSON y un
+      // `undefined` ("no cambia") volvía como `null` ("sin hora") y le borraba la hora.
+      await moveBlock(id, date, startTime === undefined ? b.startTime : startTime, sortKey, others?.length ? others : undefined);
     });
   }
   const openEdit = (b: BlockDTO) => sheet.current?.open(b);
@@ -155,7 +169,8 @@ export function WeekView({
             end: b.endTime,
             onSave: (date, start, end) =>
               startTransition(async () => {
-                applyDone({ id: b.id, date, startTime: start, endTime: end, ...(date !== b.date && date > b.date ? { done: false } : {}) });
+                // Como el servidor: solo destilda si va a una semana posterior (otro día de la misma semana conserva el hecho).
+                applyDone({ id: b.id, date, startTime: start, endTime: end, ...(startOfWeek(date) > startOfWeek(b.date) ? { done: false } : {}) });
                 await rescheduleBlock(b.id, date, start, end);
               }),
           },
@@ -193,9 +208,10 @@ export function WeekView({
 
   useOnNew(() => openNew(selected));
   // Una tarea soltada en un día: se agenda (el bloque aparece al guardarse).
-  function dropTask(taskId: string, date: string, startTime: string | null, sortKey?: number) {
+  function dropTask(taskId: string, date: string, startTime: string | null, sortKey?: number, others?: SortKeyPatch[]) {
     startTransition(async () => {
-      await scheduleTask(taskId, date, startTime, sortKey);
+      for (const [oid, key] of others ?? []) applyDone({ id: oid, sortKey: key });
+      await scheduleTask(taskId, date, startTime, sortKey, others?.length ? others : undefined);
       notifyInfo("Tarea agendada");
     });
   }
@@ -422,7 +438,7 @@ function DayList({
   onToggle: (b: BlockDTO) => void;
   onEdit: (b: BlockDTO) => void;
   onNew: () => void;
-  onMove: (id: string, date: string, startTime?: string | null, sortKey?: number) => void;
+  onMove: (id: string, date: string, startTime?: string | null, sortKey?: number, others?: SortKeyPatch[]) => void;
 }) {
   // Mantener apretado un bloque sin hora y moverlo: queda en ese lugar del día
   // (entre los vecinos, como en la columna de la compu). Los que tienen hora van por horario.
@@ -432,7 +448,8 @@ function DayList({
     const b = blocks.find((x) => x.id === moved.id);
     if (!b || b.startTime) return;
     const rest = blocks.filter((x) => x.id !== moved.id);
-    onMove(b.id, day, undefined, sortKeyAt(rest, moved.to));
+    const { key, others } = placeAt(rest, moved.to);
+    onMove(b.id, day, undefined, key, others);
   }
   return (
     <section aria-label={WEEKDAY_LONG[weekday(day)]}>

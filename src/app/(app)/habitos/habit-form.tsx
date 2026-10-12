@@ -4,13 +4,14 @@ import { safeForm } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { Flag } from "@phosphor-icons/react";
 import { saveHabit } from "@/lib/offline/habit";
-import { WEEKDAY_SHORT, type Frequency } from "@/lib/habit-logic";
+import { WEEKDAY_SHORT, type Frequency, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 
-export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO) => void };
+/** `hasHistory`: si el hábito ya tiene marcas (cambiar la meta ofrece empezar una pista nueva). */
+export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO, hasHistory?: boolean) => void };
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -49,6 +50,11 @@ function emptyDraft(today: string): Draft {
   };
 }
 
+/** ¿Tiene marcas en la pista actual? (Para ofrecer una pista nueva al cambiar la meta.) */
+export function hasMarks(logs: LogMap | undefined, startDate: string) {
+  return Object.entries(logs ?? {}).some(([d, l]) => d >= startDate && l.s !== "none");
+}
+
 export function fromHabit(h: HabitDTO): Draft {
   return {
     id: h.id,
@@ -73,15 +79,18 @@ export const HabitForm = forwardRef<HabitFormHandle, { categories: CategoryDTO[]
     const sheet = useRef<SheetHandle>(null);
     const [initial, setInitial] = useState<Draft>(() => emptyDraft(today));
     const [formKey, setFormKey] = useState(0);
+    const [hasHistory, setHasHistory] = useState(false);
 
     useImperativeHandle(ref, () => ({
       create() {
         setInitial(emptyDraft(today));
+        setHasHistory(false);
         setFormKey((k) => k + 1);
         sheet.current?.open();
       },
-      edit(h) {
+      edit(h, history = true) {
         setInitial(fromHabit(h));
+        setHasHistory(history);
         setFormKey((k) => k + 1);
         sheet.current?.open();
       },
@@ -93,6 +102,8 @@ export const HabitForm = forwardRef<HabitFormHandle, { categories: CategoryDTO[]
           key={formKey}
           initial={initial}
           categories={categories}
+          today={today}
+          hasHistory={hasHistory}
           onSaved={() => sheet.current?.close()}
         />
       </Sheet>
@@ -104,10 +115,15 @@ export const HabitForm = forwardRef<HabitFormHandle, { categories: CategoryDTO[]
 export function HabitFormBody({
   initial,
   categories,
+  today,
+  hasHistory = false,
   onSaved,
 }: {
   initial: Draft;
   categories: CategoryDTO[];
+  today: string;
+  /** El hábito ya tiene marcas en la pista actual. */
+  hasHistory?: boolean;
   onSaved?: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
@@ -120,6 +136,9 @@ export function HabitFormBody({
   }, [state]);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  // Cambiar cuándo toca o la meta reescribiría cómo se leen los días ya marcados
+  // (un "hecho" pasaría a "a medias"): antes de guardar se elige desde cuándo vale.
+  const askTrack = !!draft.id && hasHistory && initial.startDate < today && rulesDiffer(initial, draft);
 
   return (
     <form action={action} className="grid gap-5">
@@ -212,9 +231,23 @@ export function HabitFormBody({
               onChange={(v) => set("timesPerWeek", v)}
             />
             <span className="text-sm text-muted">{draft.timesPerWeek === 1 ? "vez" : "veces"} por semana</span>
-            <input type="hidden" name="weekStart" value={draft.weekStart} />
           </div>
         )}
+        {/* Va siempre, con lo que tenía el hábito: sin esto, al guardar un diario las veces
+            por semana pasaban a 1. */}
+        {draft.frequency !== "weekly" && <input type="hidden" name="timesPerWeek" value={draft.timesPerWeek} />}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pt-1">
+          <span className="text-[13px] text-muted">La semana empieza el</span>
+          <Segmented
+            name="weekStart"
+            value={String(draft.weekStart) as "1" | "0"}
+            onChange={(v) => set("weekStart", Number(v))}
+            options={[
+              { value: "1", label: "Lunes" },
+              { value: "0", label: "Domingo" },
+            ]}
+          />
+        </div>
       </div>
 
       <div className="grid gap-2">
@@ -300,10 +333,46 @@ export function HabitFormBody({
 
       {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
 
-      <Button type="submit" variant="accent" disabled={pending} className="w-full">
-        {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear hábito"}
-      </Button>
+      {askTrack ? (
+        <div role="group" aria-labelledby="pista-titulo" className="reveal grid gap-3 rounded-2xl border border-line-strong bg-surface-2 p-4">
+          <div className="grid gap-1">
+            <p id="pista-titulo" className="text-[14.5px] font-medium">Cambiaste cuándo toca o la meta. ¿Desde cuándo vale?</p>
+            <p className="text-[13px] leading-relaxed text-muted">
+              Aplicado al historial, los días ya marcados se leen con la regla nueva (un hecho puede pasar a &quot;a medias&quot;
+              y cambiar la racha).
+            </p>
+          </div>
+          <Button type="submit" name="desde" value="hoy" variant="accent" disabled={pending} className="h-auto min-h-11 py-2 whitespace-normal">
+            <span className="grid text-center leading-tight">
+              Empezar una pista nueva desde hoy
+              <span className="text-[12px] font-normal opacity-75">Recomendado: el historial queda como estaba</span>
+            </span>
+          </Button>
+          <Button type="submit" name="desde" value="siempre" variant="outline" disabled={pending}>
+            Aplicar también al historial
+          </Button>
+        </div>
+      ) : (
+        <Button type="submit" variant="accent" disabled={pending} className="w-full">
+          {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear hábito"}
+        </Button>
+      )}
     </form>
+  );
+}
+
+function effectiveTarget(d: Draft) {
+  return d.kind === "count" ? d.target : 1;
+}
+
+/** ¿Cambió algo que hace leer distinto los días ya marcados? (Lo mismo que mira el servidor.) */
+function rulesDiffer(a: Draft, b: Draft) {
+  const days = (d: Draft) => [...d.weekdays].sort().join();
+  return (
+    a.frequency !== b.frequency ||
+    effectiveTarget(a) !== effectiveTarget(b) ||
+    (b.frequency === "weekdays" && days(a) !== days(b)) ||
+    (b.frequency === "weekly" && (a.timesPerWeek !== b.timesPerWeek || a.weekStart !== b.weekStart))
   );
 }
 

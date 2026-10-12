@@ -1,7 +1,7 @@
 "use client";
 
 // Las acciones de finance-actions.ts envueltas para funcionar sin conexión (ver offline/queue.ts).
-import { saveTransaction as _saveTransaction, renameTransaction as _renameTransaction, duplicateTransaction as _duplicateTransaction, deleteTransaction as _deleteTransaction, deleteInstallments as _deleteInstallments, setTransactionCategory as _setTransactionCategory, saveAccount as _saveAccount, archiveAccount as _archiveAccount, deleteAccount as _deleteAccount, reorderAccounts as _reorderAccounts, saveCategory as _saveCategory, deleteCategory as _deleteCategory, renameTemplate as _renameTemplate, deleteTemplate as _deleteTemplate, saveSchedule as _saveSchedule, setScheduleActive as _setScheduleActive, deleteSchedule as _deleteSchedule, saveCategoryBudget as _saveCategoryBudget, saveProject as _saveProject, archiveProject as _archiveProject, deleteProject as _deleteProject, setTransactionsProject as _setTransactionsProject, markAsAdjustment as _markAsAdjustment, convertToTransfer as _convertToTransfer, adjustBalance as _adjustBalance, suggestCategory as _suggestCategory, applySuggestions as _applySuggestions, quickAdd as _quickAdd, saveDebt as _saveDebt, settleDebt as _settleDebt, reopenDebt as _reopenDebt, deleteDebt as _deleteDebt, saveGoal as _saveGoal, addToGoal as _addToGoal, archiveGoal as _archiveGoal, deleteGoal as _deleteGoal, acceptFixed as _acceptFixed, ignoreFixed as _ignoreFixed } from "../finance-actions";
+import { saveTransaction as _saveTransaction, renameTransaction as _renameTransaction, duplicateTransaction as _duplicateTransaction, deleteTransaction as _deleteTransaction, deleteInstallments as _deleteInstallments, setTransactionCategory as _setTransactionCategory, saveAccount as _saveAccount, archiveAccount as _archiveAccount, deleteAccount as _deleteAccount, reorderAccounts as _reorderAccounts, saveCategory as _saveCategory, deleteCategory as _deleteCategory, renameTemplate as _renameTemplate, deleteTemplate as _deleteTemplate, saveSchedule as _saveSchedule, setScheduleActive as _setScheduleActive, deleteSchedule as _deleteSchedule, saveCategoryBudget as _saveCategoryBudget, saveProject as _saveProject, archiveProject as _archiveProject, deleteProject as _deleteProject, setTransactionsProject as _setTransactionsProject, markAsAdjustment as _markAsAdjustment, convertToTransfer as _convertToTransfer, adjustBalance as _adjustBalance, suggestCategory as _suggestCategory, applySuggestions as _applySuggestions, quickAdd as _quickAdd, quickAddContext as _quickAddContext, saveDebt as _saveDebt, settleDebt as _settleDebt, reopenDebt as _reopenDebt, deleteDebt as _deleteDebt, saveGoal as _saveGoal, addToGoal as _addToGoal, archiveGoal as _archiveGoal, deleteGoal as _deleteGoal, acceptFixed as _acceptFixed, ignoreFixed as _ignoreFixed, saveReportRate as _saveReportRate } from "../finance-actions";
 import { isNetworkError, queueable } from "./queue";
 export type { ActionResult } from "../finance-actions";
 
@@ -41,6 +41,15 @@ export const suggestCategory: typeof _suggestCategory = (async (...args: Paramet
 }) as typeof _suggestCategory;
 export const applySuggestions = queueable("finance.applySuggestions", _applySuggestions);
 export const quickAdd = queueable("finance.quickAdd", _quickAdd, { once: true });
+/** Para la vista previa de la carga rápida; sin señal devuelve null (se ve sin categoría). */
+export const quickAddContext = async (): Promise<Awaited<ReturnType<typeof _quickAddContext>> | null> => {
+  try {
+    return await _quickAddContext();
+  } catch (e) {
+    if (isNetworkError(e)) return null;
+    throw e;
+  }
+};
 export const saveDebt = queueable("finance.saveDebt", _saveDebt, { once: true });
 export const settleDebt = queueable("finance.settleDebt", _settleDebt, { once: true });
 export const reopenDebt = queueable("finance.reopenDebt", _reopenDebt);
@@ -51,3 +60,4 @@ export const archiveGoal = queueable("finance.archiveGoal", _archiveGoal);
 export const deleteGoal = queueable("finance.deleteGoal", _deleteGoal);
 export const acceptFixed = queueable("finance.acceptFixed", _acceptFixed, { once: true });
 export const ignoreFixed = queueable("finance.ignoreFixed", _ignoreFixed);
+export const saveReportRate = queueable("finance.saveReportRate", _saveReportRate, { key: () => "informes" });

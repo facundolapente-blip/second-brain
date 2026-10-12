@@ -6,7 +6,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks } from "./plan-logic";
+import { isTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -32,6 +32,36 @@ function fecha(fd: FormData, key: string): string | null {
 // ─── Bloques ────────────────────────────────────────────────────────────────
 
 /**
+ * Un bloque creado sin señal se ve en la pantalla con id `pendiente-<id de la
+ * llamada>` (`applyPendingBlocks`). Lo que se le haga antes de subir (tildarlo,
+ * moverlo) llega con ese id: la creación ya pasó por `runOnce`, que guardó su
+ * resultado con el id de verdad, así que se busca ahí.
+ */
+async function blockId(raw: unknown): Promise<string> {
+  const s = String(raw ?? "").slice(0, 80);
+  const m = s.match(/^pendiente-([\w-]{8,64})$/);
+  if (!m) return s;
+  const r = await prisma.actionReceipt.findUnique({ where: { id: m[1] }, select: { result: true } });
+  const real = (r?.result as { id?: unknown } | null)?.id;
+  return typeof real === "string" ? real : s;
+}
+
+/** Lugar de los bloques sin hora vecinos que se renumeraron al soltar uno (`placeAt`). */
+async function applySortKeys(others: unknown) {
+  if (!Array.isArray(others)) return;
+  for (const p of others.slice(0, 200) as SortKeyPatch[]) {
+    if (!Array.isArray(p) || !Number.isFinite(Number(p[1]))) continue;
+    await prisma.planBlock.updateMany({ where: { id: await blockId(p[0]), startTime: null }, data: { sortKey: Number(p[1]) } });
+  }
+}
+
+/** Un bloque nuevo sin hora va arriba de todo en su día, con lugar propio (si no, empata con los demás). */
+async function newSortKey(date: Date): Promise<number> {
+  const day = await prisma.planBlock.findMany({ where: { date }, select: { startTime: true, sortKey: true } });
+  return topSortKey(day);
+}
+
+/**
  * La tarjeta es la misma semana a semana (se le cambia la fecha). Cuando deja una
  * semana que ya empezó, queda registro de cómo estaba ese día, así los números de
  * esa semana no se pierden; y si va a una semana posterior, llega sin tildar.
@@ -40,18 +70,25 @@ function fecha(fd: FormData, key: string): string | null {
 async function changeWeek(b: { id: string; date: Date; title: string; categoryId: string | null; done: boolean }, to: Date) {
   const from = fromDbDate(b.date);
   const dest = fromDbDate(to);
-  // Si vuelve a un día que tenía registro, el registro sobra: la tarjeta está ahí.
-  await prisma.planBlockLog.deleteMany({ where: { blockId: b.id, date: to } });
-  if (startOfWeek(from) === startOfWeek(dest)) return b.done;
+  const destMonday = startOfWeek(dest);
+  // Si vuelve a una semana donde dejó registro (cualquier día), el registro sobra:
+  // la tarjeta está ahí (si no, contaría doble) y recupera el "hecho" que tenía.
+  const logs = await prisma.planBlockLog.findMany({
+    where: { blockId: b.id, date: { gte: toDbDate(destMonday), lte: toDbDate(addDays(destMonday, 6)) } },
+    select: { id: true, done: true },
+  });
+  if (logs.length) await prisma.planBlockLog.deleteMany({ where: { id: { in: logs.map((l) => l.id) } } });
+  if (startOfWeek(from) === destMonday) return b.done;
   if (from <= todayISO()) {
     await prisma.planBlockLog.create({ data: { blockId: b.id, date: b.date, title: b.title, categoryId: b.categoryId, done: b.done } });
   }
-  return startOfWeek(dest) > startOfWeek(from) ? false : b.done;
+  if (logs.length) return logs.some((l) => l.done);
+  return destMonday > startOfWeek(from) ? false : b.done;
 }
 
 export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await exigirSesion();
-  const id = texto(fd, "id", 40) || null;
+  const id = (await blockId(texto(fd, "id", 80))) || null;
   const title = texto(fd, "title", 120);
   if (!title) return { ok: false, error: "Ponele un nombre." };
   const date = fecha(fd, "date");
@@ -85,7 +122,7 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     refrescar();
     return { ok: true, id };
   }
-  const created = await prisma.planBlock.create({ data });
+  const created = await prisma.planBlock.create({ data: { ...data, sortKey: startTime ? null : await newSortKey(data.date) } });
   await logActivity("created", "block", created.id, `${title} (${date})`);
   if (data.taskId) await prisma.planTask.update({ where: { id: data.taskId }, data: { scheduled: true } });
   refrescar();
@@ -94,7 +131,7 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
 
 export async function setBlockDone(id: string, done: boolean) {
   await exigirSesion();
-  await prisma.planBlock.update({ where: { id }, data: { done } });
+  await prisma.planBlock.updateMany({ where: { id: await blockId(id) }, data: { done: !!done } });
   refrescar();
 }
 
@@ -105,7 +142,7 @@ const cleanTitle = (t: unknown) => String(t ?? "").trim().replace(/\s+/g, " ").s
  * categoría y prioridad de la tarea) y la marca como agendada. Con hora, el
  * bloque dura una hora; sin hora queda para el día, en el lugar donde se soltó.
  */
-export async function scheduleTask(taskId: string, date: string, startTime: string | null, sortKey?: number) {
+export async function scheduleTask(taskId: string, date: string, startTime: string | null, sortKey?: number, others?: SortKeyPatch[]): Promise<ActionResult | undefined> {
   await exigirSesion();
   if (!isISODate(date)) return;
   const t = await prisma.planTask.findUnique({ where: { id: String(taskId) } });
@@ -122,12 +159,14 @@ export async function scheduleTask(taskId: string, date: string, startTime: stri
       date: toDbDate(date),
       startTime: start,
       endTime: end,
-      sortKey: !start && sortKey !== undefined && Number.isFinite(sortKey) ? sortKey : null,
+      sortKey: start ? null : sortKey !== undefined && Number.isFinite(sortKey) ? sortKey : await newSortKey(toDbDate(date)),
     },
   });
+  if (!start) await applySortKeys(others);
   await prisma.planTask.update({ where: { id: t.id }, data: { scheduled: true } });
   await logActivity("created", "block", block.id, `${t.title} (${date})`);
   refrescar();
+  return { ok: true, id: block.id };
 }
 
 /** Cambiar el nombre desde el menú de clic derecho. */
@@ -135,14 +174,14 @@ export async function renameBlock(id: string, title: string) {
   await exigirSesion();
   const t = cleanTitle(title);
   if (!t) return;
-  await prisma.planBlock.updateMany({ where: { id: String(id) }, data: { title: t } });
+  await prisma.planBlock.updateMany({ where: { id: await blockId(id) }, data: { title: t } });
   refrescar();
 }
 
 /** Duplicar desde el menú de clic derecho: la copia queda el mismo día, justo después y sin tildar. */
-export async function duplicateBlock(id: string) {
+export async function duplicateBlock(id: string): Promise<ActionResult | undefined> {
   await exigirSesion();
-  const b = await prisma.planBlock.findUnique({ where: { id: String(id) } });
+  const b = await prisma.planBlock.findUnique({ where: { id: await blockId(id) } });
   if (!b) return;
   const copy = await prisma.planBlock.create({
     data: {
@@ -161,10 +200,12 @@ export async function duplicateBlock(id: string) {
   });
   await logActivity("created", "block", copy.id, `${b.title} (copia)`);
   refrescar();
+  return { ok: true, id: copy.id };
 }
 
-export async function deleteBlock(id: string) {
+export async function deleteBlock(raw: string) {
   await exigirSesion();
+  const id = await blockId(raw);
   const block = await prisma.planBlock.findUnique({ where: { id } });
   if (!block) return;
   await trashAndDelete("block", id);
@@ -172,13 +213,13 @@ export async function deleteBlock(id: string) {
 }
 
 /** "Pasar a la semana que viene": la misma tarjeta, el mismo día de la semana, sin tildar. */
-export async function passToNextWeek(id: string): Promise<ActionResult> {
+export async function passToNextWeek(raw: string): Promise<ActionResult> {
   await exigirSesion();
-  const b = await prisma.planBlock.findUnique({ where: { id } });
+  const b = await prisma.planBlock.findUnique({ where: { id: await blockId(raw) } });
   if (!b) return { ok: false, error: "Ese bloque ya no existe." };
   const to = toDbDate(addDays(fromDbDate(b.date), 7));
   const done = await changeWeek(b, to);
-  await prisma.planBlock.update({ where: { id }, data: { date: to, done } });
+  await prisma.planBlock.update({ where: { id: b.id }, data: { date: to, done } });
   refrescar();
   return { ok: true };
 }
@@ -505,7 +546,7 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
 export async function rescheduleBlock(id: string, date: string, startTime: string | null, endTime: string | null) {
   await exigirSesion();
   if (!isISODate(date)) return;
-  const b = await prisma.planBlock.findUnique({ where: { id: String(id) } });
+  const b = await prisma.planBlock.findUnique({ where: { id: await blockId(id) } });
   if (!b) return;
   const start = startTime && isTime(startTime) ? startTime : null;
   const end = start && endTime && isTime(endTime) && endTime > start ? endTime : null;
@@ -515,11 +556,12 @@ export async function rescheduleBlock(id: string, date: string, startTime: strin
   refrescar();
 }
 
-export async function moveBlock(id: string, date: string, startTime?: string | null, sortKey?: number) {
+export async function moveBlock(raw: string, date: string, startTime?: string | null, sortKey?: number, others?: SortKeyPatch[]) {
   await exigirSesion();
   if (!isISODate(date)) return;
-  const b = await prisma.planBlock.findUnique({ where: { id } });
+  const b = await prisma.planBlock.findUnique({ where: { id: await blockId(raw) } });
   if (!b) return;
+  const id = b.id;
   let start = b.startTime;
   let end = b.endTime;
   if (startTime !== undefined && (startTime === null || isTime(startTime))) {
@@ -527,7 +569,8 @@ export async function moveBlock(id: string, date: string, startTime?: string | n
       const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
       const dur = mins(b.endTime) - mins(b.startTime);
       const e = Math.min(23 * 60 + 59, mins(startTime) + dur);
-      end = `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`;
+      // Cerca de medianoche el fin se recorta; si no queda después del inicio, sin fin.
+      end = e > mins(startTime) ? `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}` : null;
     } else if (!startTime) end = null;
     start = startTime;
   }
@@ -535,19 +578,38 @@ export async function moveBlock(id: string, date: string, startTime?: string | n
   const done = +b.date === +to ? b.done : await changeWeek(b, to);
   const key = sortKey !== undefined && Number.isFinite(sortKey) && !start ? { sortKey } : {};
   await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end, done, ...key } });
+  if (!start) await applySortKeys(others);
   refrescar();
 }
 
 // ─── Tareas que se repiten y pasos ──────────────────────────────────────────
 
-function shiftDate(iso: string, repeat: string, every: number): string {
+const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+/** Corre una fecha; en las mensuales cae el día `day` (o el último del mes si no lo tiene). */
+function shiftDate(iso: string, repeat: string, every: number, day?: number): string {
   if (repeat === "daily") return addDays(iso, every);
   if (repeat === "weekly") return addDays(iso, 7 * every);
   const [y, m, d] = iso.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1 + every, 1));
-  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
-  t.setUTCDate(Math.min(d, last));
+  t.setUTCDate(Math.min(day ?? d, lastDayOf(t.getUTCFullYear(), t.getUTCMonth() + 1)));
   return t.toISOString().slice(0, 10);
+}
+
+/**
+ * Día del mes original de cada tarea mensual que se repite (id → día), para que un
+ * 31 que pasó por febrero (28) vuelva al 31 en marzo. Sin cambiar el esquema:
+ * `AppSetting "tareas_dia_mensual"`; solo quedan las que siguen repitiéndose.
+ */
+const MONTH_DAY_KEY = "tareas_dia_mensual";
+async function readMonthDays(): Promise<Record<string, number>> {
+  const row = await prisma.appSetting.findUnique({ where: { key: MONTH_DAY_KEY } });
+  try {
+    const v = JSON.parse(row?.value ?? "{}") as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(v).filter(([, d]) => Number.isInteger(d) && (d as number) >= 1 && (d as number) <= 31)) as Record<string, number>;
+  } catch {
+    return {};
+  }
 }
 
 /** Al terminar una tarea que se repite aparece la siguiente (con los pasos sin tildar). */
@@ -556,9 +618,20 @@ async function spawnNext(id: string) {
   if (!t?.repeat) return;
   const today = todayISO();
   const base = t.deadline ? fromDbDate(t.deadline) : today;
-  // Si estaba vencida, la siguiente se corre hasta hoy o después (nunca nace vencida).
-  let next = shiftDate(base, t.repeat, t.repeatEvery);
-  for (let i = 0; next < today && i < 1000; i++) next = shiftDate(next, t.repeat, t.repeatEvery);
+  // Mensual: el día original de la serie (si la fecha no se cambió a mano), no el de
+  // esta vuelta: un 31/1 va al 28/2 y después al 31/3, no se queda en 28.
+  const monthDays = t.repeat === "monthly" ? await readMonthDays() : null;
+  let day: number | undefined;
+  if (monthDays) {
+    const [y, m, d] = base.split("-").map(Number);
+    const saved = monthDays[t.id];
+    day = saved && Math.min(saved, lastDayOf(y, m)) === d ? saved : d;
+  }
+  // Si estaba vencida, la siguiente se corre hasta hoy o después (nunca nace vencida),
+  // siempre contando desde la misma fecha (n vueltas de una).
+  let n = 1;
+  let next = shiftDate(base, t.repeat, t.repeatEvery, day);
+  while (next < today && n < 1000) next = shiftDate(base, t.repeat, t.repeatEvery * ++n, day);
   const created = await prisma.planTask.create({
     data: {
       title: t.title,
@@ -579,6 +652,12 @@ async function spawnNext(id: string) {
   });
   // La que se terminó deja de repetirse (la posta la toma la nueva).
   await prisma.planTask.update({ where: { id }, data: { repeat: null } });
+  if (monthDays && day) {
+    delete monthDays[t.id];
+    monthDays[created.id] = day;
+    const value = JSON.stringify(monthDays);
+    await prisma.appSetting.upsert({ where: { key: MONTH_DAY_KEY }, create: { key: MONTH_DAY_KEY, value }, update: { value } });
+  }
   await logActivity("created", "task", created.id, `${t.title} (se repite, para el ${next})`);
 }
 
@@ -679,11 +758,17 @@ export async function copyToYear(input: { to: number; objectiveIds: string[]; kr
     });
     newId.set(o.id, copy.id);
   }
+  let copied = 0;
   for (const k of krs) {
+    const objectiveId = k.objectiveId ? (newId.get(k.objectiveId) ?? null) : null;
+    // Correrlo dos veces no duplica: mismo nombre, mismo objetivo y mismo año ya está.
+    const exists = await prisma.planKeyResult.findFirst({ where: { title: k.title, objectiveId, year: to }, select: { id: true } });
+    if (exists) continue;
+    copied++;
     await prisma.planKeyResult.create({
       data: {
         title: k.title,
-        objectiveId: k.objectiveId ? (newId.get(k.objectiveId) ?? null) : null,
+        objectiveId,
         kind: k.kind,
         status: "todo",
         quarters: k.quarters,
@@ -696,7 +781,7 @@ export async function copyToYear(input: { to: number; objectiveIds: string[]; kr
       },
     });
   }
-  await logActivity("created", "objective", null, `Plan ${to}: ${objs.length} objetivos y ${krs.length} resultados clave copiados`);
+  await logActivity("created", "objective", null, `Plan ${to}: ${objs.length} objetivos y ${copied} resultados clave copiados`);
   refrescar();
   return { ok: true };
 }

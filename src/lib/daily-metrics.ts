@@ -2,8 +2,9 @@ import "server-only";
 import { prisma } from "./prisma";
 import { addDays, fromDbDate, toDbDate, startOfWeek } from "./dates";
 import { getHabitsWithLogs } from "./habits";
-import { dayState, type DayState } from "./habit-logic";
-import { wordCount } from "./journal-logic";
+import { habitDayMark } from "./habit-logic";
+import { isEmptyEntry, wordCount } from "./journal-logic";
+import { REVIEW_TEMPLATE } from "./review-logic";
 import { toCents } from "./finance-logic";
 import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
@@ -19,6 +20,11 @@ export type DayMetrics = {
   habitsDue: number;
   /** Por hábito: true hecho, false tocaba y no se hizo, ausente = no tocaba. */
   habit: Record<string, boolean>;
+  /**
+   * Los que cuentan como no hechos pero todavía se pueden hacer (hoy sin marcar,
+   * un "X veces por semana" en una semana que no terminó): no son un "no" todavía.
+   */
+  habitOpen: string[];
   /** Del check-in; si no hay, el ánimo de la entrada del journal. */
   mood: number | null;
   energy: number | null;
@@ -43,6 +49,8 @@ export type HabitRef = {
   /** "X veces por semana": la meta de cada semana (null si es diario o de días fijos). */
   weeklyTarget: number | null;
   startDate: string;
+  /** Día en que se archivó (después ya no cuenta); null si está activo. */
+  endDate: string | null;
 };
 
 /**
@@ -64,7 +72,7 @@ export function habitTotals(h: HabitRef, days: DayMetrics[]): { done: number; du
   }
   const weeks = new Map<string, { done: number; days: number }>();
   for (const d of days) {
-    if (d.date < h.startDate) continue;
+    if (d.date < h.startDate || (h.endDate && d.date > h.endDate)) continue;
     const w = startOfWeek(d.date);
     const x = weeks.get(w) ?? { done: 0, days: 0 };
     x.days++;
@@ -84,14 +92,17 @@ export function habitTotals(h: HabitRef, days: DayMetrics[]): { done: number; du
   return { done, due, pct: due ? Math.round((hit / due) * 100) : null };
 }
 
-const DUE: DayState[] = ["done", "partial", "failed", "unmarked", "missed", "pending"];
-
 export async function getDailyMetrics(from: string, to: string): Promise<{ days: DayMetrics[]; habits: HabitRef[] }> {
   const range = { gte: toDbDate(from), lte: toDbDate(to) };
-  const [{ habits, logs, today }, checkins, entries, accounts, txs, blocks, blockLogs] = await Promise.all([
+  const [active, archived, checkins, entries, accounts, txs, blocks, blockLogs] = await Promise.all([
     getHabitsWithLogs(),
+    // Los archivados también: cuentan en los días antes de archivarse (si no, desaparecen del pasado).
+    getHabitsWithLogs({ archived: true }),
     prisma.dailyCheckin.findMany({ where: { date: range } }),
-    prisma.journalEntry.findMany({ where: { date: range }, select: { date: true, title: true, body: true, mood: true } }),
+    prisma.journalEntry.findMany({
+      where: { date: range },
+      select: { date: true, title: true, body: true, mood: true, tags: true, _count: { select: { attachments: true } } },
+    }),
     prisma.account.findMany({ select: { id: true, currency: true } }),
     prisma.transaction.findMany({
       where: { date: range, kind: { in: ["expense", "income"] }, ...NOT_ADJUSTMENT, ...PERSONAL },
@@ -102,6 +113,9 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     prisma.planBlockLog.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),
   ]);
   const rates = await getRates();
+  const today = active.today;
+  const habits = [...active.habits, ...archived.habits];
+  const logs = { ...archived.logs, ...active.logs };
 
   const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
   const byDate = new Map<string, DayMetrics>();
@@ -111,6 +125,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       habitsDone: 0,
       habitsDue: 0,
       habit: {},
+      habitOpen: [],
       mood: null,
       energy: null,
       stress: null,
@@ -125,14 +140,14 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       blocksTotal: 0,
     };
     if (d <= today) {
+      // La misma regla que la lista de Hoy y que Inicio (`habitDayMark` = `dayProgress`).
       for (const h of habits) {
-        const s = dayState(h, logs[h.id], d, today);
-        if (!DUE.includes(s)) continue;
-        // Hoy sin marcar todavía no es un "no".
-        if (s === "pending") continue;
+        const mark = habitDayMark(h, logs[h.id] ?? {}, d, today);
+        if (!mark) continue;
         m.habitsDue++;
-        m.habit[h.id] = s === "done";
-        if (s === "done") m.habitsDone++;
+        m.habit[h.id] = mark === "done";
+        if (mark === "done") m.habitsDone++;
+        if (mark === "open") m.habitOpen.push(h.id);
       }
     }
     byDate.set(d, m);
@@ -151,10 +166,12 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
   for (const e of entries) {
     const m = byDate.get(fromDbDate(e.date));
     if (!m) continue;
-    const w = wordCount(e.body) + wordCount(e.title ?? "");
-    if (w > 0) m.wrote = true;
-    m.words += w;
     if (m.mood === null && e.mood) m.mood = e.mood;
+    // Escribiste = el criterio del Journal (título, texto, etiquetas o fotos). La
+    // reflexión semanal con las preguntas sin tocar no cuenta ni suma palabras.
+    if (e.body.trim() === REVIEW_TEMPLATE.trim()) continue;
+    if (!isEmptyEntry(e) || e._count.attachments > 0) m.wrote = true;
+    m.words += wordCount(e.body) + wordCount(e.title ?? "");
   }
   for (const t of txs) {
     const m = byDate.get(fromDbDate(t.date));
@@ -180,6 +197,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       color: h.color,
       weeklyTarget: h.frequency === "weekly" ? h.timesPerWeek : null,
       startDate: h.startDate,
+      endDate: h.archivedOn,
     })),
   };
 }

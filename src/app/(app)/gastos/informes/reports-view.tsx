@@ -3,6 +3,8 @@
 import { useSwap } from "@/components/motion";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import { quiet } from "@/components/safe-action";
+import { saveReportRate } from "@/lib/offline/finance";
 import { ArrowDownRight, ArrowSquareOut, ArrowUpRight, CaretDown, ChartBar } from "@phosphor-icons/react";
 import { addDays, formatMonth, monthBounds, shiftMonth, weekday } from "@/lib/dates";
 import { currencySymbol, moneyCents, shortNumber, moneyWhole } from "@/lib/format";
@@ -24,6 +26,71 @@ import { CategoryAvatar, useLookups } from "../shared";
 import { PeriodNav } from "../period-nav";
 import { normTitle } from "@/lib/smart-logic";
 
+const ALL = "ALL";
+
+/**
+ * Cotización de "Todo en pesos": "US$ 1 = $ 40,5", editable, con "Usar la de hoy".
+ * Se guarda al salir del campo o con Enter (se recuerda para la próxima vez).
+ */
+function RateField({ rate, todayUsd, onChange }: { rate: number; todayUsd: number | null; onChange: (n: number) => void }) {
+  const fmt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+  const [text, setText] = useState(fmt(rate));
+  // La última guardada: mientras se escribe las cifras cambian, pero se guarda al terminar.
+  const saved = useRef(rate);
+  const read = (t: string) => {
+    const s = t.trim();
+    const n = Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s);
+    return Number.isFinite(n) && n > 0 && n < 100000 ? n : null;
+  };
+  function commit(n: number | null) {
+    if (n === null) {
+      setText(fmt(saved.current));
+      onChange(saved.current);
+      return;
+    }
+    setText(fmt(n));
+    onChange(n);
+    if (n !== saved.current) {
+      saved.current = n;
+      quiet(saveReportRate(n));
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[13px]">
+      <label className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line-strong bg-surface pr-1 pl-3.5 focus-within:border-accent">
+        <span className="whitespace-nowrap text-muted">US$ 1 = $</span>
+        <input
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            const n = read(e.target.value);
+            if (n !== null) onChange(n);
+          }}
+          onBlur={() => commit(read(text))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit(read(text));
+            }
+          }}
+          inputMode="decimal"
+          aria-label="Cotización del dólar, en pesos"
+          className="h-8 w-16 bg-transparent font-mono tabular outline-none"
+        />
+      </label>
+      {todayUsd !== null && Math.abs(todayUsd - rate) >= 0.005 && (
+        <button
+          type="button"
+          onClick={() => commit(Math.round(todayUsd * 100) / 100)}
+          className="inline-flex h-10 items-center rounded-full px-3 whitespace-nowrap text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        >
+          Usar la de hoy ({fmt(todayUsd)})
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
 const CARD =
   "lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]";
@@ -40,8 +107,9 @@ function monthName(m: string) {
 /**
  * Semilla de la sección de análisis: cifras del mes, ritmo de gasto contra el
  * mes anterior, gasto/ingreso por categoría y evolución de los últimos meses.
- * Se mira una moneda a la vez (no se convierte USD a UYU) y respeta las
- * cuentas elegidas en el selector.
+ * Se mira una moneda a la vez o "Todo en pesos" (los dólares, con una cotización
+ * elegida que se recuerda: 40,5 de entrada o "Usar la de hoy"), y respeta las cuentas
+ * elegidas en el selector.
  */
 export function ReportsView({
   period,
@@ -51,6 +119,8 @@ export function ReportsView({
   accounts,
   categories,
   rows,
+  reportRate,
+  todayRates,
 }: {
   /** Mes (el de siempre) o año entero. */
   period: Period;
@@ -60,6 +130,10 @@ export function ReportsView({
   accounts: AccountDTO[];
   categories: CategoryDTO[];
   rows: FlowRow[];
+  /** Pesos por dólar para "Todo en pesos" (guardada). */
+  reportRate: number;
+  /** Cotización de hoy (pesos por unidad de cada moneda). */
+  todayRates: Record<string, number>;
 }) {
   const { selection, scope, setSelection } = useSelection(accounts);
   const lk = useLookups(accounts, categories);
@@ -69,14 +143,23 @@ export function ReportsView({
     return [...set].sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)));
   }, [accounts, scope]);
   const [pickedCurrency, setCurrency] = useState<string>("UYU");
-  const currency = currencies.includes(pickedCurrency) ? pickedCurrency : (currencies[0] ?? "UYU");
+  // "ALL" = todo en pesos: cada moneda pasada a pesos (los dólares con `rate`).
+  const allPesos = pickedCurrency === ALL && currencies.length > 1;
+  const currency = allPesos ? "UYU" : currencies.includes(pickedCurrency) ? pickedCurrency : (currencies[0] ?? "UYU");
+  const [rate, setRate] = useState(reportRate);
   const [kind, setKind] = useState<"expense" | "income">("expense");
-  const catSwap = useSwap(`${currency}-${kind}`);
+  const catSwap = useSwap(`${allPesos ? ALL : currency}-${kind}`);
 
-  const scoped = useMemo(
-    () => rows.filter((r) => isSelected(scope, r.accountId) && lk.currencyOf(r.accountId) === currency),
-    [rows, scope, lk, currency],
-  );
+  const scoped = useMemo(() => {
+    const mine = rows.filter((r) => isSelected(scope, r.accountId));
+    if (!allPesos) return mine.filter((r) => lk.currencyOf(r.accountId) === currency);
+    return mine.map((r) => {
+      const cur = lk.currencyOf(r.accountId);
+      if (cur === "UYU") return r;
+      const per = cur === "USD" ? rate : (todayRates[cur] ?? 0);
+      return { ...r, cents: Math.round(r.cents * per) };
+    });
+  }, [rows, scope, lk, currency, allPesos, rate, todayRates]);
   const yearMode = period.kind === "year";
   const year = yearMode ? period.year : month.slice(0, 4);
   const prevYear = String(Number(year) - 1);
@@ -192,14 +275,15 @@ export function ReportsView({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} basePath="/gastos/informes" modes={["month", "year"]} />
             {currencies.length > 1 && (
-              <div className="w-36">
+              <div className="w-full sm:w-[22rem]">
                 <Segmented
-                  value={currency}
+                  value={allPesos ? ALL : currency}
                   onChange={setCurrency}
-                  options={currencies.map((c) => ({ value: c, label: c }))}
+                  options={[...currencies.map((c) => ({ value: c, label: c })), { value: ALL, label: "Todo en pesos" }]}
                 />
               </div>
             )}
+            {allPesos && <RateField rate={rate} todayUsd={todayRates.USD ?? null} onChange={setRate} />}
           </div>
           <AccountSwitcher accounts={accounts} selection={selection} onChange={setSelection} />
         </section>
@@ -209,7 +293,7 @@ export function ReportsView({
             <span className="inline-flex text-accent-fg">
               <ChartBar size={22} aria-hidden />
             </span>
-            <h2 className="display text-[28px]">Sin movimientos en {currency}</h2>
+            <h2 className="display text-[28px]">Sin movimientos{allPesos ? "" : ` en ${currency}`}</h2>
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               No hay gastos ni ingresos {yearMode ? `en ${year}` : "en estos meses"} para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
@@ -241,7 +325,7 @@ export function ReportsView({
               <Stat label="Gasto por día" cents={Math.round(cur.expense / Math.max(1, elapsed) / 100) * 100} currency={currency} hint={`en ${elapsed} días`} />
             </section>
 
-            <div className="grid content-start gap-12 lg:col-span-7 lg:gap-5">
+            <div className="grid min-w-0 content-start gap-12 lg:col-span-7 lg:gap-5">
               {!yearMode && (
               <section className={`grid content-start gap-3 ${CARD}`}>
                 <div className="grid gap-0.5">
@@ -265,10 +349,10 @@ export function ReportsView({
               </section>
             </div>
 
-            <section className={`grid content-start gap-4 lg:col-span-5 ${CARD}`}>
-              <div className="flex items-center justify-between gap-3">
+            <section className={`grid min-w-0 content-start gap-4 lg:col-span-5 ${CARD}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="display text-[28px]">Por categoría</h2>
-                <div className="w-48">
+                <div className="w-48 max-w-full">
                   <Segmented
                     value={kind}
                     onChange={setKind}
@@ -281,11 +365,12 @@ export function ReportsView({
               </div>
               {cats.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted">
-                  No hay {kind === "expense" ? "gastos" : "ingresos"} en {currency} {yearMode ? `en ${year}` : "este mes"}.
+                  No hay {kind === "expense" ? "gastos" : "ingresos"}
+                  {allPesos ? "" : ` en ${currency}`} {yearMode ? `en ${year}` : "este mes"}.
                 </p>
               ) : (
                 <CategoryBars
-                  key={`${currency}-${kind}`}
+                  key={`${allPesos ? ALL : currency}-${kind}`}
                   swap={catSwap}
                   items={cats.map((c) => ({
                     key: c.categoryId ?? "none",
@@ -953,7 +1038,7 @@ function MonthlyColumns({
         <span />
         <div className="grid pt-1.5" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }} aria-hidden>
           {data.map((d) => (
-            <span key={d.month} className={cx("text-center font-mono text-[10.5px] uppercase", d.month === current ? "font-semibold text-fg" : "text-muted")}>
+            <span key={d.month} className={cx("text-center font-mono text-[11px] uppercase", d.month === current ? "font-semibold text-fg" : "text-muted")}>
               {shortMonth(d.month)}
             </span>
           ))}
@@ -995,7 +1080,7 @@ function Column({ cents, height, color, label }: { cents: number; height: number
   return (
     <span className="relative block w-[clamp(8px,28%,24px)] rounded-t-[4px]" style={{ height, background: color }}>
       {label && cents > 0 && (
-        <span className="tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap text-fg">
+        <span className="tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 rounded-[3px] bg-surface px-1 text-[11px] font-medium whitespace-nowrap text-fg">
           {compact.format(cents / 100)}
         </span>
       )}
@@ -1174,7 +1259,7 @@ function NetColumns({
                       {selected && (
                         <span
                           className={cx(
-                            "tabular pointer-events-none absolute left-1/2 -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap text-fg",
+                            "tabular pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-[3px] bg-surface px-1 text-[11px] font-medium whitespace-nowrap text-fg",
                             n > 0 ? "bottom-full mb-1" : "top-full mt-1",
                           )}
                         >
@@ -1193,7 +1278,7 @@ function NetColumns({
         <span />
         <div className="grid pt-1.5" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }} aria-hidden>
           {data.map((d) => (
-            <span key={d.month} className={cx("text-center font-mono text-[10.5px] uppercase", d.month === current ? "font-semibold text-fg" : "text-muted")}>
+            <span key={d.month} className={cx("text-center font-mono text-[11px] uppercase", d.month === current ? "font-semibold text-fg" : "text-muted")}>
               {shortMonth(d.month)}
             </span>
           ))}

@@ -33,6 +33,29 @@ function slope(ys: number[]): number {
   return den ? num / den : 0;
 }
 
+/**
+ * Reparte `total` (centavos, múltiplo de 100) entre partes exactas redondeando a pesos
+ * enteros con el método del mayor resto: cada una queda a menos de $ 1 de su valor y la
+ * suma da `total` justo.
+ */
+export function apportion(exact: number[], total: number): number[] {
+  if (!exact.length) return [];
+  const pesos = exact.map((v) => Math.max(0, v) / 100);
+  const floor = pesos.map(Math.floor);
+  let rest = Math.round(total / 100) - floor.reduce((a, b) => a + b, 0);
+  const order = pesos.map((v, i) => ({ i, frac: v - floor[i] })).sort((a, b) => b.frac - a.frac);
+  const out = [...floor];
+  for (let k = 0; rest > 0 && order.length; k = (k + 1) % order.length, rest--) out[order[k].i]++;
+  for (let k = order.length - 1; rest < 0; k = (k - 1 + order.length) % order.length) {
+    if (out[order[k].i] > 0) {
+      out[order[k].i]--;
+      rest++;
+    }
+    if (out.every((v) => v === 0)) break;
+  }
+  return out.map((v) => v * 100);
+}
+
 export function buildProjection(rows: FlowDay[], month: string, today: string, upcoming: { expense: number; income: number }) {
   const days = daysIn(month);
   const elapsed = Math.max(1, Number(today.slice(8, 10)));
@@ -80,26 +103,36 @@ export function buildProjection(rows: FlowDay[], month: string, today: string, u
     r100(cums.reduce((n, c) => n + (c[Math.min(d, c.length - 1)] ?? 0), 0) / 3),
   );
 
-  // Por categoría: proyección al cierre contra el promedio de 3 meses.
+  // Por categoría: el mismo cálculo que el total (promedio diario de cada mes con sus días),
+  // así la suma de las categorías da la proyección del mes. Se redondea a pesos repartiendo
+  // el redondeo (mayor resto) para que la suma cierre justo.
   const catIds = [...new Set(rows.filter((r) => r.kind === "expense").map((r) => r.categoryId))];
-  const categories = catIds
+  const rawCats = catIds
     .map((id) => {
       const s = sum(month, "expense", id);
       const avg = last3.reduce((n, m) => n + sum(m, "expense", id), 0) / 3;
-      const proj = r100(s + (w * (s / elapsed) + (1 - w) * (avg / days)) * left);
-      return { categoryId: id, spent: s, projected: Math.max(s, proj), avg: r100(avg) };
+      const avgDailyCat = last3.reduce((n, m) => n + sum(m, "expense", id) / daysIn(m), 0) / 3;
+      return { categoryId: id, spent: s, exact: s + (w * (s / elapsed) + (1 - w) * avgDailyCat) * left, avg: r100(avg) };
     })
-    .filter((c) => c.spent > 0 || c.avg > 0)
+    .filter((c) => c.spent > 0 || c.avg > 0 || c.exact > 0);
+  const rounded = apportion(
+    rawCats.map((c) => c.exact),
+    projected,
+  );
+  const categories = rawCats
+    .map((c, i) => ({ categoryId: c.categoryId, spent: c.spent, projected: rounded[i], avg: c.avg }))
     .sort((a, b) => b.projected - a.projected);
 
   // Próximos 3 meses.
   const hist = [...past].reverse().map((m) => ({ month: m, expense: sum(m, "expense"), income: sum(m, "income") }));
   const trendExp = slope(hist.map((h) => h.expense));
   const avgInc = last3.reduce((n, m) => n + sum(m, "income"), 0) / 3;
-  // La tendencia corrige el promedio, pero como mucho un 25% para no dispararse.
+  // La tendencia corrige el promedio, pero como mucho un 25% para no dispararse. El promedio
+  // de los 3 meses cerrados está centrado 2 meses antes del actual (x = 4 en hist, que va de
+  // x = 0 a 5; este mes es x = 6): el mes que viene (i = 1) está a i + 2 pasos.
   const capped = (base: number, delta: number) => base + Math.max(-0.25 * base, Math.min(0.25 * base, delta));
   const next = [1, 2, 3].map((i) => {
-    const expense = Math.max(0, r100(capped(avgMonth, trendExp * (i + 1))));
+    const expense = Math.max(0, r100(capped(avgMonth, trendExp * (i + 2))));
     // Los ingresos llegan a saltos: promedio sin tendencia.
     const inc = r100(avgInc);
     return { month: shiftMonth(month, i), expense, income: inc, saving: inc - expense };

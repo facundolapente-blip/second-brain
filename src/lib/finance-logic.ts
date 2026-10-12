@@ -127,6 +127,9 @@ export function centsToDecimalString(cents: number): string {
  * leía como 50020. Null si no es un monto válido o el resultado no es positivo.
  */
 export function parseAmount(raw: string): number | null {
+  // Solo dígitos, separadores, espacios, $ y los signos de cuenta: "5e3" o "x3" no son montos
+  // (antes se borraban las letras y daban $53 o $3).
+  if (!/^[\d.,\s$+\-−–xX×*/÷:]*$/.test(raw)) return null;
   const s = normalizeExpr(raw);
   if (!/\d[+\-*/]/.test(s)) return parsePlainAmount(raw);
   const parts = s.split(/([+\-*/])/);
@@ -175,7 +178,8 @@ export function isAmountExpr(raw: string): boolean {
 }
 
 function parsePlainAmount(raw: string): number | null {
-  let s = raw.replace(/[^\d.,-]/g, "");
+  if (/[^\d.,\s$]/.test(raw)) return null;
+  let s = raw.replace(/[^\d.,]/g, "");
   if (!s || s.includes("-")) return null;
   const lastComma = s.lastIndexOf(",");
   const lastDot = s.lastIndexOf(".");

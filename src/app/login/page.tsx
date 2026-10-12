@@ -6,6 +6,17 @@ import { Suspense } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { Button, Field, Input, Segmented } from "@/components/ui";
 
+/** Solo direcciones de esta misma app: "//otro.com" o "/\otro.com" serían una redirección abierta. */
+function safeReturn(volver: string | null): string {
+  if (!volver || !/^\/(?!\/|\\)/.test(volver)) return "/";
+  try {
+    const url = new URL(volver, window.location.origin);
+    return url.origin === window.location.origin ? url.pathname + url.search + url.hash : "/";
+  } catch {
+    return "/";
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -33,8 +44,7 @@ function LoginForm() {
       );
       return;
     }
-    const volver = params.get("volver");
-    router.replace(volver?.startsWith("/") ? volver : "/");
+    router.replace(safeReturn(params.get("volver")));
     router.refresh();
   }
 

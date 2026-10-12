@@ -83,9 +83,10 @@ function BlockForm({
         />
       </Field>
 
-      {/* Columnas que se pueden achicar: los campos de fecha y hora del celular no lo hacen solos. */}
-      <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:gap-3">
-        <Field label="Día" className="min-w-0">
+      {/* Columnas que se pueden achicar: los campos de fecha y hora del celular no lo hacen solos.
+          En el celular el día va en su propio renglón (en tres columnas la fecha no entraba entera). */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] sm:gap-3">
+        <Field label="Día" className="col-span-2 min-w-0 sm:col-span-1">
           <Input type="date" name="date" defaultValue={initial.date} required className="min-w-0 !px-2 sm:!px-3" />
         </Field>
         <Field label="Desde" className="min-w-0">

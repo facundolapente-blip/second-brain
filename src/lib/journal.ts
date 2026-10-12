@@ -28,8 +28,11 @@ export type EntryDTO = {
   photos: PhotoDTO[];
 };
 
-/** Las entradas recién creadas y abandonadas sin escribir nada no se listan. */
-const NOT_EMPTY: Prisma.JournalEntryWhereInput = {
+/**
+ * Las entradas recién creadas y abandonadas sin escribir nada no se listan.
+ * Es el criterio de "escribiste" de toda la app (Inicio y los resúmenes lo usan también).
+ */
+export const NOT_EMPTY: Prisma.JournalEntryWhereInput = {
   OR: [{ title: { not: null } }, { body: { not: "" } }, { tags: { isEmpty: false } }, { attachments: { some: {} } }],
 };
 
@@ -133,6 +136,19 @@ async function writtenDays(): Promise<string[]> {
   return rows.map((r) => fromDbDate(r.date));
 }
 
+/**
+ * Días con algo escrito, con el criterio del Journal (`NOT_EMPTY`: título, texto,
+ * etiquetas o fotos), sin contar un título o un texto de puros espacios. Lo usa Inicio.
+ */
+export async function getWrittenDays(): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ date: Date }[]>`
+    SELECT DISTINCT e.date FROM "JournalEntry" e
+    WHERE e.title ~ '[^[:space:]]' OR e.body ~ '[^[:space:]]' OR cardinality(e.tags) > 0
+      OR EXISTS (SELECT 1 FROM "Attachment" a WHERE a."journalEntryId" = e.id)
+    ORDER BY e.date`;
+  return rows.map((r) => fromDbDate(r.date));
+}
+
 function hourInMontevideo(): number {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(new Date()));
 }
@@ -227,19 +243,25 @@ export async function getRangeEntries(from: string, to: string) {
 export async function getStats(month: string) {
   const today = todayISO();
   const { from, to } = monthBounds(month);
-  const [days, all] = await Promise.all([
+  const [days, all, checkins] = await Promise.all([
     writtenDays(),
     prisma.journalEntry.findMany({
       where: NOT_EMPTY,
       select: { id: true, date: true, body: true, title: true, mood: true },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.dailyCheckin.findMany({
+      where: { date: { gte: toDbDate(from), lte: toDbDate(to) }, mood: { not: null } },
+      select: { date: true, mood: true },
     }),
   ]);
   let words = 0;
-  const inMonth: { mood: number | null; words: number }[] = [];
+  const inMonth: { words: number }[] = [];
   const perMonth = new Map<string, number>();
   const perMonthWords = new Map<string, number>();
-  // Entradas por día de la semana, lunes primero.
-  const perWeekday = [0, 0, 0, 0, 0, 0, 0];
+  // Ánimo del mes, uno por día como en Análisis e Inicio: el del check-in o, si no hay, el de la primera entrada con ánimo.
+  const dayMood = new Map<string, number>();
+  for (const c of checkins) if (c.mood !== null) dayMood.set(fromDbDate(c.date), c.mood);
   let longest: { id: string; date: string; title: string | null; words: number } | null = null;
   for (const e of all) {
     const w = wordCount(e.body) + wordCount(e.title ?? "");
@@ -248,13 +270,20 @@ export async function getStats(month: string) {
     const m = iso.slice(0, 7);
     perMonth.set(m, (perMonth.get(m) ?? 0) + 1);
     perMonthWords.set(m, (perMonthWords.get(m) ?? 0) + w);
-    perWeekday[(new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7]++;
     if (!longest || w > longest.words) longest = { id: e.id, date: iso, title: e.title, words: w };
-    if (iso >= from && iso <= to) inMonth.push({ mood: e.mood, words: w });
+    if (iso >= from && iso <= to) {
+      inMonth.push({ words: w });
+      if (e.mood !== null && !dayMood.has(iso)) dayMood.set(iso, e.mood);
+    }
   }
   const perMonthDays = new Map<string, number>();
-  for (const d of days) perMonthDays.set(d.slice(0, 7), (perMonthDays.get(d.slice(0, 7)) ?? 0) + 1);
-  const moods = inMonth.map((e) => e.mood).filter((m): m is number => m !== null);
+  // Días escritos por día de la semana, lunes primero (no entradas: dos el mismo día cuentan una vez).
+  const perWeekday = [0, 0, 0, 0, 0, 0, 0];
+  for (const d of days) {
+    perMonthDays.set(d.slice(0, 7), (perMonthDays.get(d.slice(0, 7)) ?? 0) + 1);
+    perWeekday[(new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7]++;
+  }
+  const moods = [...dayMood.values()];
   const moodCounts = [1, 2, 3, 4, 5].map((v) => moods.filter((m) => m === v).length);
   return {
     today,

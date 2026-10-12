@@ -115,11 +115,12 @@ export function ContextMenuHost() {
   if (!open) return null;
 
   function onMenuKey(e: React.KeyboardEvent) {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
     e.preventDefault();
     const items = [...(box.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
     const i = items.indexOf(document.activeElement as HTMLElement);
-    const next = e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+    const next =
+      e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
     items[next]?.focus();
   }
 

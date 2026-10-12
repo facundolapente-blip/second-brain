@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
-import { THEME_COOKIE, themeFromCookie } from "@/lib/theme";
+import { THEME_COLOR, THEME_COOKIE, themeFromCookie } from "@/lib/theme";
 import "./globals.css";
 
 // Geist para toda la interfaz y la lectura; Geist Mono para números, fechas y rótulos.
@@ -14,13 +14,15 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Second Brain", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eef2ec" },
-    { media: "(prefers-color-scheme: dark)", color: "#141413" },
-  ],
-  viewportFit: "cover",
-};
+/**
+ * La barra de estado sigue al tema elegido (cookie), no al del sistema: con
+ * Oscuro elegido y el celular en claro quedaba clara. Sin cookie el tema es Claro.
+ * Al cambiar de tema, el Shell actualiza la etiqueta en el momento (`applyTheme`).
+ */
+export async function generateViewport(): Promise<Viewport> {
+  const theme = themeFromCookie((await cookies()).get(THEME_COOKIE)?.value);
+  return { themeColor: THEME_COLOR[theme], viewportFit: "cover" };
+}
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   // El tema se lee del servidor para que la primera pintada ya salga con el color elegido.

@@ -32,8 +32,13 @@ function krPct(k: KeyResultDTO): number | null {
   return progressPct(k.progress, k.goal);
 }
 
+/** El resultado clave con el progreso que cuenta: si se mide solo (hábito, cuenta, meta), el del vínculo. */
+function effective(k: KeyResultDTO): KeyResultDTO {
+  return k.auto ? { ...k, progress: k.auto.progress, goal: k.auto.goal ?? k.goal } : k;
+}
+
 function objectivePct(o: ObjectiveDTO): number | null {
-  const ps = o.keyResults.map(krPct).filter((p): p is number => p !== null);
+  const ps = o.keyResults.map((k) => krPct(effective(k))).filter((p): p is number => p !== null);
   return ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null;
 }
 
@@ -72,7 +77,8 @@ export function ObjectivesView({
   const planSheet = useRef<SheetHandle>(null);
   const [editingObj, setEditingObj] = useState<ObjectiveDTO | null>(null);
   const [objKey, setObjKey] = useState(0);
-  const nextYear = Math.max(...years) + 1;
+  // El año siguiente al que se está mirando (mirando 2025 se planifica 2026).
+  const nextYear = year + 1;
   const match = (k: KeyResultDTO) =>
     (quarter === "all" || k.quarters.includes(quarter)) && (showClosed || (k.status !== "done" && k.status !== "closed"));
   const groups = [
@@ -156,10 +162,14 @@ export function ObjectivesView({
               <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
                 <Plus size={15} /> Nuevo objetivo
               </Button>
+              {/* "Planificar" copia del año que se mira al siguiente: para traer algo, se va al año anterior. */}
               {!objectives.length && !loose.length && years.some((y) => y < year) && (
-                <Button variant="outline" size="sm" onClick={() => planSheet.current?.open()}>
-                  <CalendarPlus size={15} /> Traer de {Math.max(...years.filter((y) => y < year))}
-                </Button>
+                <Link
+                  href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
+                >
+                  <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
+                </Link>
               )}
             </div>
           </div>
@@ -370,7 +380,7 @@ function PlanYearForm({
 
 function KrRow({ kr: raw, today, onOpen }: { kr: KeyResultDTO; today: string; onOpen: () => void }) {
   // Si se mide solo, el progreso sale del vínculo.
-  const k = raw.auto ? { ...raw, progress: raw.auto.progress, goal: raw.auto.goal ?? raw.goal } : raw;
+  const k = effective(raw);
   const pct = krPct(k);
   const st = KR_STATUS[k.status];
   const left = k.status === "todo" || k.status === "doing" ? daysLeft(k.deadline, today) : null;
@@ -588,7 +598,7 @@ function KrForm({
  */
 function ObjectivesSummary({ krs, today }: { krs: KeyResultDTO[]; today: string }) {
   if (krs.length === 0) return null;
-  const pcts = krs.map(krPct).filter((p): p is number => p !== null);
+  const pcts = krs.map((k) => krPct(effective(k))).filter((p): p is number => p !== null);
   const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
   const done = krs.filter((k) => k.status === "done").length;
   const doing = krs.filter((k) => k.status === "doing").length;

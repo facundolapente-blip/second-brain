@@ -99,6 +99,8 @@ export async function getTasks(): Promise<TaskDTO[]> {
     repeat: t.repeat === "daily" || t.repeat === "weekly" || t.repeat === "monthly" ? t.repeat : null,
     repeatEvery: t.repeatEvery,
     order: t.order,
+    // Cuándo se terminó (las viejas sin la fecha, la última vez que se tocó).
+    doneAt: t.status === "done" ? (t.completedAt ?? t.updatedAt).toISOString() : null,
   }));
 }
 

@@ -12,6 +12,7 @@ import {
   STATE_LABEL,
   type BudgetState,
   type CategoryBudgetDTO,
+  type ForeignSpend,
   type ProjectDTO,
 } from "@/lib/budget-logic";
 import { formatShort } from "@/lib/dates";
@@ -42,7 +43,7 @@ export function BudgetsView({
   today: string;
   categories: CategoryDTO[];
   budgets: CategoryBudgetDTO[];
-  unbudgeted: { categoryId: string | null; spentCents: number }[];
+  unbudgeted: { categoryId: string | null; spentCents: number; foreign: ForeignSpend[] }[];
   projects: ProjectDTO[];
 }) {
   const catById = new Map(categories.map((c) => [c.id, c]));
@@ -58,7 +59,9 @@ export function BudgetsView({
   const total = budgetState(totalSpent, totalBudget, share);
   const sorted = [...budgets].sort((a, b) => b.spentCents / b.amountCents - a.spentCents / a.amountCents);
   const without = categories.filter((c) => !budgets.some((b) => b.categoryId === c.id));
-  const spentWithout = new Map(unbudgeted.map((u) => [u.categoryId, u.spentCents]));
+  const spentWithout = new Map(unbudgeted.map((u) => [u.categoryId, u]));
+  // Presupuestos pasa todo a pesos (Movimientos no): se avisa cuando hay dólares.
+  const hasForeign = budgets.some((b) => b.foreign.length > 0) || unbudgeted.some((u) => u.foreign.length > 0);
 
   function edit(category: CategoryDTO, budget?: CategoryBudgetDTO) {
     setEditing({ category, budget });
@@ -84,14 +87,18 @@ export function BudgetsView({
           </Button>
         }
       />
-      <main className="mx-auto grid max-w-3xl grid-cols-1 gap-6 px-4 pt-2 pb-10 lg:max-w-6xl lg:grid-cols-12 lg:gap-8 lg:px-10 lg:pt-6">
+      {/* Abajo deja lugar para el + flotante del celular: si no, tapaba el "Poner" de la última fila. */}
+      <main className="mx-auto grid max-w-3xl grid-cols-1 gap-6 px-4 pt-2 pb-28 lg:max-w-6xl lg:grid-cols-12 lg:gap-8 lg:px-10 lg:pt-6 lg:pb-10">
         {/* Mensual por categoría */}
-        <section aria-label="Presupuesto mensual por categoría" className="grid content-start gap-4 lg:col-span-7">
+        <section aria-label="Presupuesto mensual por categoría" className="grid min-w-0 content-start gap-4 lg:col-span-7">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="display text-[22px]">Mensual por categoría</h2>
             <div className="-mr-2">
               <MonthNav month={month} basePath="/gastos/presupuestos" current={today.slice(0, 7)} />
             </div>
+            {hasForeign && (
+              <p className="basis-full text-[12.5px] text-muted">Los gastos en dólares se pasan a pesos con la cotización de hoy.</p>
+            )}
           </div>
 
           {budgets.length > 0 && (
@@ -141,13 +148,16 @@ export function BudgetsView({
                       onClick={() => edit(c, b)}
                       className="grid w-full gap-2.5 rounded-2xl border border-line bg-surface p-4 text-left transition-colors hover:bg-surface-2/60"
                     >
-                      <span className="flex items-center gap-3">
-                        <CategoryAvatar category={c} size={34} />
-                        <span className="grid min-w-0 flex-1">
-                          <span className="truncate text-[15px] font-medium">{c.name}</span>
-                          <span className={cx("text-[12.5px]", STATE_TONE[st].text)}>{STATE_LABEL[st]}</span>
+                      {/* Si no entra todo en una fila (celular), los montos bajan: el nombre se lee entero. */}
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <span className="flex min-w-0 flex-1 basis-40 items-center gap-3">
+                          <CategoryAvatar category={c} size={34} />
+                          <span className="grid min-w-0 flex-1">
+                            <span className="text-[15px] font-medium break-words">{c.name}</span>
+                            <span className={cx("text-[12.5px]", STATE_TONE[st].text)}>{STATE_LABEL[st]}</span>
+                          </span>
                         </span>
-                        <span className="grid justify-items-end">
+                        <span className="ml-auto grid justify-items-end text-right">
                           <span className="tabular text-[15px] font-medium">
                             {moneyCents(b.spentCents, b.currency)}
                             <span className="text-muted"> / {moneyCents(b.amountCents, b.currency)}</span>
@@ -159,6 +169,16 @@ export function BudgetsView({
                           </span>
                         </span>
                       </span>
+                      {(b.carriedCents > 0 || b.foreign.length > 0) && (
+                        <span className="grid gap-0.5 text-[12px] text-muted">
+                          {b.carriedCents > 0 && (
+                            <span>
+                              Incluye {moneyCents(b.carriedCents, b.currency)} que sobraron (más {moneyCents(b.monthlyCents, b.currency)} del mes)
+                            </span>
+                          )}
+                          {b.foreign.length > 0 && <span>{foreignNote(b.foreign, b.currency)}</span>}
+                        </span>
+                      )}
                       <Meter spent={b.spentCents} budget={b.amountCents} share={share} state={st} />
                     </button>
                   </li>
@@ -179,20 +199,25 @@ export function BudgetsView({
                       className="flex min-h-14 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-surface-2/60"
                     >
                       <CategoryAvatar category={c} size={30} />
-                      <span className="min-w-0 flex-1 truncate text-[14px]">{c.name}</span>
-                      {(spentWithout.get(c.id) ?? 0) > 0 && (
-                        <span className="tabular text-[13px] text-muted">{moneyCents(spentWithout.get(c.id)!)} este mes</span>
-                      )}
-                      <span className="inline-flex items-center gap-1 text-[13px] font-medium text-accent-fg">
+                      <span className="grid min-w-0 flex-1 py-2">
+                        <span className="text-[14px] break-words">{c.name}</span>
+                        {(spentWithout.get(c.id)?.spentCents ?? 0) > 0 && (
+                          <span className="tabular text-[12.5px] text-muted">
+                            {moneyCents(spentWithout.get(c.id)!.spentCents)} este mes
+                            {spentWithout.get(c.id)!.foreign.length > 0 && ` · ${foreignNote(spentWithout.get(c.id)!.foreign, "UYU")}`}
+                          </span>
+                        )}
+                      </span>
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium whitespace-nowrap text-accent-fg">
                         <Plus size={13} weight="bold" aria-hidden /> Poner
                       </span>
                     </button>
                   </li>
                 ))}
               </ul>
-              {(spentWithout.get(null) ?? 0) > 0 && (
+              {(spentWithout.get(null)?.spentCents ?? 0) > 0 && (
                 <p className="text-[12.5px] text-muted">
-                  Además hay {moneyCents(spentWithout.get(null)!)} sin clasificar este mes.{" "}
+                  Además hay {moneyCents(spentWithout.get(null)!.spentCents)} sin clasificar este mes.{" "}
                   <Link href="/gastos/sin-clasificar" className="underline underline-offset-4">
                     Clasificarlos
                   </Link>
@@ -203,10 +228,13 @@ export function BudgetsView({
         </section>
 
         {/* Puntuales */}
-        <section aria-label="Presupuestos puntuales" className="grid content-start gap-4 lg:col-span-5">
-          <div className="flex items-center justify-between gap-2">
+        <section aria-label="Presupuestos puntuales" className="grid min-w-0 content-start gap-4 lg:col-span-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="display text-[22px]">Puntuales</h2>
-            <Link href="/gastos/metas" className="ml-auto mr-1 inline-flex min-h-11 items-center px-1 text-[13px] text-accent-fg underline-offset-4 hover:underline">
+            <Link
+              href="/gastos/metas"
+              className="ml-auto mr-1 inline-flex min-h-11 items-center px-1 text-[13px] whitespace-nowrap text-accent-fg underline-offset-4 hover:underline"
+            >
               Metas de ahorro →
             </Link>
             <Button
@@ -347,13 +375,19 @@ function Meter({
   );
 }
 
+/** "incluye US$ 40 (≈ $ 1.620)": lo gastado en otra moneda, ya sumado al total. */
+function foreignNote(foreign: ForeignSpend[], to: string): string {
+  return `incluye ${foreign.map((f) => `${moneyCents(f.cents, f.currency)} (≈ ${moneyCents(f.equivCents, to)})`).join(" y ")}`;
+}
+
 function BudgetForm({ category, budget, onDone }: { category: CategoryDTO; budget?: CategoryBudgetDTO; onDone: () => void }) {
-  const [value, setValue] = useState(centsToInput(budget?.amountCents));
+  const [value, setValue] = useState(centsToInput(budget?.monthlyCents));
+  const [rollover, setRollover] = useState(budget?.rollover ?? false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useSafeTransition();
   function save(raw: string) {
     start(async () => {
-      const r = await saveCategoryBudget(category.id, raw);
+      const r = await saveCategoryBudget(category.id, raw, rollover);
       if (r.ok) onDone();
       else setError(r.error);
     });
@@ -366,9 +400,28 @@ function BudgetForm({ category, budget, onDone }: { category: CategoryDTO; budge
         save(value);
       }}
     >
-      <Field label="Por mes, en pesos" hint="Se repite todos los meses. Cuentan los gastos de tus cuentas en pesos.">
+      <Field
+        label="Por mes, en pesos"
+        hint="Se repite todos los meses. Cuentan tus gastos personales; los de dólares, pasados a pesos con la cotización de hoy."
+      >
         <Input inputMode="decimal" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" />
       </Field>
+      <label className="flex min-h-11 items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-sm">
+        <input
+          type="checkbox"
+          checked={rollover}
+          onChange={(e) => setRollover(e.target.checked)}
+          className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
+        />
+        <span className="grid gap-0.5">
+          <span className="font-medium">Pasar lo que sobra al mes siguiente</span>
+          <span className="text-[12.5px] text-muted">
+            {budget?.rollover && budget.carriedCents > 0
+              ? `Este mes tenés ${moneyCents(budget.carriedCents, budget.currency)} que sobraron. Si lo apagás, se pierde lo acumulado.`
+              : "Lo que no gastes se suma al presupuesto del mes que viene (desde este mes)."}
+          </span>
+        </span>
+      </label>
       {error && (
         <p role="alert" className="reveal text-[13px] text-danger">
           {error}

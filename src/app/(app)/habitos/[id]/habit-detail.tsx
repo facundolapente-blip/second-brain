@@ -45,7 +45,7 @@ import {
   useHabitLogs,
   type DaySheetHandle,
 } from "../habit-ui";
-import { fromHabit, HabitFormBody } from "../habit-form";
+import { fromHabit, HabitFormBody, hasMarks } from "../habit-form";
 
 export type DetailTab = "calendario" | "estadisticas" | "editar";
 
@@ -144,7 +144,7 @@ export function HabitDetail({
         )}
         {tab === "editar" && (
           <div className="grid lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <EditTab habit={habit} categories={categories} onSaved={() => changeTab("calendario")} />
+            <EditTab habit={habit} categories={categories} today={today} hasHistory={hasMarks(logs, habit.startDate)} onSaved={() => changeTab("calendario")} />
             <TracksPanel habit={habit} today={today} />
           </div>
         )}
@@ -235,11 +235,11 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           aria-label="Inicio de la pista nueva"
           className="h-11 rounded-[4px] border border-line-strong bg-surface px-3 text-sm"
         />
-        <Button
-          variant="outline"
+        <ConfirmButton
           disabled={pending}
-          onClick={() => {
-            if (!confirm("¿Empezar una pista nueva? La racha y el puntaje arrancan de cero desde esa fecha.")) return;
+          className="border border-line-strong"
+          confirmLabel="Tocá de nuevo: racha y puntaje arrancan de cero"
+          onConfirm={() => {
             setError(null);
             startTransition(async () => {
               const r = await startNewTrack(habit.id, date);
@@ -248,16 +248,14 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           }}
         >
           Empezar pista nueva
-        </Button>
+        </ConfirmButton>
       </div>
       {habit.tracks.length > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-2"
+        <ConfirmButton
+          className="mt-2 h-9! px-3.5! text-[13px]!"
           disabled={pending}
-          onClick={() => {
-            if (!confirm("¿Unir la pista actual con la anterior?")) return;
+          confirmLabel="Tocá de nuevo para unirlas"
+          onConfirm={() => {
             setError(null);
             startTransition(async () => {
               const r = await mergeLastTrack(habit.id);
@@ -266,7 +264,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           }}
         >
           Unir con la pista anterior
-        </Button>
+        </ConfirmButton>
       )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </Panel>
@@ -519,7 +517,7 @@ const MARKER: Record<string, { icon: React.ReactNode; cls: string } | undefined>
   },
 };
 
-/** Línea del mes: un punto por día con la marca arriba. */
+/** Línea del mes: un punto por día con la marca arriba (desde 640 px entran los 31 días). */
 function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState; today: string }) {
   const [month, setMonth] = useState(today.slice(0, 7));
   const monthSlide = useSlide(month);
@@ -547,15 +545,16 @@ function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState;
         ref={scroller}
         className="relative overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div key={month} className={cx("relative flex w-max lg:w-full", monthSlide)}>
+        {/* En el celular se desliza (un día por cada 40 px); desde 640 px entran los 31 días en el ancho. */}
+        <div key={month} className={cx("relative flex w-max sm:w-full", monthSlide)}>
           <span className="absolute inset-x-4 top-[39px] h-px bg-line-strong" />
           {days.map((d) => {
             const m = d <= today ? MARKER[stateOf(d)] : undefined;
             return (
-              <div key={d} data-day={d} className="relative grid w-10 justify-items-center gap-2 lg:w-auto lg:min-w-8 lg:flex-1">
+              <div key={d} data-day={d} className="relative grid w-10 justify-items-center gap-2 sm:w-auto sm:min-w-0 sm:flex-1">
                 <span className="flex h-7 items-end">
                   {m && (
-                    <span className={cx("inline-flex size-6 items-center justify-center rounded-full border", m.cls)}>
+                    <span className={cx("inline-flex size-6 items-center justify-center rounded-full border sm:size-5 xl:size-6 sm:[&_svg]:size-[11px] xl:[&_svg]:size-[13px]", m.cls)}>
                       {m.icon}
                     </span>
                   )}
@@ -751,14 +750,15 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
   const next = goals.find((g) => g > best);
   return (
     <div className="grid gap-3">
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* En el celular se desliza; desde 640 px las medallas se reparten el ancho (entran todas). */}
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:overflow-visible [&::-webkit-scrollbar]:hidden">
         {goals.map((g) => {
           const unlocked = best >= g;
           return (
             <div
               key={g}
               className={cx(
-                "grid w-20 shrink-0 justify-items-center gap-2 py-1",
+                "grid w-20 shrink-0 justify-items-center gap-2 py-1 sm:w-auto sm:min-w-0 sm:flex-1 sm:shrink",
               )}
             >
               <span
@@ -778,7 +778,7 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
       </div>
       <p className="text-[14px] text-muted">
         {next
-          ? `Próxima medalla: ${next} ${streakUnit(habit, next)} seguidas. Tu mejor racha es ${best}.`
+          ? `Próxima medalla: ${next} ${streakUnit(habit, next)} ${(habit.frequency === "weekly" ? "seguida" : "seguido") + (next === 1 ? "" : "s")}. Tu mejor racha es ${best} ${streakUnit(habit, best)}.`
           : "Desbloqueaste todas las medallas."}
       </p>
     </div>
@@ -790,10 +790,14 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
 function EditTab({
   habit,
   categories,
+  today,
+  hasHistory,
   onSaved,
 }: {
   habit: HabitDTO;
   categories: CategoryDTO[];
+  today: string;
+  hasHistory: boolean;
   onSaved: () => void;
 }) {
   const router = useRouter();
@@ -804,7 +808,7 @@ function EditTab({
         <div className="mb-5 flex items-center gap-3">
           <HabitBadge habit={habit} />
         </div>
-        <HabitFormBody initial={fromHabit(habit)} categories={categories} onSaved={onSaved} />
+        <HabitFormBody initial={fromHabit(habit)} categories={categories} today={today} hasHistory={hasHistory} onSaved={onSaved} />
       </Panel>
       <Panel>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">

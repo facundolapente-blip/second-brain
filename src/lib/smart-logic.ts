@@ -124,18 +124,17 @@ export function parseQuick(text: string, accounts: QuickAccount[]): QuickParse |
     }
     return false;
   };
-  let accountId: string | null = null;
-  const sorted = [...accounts].sort((a, b) => b.name.length - a.name.length);
-  for (const a of sorted) {
-    const n = fold(a.name);
-    const words = [n, ...(n.includes(" ") ? [n.split(" ")[0]] : [])];
-    const hit = words.find((w) => w.length >= 3 && atEdge(w) && new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(rest));
-    if (hit) {
-      accountId = a.id;
-      rest = rest.replace(new RegExp(`\\b${hit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`), " ");
-      break;
-    }
-  }
+  const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const found = (w: string) => w.length >= 3 && atEdge(w) && new RegExp(`\\b${esc(w)}\\b`).test(rest);
+  // Primero el nombre completo, en todas las cuentas (el más largo gana: "itau usd" antes
+  // que "itau"); recién después la primera palabra de un nombre de varias ("mercado" por
+  // "Mercado Pago"). Así "350 almuerzo itau" va a Itau y no a "Itau USD".
+  const named = accounts.map((a) => ({ id: a.id, n: fold(a.name).trim() })).sort((x, y) => y.n.length - x.n.length);
+  const full = named.find(({ n }) => found(n));
+  const byWord = full ? null : named.find(({ n }) => n.includes(" ") && found(n.split(" ")[0]));
+  const hit = full ? { id: full.id, w: full.n } : byWord ? { id: byWord.id, w: byWord.n.split(" ")[0] } : null;
+  const accountId: string | null = hit?.id ?? null;
+  if (hit) rest = rest.replace(new RegExp(`\\b${esc(hit.w)}\\b`), " ");
   // La moneda se mira después de la cuenta: "dolares" puede ser el nombre de una.
   let currency: string | null = null;
   if (/(^|\s)(usd|us\$|u\$s|dolares|dls)(?=\s|$)/.test(rest)) currency = "USD";

@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";
 import { Card, Delta, Kpi, Mini } from "../summary-ui";
+import { YearHeat } from "./year-heat";
 
 const WD = ["L", "M", "X", "J", "V", "S", "D"];
 const nf = new Intl.NumberFormat("es-UY");
@@ -73,9 +74,12 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
                   ? `/resumen?mes=${lastMonth}`
                   : `/resumen?anio=${key.slice(0, 4)}`
               }
-              className="mr-1 inline-flex h-9 items-center rounded-full border border-line-strong px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              aria-label={isYear ? "Ver el mes" : "Ver el año"}
+              className="mr-1 inline-flex h-9 shrink-0 items-center rounded-full border border-line-strong px-3 text-[13px] whitespace-nowrap text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:px-3.5"
             >
-              {isYear ? "Ver el mes" : "Ver el año"}
+              {/* En el celular, corto: si no, el botón se partía en renglones y el título se cortaba. */}
+              <span className="sm:hidden">{isYear ? "Mes" : "Año"}</span>
+              <span className="hidden sm:inline">{isYear ? "Ver el mes" : "Ver el año"}</span>
             </Link>
             <Link
               href={href(prevKey)}
@@ -98,11 +102,12 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
             <button
               type="button"
               onClick={printLight}
-              className="ml-1.5 inline-flex h-10 items-center gap-2 rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]"
+              aria-label="Descargar PDF"
+              title="Descargar PDF"
+              className="ml-1 inline-flex size-10 shrink-0 items-center justify-center gap-2 rounded-full bg-ink text-[13.5px] font-medium whitespace-nowrap text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] sm:ml-1.5 sm:w-auto sm:px-4"
             >
               <FilePdf size={17} aria-hidden />
               <span className="hidden sm:inline">Descargar PDF</span>
-              <span className="sm:hidden">PDF</span>
             </button>
           </>
         }
@@ -142,6 +147,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
           </div>
         </section>
 
+        {isYear && <YearHeat year={key} days={s.days} today={s.today} />}
         {isYear && <MonthTable rows={s.byMonth} />}
 
         {/* Calendario del mes */}
@@ -162,7 +168,6 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
               ))}
               {s.days.map((d) => {
                 const pct = d.habitsDue ? d.habitsDone / d.habitsDue : null;
-                const strong = pct !== null && pct >= 0.6;
                 const info = moodInfo(d.mood);
                 return (
                   <div
@@ -171,12 +176,13 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
                     className={cx(
                       "relative grid h-14 grid-rows-[auto_1fr] rounded-xl p-1.5 lg:h-20 lg:p-2",
                       pct === null && "bg-surface-2",
-                      strong ? "text-white" : "text-fg",
+                      "text-fg",
                     )}
                     style={
                       pct !== null
                         ? {
-                            background: `color-mix(in oklab, var(--c-habitos) ${Math.round(12 + pct * 78)}%, var(--surface-2))`,
+                            // Tope de intensidad: el número (en el color de texto) se lee en los dos temas.
+                            background: `color-mix(in oklab, var(--c-habitos) ${Math.round(10 + pct * 38)}%, var(--surface-2))`,
                           }
                         : undefined
                     }
@@ -457,7 +463,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
             <Mini
               label="Entradas"
               value={nf.format(s.journal.entries)}
-              sub={`${now.wroteDays} de ${totalDays} días`}
+              sub={`${now.wroteDays} de ${totalDays} ${totalDays === 1 ? "día" : "días"}`}
             />
             <Mini
               label="Palabras"
@@ -492,7 +498,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
               </span>
               <span className="text-[12.5px] text-muted">
                 {formatShort(s.journal.longest.date)} ·{" "}
-                {nf.format(s.journal.longest.words)} palabras
+                {nf.format(s.journal.longest.words)} {s.journal.longest.words === 1 ? "palabra" : "palabras"}
               </span>
             </Link>
           )}

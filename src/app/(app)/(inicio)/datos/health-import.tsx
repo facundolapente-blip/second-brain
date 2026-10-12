@@ -67,7 +67,7 @@ export function HealthImport({ status }: { status: string }) {
       </label>
       {parsed && parsed.days.length > 0 && (
         <p className="reveal text-[13px] text-muted">
-          {parsed.source}: {nf.format(parsed.days.length)} días, del {formatShort(parsed.days[0].date)} {parsed.days[0].date.slice(0, 4)} al{" "}
+          {parsed.source}: {nf.format(parsed.days.length)} {parsed.days.length === 1 ? "día" : "días"}, del {formatShort(parsed.days[0].date)} {parsed.days[0].date.slice(0, 4)} al{" "}
           {formatShort(parsed.days.at(-1)!.date)} {parsed.days.at(-1)!.date.slice(0, 4)} · pasos en {nf.format(steps)}, sueño en {nf.format(sleep)}.
         </p>
       )}

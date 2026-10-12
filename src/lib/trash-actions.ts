@@ -13,15 +13,24 @@ export async function restoreItem(id: string): Promise<TrashResult> {
   const item = await prisma.trashItem.findUnique({ where: { id } });
   if (!item) return { ok: false, error: "Ya no está en la papelera." };
   try {
-    const err = await restoreSnapshot(item.kind as TrashKind, item.data as never);
+    // Todo o nada: si algo falla a mitad de camino (un hábito con sus marcas, una
+    // categoría con sus movimientos), no queda restaurado a medias y sigue en la papelera.
+    const err = await prisma.$transaction(
+      async (tx) => {
+        const err = await restoreSnapshot(item.kind as TrashKind, item.data as never, tx);
+        if (err) return err;
+        await tx.trashItem.delete({ where: { id } });
+        await logActivity("restored", item.kind as TrashKind, item.entityId, item.label, tx);
+        return null;
+      },
+      { maxWait: 10_000, timeout: 60_000 },
+    );
     if (err) return { ok: false, error: err };
   } catch (e) {
     // Lo más común: ya existe algo con ese id o con ese nombre.
     console.error(e);
     return { ok: false, error: "No se pudo restaurar (puede que ya exista algo igual)." };
   }
-  await prisma.trashItem.delete({ where: { id } });
-  await logActivity("restored", item.kind as TrashKind, item.entityId, item.label);
   revalidatePath("/", "layout");
   return { ok: true };
 }

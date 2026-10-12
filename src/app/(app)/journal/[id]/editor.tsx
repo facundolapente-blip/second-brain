@@ -15,6 +15,7 @@ import { isEmptyEntry, MOODS, normalizeTag, TAGS_MAX, TITLE_MAX, wordCount } fro
 import type { EntryDTO } from "@/lib/journal";
 import { tone } from "@/lib/palette";
 import { MoodIcon, useWrite } from "../journal-ui";
+import { journalReturn } from "../journal-nav";
 
 type Status = "idle" | "pending" | "saving" | "saved" | "local" | "error";
 
@@ -26,7 +27,7 @@ const DEBOUNCE = 900;
  * último estado, así no se pisa nada aunque la red tarde.
  */
 /** Descartes pendientes por entrada (ver el efecto de salida en `Editor`). */
-const leaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const leaveTimers = new Map<string, { timer?: ReturnType<typeof setTimeout> }>();
 
 function useAutosave(id: string, initial: EntryInput) {
   const data = useRef(initial);
@@ -161,29 +162,45 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   // Al salir por cualquier lado (Atrás del navegador, el menú, otro enlace), una
   // entrada vacía se descarta. Con un retraso corto: el modo estricto de React
   // desmonta y vuelve a montar al abrir, y eso no es salir (el nuevo montaje lo cancela).
+  // Y recién cuando terminó la fila de guardados: si no, con red lenta se borraba
+  // antes de que el último guardado pasara el ánimo al check-in.
   useEffect(() => {
     const id = entry.id;
-    clearTimeout(leaveTimers.get(id));
+    const pendingLeave = leaveTimers.get(id);
+    if (pendingLeave) {
+      clearTimeout(pendingLeave.timer);
+      leaveTimers.delete(id);
+    }
     const current = data;
     const photos = photoCount;
     return () => {
       const empty = isEmptyEntry({ ...current.current, title: current.current.title || null }) && photos.current === 0;
       if (!empty) return;
-      leaveTimers.set(
-        id,
-        setTimeout(() => {
+      const job: { timer?: ReturnType<typeof setTimeout> } = {};
+      job.timer = setTimeout(() => {
+        void flush().then(() => {
+          // Si mientras tanto se volvió a abrir esta entrada, no se descarta.
+          if (leaveTimers.get(id) !== job) return;
           leaveTimers.delete(id);
           void quiet(discardIfEmpty(id));
-        }, 400),
-      );
+        });
+      }, 400);
+      leaveTimers.set(id, job);
     };
-  }, [entry.id, data]);
+  }, [entry.id, data, flush]);
+
+  /** Vuelve a la lista de donde se vino (con sus filtros y posición) o a /journal si se abrió directo. */
+  const leave = useCallback(() => {
+    const to = journalReturn();
+    if (to.back) router.back();
+    else router.push(to.href);
+  }, [router]);
 
   function goBack() {
     startLeaving(async () => {
       await flush();
       if (isEmptyEntry({ ...data.current, title: data.current.title || null }) && photoCount.current === 0) await discardIfEmpty(entry.id);
-      router.push("/journal");
+      leave();
     });
   }
 
@@ -198,8 +215,11 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
           </IconButton>
 
           {/* La fecha se cambia con el selector nativo del sistema. */}
-          <label className="relative inline-flex h-11 min-w-0 cursor-pointer items-center gap-1.5 rounded-[4px] px-2 hover:bg-surface-2">
-            <span className="display truncate text-[21px] first-letter:uppercase">{formatRelative(date, today)}</span>
+          <label className="relative inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-1.5 rounded-[4px] px-2 hover:bg-surface-2">
+            {/* En el celular una fecha larga ("miércoles, 7 de octubre de 2025") pasa a dos renglones en vez de cortarse. */}
+            <span className="display line-clamp-2 text-[19px] leading-[1.1] first-letter:uppercase min-[420px]:text-[21px]">
+              {formatRelative(date, today)}
+            </span>
             <CaretDown size={14} weight="bold" className="shrink-0 text-muted" />
             <input
               ref={dateRef}
@@ -329,8 +349,13 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
               className="bg-danger! text-on-accent!"
               disabled={deleting}
               onClick={() => {
-                startDelete(() => deleteEntry(entry.id));
-                notifyDeleted("Entrada borrada");
+                startDelete(async () => {
+                  await deleteEntry(entry.id);
+                  // El aviso recién cuando la entrada está en la papelera: Deshacer restaura lo último que entró.
+                  notifyDeleted("Entrada borrada");
+                  confirmSheet.current?.close();
+                  leave();
+                });
               }}
             >
               <Trash size={16} weight="bold" /> Borrar
@@ -345,13 +370,14 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
 /** Estado del autoguardado: discreto mientras todo va bien, claro si falla. */
 function SaveStatus({ status }: { status: Status }) {
   const busy = status === "saving" || status === "pending";
+  // Sin nada que contar no ocupa lugar (si no, le cortaba la fecha en el celular).
+  if (status === "idle") return <span aria-live="polite" className="ml-auto" />;
   return (
     <span
       aria-live="polite"
       className={cx(
-        "ml-auto inline-flex items-center gap-1.5 px-2 font-mono text-[11px] tracking-[0.04em] uppercase transition-opacity duration-300",
+        "ml-auto inline-flex shrink-0 items-center gap-1.5 px-2 font-mono text-[11px] tracking-[0.04em] uppercase",
         status === "error" ? "text-danger" : "text-muted",
-        status === "idle" && "opacity-0",
       )}
     >
       {status === "error" ? (
@@ -361,7 +387,12 @@ function SaveStatus({ status }: { status: Status }) {
       ) : (
         <Check size={13} weight="bold" aria-hidden />
       )}
-      <span key={busy ? "busy" : status} className="reveal inline-flex items-center gap-1.5">
+      {/* En pantallas angostas, "Guardando" y "Guardado" quedan solo en el ícono (el texto, para el
+          lector de pantalla): la fecha necesita el lugar. Lo que hay que ver (sin guardar, en el aparato) sigue escrito. */}
+      <span
+        key={busy ? "busy" : status}
+        className={cx("reveal inline-flex items-center gap-1.5", (busy || status === "saved") && "max-[419px]:sr-only")}
+      >
         {busy ? "Guardando" : status === "error" ? "Sin guardar" : status === "local" ? "Guardado en el aparato" : "Guardado"}
       </span>
     </span>

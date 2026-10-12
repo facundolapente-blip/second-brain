@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
-import { isISODate, todayISO, toDbDate } from "./dates";
+import { addDays, isISODate, todayISO, toDbDate } from "./dates";
 import { isPaletteKey } from "./palette";
 import type { LogStatus } from "./habit-logic";
 import { HABIT_CONFIG_LOCKED } from "./importers/habitnow";
@@ -82,16 +82,39 @@ function texto(fd: FormData, key: string, max = 200): string {
 }
 
 function entero(fd: FormData, key: string, min: number, max: number, def: number): number {
-  const n = Number(fd.get(key));
+  // Un campo que no vino no es 0 (Number(null) daba 0): queda el valor por defecto.
+  const raw = fd.get(key);
+  if (raw === null || raw === "") return def;
+  const n = Number(raw);
   if (!Number.isFinite(n)) return def;
   return Math.max(min, Math.min(max, Math.round(n)));
 }
 
+/** Lo que define qué días tocan y cuándo uno está hecho: si cambia, el historial se lee distinto. */
+type RuleFields = { frequency: string; weekdays: number[]; timesPerWeek: number; weekStart: number; target: number };
+
+function ruleChanged(a: RuleFields, b: RuleFields): boolean {
+  return (
+    a.frequency !== b.frequency ||
+    a.target !== b.target ||
+    (b.frequency === "weekdays" && a.weekdays.join() !== b.weekdays.join()) ||
+    (b.frequency === "weekly" && (a.timesPerWeek !== b.timesPerWeek || a.weekStart !== b.weekStart))
+  );
+}
+
+/**
+ * Crea o edita un hábito. Al editar, si cambia cuándo toca o la meta y el form
+ * manda `desde = "hoy"`, la configuración vieja queda como pista cerrada hasta
+ * ayer y la nueva arranca hoy (el historial se sigue leyendo como estaba); con
+ * `desde = "siempre"` (o sin el campo) se aplica también al historial.
+ */
 export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await exigirSesion();
   const id = texto(fd, "id", 40) || null;
   const name = texto(fd, "name", 80);
   if (!name) return { ok: false, error: "Ponele un nombre." };
+  const before = id ? await prisma.habit.findUnique({ where: { id } }) : null;
+  if (id && !before) return { ok: false, error: "No existe ese hábito." };
 
   const frequency = ["daily", "weekdays", "weekly"].includes(texto(fd, "frequency"))
     ? texto(fd, "frequency")
@@ -117,8 +140,9 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     categoryId,
     frequency,
     weekdays: frequency === "weekdays" ? [...new Set(weekdays)].sort() : [],
-    timesPerWeek: entero(fd, "timesPerWeek", 1, 7, 1),
-    weekStart: entero(fd, "weekStart", 0, 1, 1),
+    // Si el campo no vino, queda lo que tenía el hábito (antes pasaba a 0 = domingo).
+    timesPerWeek: entero(fd, "timesPerWeek", 1, 7, before?.timesPerWeek ?? 1),
+    weekStart: entero(fd, "weekStart", 0, 1, before?.weekStart ?? 1),
     target,
     unit,
     priority: entero(fd, "priority", 1, 5, 1),
@@ -126,22 +150,43 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     startDate: toDbDate(startDate),
   };
 
-  if (id) {
+  if (id && before) {
+    const today = todayISO();
+    const newTrack = texto(fd, "desde") === "hoy" && ruleChanged(before, data) && toDbDate(today) > before.startDate;
+    if (newTrack) data.startDate = toDbDate(today);
     // La pista actual no puede arrancar antes de que termine la anterior.
     const last = await prisma.habitTrack.findFirst({ where: { habitId: id }, orderBy: { endDate: "desc" } });
-    if (last && data.startDate <= last.endDate) {
+    if (!newTrack && last && data.startDate <= last.endDate) {
       return { ok: false, error: "La fecha de inicio tiene que ser posterior a la pista anterior." };
     }
-    const before = await prisma.habit.findUnique({ where: { id } });
-    await prisma.habit.update({ where: { id }, data });
+    if (newTrack) {
+      // Como "Empezar pista nueva": la configuración de antes queda cerrada hasta ayer.
+      await prisma.$transaction([
+        prisma.habitTrack.create({
+          data: {
+            habitId: id,
+            startDate: before.startDate,
+            endDate: toDbDate(addDays(today, -1)),
+            frequency: before.frequency,
+            weekdays: before.weekdays,
+            timesPerWeek: before.timesPerWeek,
+            weekStart: before.weekStart,
+            target: before.target,
+          },
+        }),
+        prisma.habit.update({ where: { id }, data }),
+      ]);
+    } else {
+      await prisma.habit.update({ where: { id }, data });
+    }
     // Si se cambió cuándo toca, la configuración pasa a ser de la app: los backups
     // de HabitNow ya no la pisan (las marcas sí se siguen importando).
     if (
-      before &&
-      (before.frequency !== data.frequency ||
-        before.weekdays.join() !== data.weekdays.join() ||
-        before.timesPerWeek !== data.timesPerWeek ||
-        before.target !== data.target)
+      before.frequency !== data.frequency ||
+      before.weekdays.join() !== data.weekdays.join() ||
+      before.timesPerWeek !== data.timesPerWeek ||
+      before.weekStart !== data.weekStart ||
+      before.target !== data.target
     ) {
       await lockHabitConfig(id);
     }

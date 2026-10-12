@@ -75,9 +75,9 @@ export function linkLabel(url: string): string {
 
 /** Columnas de la tabla de tareas (compu) con su ancho por defecto en px. La última (Progreso) toma lo que sobra. */
 export const TASK_COLUMNS = [
-  { key: "title", label: "Tarea", width: 340 },
-  { key: "status", label: "Estado", width: 150 },
-  { key: "category", label: "Categoría", width: 150 },
+  { key: "title", label: "Tarea", width: 300 },
+  { key: "status", label: "Estado", width: 130 },
+  { key: "category", label: "Categoría", width: 130 },
   { key: "priority", label: "Prioridad", width: 120 },
   { key: "deadline", label: "Deadline", width: 130 },
   { key: "scheduled", label: "Agendada", width: 100 },
@@ -139,6 +139,8 @@ export type TaskDTO = {
   repeatEvery: number;
   /** Orden arrastrado a mano. */
   order: number;
+  /** Cuándo se terminó (ISO), solo las terminadas. */
+  doneAt: string | null;
 };
 
 /** Vistas donde se puede arrastrar: en "Con deadline" manda la fecha y en "Terminadas", cuándo. */
@@ -242,13 +244,51 @@ export function sortBlocks<T extends Pick<BlockDTO, "startTime" | "title"> & { s
  * `sortKey` para soltar un bloque sin hora en la posición `index` de la lista
  * del día (ya ordenada y sin el bloque que se mueve): entre sus dos vecinos.
  */
-export function sortKeyAt<T extends Pick<BlockDTO, "startTime"> & { sortKey?: number | null }>(list: T[], index: number): number {
+export type SortKeyPatch = [id: string, sortKey: number];
+
+/**
+ * Dónde queda un bloque sin hora soltado en la posición `index` de la lista del
+ * día (ya ordenada y sin el bloque que se mueve): `key` es su `sortKey`, entre sus
+ * dos vecinos. Si los vecinos empatan (dos sin lugar guardado valen -1, o uno sin
+ * hora soltado justo a la hora del siguiente), no hay lugar en el medio: se
+ * renumeran los sin hora de ese tramo (entre los dos bloques con hora que lo
+ * rodean) y `others` trae los que cambian, para mandarlos junto con el movimiento.
+ */
+export function placeAt<T extends Pick<BlockDTO, "id" | "startTime"> & { sortKey?: number | null }>(
+  list: T[],
+  index: number,
+): { key: number; others: SortKeyPatch[] } {
   const prev = index > 0 ? blockSortKey(list[index - 1]) : null;
   const next = index < list.length ? blockSortKey(list[index]) : null;
-  if (prev === null && next === null) return -1;
-  if (prev === null) return next! - 10;
-  if (next === null) return prev + 1;
-  return (prev + next) / 2;
+  if (prev === null && next === null) return { key: 0, others: [] };
+  if (prev === null) return { key: next! - 10, others: [] };
+  if (next === null) return { key: prev + 10, others: [] };
+  if (next - prev > 0.001) return { key: (prev + next) / 2, others: [] };
+  // Sin lugar: el tramo de sin hora (en el orden final) alrededor de donde cae.
+  const MOVED = null;
+  const order: (T | typeof MOVED)[] = [...list.slice(0, index), MOVED, ...list.slice(index)];
+  let a = index;
+  while (a > 0 && !order[a - 1]?.startTime) a--;
+  let z = index;
+  while (z < order.length - 1 && !order[z + 1]?.startTime) z++;
+  const lo = a > 0 ? blockSortKey(order[a - 1]!) : null;
+  const hi = z < order.length - 1 ? blockSortKey(order[z + 1]!) : null;
+  const n = z - a + 1;
+  const keyOf = (i: number) =>
+    lo !== null && hi !== null ? lo + ((hi - lo) * (i + 1)) / (n + 1) : lo !== null ? lo + 10 * (i + 1) : hi !== null ? hi - 10 * (n - i) : 10 * i;
+  let key = 0;
+  const others: SortKeyPatch[] = [];
+  for (let i = 0; i < n; i++) {
+    const b = order[a + i];
+    if (b === MOVED) key = keyOf(i);
+    else if (keyOf(i) !== b.sortKey) others.push([b.id, keyOf(i)]);
+  }
+  return { key, others };
+}
+
+/** `sortKey` para un bloque sin hora nuevo: arriba de todo en su día (como antes, pero con lugar propio). */
+export function topSortKey(dayBlocks: (Pick<BlockDTO, "startTime"> & { sortKey?: number | null })[]): number {
+  return dayBlocks.length ? Math.min(0, ...dayBlocks.map(blockSortKey)) - 10 : 0;
 }
 
 /** Un bloque "Libre" es tiempo propio: se ve más tenue. */
@@ -313,6 +353,7 @@ export function applyTaskView(tasks: TaskDTO[], view: TaskView, manualOrder = fa
     case "backlog":
       return tasks.filter((t) => t.status === "backlog").sort(manual ? byOrder : byPriority);
     case "done":
-      return tasks.filter((t) => t.status === "done");
+      // De la terminada más reciente a la más vieja.
+      return tasks.filter((t) => t.status === "done").sort((a, b) => (b.doneAt ?? "").localeCompare(a.doneAt ?? ""));
   }
 }

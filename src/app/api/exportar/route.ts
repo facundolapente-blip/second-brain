@@ -23,8 +23,11 @@ export async function GET(req: Request) {
       include: { account: { select: { name: true, currency: true } }, toAccount: { select: { name: true } }, category: { select: { name: true } } },
     });
     const esc = (v: unknown) => {
-      const s = v === null || v === undefined ? "" : String(v);
-      return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      let s = v === null || v === undefined ? "" : String(v);
+      // Un texto que empieza con = + - @ (o tab / retorno) Excel lo toma como fórmula:
+      // se le antepone ' para que quede como texto. Los números ("-12,50") quedan igual.
+      if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(,\d+)?$/.test(s)) s = `'${s}`;
+      return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const tipo = { expense: "Gasto", income: "Ingreso", transfer: "Transferencia" } as Record<string, string>;
     const rows = [

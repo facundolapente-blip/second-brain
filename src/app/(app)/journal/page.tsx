@@ -154,7 +154,8 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       </div>
 
       {/* Panel de la computadora: la entrada elegida, o el recuerdo y un resumen. */}
-      <div className="hidden lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]">
+      {/* minmax(0,1fr) y min-w-0: un renglón que no se corta (la fecha del panel) no puede ensanchar la columna. */}
+      <div className="hidden min-w-0 lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:grid-cols-[minmax(0,1fr)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]">
         {reading ? (
           <EntryReader key={reading.id} entry={reading} closeHref={closeHref} />
         ) : (

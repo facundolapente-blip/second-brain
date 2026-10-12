@@ -218,7 +218,7 @@ export function AccountsView({
               {sorted.map((a, i) => (
                 <li
                   key={a.id}
-                  className="rise flex items-center gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:pr-2 lg:shadow-[var(--card-shadow)]"
+                  className="rise flex min-w-0 items-center gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:pr-2 lg:shadow-[var(--card-shadow)]"
                   style={{ "--i": i } as React.CSSProperties}
                 >
                   <button
@@ -234,13 +234,13 @@ export function AccountsView({
                         {ACCOUNT_TYPES[a.type] ?? a.type} · {a.currency}
                       </span>
                     </span>
-                    <span className="lg:col-span-2 lg:flex lg:items-baseline lg:justify-between lg:gap-3">
+                    <span className="lg:col-span-2 lg:flex lg:min-w-0 lg:flex-wrap lg:items-baseline lg:justify-between lg:gap-x-3 lg:gap-y-1">
                       <Balance
                         cents={a.balanceCents}
                         currency={a.currency}
                         className="font-mono text-[14px] font-medium lg:font-sans lg:text-[28px] lg:font-semibold lg:tracking-[-0.035em]"
                       />
-                      <span className="hidden font-mono text-[11.5px] text-muted tabular lg:inline">
+                      <span className="hidden font-mono text-[11.5px] whitespace-nowrap text-muted tabular lg:inline">
                         {a.txCount === 1 ? "1 movimiento" : `${a.txCount.toLocaleString("es-UY")} movimientos`}
                       </span>
                     </span>

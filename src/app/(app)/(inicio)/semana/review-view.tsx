@@ -28,7 +28,8 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
   const { now, before } = r;
   const habitsSorted = r.perHabit;
   const strong = habitsSorted.filter((h) => (h.pct ?? 0) >= 80);
-  const weak = habitsSorted.filter((h) => (h.pct ?? 0) < 50);
+  // En la semana en curso no entra lo que todavía se puede cumplir (lo decide `reinforce`).
+  const weak = habitsSorted.filter((h) => h.reinforce);
   const maxSpent = Math.max(1, ...r.days.map((d) => d.spentCents));
   const hasFeel = r.days.some((d) => d.mood !== null || d.energy !== null || d.sleepMin !== null);
 
@@ -100,12 +101,15 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
             <p className="text-[14px] text-muted">Esta semana no tocaba ningún hábito.</p>
           ) : (
             <>
-              <p className="text-[13.5px] text-muted">
-                {strong.length > 0 && <>Firmes: {strong.map((h) => h.name).join(", ")}. </>}
-                {weak.length > 0 && <>Para reforzar: {weak.map((h) => h.name).join(", ")}.</>}
-              </p>
-              <div className="grid grid-cols-[minmax(0,1fr)_repeat(7,1.25rem)_2.5rem] sm:grid-cols-[minmax(0,1fr)_repeat(7,1.5rem)_3rem] items-center gap-x-1.5 gap-y-2 text-[13.5px]">
-                <span />
+              {(strong.length > 0 || weak.length > 0) && (
+                <p className="text-[13.5px] text-muted">
+                  {strong.length > 0 && <>Firmes: {strong.map((h) => h.name).join(", ")}. </>}
+                  {weak.length > 0 && <>Para reforzar: {weak.map((h) => h.name).join(", ")}.</>}
+                </p>
+              )}
+              {/* En el celular el nombre va arriba y los siete días debajo (a lo ancho), así se lee entero. */}
+              <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_2.75rem] items-center gap-x-1.5 gap-y-1.5 text-[13.5px] sm:grid-cols-[minmax(0,1fr)_repeat(7,1.5rem)_3rem] sm:gap-y-2">
+                <span className="hidden sm:block" />
                 {r.days.map((d) => (
                   <span key={d.date} className="text-center font-mono text-[10.5px] text-muted">
                     {WD[weekday(d.date)]}
@@ -221,7 +225,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
               value={now.blocksTotal ? `${Math.round((now.blocksDone / now.blocksTotal) * 100)}%` : "–"}
               sub={`${now.blocksDone} de ${now.blocksTotal}`}
             />
-            <Mini label="Palabras escritas" value={now.words.toLocaleString("es-UY")} sub={`${now.wroteDays} días`} />
+            <Mini label="Palabras escritas" value={now.words.toLocaleString("es-UY")} sub={now.wroteDays === 1 ? "1 día" : `${now.wroteDays} días`} />
           </dl>
           {r.tasksDone.length > 0 && (
             <div className="grid gap-1.5">
@@ -265,20 +269,23 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
 function HabitRow({ h, days }: { h: WeeklyReview["perHabit"][number]; days: WeeklyReview["days"] }) {
   return (
     <>
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="col-span-full mt-1.5 flex min-w-0 items-center gap-2 sm:col-span-1 sm:mt-0">
         <HabitAvatar icon={h.icon} color={h.color} size={26} />
         <span className="min-w-0 truncate" title={h.name}>{h.name}</span>
       </span>
       {days.map((d) => {
         const v = d.habit[h.id];
+        // Toca y todavía se puede hacer (hoy, o un semanal con la semana en curso): sin rojo.
+        const open = v === false && d.habitOpen.includes(h.id);
         return (
           <span
             key={d.date}
-            title={`${formatShort(d.date)}: ${v === undefined ? "no tocaba" : v ? "hecho" : "no"}`}
+            title={`${formatShort(d.date)}: ${v === undefined ? "no tocaba" : v ? "hecho" : open ? "todavía se puede" : "no"}`}
             className={cx(
-              "mx-auto size-4 rounded-full sm:size-5",
+              "mx-auto size-5 rounded-full",
               v === true && "bg-[var(--st-done-line)]",
-              v === false && "bg-[var(--st-fail-bg)] ring-1 ring-[var(--st-fail-line)]/40",
+              v === false && !open && "bg-[var(--st-fail-bg)] ring-1 ring-[var(--st-fail-line)]/40",
+              open && "border-2 border-dashed border-line-strong",
               v === undefined && "bg-surface-2",
             )}
           />

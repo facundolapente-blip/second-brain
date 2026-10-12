@@ -3,7 +3,8 @@ import { prisma } from "./prisma";
 import { backupWarning } from "./backup";
 import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
-import { currentStreak as habitStreak, dayProgress, dayState, packAll, showsOn } from "./habit-logic";
+import { currentStreak as habitStreak, dayProgress, dayState, habitDayMark, packAll, showsOn } from "./habit-logic";
+import { getWrittenDays, NOT_EMPTY } from "./journal";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
 import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL, runSchedules } from "./finance";
 import { budgetState, monthShare } from "./budget-logic";
@@ -57,16 +58,14 @@ export async function getDashboard() {
     getCategoryBudgets(today.slice(0, 7)),
     backupWarning(),
   ]);
-  const [habitData, journalDays, lastEntry, accounts, flows, categories, blocks, blockLogs, tasks, habitOrderFlag] = await Promise.all([
+  const [habitData, archivedData, written, lastEntry, accounts, flows, categories, blocks, blockLogs, tasks, habitOrderFlag] = await Promise.all([
     getHabitsWithLogs(),
-    prisma.journalEntry.findMany({
-      where: { OR: [{ title: { not: null } }, { body: { not: "" } }] },
-      select: { date: true },
-      distinct: ["date"],
-      orderBy: { date: "asc" },
-    }),
+    // Los archivados cuentan en los días de antes (Tu semana, Constancia), no en los de hoy.
+    getHabitsWithLogs({ archived: true }),
+    // Escribiste = el criterio del Journal, así la racha y los días coinciden con los suyos.
+    getWrittenDays(),
     prisma.journalEntry.findFirst({
-      where: { OR: [{ title: { not: null } }, { body: { not: "" } }] },
+      where: NOT_EMPTY,
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       select: { id: true, date: true, title: true, body: true, mood: true },
     }),
@@ -114,17 +113,30 @@ export async function getDashboard() {
     // Los mismos que muestra la lista Hoy (`showsOn`), así las cifras coinciden.
     .filter((h) => showsOn(habits.find((x) => x.id === h.id)!, logs[h.id] ?? {}, today));
 
-  // Misma regla que la lista de Hoy (los hábitos que aparecen ese día), así coinciden.
+  // Hoy: la misma cuenta que el anillo y la lista de Hoy (`dayProgress`, sin salteados).
+  const progressToday = dayProgress(habits, logs, today, today);
+  const skippedToday = habits.filter((h) => showsOn(h, logs[h.id] ?? {}, today) && logs[h.id]?.[today]?.s === "skipped").length;
+  // Los días de antes, con la misma regla (`habitDayMark` = `dayProgress` de a uno), más
+  // los hábitos archivados hasta el día en que se archivaron.
+  const allHabits = [...habits, ...archivedData.habits];
+  const allLogs = { ...archivedData.logs, ...logs };
   const habitDay = (iso: string) => {
-    const { done, total } = dayProgress(habits, logs, iso, today);
-    return { done, due: total };
+    if (iso === today) return { done: progressToday.done, due: progressToday.total };
+    let done = 0;
+    let due = 0;
+    for (const h of allHabits) {
+      const mark = habitDayMark(h, allLogs[h.id] ?? {}, iso, today);
+      if (!mark) continue;
+      due++;
+      if (mark === "done") done++;
+    }
+    return { done, due };
   };
   const habitHistory: { date: string; done: number; due: number }[] = [];
   for (let iso = heatFrom; iso <= today; iso = addDays(iso, 1)) habitHistory.push({ date: iso, ...habitDay(iso) });
   const bestHabitStreak = [...habitsToday].sort((a, b) => b.streak - a.streak)[0] ?? null;
 
   // ─── Journal ──────────────────────────────────────────────────────────────
-  const written = journalDays.map((r) => fromDbDate(r.date));
   const writtenSet = new Set(written);
   const monthWritten = written.filter((d) => d.startsWith(month)).length;
 
@@ -235,9 +247,9 @@ export async function getDashboard() {
     checkin: { today: checkToday, yesterday: checkYesterday, lastWeightG: weight },
     habits: {
       today: habitsToday,
-      doneToday: habitsToday.filter((h) => h.state === "done").length,
-      skippedToday: habitsToday.filter((h) => h.state === "skipped").length,
-      dueToday: habitsToday.length,
+      doneToday: progressToday.done,
+      skippedToday,
+      dueToday: progressToday.total,
       // Para la tarjeta de Inicio, que es la misma lista que Hoy (filas, orden, marcas).
       list: habits,
       packed: packAll(logs),

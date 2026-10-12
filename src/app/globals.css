@@ -113,7 +113,9 @@
   --border-strong: color-mix(in oklab, var(--mod) 16%, #d0d3cc);
   --text: #1b1e1a;
   --muted: #5d625a;
-  --faint: #868b82;
+  /* Placeholders, íconos, trazos y marcas de "vacío": ≥4,5:1 sobre --surface y ≥3,9:1 sobre
+     el --bg de cualquier módulo. Texto chico que tenga que leerse sobre --bg: --muted. */
+  --faint: #6b7067;
   --ink: color-mix(in oklab, var(--mod) 88%, black);
   --on-ink: #ffffff;
   --accent: var(--mod);
@@ -134,6 +136,10 @@
 [data-module="gastos"] { --mod: var(--mod-gastos); }
 [data-module="plan"] { --mod: var(--mod-plan); }
 [data-module="inicio"] { --mod: var(--mod-inicio); }
+/* Plan en claro: el ámbar del módulo no da contraste como acento (2,8:1 sobre el fondo y
+   3,4:1 con el blanco de las casillas tildadas). El acento es un ámbar tostado (5,6:1 con
+   blanco, 4,6:1 sobre --bg); el fondo y los tonos suaves siguen con --mod-plan. */
+:root:not([data-theme="oscuro"]) [data-module="plan"] { --accent: #9c5510; }
 
 /* ── Oscuro: carbón; cada módulo aporta su resplandor y su acento ── */
 :root[data-theme="oscuro"] {
@@ -142,7 +148,7 @@
   --c-gastos: color-mix(in oklab, var(--mod-gastos) 70%, white);
   --c-plan: color-mix(in oklab, var(--mod-plan) 75%, white);
   --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
-  --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #79756d;
+  --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #8f8b83;
   --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);
   --accent: #7cc4a0; --accent-soft: #1f2d26; --accent-fg: #a3dbbe; --on-accent: #0f1a14;
   --shadow-tint: 0, 0, 0; --grain-opacity: 0.04;

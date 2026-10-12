@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
 import { signOut } from "@/lib/auth-client";
-import { THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
+import { THEME_COLOR, THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
 import { flushQueue, pendingCount } from "@/lib/offline-queue";
 import { flushActions, pendingActions, subscribePending } from "@/lib/offline/registry";
@@ -123,6 +123,11 @@ function applyTheme(t: Theme) {
   document.cookie = `${THEME_COOKIE}=${t}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
   const set = () => {
     document.documentElement.dataset.theme = t;
+    // La barra de estado del celular cambia con el tema (la etiqueta la puso el layout raíz).
+    for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+      m.content = THEME_COLOR[t];
+      m.removeAttribute("media");
+    }
   };
   // Claro y oscuro se cruzan en un fundido donde el navegador lo permite (si no, cambia directo).
   const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
@@ -133,10 +138,10 @@ function applyTheme(t: Theme) {
 /** Elegir el tema: se guarda en una cookie (la lee el servidor) y se aplica al instante. */
 /**
  * Cerrar sesión (abajo del menú). Pide un segundo toque para no salir sin querer
- * y borra las pantallas guardadas para usar sin señal (tienen tus datos).
+ * y borra todo lo guardado en el aparato (tiene tus datos): colas sin subir
+ * (antes intenta subirlas), cachés del service worker y el service worker mismo.
  */
 function SignOutButton() {
-  const router = useRouter();
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -146,18 +151,42 @@ function SignOutButton() {
   }, [armed]);
   async function out() {
     setBusy(true);
+    // Con señal, lo pendiente se sube antes de salir (después se borra del aparato).
+    if (navigator.onLine) {
+      try {
+        await flushQueue();
+        await flushActions();
+      } catch {
+        // Lo que no se pudo subir se pierde al salir: es lo mismo que pasaría sin señal.
+      }
+    }
     try {
       await signOut();
     } catch {
       // Sin señal: igual se borra lo guardado y se va al login.
     }
+    // Todo lo que quedó en el aparato tiene datos: colas sin subir, pantallas y
+    // fotos guardadas para usar sin señal y el service worker.
+    for (const store of [localStorage, sessionStorage]) {
+      try {
+        for (const k of Object.keys(store)) if (k.startsWith("sb_")) store.removeItem(k);
+      } catch {
+        // Almacenamiento bloqueado: nada que borrar.
+      }
+    }
     try {
-      for (const k of await caches.keys()) if (k.startsWith("pages-")) await caches.delete(k);
+      for (const k of await caches.keys()) await caches.delete(k);
     } catch {
       // Navegador sin caché: nada que borrar.
     }
-    router.replace("/login");
-    router.refresh();
+    try {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    } catch {
+      // Sin service worker (en la compu de desarrollo no se registra).
+    }
+    // Carga completa (no navegación del cliente): así no queda nada en memoria
+    // (las colas guardan una copia) y el service worker se vuelve a registrar al entrar.
+    window.location.replace("/login");
   }
   return (
     <button
@@ -282,7 +311,25 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
     if (!drawer) return;
     const opener = document.activeElement as HTMLElement | null;
     drawerRef.current?.querySelector<HTMLElement>("a[href], button")?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return setDrawer(false);
+      // Abierto es modal: Tab y Shift+Tab dan la vuelta dentro del cajón.
+      if (e.key !== "Tab" || !drawerRef.current) return;
+      const items = [...drawerRef.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex='-1'])")].filter(
+        (el) => el.getClientRects().length > 0,
+      );
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const inside = drawerRef.current.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);

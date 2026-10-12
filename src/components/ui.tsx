@@ -85,6 +85,22 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
 );
 
 /** Grupo de opciones excluyentes con aspecto de interruptor segmentado. */
+/**
+ * Teclado de un grupo de radios (Segmented, PillSwitch): flechas izquierda/derecha
+ * (y arriba/abajo), Inicio y Fin. Devuelve a qué opción pasar, o null si no es una de esas teclas.
+ */
+export function radioKeyTarget(e: React.KeyboardEvent, index: number, count: number): number | null {
+  if (e.altKey || e.ctrlKey || e.metaKey || count < 2) return null;
+  let to: number;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") to = (index + 1) % count;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = (index - 1 + count) % count;
+  else if (e.key === "Home") to = 0;
+  else if (e.key === "End") to = count - 1;
+  else return null;
+  e.preventDefault();
+  return to;
+}
+
 export function Segmented<T extends string>({
   name,
   value,
@@ -98,7 +114,16 @@ export function Segmented<T extends string>({
 }) {
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   return (
-    <div className="relative grid auto-cols-fr grid-flow-col rounded-[5px] border border-line bg-surface-2 p-[3px]" role="radiogroup">
+    <div
+      className="relative grid auto-cols-fr grid-flow-col rounded-[5px] border border-line bg-surface-2 p-[3px]"
+      role="radiogroup"
+      onKeyDown={(e) => {
+        const to = radioKeyTarget(e, index, options.length);
+        if (to === null) return;
+        onChange(options[to].value);
+        e.currentTarget.querySelectorAll<HTMLElement>("[role=radio]")[to]?.focus();
+      }}
+    >
       {/* La marca de lo elegido se desliza a la opción nueva (las columnas son iguales). */}
       <span
         aria-hidden
@@ -111,6 +136,8 @@ export function Segmented<T extends string>({
           key={o.value}
           role="radio"
           aria-checked={value === o.value}
+          // Como un grupo de radios nativo: Tab entra solo a lo elegido y las flechas cambian.
+          tabIndex={o.value === options[index]?.value ? 0 : -1}
           onClick={() => onChange(o.value)}
           className={cx(
             "relative h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors",

@@ -191,8 +191,12 @@ model CategoryBudget {
   categoryId String   @unique
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   amount     Decimal  @db.Decimal(14, 2)
-  /// Solo cuentan los gastos de cuentas en esta moneda.
+  /// Moneda del presupuesto: los gastos en otra moneda se pasan con la cotización de hoy.
   currency   String   @default("UYU")
+  /// "Pasar lo que sobra al mes siguiente": lo que no se gastó se suma al mes que viene.
+  rollover   Boolean  @default(false)
+  /// Primer mes (día 1) desde que se activó el arrastre; null si no tiene.
+  rolloverSince DateTime? @db.Date
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

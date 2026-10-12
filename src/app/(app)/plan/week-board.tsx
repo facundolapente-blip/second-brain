@@ -1,10 +1,10 @@
 "use client";
 
 import { useNewIds } from "@/components/motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
-import { HOURS_TODO_FOLD_COOKIE, isFreeBlock, sortKeyAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, TASK_DRAG } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, isFreeBlock, placeAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type SortKeyPatch, TASK_DRAG } from "@/lib/plan-logic";
 import { PRIORITIES, PriorityDots } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -18,11 +18,11 @@ type Props = {
   onToggle: (b: BlockDTO) => void;
   onEdit: (b: BlockDTO) => void;
   onNew: (date: string, startTime?: string) => void;
-  onMove: (id: string, date: string, startTime?: string | null, sortKey?: number) => void;
+  onMove: (id: string, date: string, startTime?: string | null, sortKey?: number, others?: SortKeyPatch[]) => void;
   /** Clic derecho en un bloque (duplicar, cambiar nombre...). */
   onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
   /** Soltar una tarea de la tabla en un día (o una hora): la agenda. */
-  onDropTask?: (taskId: string, date: string, startTime: string | null, sortKey?: number) => void;
+  onDropTask?: (taskId: string, date: string, startTime: string | null, sortKey?: number, others?: SortKeyPatch[]) => void;
 };
 const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes(DRAG) || e.dataTransfer.types.includes(TASK_DRAG);
 
@@ -95,7 +95,8 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               if (taskId) {
                 setOver(null);
                 setSlot(null);
-                onDropTask?.(taskId, d, null, sortKeyAt(list, dropIndex(e.currentTarget, e.clientY, null)));
+                const p = placeAt(list, dropIndex(e.currentTarget, e.clientY, null));
+                onDropTask?.(taskId, d, null, p.key, p.others);
                 return;
               }
               const id = e.dataTransfer.getData(DRAG);
@@ -105,7 +106,8 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
               if (!id) return;
               if (untimed && dragging.id === id) {
                 const rest = list.filter((b) => b.id !== id);
-                onMove(id, d, undefined, sortKeyAt(rest, dropIndex(e.currentTarget, e.clientY, id)));
+                const p = placeAt(rest, dropIndex(e.currentTarget, e.clientY, id));
+                onMove(id, d, undefined, p.key, p.others);
               } else onMove(id, d);
             }}
             className={cx(
@@ -127,7 +129,7 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                   {Number(d.slice(8))}
                 </span>
               </span>
-              <span className="pb-1 font-mono text-[11px] text-faint tabular">{list.filter((b) => !isFreeBlock(b)).length || ""}</span>
+              <span className="pb-1 font-mono text-[11px] text-muted tabular">{list.filter((b) => !isFreeBlock(b)).length || ""}</span>
             </header>
             {list.map((b) => {
               const others = list.filter((x) => x.id !== dragging?.id);
@@ -188,7 +190,12 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
 const FROM = 6;
 const TO = 24;
 const ROW = 60; // px por hora
+const SNAP = 15; // al soltar, la hora se redondea a cuartos de hora
 const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+/** Lo que se arrastra en la vista por horas: cuánto dura (min) y a qué altura de la tarjeta se agarró (px). */
+type HourDrag = { dur: number; offset: number };
 
 /**
  * Escritorio, vista por horas: como un calendario. Arriba lo que no tiene
@@ -197,6 +204,25 @@ const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, onDropTask, todoFolded = false }: Props & { todoFolded?: boolean }) {
   const fresh = useNewIds(days.flatMap((d) => byDay.get(d)!.map((b) => `${d}:${b.id}:${b.startTime ?? ""}`)));
   const [over, setOver] = useState<string | null>(null);
+  // Dónde caería lo arrastrado en la grilla (día y minuto de inicio, ya redondeado).
+  const [drop, setDrop] = useState<{ day: string; min: number; dur: number } | null>(null);
+  // Lo que se arrastra (el navegador no deja leer los datos durante el arrastre).
+  const grab = useRef<HourDrag | null>(null);
+  useEffect(() => {
+    const clear = () => {
+      grab.current = null;
+      setDrop(null);
+    };
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
+  const onGrab = (offset: number, dur: number) => {
+    grab.current = { offset, dur };
+  };
   // Los bloques sin hora son pendientes del día: lista corta arriba que se pliega (cookie: se recuerda entre visitas).
   const [folded, setFolded] = useState(todoFolded);
   function toggleFold() {
@@ -204,7 +230,16 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
     setFolded(next);
     document.cookie = `${HOURS_TODO_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
   }
-  const hours = Array.from({ length: TO - FROM }, (_, i) => FROM + i);
+  // La grilla arranca a las 6, o antes si algún bloque de estos días empieza más temprano.
+  const from = Math.min(FROM, ...days.flatMap((d) => byDay.get(d)!.filter((b) => b.startTime).map((b) => Math.floor(mins(b.startTime!) / 60))));
+  const hours = Array.from({ length: TO - from }, (_, i) => from + i);
+  // Minuto de inicio según la altura del puntero en la columna: el borde de arriba
+  // de la tarjeta arrastrada (no el puntero), redondeado a 15 minutos.
+  const minuteAt = (e: React.DragEvent<HTMLElement>) => {
+    const y = e.clientY - e.currentTarget.getBoundingClientRect().top - (grab.current?.offset ?? 0);
+    const m = from * 60 + Math.round((y / ROW) * (60 / SNAP)) * SNAP;
+    return Math.max(from * 60, Math.min(TO * 60 - SNAP, m));
+  };
   // Columnas que se achican hasta 7,5rem: entran los 7 días desde ~1280 px (como Lista).
   const cols = `3.5rem repeat(${days.length}, minmax(${days.length > 1 ? "7.5rem" : "0"}, 1fr))`;
   return (
@@ -268,7 +303,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                 <div className="fold" data-closed={folded || undefined}>
                   <ul className="grid min-w-0">
                     {todo.map((b) => (
-                      <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} />
+                      <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} onGrab={onGrab} />
                     ))}
                   </ul>
                 </div>
@@ -288,9 +323,33 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
             ))}
           </div>
           {days.map((d) => (
-            <div key={d} className={cx("relative border-l border-line", d === today && "bg-[color-mix(in_oklab,var(--accent)_3%,transparent)]")}>
+            // La columna entera recibe lo que se suelta (también encima de otro bloque o
+            // del mismo que se arrastra): la hora sale de la altura, en cuartos de hora.
+            <div
+              key={d}
+              onDragOver={(e) => {
+                if (!accepts(e)) return;
+                e.preventDefault();
+                const min = minuteAt(e);
+                const dur = grab.current?.dur ?? 60;
+                setDrop((o) => (o?.day === d && o.min === min && o.dur === dur ? o : { day: d, min, dur }));
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                setDrop((o) => (o?.day === d ? null : o));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const time = hhmm(minuteAt(e));
+                setDrop(null);
+                const taskId = e.dataTransfer.getData(TASK_DRAG);
+                if (taskId) return onDropTask?.(taskId, d, time);
+                const id = e.dataTransfer.getData(DRAG);
+                if (id) onMove(id, d, time);
+              }}
+              className={cx("relative border-l border-line", d === today && "bg-[color-mix(in_oklab,var(--accent)_3%,transparent)]")}
+            >
               {hours.map((h) => {
-                const slot = `${d}|${h}`;
                 const time = `${String(h).padStart(2, "0")}:00`;
                 return (
                   <button
@@ -298,29 +357,13 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                     type="button"
                     aria-label={`Nuevo bloque ${WEEKDAY_LONG[weekday(d)]} a las ${time}`}
                     onClick={() => onNew(d, time)}
-                    onDragOver={(e) => {
-                      if (!accepts(e)) return;
-                      e.preventDefault();
-                      setOver(slot);
-                    }}
-                    onDragLeave={() => setOver((o) => (o === slot ? null : o))}
-                    onDrop={(e) => {
-                      setOver(null);
-                      const taskId = e.dataTransfer.getData(TASK_DRAG);
-                      if (taskId) return onDropTask?.(taskId, d, time);
-                      const id = e.dataTransfer.getData(DRAG);
-                      if (id) onMove(id, d, time);
-                    }}
                     style={{ height: ROW }}
-                    className={cx(
-                      "block w-full border-t border-line/60 transition-colors hover:bg-surface-2",
-                      over === slot && "bg-[color-mix(in_oklab,var(--accent)_16%,transparent)]",
-                    )}
+                    className="block w-full border-t border-line/60 transition-colors hover:bg-surface-2"
                   />
                 );
               })}
-              {lanesOf(byDay.get(d)!.filter((b) => b.startTime)).map(({ b, start, end, lane, lanes }) => {
-                  const top = ((start - FROM * 60) / 60) * ROW;
+              {lanesOf(byDay.get(d)!.filter((b) => b.startTime), from).map(({ b, start, end, lane, lanes }) => {
+                  const top = ((start - from * 60) / 60) * ROW;
                   const height = Math.max(22, ((end - start) / 60) * ROW - 2);
                   return (
                     <div
@@ -329,10 +372,20 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                       className={cx("absolute", fresh.has(`${d}:${b.id}:${b.startTime ?? ""}`) && "reveal")}
                       style={{ top, height, left: `calc(${(lane / lanes) * 100}% + 3px)`, width: `calc(${100 / lanes}% - 6px)` }}
                     >
-                      <Chip b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} full />
+                      <Chip b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} onGrab={onGrab} dur={end - start} full />
                     </div>
                   );
                 })}
+              {/* Dónde va a quedar: el lugar con su hora (no recibe el puntero). */}
+              {drop?.day === d && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-[3px] z-[1] rounded-lg border-2 border-dashed border-accent bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] px-1.5 py-0.5"
+                  style={{ top: ((drop.min - from * 60) / 60) * ROW, height: Math.max(22, (drop.dur / 60) * ROW - 2) }}
+                >
+                  <span className="font-mono text-[11px] font-semibold text-accent-fg tabular">{hhmm(drop.min)}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -347,10 +400,10 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
  * Bloques que se pisan en el horario van lado a lado (como en un calendario):
  * cada grupo de bloques encadenados se reparte en carriles.
  */
-function lanesOf(blocks: BlockDTO[]) {
+function lanesOf(blocks: BlockDTO[], from: number) {
   const items = blocks
     .map((b) => {
-      const start = Math.max(FROM * 60, mins(b.startTime!));
+      const start = Math.max(from * 60, mins(b.startTime!));
       return { b, start, end: Math.max(start + 30, b.endTime ? mins(b.endTime) : start + 60), lane: 0, lanes: 1 };
     })
     .sort((x, y) => x.start - y.start || y.end - x.end);
@@ -386,12 +439,15 @@ function TodoRow({
   onEdit,
   onToggle,
   onMenu,
+  onGrab,
 }: {
   b: BlockDTO;
   cats: Map<string, CategoryDTO>;
   onEdit: (b: BlockDTO) => void;
   onToggle: (b: BlockDTO) => void;
   onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
+  /** Al empezar a arrastrarlo: sin hora cae con su borde de arriba en el puntero y dura una hora. */
+  onGrab?: (offset: number, dur: number) => void;
 }) {
   const c = b.categoryId ? cats.get(b.categoryId) : null;
   const free = isFreeBlock(b);
@@ -405,6 +461,7 @@ function TodoRow({
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG, b.id);
         e.dataTransfer.effectAllowed = "move";
+        onGrab?.(0, 60);
       }}
       className="flex min-h-9 min-w-0 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2"
       title="Arrastralo a una hora para agendarlo"
@@ -448,6 +505,8 @@ function Chip({
   onEdit,
   onToggle,
   onMenu,
+  onGrab,
+  dur = 60,
   full,
 }: {
   b: BlockDTO;
@@ -455,6 +514,9 @@ function Chip({
   onEdit: (b: BlockDTO) => void;
   onToggle: (b: BlockDTO) => void;
   onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
+  /** Al empezar a arrastrarlo: a qué altura se agarró (px) y cuánto dura (min). */
+  onGrab?: (offset: number, dur: number) => void;
+  dur?: number;
   full?: boolean;
 }) {
   const [tapped, setTapped] = useState(false);
@@ -467,6 +529,7 @@ function Chip({
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG, b.id);
         e.dataTransfer.effectAllowed = "move";
+        onGrab?.(e.clientY - e.currentTarget.getBoundingClientRect().top, dur);
       }}
       // "Libre": verde suave en vez del color de su categoría.
       style={tone(isFreeBlock(b) ? "green" : (c?.color ?? "stone"))}
@@ -504,9 +567,11 @@ function Chip({
             setTapped(true);
             onToggle(b);
           }}
-          aria-label={b.done ? "Marcar como no hecho" : "Marcar como hecho"}
+          aria-pressed={b.done}
+          aria-label={b.done ? `${b.title}: hecho. Desmarcar` : `Marcar ${b.title} como hecho`}
           className={cx(
-            "inline-flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--dur-quick)]",
+            // El dibujo mide 16 px pero el área para tocar es de ~40 (pseudo-elemento; la tarjeta la recorta si es más baja).
+            "relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--dur-quick)] before:absolute before:-inset-3 before:content-['']",
             b.done ? "border-current bg-current" : "border-current/60",
           )}
         >

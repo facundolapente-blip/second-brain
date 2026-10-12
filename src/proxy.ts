@@ -29,7 +29,8 @@ export async function proxy(request: NextRequest) {
   }
 
   const login = new URL("/login", request.url);
-  if (pathname !== "/") login.searchParams.set("volver", pathname + search);
+  // Solo una ruta de esta app ("//otro.com" sería una redirección abierta al volver del login).
+  if (pathname !== "/" && /^\/(?!\/|\\)/.test(pathname)) login.searchParams.set("volver", pathname + search);
   return NextResponse.redirect(login);
 }
 

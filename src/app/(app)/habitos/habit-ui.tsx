@@ -4,7 +4,9 @@ import { useSlide } from "@/components/motion";
 import { useSafeTransition } from "@/components/safe-action";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { enqueue, flushQueue, isNetworkError, pendingOps } from "@/lib/offline-queue";
+import { dropPending, enqueue, flushQueue, isNetworkError, pendingOps, subscribeQueue } from "@/lib/offline-queue";
+import { isSessionExpired, isStaleDeploy, reloadForNewVersion } from "@/lib/offline/queue";
+import { notifyError } from "@/components/undo-toast";
 import { ArrowBendUpRight, CaretLeft, CaretRight, Check, Flag, Minus, Plus, X } from "@phosphor-icons/react";
 import { reorderHabits, setHabitLog } from "@/lib/offline/habit";
 import {
@@ -63,46 +65,83 @@ function withMark(state: Record<string, LogMap>, m: Mark): Record<string, LogMap
   return { ...state, [m.habitId]: next };
 }
 
+/** Marcas de la cola sin señal (las de hábitos), como `Mark`. */
+function queuedMarks(): Mark[] {
+  return pendingOps()
+    .filter((o) => o.type === "habit")
+    .map((o) => ({ habitId: o.habitId, date: o.date, status: o.status, value: o.value, note: o.note }));
+}
+
 export function useHabitLogs(packed: PackedLogMap) {
   const router = useRouter();
-  // Marcas hechas sin señal que todavía no llegaron al servidor (ver offline-queue).
-  const [queued, setQueued] = useState<Mark[]>([]);
+  // Marcas hechas sin señal que todavía no llegaron al servidor (ver offline-queue),
+  // y las que acaban de subir: siguen encima de `packed` hasta que llega la versión
+  // nueva del servidor (si no, por un momento se vería el estado de antes).
+  const [queue, setQueue] = useState<{ ops: Mark[]; sent: Mark[]; sentFor: PackedLogMap | null }>({
+    ops: [],
+    sent: [],
+    sentFor: null,
+  });
   useEffect(() => {
-    const load = () => setQueued(pendingOps().filter((o) => o.type === "habit"));
+    // Se relee cada vez que la cola cambia, también cuando la sube el Shell: si no,
+    // una marca vieja ya subida tapaba a la nueva hasta recargar.
+    const load = (sent: Mark[] = []) =>
+      setQueue((q) => ({
+        ops: queuedMarks(),
+        sent: sent.length ? [...(q.sentFor === packed ? q.sent : []), ...sent] : q.sent,
+        sentFor: sent.length ? packed : q.sentFor,
+      }));
     load();
+    const unsub = subscribeQueue((c) => load(c.sent));
     const online = async () => {
       if ((await flushQueue()) > 0) router.refresh();
-      load();
     };
     window.addEventListener("online", online);
-    return () => window.removeEventListener("online", online);
-  }, [router]);
+    return () => {
+      unsub();
+      window.removeEventListener("online", online);
+    };
+  }, [router, packed]);
+  const sent = queue.sentFor === packed ? queue.sent : EMPTY;
   // Llegan compactas (ver packLogs); se abren una vez por cada versión del servidor.
-  const initial = useMemo(() => queued.reduce(withMark, unpackAll(packed)), [packed, queued]);
+  const initial = useMemo(() => [...sent, ...queue.ops].reduce(withMark, unpackAll(packed)), [packed, sent, queue.ops]);
   const [logs, apply] = useOptimistic(initial, withMark);
   const [, startTransition] = useSafeTransition();
 
   const mark: MarkFn = (habitId, date, status, value = 1, note) => {
-    const m: Mark = { habitId, date, status, value, note };
-    const keep = () => {
-      enqueue({ type: "habit", ...m });
-      setQueued((q) => [...q, m]);
-    };
-    if (!navigator.onLine) return keep();
+    // Una marca nueva reemplaza a las que seguían en la cola para ese día (si no, al
+    // subir después pisarían a esta); se queda con la nota que traían.
+    const keptNote = dropPending(habitId, date);
+    const m: Mark = { habitId, date, status, value, note: note === undefined ? keptNote : note };
+    if (!navigator.onLine) return enqueue({ type: "habit", ...m });
     startTransition(async () => {
       apply(m);
       try {
-        await setHabitLog(habitId, date, status, value, note);
+        await setHabitLog(habitId, date, status, value, m.note);
       } catch (e) {
-        // Se cortó la señal en el medio: queda en la cola. Otro error no se reintenta.
-        if (isNetworkError(e)) keep();
-        else router.refresh();
+        // Se cortó la señal en el medio: queda en la cola (y se sigue viendo).
+        if (isNetworkError(e)) return enqueue({ type: "habit", ...m });
+        // Versión nueva publicada con la pantalla abierta: se guarda y se recarga.
+        if (isStaleDeploy(e)) {
+          enqueue({ type: "habit", ...m });
+          return reloadForNewVersion();
+        }
+        // Sesión vencida: queda guardada hasta que se vuelva a entrar.
+        if (isSessionExpired(e)) {
+          enqueue({ type: "habit", ...m });
+          return notifyError("Sesión vencida: la marca quedó guardada en este aparato. Entrá de nuevo para subirla.");
+        }
+        // El servidor la rechazó: la marca vuelve a como estaba, con aviso.
+        notifyError("No se pudo guardar la marca. Volvió a como estaba.");
+        router.refresh();
       }
     });
   };
 
   return { logs, mark };
 }
+
+const EMPTY: Mark[] = [];
 
 export function isCountHabit(h: Pick<HabitDTO, "target" | "unit">) {
   return h.target > 1 || !!h.unit;
@@ -364,6 +403,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
     const current = habit && target ? logs[habit.id]?.[target.date] : undefined;
     const marked = current && current.s !== "none" ? (current.s as LogStatus) : null;
     const noteChanged = note.trim() !== (current?.n ?? "");
+    const valueChanged = isCount && value !== (current?.s === "done" ? current.v : 0);
 
     function apply(status: LogStatus | null, v = 1) {
       if (!habit || !target) return;
@@ -376,11 +416,13 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
       <Sheet
         ref={sheet}
         title={habit?.name ?? ""}
-        // Una nota escrita no se pierde al cerrar con la X, Escape o arrastrando: se guarda igual.
+        // Una nota escrita o una cantidad cambiada no se pierden al cerrar con la X,
+        // Escape o arrastrando: se guardan igual (la cantidad, como con "Guardar").
         onClose={() => {
-          if (handled.current || !habit || !target || !noteChanged) return;
+          if (handled.current || !habit || !target || (!noteChanged && !valueChanged)) return;
           handled.current = true;
-          mark(habit.id, target.date, marked, current?.v ?? 1, note);
+          if (valueChanged) mark(habit.id, target.date, value > 0 ? "done" : null, value, note);
+          else mark(habit.id, target.date, marked, current?.v ?? 1, note);
         }}
       >
         {habit && target && (
@@ -420,6 +462,21 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   >
                     <Plus size={20} weight="bold" />
                   </button>
+                </div>
+                {/* Atajos: solo cambian el número (se guarda con Guardar o al cerrar la hoja). */}
+                <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Atajos de cantidad">
+                  {stepOf(habit.target) > 1 && (
+                    <Button variant="outline" size="sm" onClick={() => setValue((v) => v + stepOf(habit.target))}>
+                      +{stepOf(habit.target)}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" disabled={value >= habit.target} onClick={() => setValue(habit.target)}>
+                    <Check size={14} weight="bold" aria-hidden />
+                    Completar
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={value === 0} onClick={() => setValue(0)}>
+                    Poner en 0
+                  </Button>
                 </div>
                 <Button variant="accent" onClick={() => apply(value > 0 ? "done" : null, value)}>
                   Guardar
@@ -492,6 +549,19 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
     );
   },
 );
+
+/**
+ * Paso del atajo "+N" de la hoja: con metas chicas ya están el + y el − (paso 1);
+ * con metas grandes, un cuarto de la meta redondeado a 1, 2 o 5 por potencia de 10
+ * (2000 ml → +500, 30 páginas → +5, 8 vasos → sin atajo).
+ */
+function stepOf(target: number): number {
+  if (target <= 10) return 1;
+  const raw = target / 4;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const nice = [1, 2, 5, 10].map((m) => m * pow).filter((n) => n <= raw);
+  return Math.max(1, nice.at(-1) ?? pow);
+}
 
 function StatusOption({
   active,

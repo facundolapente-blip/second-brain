@@ -45,7 +45,8 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
   const past = days.filter((d) => d.habitsDue > 0 || d.spentCents > 0 || d.wrote || d.mood !== null);
 
   for (const h of habits) {
-    const done = (d: DayMetrics) => (h.id in d.habit ? d.habit[h.id] : null);
+    // Lo que todavía se puede hacer (un semanal con la semana en curso) no es un "no".
+    const done = (d: DayMetrics) => (h.id in d.habit && !d.habitOpen.includes(h.id) ? d.habit[h.id] : null);
     // Gasto los días que se hizo contra los que no.
     const s = split(past, done, (d) => d.spentCents);
     if (s && s.b > 0) {
@@ -192,15 +193,15 @@ export function byWeekday(days: DayMetrics[]) {
 // ─── Correlaciones ──────────────────────────────────────────────────────────
 
 export const METRICS = [
-  { id: "habits", label: "Hábitos %", get: (d: DayMetrics) => (d.habitsDue ? d.habitsDone / d.habitsDue : null) },
-  { id: "mood", label: "Ánimo", get: (d: DayMetrics) => d.mood },
-  { id: "energy", label: "Energía", get: (d: DayMetrics) => d.energy },
-  { id: "stress", label: "Estrés", get: (d: DayMetrics) => d.stress },
-  { id: "sleep", label: "Sueño", get: (d: DayMetrics) => d.sleepMin },
-  { id: "steps", label: "Pasos", get: (d: DayMetrics) => d.steps },
-  { id: "spent", label: "Gasto", get: (d: DayMetrics) => d.spentCents },
-  { id: "words", label: "Palabras", get: (d: DayMetrics) => d.words },
-  { id: "plan", label: "Plan %", get: (d: DayMetrics) => (d.blocksTotal ? d.blocksDone / d.blocksTotal : null) },
+  { id: "habits", label: "Hábitos %", short: "Háb. %", get: (d: DayMetrics) => (d.habitsDue ? d.habitsDone / d.habitsDue : null) },
+  { id: "mood", label: "Ánimo", short: "Ánimo", get: (d: DayMetrics) => d.mood },
+  { id: "energy", label: "Energía", short: "Energ.", get: (d: DayMetrics) => d.energy },
+  { id: "stress", label: "Estrés", short: "Estrés", get: (d: DayMetrics) => d.stress },
+  { id: "sleep", label: "Sueño", short: "Sueño", get: (d: DayMetrics) => d.sleepMin },
+  { id: "steps", label: "Pasos", short: "Pasos", get: (d: DayMetrics) => d.steps },
+  { id: "spent", label: "Gasto", short: "Gasto", get: (d: DayMetrics) => d.spentCents },
+  { id: "words", label: "Palabras", short: "Palab.", get: (d: DayMetrics) => d.words },
+  { id: "plan", label: "Plan %", short: "Plan %", get: (d: DayMetrics) => (d.blocksTotal ? d.blocksDone / d.blocksTotal : null) },
 ] as const;
 
 export type Corr = { r: number | null; n: number };
@@ -257,6 +258,8 @@ export function weeklySeries(days: DayMetrics[]) {
     const moods = ds.map((d) => d.mood).filter((m): m is number => m !== null);
     return {
       monday,
+      /** Días del período en esa semana: la primera y la última pueden venir cortadas. */
+      days: ds.length,
       habitPct: due ? Math.round((done / due) * 100) : null,
       spentCents: ds.reduce((n, d) => n + d.spentCents, 0),
       wrote: ds.filter((d) => d.wrote).length,

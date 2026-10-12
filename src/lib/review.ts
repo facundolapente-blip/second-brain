@@ -5,7 +5,7 @@ import { getDailyMetrics, habitTotals, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
 import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
-import { REVIEW_TAG } from "./review-logic";
+import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 
 function avg(xs: (number | null)[]) {
   const v = xs.filter((x): x is number => x !== null);
@@ -62,9 +62,13 @@ export async function getWeeklyReview(day: string) {
       select: { id: true, title: true, deadline: true },
       orderBy: { deadline: "asc" },
     }),
+    // La reflexión de esta semana: solo la de lunes a domingo (`writeWeeklyReview` la
+    // crea el domingo, o hoy si la semana no terminó). Con el lunes siguiente, una
+    // escrita ese lunes contaba para las dos semanas.
     prisma.journalEntry.findFirst({
-      where: { tags: { has: REVIEW_TAG }, date: { gte: toDbDate(monday), lte: toDbDate(addDays(sunday, 1)) } },
+      where: { tags: { has: REVIEW_TAG }, date: { gte: toDbDate(monday), lte: toDbDate(sunday) } },
       select: { id: true, body: true },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -80,8 +84,27 @@ export async function getWeeklyReview(day: string) {
   // Hábitos: cuántas veces se hizo cada uno de las que tocaba (los semanales, contra su meta).
   // Los siete días, así un semanal se mide contra la meta entera de la semana ("1 de 4").
   const fullWeek = all.filter((d) => d.date >= monday);
+  const todayRow = week.find((d) => d.date === today);
+  /**
+   * "Para reforzar". En la semana en curso no se juzga lo que todavía se puede
+   * hacer: un semanal entra solo si ya no llega a la meta con los días que quedan
+   * (si no, un lunes todos daban "0 de 5"), y los demás se miden sobre los días
+   * cerrados (hoy sin marcar todavía no es un "no").
+   */
+  const reinforce = (h: (typeof habits)[number], t: { done: number; due: number; pct: number | null }) => {
+    if (!isCurrent) return (t.pct ?? 0) < 50;
+    if (h.weeklyTarget) {
+      const left = fullWeek.filter((d) => d.date > today).length + (todayRow?.habitOpen.includes(h.id) ? 1 : 0);
+      return t.done + left < t.due;
+    }
+    const closed = week.filter((d) => h.id in d.habit && !d.habitOpen.includes(h.id));
+    return closed.length > 0 && closed.filter((d) => d.habit[h.id]).length / closed.length < 0.5;
+  };
   const perHabit = habits
-    .map((h) => ({ ...h, ...habitTotals(h, h.weeklyTarget ? fullWeek : week) }))
+    .map((h) => {
+      const t = habitTotals(h, h.weeklyTarget ? fullWeek : week);
+      return { ...h, ...t, reinforce: reinforce(h, t) };
+    })
     .filter((h) => h.due > 0)
     .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0) || b.done - a.done);
 
@@ -124,7 +147,8 @@ export async function getWeeklyReview(day: string) {
       weights.length >= 1
         ? { first: weights[0].weightG!, last: weights.at(-1)!.weightG!, n: weights.length }
         : null,
-    review: review ? { id: review.id, written: review.body.trim().length > 0 } : null,
+    // "Ya la empezaste" solo si escribió algo además de las preguntas.
+    review: review ? { id: review.id, written: review.body.trim().length > 0 && review.body.trim() !== REVIEW_TEMPLATE.trim() } : null,
   };
 }
 

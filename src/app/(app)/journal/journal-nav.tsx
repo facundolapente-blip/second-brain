@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { CalendarBlank, ChartBar, PenNib, Plus, type Icon } from "@phosphor-icons/react";
 import { Button, cx } from "@/components/ui";
 import { useWrite } from "./journal-ui";
@@ -15,6 +16,53 @@ const TABS = [
 /** El editor ocupa toda la pantalla: sin barra inferior. */
 function isEditor(pathname: string) {
   return pathname.startsWith("/journal/") && !TABS.some((t) => t.href === pathname);
+}
+
+/**
+ * Direcciones del journal recorridas en esta pestaña, en orden (con búsqueda y
+ * filtros). Vive en memoria: al recargar se vacía, así que nunca apunta a algo
+ * fuera de la app. (No se vacía al desmontar: React lo desmonta y monta de nuevo
+ * en algunas navegaciones dentro del módulo.)
+ */
+let trail: string[] = [];
+
+/** Anota cada dirección del journal (va en el layout del módulo). */
+export function JournalTrail() {
+  const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const url = search ? `${pathname}?${search}` : pathname;
+  useEffect(() => {
+    if (trail.at(-1) !== url) trail.push(url);
+    if (trail.length > 50) trail = trail.slice(-50);
+  }, [url]);
+  return null;
+}
+
+type NavigationLike = { currentEntry?: { index: number } | null; entries?: () => { url: string | null }[] };
+
+/** Una pantalla del journal que no es el editor (lista, calendario, estadísticas). */
+function isJournalList(u: string) {
+  const path = u.split("?")[0];
+  return (path === "/journal" || path.startsWith("/journal/")) && !isEditor(path);
+}
+
+/**
+ * Adónde vuelve la flecha del editor: si la pantalla anterior de esta pestaña es
+ * una del journal, Atrás (conserva búsqueda, filtros, ?ver=, ?n= y la posición);
+ * si no (abierto directo, o desde Inicio), la última lista vista o /journal.
+ */
+export function journalReturn(): { back: true } | { back: false; href: string } {
+  let prev = trail.length > 1 && !isJournalList(trail.at(-1)!) ? trail.at(-2) : undefined;
+  // Con la Navigation API se sabe exacta la entrada anterior del historial (también si se pasó por otro módulo).
+  const nav = (window as unknown as { navigation?: NavigationLike }).navigation;
+  if (nav?.currentEntry && typeof nav.entries === "function") {
+    const i = nav.currentEntry.index;
+    const raw = i > 0 ? nav.entries()[i - 1]?.url : null;
+    const u = raw ? new URL(raw) : null;
+    prev = u && u.origin === location.origin ? u.pathname + u.search : undefined;
+  }
+  if (prev && isJournalList(prev)) return { back: true };
+  return { back: false, href: trail.findLast(isJournalList) ?? "/journal" };
 }
 
 function SideLink({ href, label, icon: Ico, active }: { href: string; label: string; icon: Icon; active: boolean }) {

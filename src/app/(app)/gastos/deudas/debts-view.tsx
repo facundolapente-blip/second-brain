@@ -1,6 +1,6 @@
 "use client";
 
-import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { quiet, safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Handshake, Plus } from "@phosphor-icons/react";
 import { deleteDebt, reopenDebt, saveDebt, settleDebt, type ActionResult } from "@/lib/offline/finance";
@@ -125,14 +125,25 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
             {showSettled && (
               <ul className="reveal grid divide-y divide-line rounded-2xl border border-line bg-surface">
                 {settled.map((d) => (
-                  <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-muted">
-                    <span className="min-w-0 flex-1 truncate text-[13.5px]">
+                  <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-muted">
+                    <span className="min-w-0 flex-1 basis-56 truncate text-[13.5px]">
                       {d.person} · {d.direction === "owed_to_me" ? "te devolvió" : "le pagaste"} {moneyCents(d.amountCents, d.currency)} ·{" "}
                       {formatShort(d.settledAt!)}
                     </span>
-                    <Button size="sm" variant="ghost" onClick={() => reopenDebt(d.id)}>
-                      Reabrir
-                    </Button>
+                    {d.hasSettleTx ? (
+                      <ConfirmButton
+                        className="h-9! shrink-0 px-3.5! text-[13px]!"
+                        confirmLabel="Tocá de nuevo: también se borra el movimiento"
+                        undo="Movimiento de la deuda borrado"
+                        onConfirm={() => quiet(reopenDebt(d.id))}
+                      >
+                        Reabrir y borrar el movimiento
+                      </ConfirmButton>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => quiet(reopenDebt(d.id))}>
+                        Reabrir
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -13,7 +13,7 @@ import {
   type ScheduleDTO,
   type ScheduleFrequency,
 } from "./schedule-logic";
-import type { CategoryBudgetDTO, ProjectDTO } from "./budget-logic";
+import { convertCents, rolloverCarry, type CategoryBudgetDTO, type ForeignSpend, type ProjectDTO } from "./budget-logic";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { getRates, toUyu } from "./fx";
 import {
@@ -169,11 +169,11 @@ export async function getCardSummaries(accounts?: AccountDTO[]): Promise<CardSum
     const moves: CardMove[] = [];
     for (const t of txs) {
       // Los ajustes de saldo corrigen la deuda pero no son compras del resumen.
-      if (t.category?.isAdjustment) continue;
+      const adjustment = !!t.category?.isAdjustment;
       const date = fromDbDate(t.date);
       if (t.accountId === c.id) {
         const cents = toCents(t.amount);
-        moves.push({ date, chargeCents: t.kind === "income" ? -cents : cents, paymentCents: 0, installment: !!t.installmentGroup });
+        moves.push({ date, chargeCents: t.kind === "income" ? -cents : cents, paymentCents: 0, installment: !!t.installmentGroup, adjustment });
       } else if (t.toAccountId === c.id && t.toAmount !== null) {
         moves.push({ date, chargeCents: 0, paymentCents: toCents(t.toAmount), installment: false });
       }
@@ -382,14 +382,19 @@ export async function getSchedules(): Promise<ScheduleDTO[]> {
 
 // ─── Presupuestos ───────────────────────────────────────────────────────────
 
-/** Presupuestos mensuales por categoría con lo gastado en el mes (en su moneda). */
+/**
+ * Presupuestos mensuales por categoría con lo gastado en el mes, en la moneda del
+ * presupuesto: lo de otras monedas se pasa con la cotización de hoy y queda anotado
+ * aparte (`foreign`, "incluye US$ 40"). Con arrastre, `amountCents` es lo disponible
+ * (monto + lo que sobró de los meses anteriores desde que se activó).
+ */
 export async function getCategoryBudgets(month: string): Promise<{
   budgets: CategoryBudgetDTO[];
   /** Gasto del mes en pesos de las categorías sin presupuesto (null = sin clasificar). */
-  unbudgeted: { categoryId: string | null; spentCents: number }[];
+  unbudgeted: { categoryId: string | null; spentCents: number; foreign: ForeignSpend[] }[];
 }> {
   const { from, to } = monthBounds(month);
-  const [budgets, accounts, spent, rates] = await Promise.all([
+  const [budgets, accounts, spent, rates, expenseCatRows] = await Promise.all([
     prisma.categoryBudget.findMany(),
     prisma.account.findMany({ select: { id: true, currency: true } }),
     prisma.transaction.groupBy({
@@ -398,51 +403,113 @@ export async function getCategoryBudgets(month: string): Promise<{
       _sum: { amount: true },
     }),
     getRates(),
+    prisma.category.findMany({ where: { kind: "expense" }, select: { id: true } }),
   ]);
-  const expenseCats = new Set(
-    (await prisma.category.findMany({ where: { kind: "expense" }, select: { id: true } })).map((c) => c.id),
-  );
+  const expenseCats = new Set(expenseCatRows.map((c) => c.id));
   const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
-  // Gasto por categoría en pesos (los dólares, con la cotización del día);
-  // los reintegros (ingresos con categoría de gasto) restan.
-  const byCat = new Map<string | null, number>();
-  for (const g of spent) {
-    const cents = g._sum.amount ? toUyu(toCents(g._sum.amount), currencyOf.get(g.accountId) ?? "UYU", rates) : 0;
-    if (g.kind === "expense") byCat.set(g.categoryId, (byCat.get(g.categoryId) ?? 0) + cents);
-    else if (g.categoryId && expenseCats.has(g.categoryId)) byCat.set(g.categoryId, (byCat.get(g.categoryId) ?? 0) - cents);
+  // Gasto neto por categoría y moneda (en la moneda de la cuenta); los reintegros
+  // (ingresos con categoría de gasto) restan.
+  const net = (rows: { categoryId: string | null; accountId: string; kind: string; cents: number }[]) => {
+    const out = new Map<string | null, Map<string, number>>();
+    for (const r of rows) {
+      const sign = r.kind === "expense" ? 1 : r.categoryId && expenseCats.has(r.categoryId) ? -1 : 0;
+      if (!sign) continue;
+      const cur = currencyOf.get(r.accountId) ?? "UYU";
+      const inner = out.get(r.categoryId) ?? new Map<string, number>();
+      inner.set(cur, (inner.get(cur) ?? 0) + sign * r.cents);
+      out.set(r.categoryId, inner);
+    }
+    return out;
+  };
+  const inCurrency = (byCur: Map<string, number> | undefined, to: string) =>
+    [...(byCur ?? [])].reduce((n, [cur, cents]) => n + convertCents(cents, cur, to, rates.toUyu), 0);
+  const foreignOf = (byCur: Map<string, number> | undefined, to: string): ForeignSpend[] =>
+    [...(byCur ?? [])]
+      .filter(([cur, cents]) => cur !== to && cents > 0)
+      .map(([currency, cents]) => ({ currency, cents, equivCents: convertCents(cents, currency, to, rates.toUyu) }));
+
+  const byCat = net(spent.map((g) => ({ ...g, cents: g._sum.amount ? toCents(g._sum.amount) : 0 })));
+
+  // Arrastre: lo gastado mes a mes desde que se activó, hasta el mes anterior.
+  const withRollover = budgets.filter((b) => b.rollover && b.rolloverSince);
+  const sinceOf = (b: (typeof budgets)[number]) => (b.rolloverSince ? fromDbDate(b.rolloverSince).slice(0, 7) : null);
+  const earliest = withRollover.map(sinceOf).filter((m): m is string => !!m && m < month).sort()[0];
+  const perMonth = new Map<string, Map<string | null, Map<string, number>>>();
+  if (earliest) {
+    const past = await prisma.transaction.findMany({
+      where: {
+        kind: { in: ["expense", "income"] },
+        categoryId: { in: withRollover.map((b) => b.categoryId) },
+        date: { gte: toDbDate(monthBounds(earliest).from), lt: toDbDate(from) },
+        ...NOT_ADJUSTMENT,
+        ...PERSONAL,
+      },
+      select: { date: true, amount: true, categoryId: true, accountId: true, kind: true },
+    });
+    const byMonth = new Map<string, typeof past>();
+    for (const t of past) {
+      const m = fromDbDate(t.date).slice(0, 7);
+      byMonth.set(m, [...(byMonth.get(m) ?? []), t]);
+    }
+    for (const [m, rows] of byMonth) perMonth.set(m, net(rows.map((t) => ({ ...t, cents: toCents(t.amount) }))));
   }
+
   const withBudget = new Set(budgets.map((b) => b.categoryId));
-  const unbudgeted = new Map<string | null, number>();
-  for (const [cat, cents] of byCat) {
+  const unbudgeted: { categoryId: string | null; spentCents: number; foreign: ForeignSpend[] }[] = [];
+  for (const [cat, byCur] of byCat) {
     if (cat && withBudget.has(cat)) continue;
-    if (cents > 0) unbudgeted.set(cat, cents);
+    const cents = inCurrency(byCur, "UYU");
+    if (cents > 0) unbudgeted.push({ categoryId: cat, spentCents: cents, foreign: foreignOf(byCur, "UYU") });
   }
-  const fromUyu = (cents: number, cur: string) => (cur === "UYU" ? cents : Math.round(cents / (rates.toUyu[cur] ?? 1)));
   return {
-    budgets: budgets.map((b) => ({
-      categoryId: b.categoryId,
-      amountCents: toCents(b.amount),
-      currency: b.currency,
-      spentCents: Math.max(0, fromUyu(byCat.get(b.categoryId) ?? 0, b.currency)),
-    })),
-    unbudgeted: [...unbudgeted].map(([categoryId, spentCents]) => ({ categoryId, spentCents })).sort((a, b) => b.spentCents - a.spentCents),
+    budgets: budgets.map((b) => {
+      const monthlyCents = toCents(b.amount);
+      const carriedCents = b.rollover
+        ? rolloverCarry(monthlyCents, sinceOf(b), month, (m) => Math.max(0, inCurrency(perMonth.get(m)?.get(b.categoryId), b.currency)))
+        : 0;
+      const byCur = byCat.get(b.categoryId);
+      return {
+        categoryId: b.categoryId,
+        amountCents: monthlyCents + carriedCents,
+        monthlyCents,
+        carriedCents,
+        rollover: b.rollover,
+        currency: b.currency,
+        spentCents: Math.max(0, inCurrency(byCur, b.currency)),
+        foreign: foreignOf(byCur, b.currency),
+      };
+    }),
+    unbudgeted: unbudgeted.sort((a, b) => b.spentCents - a.spentCents),
   };
 }
 
 type ProjectRow = Awaited<ReturnType<typeof prisma.budgetProject.findMany>>[number];
 
-async function projectSpent(ids: string[]) {
-  const sums = await prisma.transaction.groupBy({
-    by: ["projectId", "kind"],
-    where: { projectId: { in: ids }, kind: { in: ["expense", "income"] } },
-    _sum: { amount: true },
-    _count: true,
-  });
+/**
+ * Lo gastado en cada puntual, en la moneda del puntual: un gasto en dólares de un viaje
+ * en pesos se pasa con la cotización de hoy (antes US$ 100 contaba como $ 100). Los
+ * reintegros restan; los ajustes de saldo no cuentan.
+ */
+async function projectSpent(projects: { id: string; currency: string }[]) {
+  const ids = projects.map((p) => p.id);
+  const [sums, accounts, rates] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ["projectId", "kind", "accountId"],
+      where: { projectId: { in: ids }, kind: { in: ["expense", "income"] }, ...NOT_ADJUSTMENT },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.account.findMany({ select: { id: true, currency: true } }),
+    getRates(),
+  ]);
+  const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
+  const projectCurrency = new Map(projects.map((p) => [p.id, p.currency]));
   const spent = new Map<string, { cents: number; n: number }>();
   for (const g of sums) {
     if (!g.projectId) continue;
     const cur = spent.get(g.projectId) ?? { cents: 0, n: 0 };
-    const c = g._sum.amount ? toCents(g._sum.amount) : 0;
+    const raw = g._sum.amount ? toCents(g._sum.amount) : 0;
+    const c = convertCents(raw, currencyOf.get(g.accountId) ?? "UYU", projectCurrency.get(g.projectId) ?? "UYU", rates.toUyu);
     cur.cents += g.kind === "expense" ? c : -c;
     cur.n += g._count;
     spent.set(g.projectId, cur);
@@ -470,7 +537,7 @@ function toProjectDTO(p: ProjectRow, s?: { cents: number; n: number }): ProjectD
 /** Presupuestos puntuales (viajes, vacaciones), los activos primero. */
 export async function getProjects(): Promise<ProjectDTO[]> {
   const rows = await prisma.budgetProject.findMany({ orderBy: [{ archivedAt: "asc" }, { createdAt: "desc" }] });
-  const spent = await projectSpent(rows.map((r) => r.id));
+  const spent = await projectSpent(rows);
   return rows.map((r) => toProjectDTO(r, spent.get(r.id))).sort((a, b) => Number(a.archived) - Number(b.archived));
 }
 
@@ -490,7 +557,7 @@ export async function getProjectOptions(): Promise<{ id: string; name: string; a
 export async function getProject(id: string) {
   const row = await prisma.budgetProject.findUnique({ where: { id } });
   if (!row) return null;
-  const spent = await projectSpent([id]);
+  const [spent, rates] = await Promise.all([projectSpent([row]), getRates()]);
   const from = row.startDate ? fromDbDate(row.startDate) : addDays(todayISO(), -60);
   const to = row.endDate ? fromDbDate(row.endDate) : todayISO();
   const [txs, candidates] = await Promise.all([
@@ -502,7 +569,13 @@ export async function getProject(id: string) {
       take: 200,
     }),
   ]);
-  return { project: toProjectDTO(row, spent.get(id)), txs: txs.map(toTxDTO), candidates: candidates.map(toTxDTO) };
+  return {
+    project: toProjectDTO(row, spent.get(id)),
+    txs: txs.map(toTxDTO),
+    candidates: candidates.map(toTxDTO),
+    /** Pesos por unidad de cada moneda: para mostrar el equivalente de lo que está en otra moneda. */
+    toUyu: rates.toUyu,
+  };
 }
 
 // ─── Clasificación automática ───────────────────────────────────────────────
@@ -539,10 +612,16 @@ export type DebtDTO = {
   date: string;
   note: string | null;
   settledAt: string | null;
+  /** Al saldarla se cargó un movimiento (que todavía existe). */
+  hasSettleTx: boolean;
 };
 
 export async function getDebts(): Promise<DebtDTO[]> {
   const rows = await prisma.debt.findMany({ orderBy: [{ settledAt: "asc" }, { date: "desc" }] });
+  const txIds = rows.flatMap((d) => (d.settleTxId ? [d.settleTxId] : []));
+  const alive = new Set(
+    txIds.length ? (await prisma.transaction.findMany({ where: { id: { in: txIds } }, select: { id: true } })).map((t) => t.id) : [],
+  );
   return rows.map((d) => ({
     id: d.id,
     person: d.person,
@@ -552,6 +631,7 @@ export async function getDebts(): Promise<DebtDTO[]> {
     date: fromDbDate(d.date),
     note: d.note,
     settledAt: d.settledAt ? dayOfInstant(d.settledAt) : null,
+    hasSettleTx: !!d.settleTxId && alive.has(d.settleTxId),
   }));
 }
 
@@ -739,3 +819,13 @@ export async function getFixedSuggestions(): Promise<FixedSuggestion[]> {
 
 /** AppSetting con las sugerencias de gastos fijos que se descartaron. */
 export const FIXED_IGNORED = "fijos_ignorados";
+
+/** Cotización de "Todo en pesos" en Informes (pesos por dólar), elegida a mano. */
+export const REPORT_RATE = "informes_cotizacion";
+export const DEFAULT_REPORT_RATE = 40.5;
+
+export async function getReportRate(): Promise<number> {
+  const row = await prisma.appSetting.findUnique({ where: { key: REPORT_RATE } });
+  const n = Number(row?.value);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_REPORT_RATE;
+}

@@ -156,7 +156,8 @@ export function TasksBoard({
       <div
         role="tablist"
         aria-label="Vistas"
-        className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden"
+        // Celular: tira que se corre de costado (llega al borde). Compu: si no entran, bajan de renglón.
+        className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
       >
         {TASK_VIEWS.map((v) => {
           const n = applyTaskView(ordered, v.id, manual).length;
@@ -176,7 +177,7 @@ export function TasksBoard({
               )}
             >
               {v.label}
-              <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink/90" : "text-muted")}>{n}</span>
+              <span className={cx("font-mono text-[11px] tabular", on ? "text-on-ink" : "text-muted")}>{n}</span>
             </button>
           );
         })}
@@ -317,6 +318,18 @@ function ProgressButtons({ task: t, hover }: { task: TaskDTO; hover?: boolean })
   );
 }
 
+/** Columnas que en la tabla compacta (menos de 1440 px) pasan debajo del nombre. */
+const SECONDARY = new Set<TaskColumnKey>(["category", "priority"]);
+/** Anchos de la tabla compacta (pisan los guardados): la tarea toma lo que sobra. */
+const COMPACT_COL: Record<TaskColumnKey, string> = {
+  title: "max-[90rem]:w-auto!",
+  status: "max-[90rem]:w-[8.5rem]!",
+  category: "max-[90rem]:hidden",
+  priority: "max-[90rem]:hidden",
+  deadline: "max-[90rem]:w-[7rem]!",
+  scheduled: "max-[90rem]:w-[5.5rem]!",
+};
+
 /** En la computadora, la vista es una tabla ancha como la base de Notion. */
 function TaskTable({
   tasks,
@@ -355,19 +368,21 @@ function TaskTable({
     // El envoltorio de arrastre va por fuera de la tabla (mete elementos de accesibilidad que una tabla no admite).
     <Sortable ids={tasks.map((t) => t.id)} onReorder={onReorder} disabled={!sortable}>
     <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
-      <table className="w-full table-fixed text-left text-[14px]" style={{ minWidth: total }}>
+      {/* Hasta 1440 px la tabla es compacta (entra desde 1024): Categoría y Prioridad van
+          debajo del nombre, las otras columnas con ancho fijo y la tarea toma lo que sobra. */}
+      <table className="w-full table-fixed text-left text-[14px] max-[90rem]:min-w-[40rem]!" style={{ minWidth: total }}>
         <colgroup>
           {TASK_COLUMNS.map((c) => (
-            <col key={c.key} style={{ width: widthOf(c.key) }} />
+            <col key={c.key} style={{ width: widthOf(c.key) }} className={COMPACT_COL[c.key]} />
           ))}
-          <col />
+          <col className="max-[90rem]:w-[8.5rem]" />
         </colgroup>
         <thead>
           <tr className="border-b border-line text-[12px] text-muted">
             {TASK_COLUMNS.map((c, i) => (
               <th
                 key={c.key}
-                className={cx("relative py-3 font-medium", i === 0 ? "pr-3 pl-5" : "px-3", c.key === "scheduled" && "text-center")}
+                className={cx("relative py-3 font-medium", i === 0 ? "pr-3 pl-5" : "px-3", c.key === "scheduled" && "text-center", SECONDARY.has(c.key) && "max-[90rem]:hidden")}
               >
                 <span className="block truncate">{c.label}</span>
                 <ColumnResizer label={c.label} width={widthOf(c.key)} onResize={(w, save) => resize(c.key, w, save)} />
@@ -417,16 +432,23 @@ function TaskTable({
                   <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full min-w-0 content-center gap-0.5 rounded-lg px-2 text-left">
                     <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
                     <TaskMeta t={t} done={done} hideScheduled />
+                    {/* Tabla compacta: categoría y prioridad debajo del nombre. */}
+                    {(t.categoryId || t.priority > 0) && (
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 min-[90rem]:hidden">
+                        <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
+                        <PriorityTag n={t.priority} />
+                      </span>
+                    )}
                   </button>
                   </div>
                 </td>
                 <td className="px-3 py-2">
                   <StatusPill label={st.label} toneKey={st.tone} />
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 max-[90rem]:hidden">
                   <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 max-[90rem]:hidden">
                   <PriorityTag n={t.priority} />
                 </td>
                 <td className="px-3 py-2">
@@ -490,7 +512,7 @@ function ColumnResizer({ label, width, onResize }: { label: string; width: numbe
           onResize(width + (e.key === "ArrowRight" ? 16 : -16), true);
         }
       }}
-      className="group/res absolute inset-y-0 right-0 z-10 flex w-3 cursor-col-resize touch-none justify-end outline-none"
+      className="group/res absolute inset-y-0 right-0 z-10 flex w-3 cursor-col-resize touch-none justify-end outline-none max-[90rem]:hidden"
     >
       <span className="my-2 w-0.5 rounded-full bg-line transition-colors group-hover/res:bg-accent group-focus-visible/res:bg-accent group-active/res:bg-accent" />
     </span>

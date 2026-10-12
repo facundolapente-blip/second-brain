@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/page-header";
 import { cx } from "@/components/ui";
 
 type Weekday = { weekday: number; habitPct: number | null; spentAvg: number; wrotePct: number; mood: number | null };
-type Week = { monday: string; habitPct: number | null; spentCents: number; wrote: number; mood: number | null };
+type Week = { monday: string; days: number; habitPct: number | null; spentCents: number; wrote: number; mood: number | null };
 
 const MODULE_COLOR: Record<Insight["module"], string> = {
   habitos: "var(--c-habitos)",
@@ -41,22 +41,25 @@ export function AnalysisView({
 }) {
   // Otro rango: el contenido cambia con un fundido (no al cargar).
   const rangeSwap = useSwap(String(range));
+  const rangeSwitch = (
+    <PillSwitch
+      label="Período"
+      value={String(range)}
+      options={ranges.map((r) => ({ value: String(r), label: r === 365 ? "1 año" : `${r}d` }))}
+      hrefOf={(r) => `/analisis?dias=${r}`}
+      item="h-8 px-3 text-[12.5px]"
+    />
+  );
   return (
     <>
       <PageHeader
         title="Análisis"
-        kicker={`Últimos ${range} días, hasta ayer`}
+        kicker={range === 365 ? "Último año, hasta ayer" : `Últimos ${range} días, hasta ayer`}
         wide
-        actions={
-          <PillSwitch
-            label="Período"
-            value={String(range)}
-            options={ranges.map((r) => ({ value: String(r), label: r === 365 ? "1 año" : `${r}d` }))}
-            hrefOf={(r) => `/analisis?dias=${r}`}
-            item="h-8 px-3 text-[12.5px]"
-          />
-        }
+        // En el celular el selector va debajo: al lado del título se cortaban el rótulo y el título.
+        actions={<div className="hidden sm:block">{rangeSwitch}</div>}
       />
+      <div className="mx-auto flex max-w-6xl px-4 pb-2 sm:hidden">{rangeSwitch}</div>
       <main key={range} className={cx("mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4", rangeSwap)}>
         <Card title="Lo que se ve en tus datos" className="xl:col-span-12">
           {insights.length === 0 ? (
@@ -98,28 +101,31 @@ export function AnalysisView({
         </Card>
 
         <Card title="Semana a semana" className="xl:col-span-12">
+          {weeks.some((w) => w.days < 7) && (
+            <p className="-mt-2 text-[12.5px] text-muted">Las semanas cortadas por el período (con menos de 7 días) van más claras.</p>
+          )}
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             <MiniBars
               title="Hábitos cumplidos"
               color="var(--c-habitos)"
-              items={weeks.map((w) => ({ key: w.monday, label: formatShort(w.monday), value: w.habitPct, text: w.habitPct === null ? "–" : `${w.habitPct}%` }))}
+              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.habitPct, text: w.habitPct === null ? "–" : `${w.habitPct}%` }))}
               max={100}
             />
             <MiniBars
               title="Gasto (pesos)"
               color="var(--c-gastos)"
-              items={weeks.map((w) => ({ key: w.monday, label: formatShort(w.monday), value: w.spentCents, text: moneyCents(w.spentCents) }))}
+              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.spentCents, text: moneyCents(w.spentCents) }))}
             />
             <MiniBars
               title="Días escritos"
               color="var(--c-journal)"
-              items={weeks.map((w) => ({ key: w.monday, label: formatShort(w.monday), value: w.wrote, text: `${w.wrote} de 7` }))}
+              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.wrote, text: `${w.wrote} de ${w.days}` }))}
               max={7}
             />
             <MiniBars
               title="Ánimo promedio"
               color="var(--mod-inicio)"
-              items={weeks.map((w) => ({ key: w.monday, label: formatShort(w.monday), value: w.mood, text: w.mood === null ? "sin datos" : dec1(w.mood) }))}
+              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.mood, text: w.mood === null ? "sin datos" : dec1(w.mood) }))}
               max={5}
             />
           </div>
@@ -137,7 +143,7 @@ export function AnalysisView({
               <tbody className="tabular">
                 {[...weeks].reverse().map((w) => (
                   <tr key={w.monday} className="border-t border-line">
-                    <td className="py-1">{formatShort(w.monday)}</td>
+                    <td className="py-1">{weekLabel(w)}</td>
                     <td className="py-1 text-right">{w.habitPct === null ? "–" : `${w.habitPct}%`}</td>
                     <td className="py-1 text-right">{moneyCents(w.spentCents)}</td>
                     <td className="py-1 text-right">{w.wrote}</td>
@@ -154,6 +160,11 @@ export function AnalysisView({
       </main>
     </>
   );
+}
+
+/** "6 oct" o "6 oct (3 días)" si la semana viene cortada por el período. */
+function weekLabel(w: Week) {
+  return w.days < 7 ? `${formatShort(w.monday)} (${w.days} ${w.days === 1 ? "día" : "días"})` : formatShort(w.monday);
 }
 
 function Card({ title, className, children }: { title: string; className?: string; children: React.ReactNode }) {
@@ -183,7 +194,7 @@ function MiniBars({
 }: {
   title: string;
   color: string;
-  items: { key: string; label: string; value: number | null; text: string }[];
+  items: { key: string; label: string; value: number | null; text: string; partial?: boolean }[];
   max?: number;
 }) {
   const [focus, setFocus] = useState<number | null>(null);
@@ -217,7 +228,8 @@ function MiniBars({
               className={cx("w-full rounded-t-[3px] transition-opacity", focus !== null && focus !== i && "opacity-45")}
               style={{
                 height: it.value === null ? "2px" : `${Math.max(3, (it.value / top) * 100)}%`,
-                background: it.value === null ? "var(--border)" : color,
+                // Semana cortada por el período: más clara (no se compara de igual a igual).
+                background: it.value === null ? "var(--border)" : it.partial ? `color-mix(in oklab, ${color} 38%, var(--surface-2))` : color,
               }}
             />
           </button>
@@ -233,7 +245,8 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
   const best = [...withHabits].sort((a, b) => (b.habitPct ?? 0) - (a.habitPct ?? 0))[0];
   const worst = [...withHabits].sort((a, b) => (a.habitPct ?? 0) - (b.habitPct ?? 0))[0];
   const spender = [...weekdays].sort((a, b) => b.spentAvg - a.spentAvg)[0];
-  const cell = (pct: number, color: string) => `color-mix(in oklab, ${color} ${Math.max(6, pct)}%, var(--surface-2))`;
+  // Tope de intensidad: el número (en el color de texto) se lee en los dos temas.
+  const cell = (pct: number, color: string) => `color-mix(in oklab, ${color} ${Math.round(6 + Math.min(100, pct) * 0.39)}%, var(--surface-2))`;
 
   return (
     <Card title="Por día de la semana" className="xl:col-span-6">
@@ -264,7 +277,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
               <td
                 key={w.weekday}
                 className="h-10 rounded-lg"
-                style={{ background: cell(w.habitPct ?? 0, "var(--c-habitos)"), color: (w.habitPct ?? 0) > 60 ? "white" : undefined }}
+                style={{ background: cell(w.habitPct ?? 0, "var(--c-habitos)") }}
               >
                 {w.habitPct === null ? "–" : `${w.habitPct}%`}
               </td>
@@ -275,7 +288,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
             {weekdays.map((w) => {
               const p = (w.spentAvg / maxSpent) * 100;
               return (
-                <td key={w.weekday} className="h-10 rounded-lg" style={{ background: cell(p, "var(--c-gastos)"), color: p > 60 ? "white" : undefined }}>
+                <td key={w.weekday} className="h-10 rounded-lg" style={{ background: cell(p, "var(--c-gastos)") }}>
                   {shortNumber(w.spentAvg / 100)}
                 </td>
               );
@@ -284,7 +297,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
           <tr>
             <th scope="row" className="text-left font-normal text-muted">Escribís</th>
             {weekdays.map((w) => (
-              <td key={w.weekday} className="h-10 rounded-lg" style={{ background: cell(w.wrotePct, "var(--c-journal)"), color: w.wrotePct > 60 ? "white" : undefined }}>
+              <td key={w.weekday} className="h-10 rounded-lg" style={{ background: cell(w.wrotePct, "var(--c-journal)") }}>
                 {w.wrotePct}%
               </td>
             ))}
@@ -323,13 +336,15 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
           : "Verde: suben juntas. Naranja: una sube y la otra baja. Gris: pocos datos."}
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[26rem] table-fixed border-separate border-spacing-[3px] text-center text-[11px]">
+        <table className="w-full min-w-[31rem] table-fixed border-separate border-spacing-[3px] text-center text-[11px]">
           <thead>
             <tr>
               <th className="w-20" />
               {METRICS.map((m) => (
-                <th key={m.id} scope="col" className="truncate px-0.5 font-normal text-muted" title={m.label}>
-                  {m.label.slice(0, 5)}
+                <th key={m.id} scope="col" className="px-0.5 font-normal whitespace-nowrap text-muted" title={m.label}>
+                  <abbr title={m.label} aria-label={m.label} className="no-underline">
+                    {m.short}
+                  </abbr>
                 </th>
               ))}
             </tr>

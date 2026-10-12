@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { Archive, CaretLeft, Check, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { archiveProject, deleteProject, setTransactionsProject } from "@/lib/offline/finance";
 import type { AccountDTO, CategoryDTO, TxDTO } from "@/lib/finance-logic";
-import { budgetState, type ProjectDTO } from "@/lib/budget-logic";
+import { budgetState, convertCents, type ProjectDTO } from "@/lib/budget-logic";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import { tone } from "@/lib/palette";
@@ -24,12 +24,15 @@ export function ProjectView({
   candidates,
   accounts,
   categories,
+  toUyu,
 }: {
   project: ProjectDTO;
   txs: TxDTO[];
   candidates: TxDTO[];
   accounts: AccountDTO[];
   categories: CategoryDTO[];
+  /** Pesos por unidad de cada moneda (cotización de hoy). */
+  toUyu: Record<string, number>;
 }) {
   const router = useRouter();
   const lk = useLookups(accounts, categories);
@@ -41,12 +44,16 @@ export function ProjectView({
 
   const st = budgetState(p.spentCents, p.amountCents, null);
   const pct = p.amountCents ? Math.min(100, Math.round((p.spentCents / p.amountCents) * 100)) : 0;
+  // En la moneda del presupuesto: lo que está en otra se pasa con la cotización de hoy.
+  const inProject = (t: TxDTO) => convertCents(t.amountCents, lk.currencyOf(t.accountId), p.currency, toUyu);
   const byCat = new Map<string | null, number>();
   for (const t of txs) {
-    if (t.kind !== "expense") continue;
-    byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amountCents);
+    if (t.kind === "transfer") continue;
+    // Un reintegro (ingreso asignado) baja su categoría.
+    byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + (t.kind === "expense" ? inProject(t) : -inProject(t)));
   }
-  const cats = [...byCat].sort((a, b) => b[1] - a[1]);
+  const cats = [...byCat].filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1]);
+  const foreign = txs.some((t) => lk.currencyOf(t.accountId) !== p.currency);
   const maxCat = Math.max(1, ...cats.map(([, c]) => c));
 
   function toggle(id: string) {
@@ -118,6 +125,12 @@ export function ProjectView({
                 ? `Te pasaste ${moneyCents(p.spentCents - p.amountCents, p.currency)}`
                 : `Quedan ${moneyCents(p.amountCents - p.spentCents, p.currency)} (${100 - pct}%)`}
             </p>
+            {foreign && (
+              <p className="hero-sub text-[12px]">
+                Lo que está en otra moneda se pasa a {p.currency === "UYU" ? "pesos" : p.currency === "USD" ? "dólares" : p.currency} con la cotización
+                de hoy.
+              </p>
+            )}
           </div>
 
           {cats.length > 0 && (
@@ -164,7 +177,7 @@ export function ProjectView({
           ) : (
             <ul className="grid divide-y divide-line rounded-2xl border border-line bg-surface">
               {txs.map((t) => (
-                <TxLine key={t.id} t={t} lk={lk}>
+                <TxLine key={t.id} t={t} lk={lk} equivalent={lk.currencyOf(t.accountId) !== p.currency ? moneyCents(inProject(t), p.currency) : null}>
                   <IconButton
                     label="Sacar de este presupuesto"
                     onClick={() => start(() => setTransactionsProject([t.id], null))}
@@ -248,7 +261,18 @@ export function ProjectView({
   );
 }
 
-function TxLine({ t, lk, children }: { t: TxDTO; lk: ReturnType<typeof useLookups>; children?: React.ReactNode }) {
+function TxLine({
+  t,
+  lk,
+  equivalent,
+  children,
+}: {
+  t: TxDTO;
+  lk: ReturnType<typeof useLookups>;
+  /** En otra moneda que el presupuesto: lo que cuenta ("≈ $ 4.050"). */
+  equivalent?: string | null;
+  children?: React.ReactNode;
+}) {
   const c = lk.category(t.categoryId);
   const cur = lk.currencyOf(t.accountId);
   return (
@@ -260,9 +284,12 @@ function TxLine({ t, lk, children }: { t: TxDTO; lk: ReturnType<typeof useLookup
           {formatShort(t.date)} · {lk.account(t.accountId)?.name}
         </span>
       </span>
-      <span className={cx("tabular text-[14px]", t.kind === "income" && "fin-income")}>
-        {t.kind === "income" ? "+ " : "− "}
-        {moneyCents(t.amountCents, cur)}
+      <span className="grid shrink-0 justify-items-end">
+        <span className={cx("tabular text-[14px]", t.kind === "income" && "fin-income")}>
+          {t.kind === "income" ? "+ " : "− "}
+          {moneyCents(t.amountCents, cur)}
+        </span>
+        {equivalent && <span className="tabular text-[11.5px] text-muted">≈ {equivalent}</span>}
       </span>
       {children}
     </li>

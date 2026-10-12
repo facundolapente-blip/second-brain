@@ -12,8 +12,9 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/foto/[id]">) {
   return new Response(r.stream, {
     headers: {
       "Content-Type": r.attachment.contentType,
-      // El archivo nunca cambia: el navegador la guarda y no la vuelve a pedir.
-      "Cache-Control": "private, max-age=31536000, immutable",
+      // Poco rato en la caché del navegador: al cerrar sesión no tiene que quedar
+      // una copia que dure un año en el aparato.
+      "Cache-Control": "private, max-age=300",
     },
   });
 }

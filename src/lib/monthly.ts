@@ -5,7 +5,8 @@ import { getDailyMetrics, habitTotals, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
 import { getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
-import { wordCount } from "./journal-logic";
+import { isEmptyEntry, wordCount } from "./journal-logic";
+import { REVIEW_TEMPLATE } from "./review-logic";
 import { summarize } from "./review";
 
 /** Medianoche de Montevideo (UTC-3) de un día, para columnas con hora. */
@@ -36,7 +37,7 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
     period.kind === "month" ? getCategoryBudgets(period.key) : Promise.resolve({ budgets: [] }),
     prisma.journalEntry.findMany({
       where: { date: { gte: toDbDate(from), lte: toDbDate(to) } },
-      select: { id: true, date: true, title: true, body: true, tags: true },
+      select: { id: true, date: true, title: true, body: true, tags: true, _count: { select: { attachments: true } } },
     }),
     prisma.planTask.findMany({
       where: { completedAt: { gte: mvd(from), lt: mvd(addDays(to, 1)) } },
@@ -75,13 +76,14 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
     });
   const budgetsOver = budgets.budgets.filter((b) => b.spentCents > b.amountCents);
 
-  // Journal: palabras, etiquetas y la entrada más larga.
+  // Journal: palabras, etiquetas y la entrada más larga. Cuentan las que cuenta el
+  // Journal (título, texto, etiquetas o fotos), sin la reflexión semanal sin tocar.
   const written = entries
-    .map((e) => ({ ...e, words: wordCount(e.body) + wordCount(e.title ?? "") }))
-    .filter((e) => e.words > 0);
+    .filter((e) => (!isEmptyEntry(e) || e._count.attachments > 0) && e.body.trim() !== REVIEW_TEMPLATE.trim())
+    .map((e) => ({ ...e, words: wordCount(e.body) + wordCount(e.title ?? "") }));
   const tagCount = new Map<string, number>();
   for (const e of written) for (const t of e.tags) tagCount.set(t, (tagCount.get(t) ?? 0) + 1);
-  const longest = written.reduce<(typeof written)[number] | null>((a, e) => (!a || e.words > a.words ? e : a), null);
+  const longest = written.filter((e) => e.words > 0).reduce<(typeof written)[number] | null>((a, e) => (!a || e.words > a.words ? e : a), null);
 
   const weights = days.filter((d) => d.weightG !== null);
 
