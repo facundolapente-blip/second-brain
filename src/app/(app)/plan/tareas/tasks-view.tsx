@@ -3,19 +3,49 @@
 import { useNewIds } from "@/components/motion";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
-import { quiet, useSafeTransition } from "@/components/safe-action";
-import { useOptimistic, useRef, useState, useEffect } from "react";
+import { useSafeTransition } from "@/components/safe-action";
+import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
+import { bumpTaskProgress, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, SORTABLE_VIEWS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
-import { mergeOrder, Sortable, SortableItem } from "@/components/sortable";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
-import { CategoryTag, categoryMap, PriorityTag, ProgressBar, StatusPill } from "../plan-ui";
+import { CategoryTag, categoryMap, PriorityTag, ProgressBar } from "../plan-ui";
+import { tone } from "@/lib/palette";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
 
 const LIMIT = 6;
+
+/** Orden de los grupos de la tabla (en "Terminadas" hay uno solo). */
+const GROUPS: TaskStatus[] = ["doing", "todo", "backlog", "done"];
+
+/**
+ * Agrupa por estado y, dentro de cada grupo, primero lo que vence antes
+ * (sin deadline al final, en el orden de la vista). "Terminadas" queda como
+ * viene: de la terminada más reciente a la más vieja.
+ */
+function arrange(list: TaskDTO[], view: TaskView): TaskDTO[] {
+  if (view === "done") return list;
+  return list
+    .map((t, i) => ({ t, i }))
+    .sort(
+      (a, b) =>
+        GROUPS.indexOf(a.t.status) - GROUPS.indexOf(b.t.status) ||
+        (a.t.deadline ?? "9999").localeCompare(b.t.deadline ?? "9999") ||
+        a.i - b.i,
+    )
+    .map((x) => x.t);
+}
+
+/** Tareas visibles partidas en grupos de estado, con el total del grupo en la vista. */
+function groupsOf(visible: TaskDTO[], matching: TaskDTO[]) {
+  return GROUPS.map((status) => ({
+    status,
+    tasks: visible.filter((t) => t.status === status),
+    total: matching.filter((t) => t.status === status).length,
+  })).filter((g) => g.tasks.length > 0);
+}
 
 /**
  * Tareas arriba de la semana, en la misma página (como el Plan Semanal de
@@ -31,7 +61,6 @@ export function TasksBoard({
   today,
   manualOrder = false,
   folded: foldedInitial = false,
-  columns = {},
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
@@ -40,7 +69,7 @@ export function TasksBoard({
   manualOrder?: boolean;
   /** En el celular, las tareas se pliegan en una línea de resumen. */
   folded?: boolean;
-  /** Anchos de columna guardados (tabla de la compu). */
+  /** Ya no se usa: la tabla tiene anchos fijos. */
   columns?: TaskColumnWidths;
 }) {
   const [folded, setFolded] = useState(foldedInitial);
@@ -68,22 +97,11 @@ export function TasksBoard({
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
-  // Orden optimista mientras se guarda lo arrastrado.
-  const [localOrder, setLocalOrder] = useState<Map<string, number> | null>(null);
-  const [, startOrder] = useSafeTransition();
-  const manual = manualOrder || localOrder !== null;
-  const ordered = localOrder ? tasks.map((t) => ({ ...t, order: localOrder.get(t.id) ?? t.order })) : tasks;
-  const matching = applyTaskView(ordered, view, manual);
-  const canSort = SORTABLE_VIEWS.includes(view);
-  function reorder(visibleNew: string[]) {
-    // La base es el orden de esta vista seguido por el resto: lo que no se ve no se mueve.
-    const viewIds = matching.map((t) => t.id);
-    const rest = [...ordered].sort((a, b) => a.order - b.order).map((t) => t.id).filter((id) => !viewIds.includes(id));
-    const full = mergeOrder([...viewIds, ...rest], visibleNew);
-    setLocalOrder(new Map(full.map((id, i) => [id, i])));
-    startOrder(() => reorderTasks(full));
-  }
+  const manual = manualOrder;
+  const ordered = tasks;
+  const matching = arrange(applyTaskView(ordered, view, manual), view);
   const visible = all ? matching : matching.slice(0, LIMIT);
+  const groups = groupsOf(visible, matching);
   const fresh = useNewIds(visible.map((t) => t.id));
   const hidden = matching.length - visible.length;
   // Clic derecho en una tarea (tabla de la compu).
@@ -192,23 +210,27 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable tasks={visible} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} columns={columns} onMenu={taskMenu} />
-          {/* Celular: mantener apretada una tarea y moverla para cambiar el orden. */}
-          <Sortable ids={visible.map((t) => t.id)} onReorder={reorder} disabled={!canSort}>
+          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} />
+          {/* Celular: la misma agrupación, con la fecha a la izquierda. */}
           <ul className="grid border-t border-line lg:hidden">
-            {visible.map((t) => (
-              <TaskRow
-                key={t.id}
-                fresh={fresh.has(t.id)}
-                task={t}
-                category={t.categoryId ? cats.get(t.categoryId) : null}
-                today={today}
-                onOpen={() => sheet.current?.open(t)}
-                sortable={canSort}
-              />
+            {groups.map((g) => (
+              <Fragment key={g.status}>
+                <li>
+                  <GroupLabel status={g.status} total={g.total} className="border-b border-line px-1 py-2.5" />
+                </li>
+                {g.tasks.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    fresh={fresh.has(t.id)}
+                    task={t}
+                    category={t.categoryId ? cats.get(t.categoryId) : null}
+                    today={today}
+                    onOpen={() => sheet.current?.open(t)}
+                  />
+                ))}
+              </Fragment>
             ))}
           </ul>
-          </Sortable>
         </>
       )}
       {(hidden > 0 || (all && matching.length > LIMIT)) && (
@@ -239,64 +261,106 @@ function TaskRow({
   category,
   today,
   onOpen,
-  sortable,
   fresh,
 }: {
   task: TaskDTO;
   category?: CategoryDTO | null;
   today: string;
   onOpen: () => void;
-  sortable: boolean;
   /** Recién aparecida ("Ver todas", nueva): entra con un fundido. */
   fresh?: boolean;
 }) {
   const left = daysLeft(t.deadline, today);
-  const pct = progressPct(t.progress, t.goal);
-  const st = TASK_STATUS[t.status];
   const done = t.status === "done";
   return (
-    <SortableItem id={t.id} disabled={!sortable} className={cx("border-b border-line bg-bg", fresh && "reveal")}>
-      <button type="button" onClick={onOpen} className="grid w-full gap-2.5 px-1 py-3.5 text-left">
-        <span className="flex items-start gap-3">
-          <span className="grid min-w-0 flex-1 gap-0.5">
-            <span className={cx("text-[15.5px] leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
-            <TaskMeta t={t} done={done} />
+    <li className={cx("border-b border-line", fresh && "reveal")}>
+      <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 px-1 py-3 text-left">
+        <DateBlock deadline={t.deadline} left={left} done={done} />
+        <span className="grid min-w-0 flex-1 gap-1">
+          <span className={cx("text-[15.5px] leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
+          <TaskMeta t={t} done={done} />
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <CategoryTag category={category} />
+            <PriorityTag n={t.priority} />
+            <DueLabel left={left} done={done} />
           </span>
-          <Deadline deadline={t.deadline} left={left} done={done} />
-        </span>
-        <span className="flex flex-wrap items-center gap-1.5">
-          <StatusPill label={st.label} toneKey={st.tone} />
-          <CategoryTag category={category} />
-          <PriorityTag n={t.priority} />
         </span>
       </button>
-      {pct !== null && (
-        <div className="flex items-center gap-2 px-1 pb-3">
-          <ProgressBar pct={pct} label={`${t.progress ?? 0} de ${t.goal}`} />
+      {t.goal ? (
+        <div className="flex items-center gap-2 pr-1 pb-3 pl-[3.75rem]">
+          <Steps progress={t.progress} goal={t.goal} />
           {!done && <ProgressButtons task={t} />}
         </div>
-      )}
-    </SortableItem>
+      ) : null}
+    </li>
   );
 }
 
-/** Deadline: la fecha y, si está cerca o vencida, una etiqueta suave de color. */
-function Deadline({ deadline, left, done }: { deadline: string | null; left: number | null; done: boolean }) {
-  if (!deadline) return <span className="text-faint" aria-label="Sin deadline">–</span>;
-  const tone =
-    done || left === null || left > 2
-      ? null
-      : left < 0
-        ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]"
-        : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]";
+/** Encabezado de un grupo de estado: cuadradito del color del estado, nombre y cuántas hay. */
+function GroupLabel({ status, total, className }: { status: TaskStatus; total: number; className?: string }) {
+  const st = TASK_STATUS[status];
   return (
-    <span className="grid shrink-0 justify-items-start gap-1">
-      <span className="text-[13.5px] tabular">{formatShort(deadline)}</span>
-      {!done && left !== null && (
-        <span className={cx("rounded-md text-[11.5px] leading-none", tone ? `${tone} px-1.5 py-1 font-medium` : "text-muted")}>
-          {daysLeftLabel(left)}
-        </span>
+    <span className={cx("flex items-center gap-2 text-[12.5px] font-semibold", className)}>
+      <span aria-hidden style={tone(st.tone)} className="size-2 rounded-[3px] bg-[var(--tone-chip)]" />
+      {st.label}
+      <span className="font-mono text-[12px] font-normal text-muted tabular">{total}</span>
+    </span>
+  );
+}
+
+/**
+ * La fecha del deadline como un calendario chico (día grande, mes abajo):
+ * en rojo si venció, en amarillo si vence en 2 días o menos.
+ */
+function DateBlock({ deadline, left, done }: { deadline: string | null; left: number | null; done: boolean }) {
+  if (!deadline) {
+    return (
+      <span className="grid h-[42px] w-11 shrink-0 place-items-center rounded-lg bg-surface-2 text-[13px] text-faint" aria-label="Sin deadline">
+        –
+      </span>
+    );
+  }
+  const [day, month] = formatShort(deadline).split(" ");
+  const late = !done && left !== null && left < 0;
+  const near = !done && left !== null && left >= 0 && left <= 2;
+  return (
+    <span
+      title={`${formatShort(deadline)} ${deadline.slice(0, 4)}`}
+      className={cx(
+        "grid h-[42px] w-11 shrink-0 content-center justify-items-center gap-0.5 rounded-lg leading-none",
+        late ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : near ? "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]" : "bg-surface-2",
       )}
+    >
+      <span className="text-[16px] font-semibold tracking-[-0.02em] tabular">{day}</span>
+      <span className={cx("font-mono text-[9.5px] tracking-[0.06em] uppercase", !late && !near && "text-muted")}>{month}</span>
+    </span>
+  );
+}
+
+/** Cuánto falta o cuánto pasó ("ayer", "en 16 días"), en rojo si venció. */
+function DueLabel({ left, done }: { left: number | null; done: boolean }) {
+  if (done || left === null) return null;
+  return (
+    <span className={cx("inline-block font-mono text-[12px] tabular first-letter:lowercase", left < 0 ? "text-danger" : left <= 2 ? "text-[var(--st-skip-fg)]" : "text-muted")}>
+      {daysLeftLabel(left)}
+    </span>
+  );
+}
+
+/** Progreso en segmentos, uno por paso (con metas grandes, barra). */
+function Steps({ progress, goal }: { progress: number | null; goal: number }) {
+  const n = Math.max(0, Math.min(progress ?? 0, goal));
+  if (goal > 10) return <ProgressBar pct={progressPct(progress, goal)} label={`${progress ?? 0}/${goal}`} />;
+  return (
+    <span className="inline-flex items-center gap-2" aria-label={`Avance ${n} de ${goal}`}>
+      <span className="flex gap-0.5" aria-hidden>
+        {Array.from({ length: goal }, (_, i) => (
+          <span key={i} className={cx("h-1.5 w-3 rounded-[2px]", i < n ? (n >= goal ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")} />
+        ))}
+      </span>
+      <span className="font-mono text-[12px] text-muted tabular" aria-hidden>
+        {progress ?? 0}/{goal}
+      </span>
     </span>
   );
 }
@@ -318,204 +382,145 @@ function ProgressButtons({ task: t, hover }: { task: TaskDTO; hover?: boolean })
   );
 }
 
-/** Columnas que en la tabla compacta (menos de 1440 px) pasan debajo del nombre. */
-const SECONDARY = new Set<TaskColumnKey>(["category", "priority"]);
-/** Anchos de la tabla compacta (pisan los guardados): la tarea toma lo que sobra. */
-const COMPACT_COL: Record<TaskColumnKey, string> = {
-  title: "max-[90rem]:w-auto!",
-  status: "max-[90rem]:w-[8.5rem]!",
-  category: "max-[90rem]:hidden",
-  priority: "max-[90rem]:hidden",
-  deadline: "max-[90rem]:w-[7rem]!",
-  scheduled: "max-[90rem]:w-[5.5rem]!",
-};
+/** Celdas de la planilla: líneas finas entre columnas. */
+const CELL = "border-l border-line first:border-l-0";
+/**
+ * Columnas que en la tabla compacta (menos de 1440 px) pasan debajo del nombre.
+ * Se achican a 0 en vez de ocultarse: una celda con display:none corre a las de al lado de columna.
+ */
+const WIDE_ONLY_COL = "max-[90rem]:w-0";
+const WIDE_ONLY = "max-[90rem]:invisible max-[90rem]:overflow-hidden max-[90rem]:border-l-0 max-[90rem]:px-0";
 
-/** En la computadora, la vista es una tabla ancha como la base de Notion. */
+/**
+ * En la computadora, una planilla agrupada por estado (como los grupos de
+ * Notion): la fecha del deadline adelante, filas bajas con rayado suave y
+ * líneas finas. Hasta 1440 px, Categoría y Prioridad van debajo del nombre.
+ */
 function TaskTable({
-  tasks,
+  groups,
   cats,
   today,
   onOpen,
-  sortable,
-  onReorder,
-  columns,
   onMenu,
   fresh,
 }: {
+  groups: ReturnType<typeof groupsOf>;
   /** Filas recién aparecidas: entran con un fundido. */
   fresh?: Set<string>;
-  tasks: TaskDTO[];
   cats: Map<string, CategoryDTO>;
   today: string;
   onOpen: (t: TaskDTO) => void;
-  /** Clic y arrastrar una fila para cambiar el orden. */
-  sortable: boolean;
-  onReorder: (ids: string[]) => void;
-  columns: TaskColumnWidths;
   onMenu: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
-  const [widths, setWidths] = useState<TaskColumnWidths>(columns);
-  const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
-  const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0) + 180;
-  function resize(k: TaskColumnKey, w: number | null, save: boolean) {
-    const next = { ...widths };
-    if (w === null) delete next[k];
-    else next[k] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, w)));
-    setWidths(next);
-    if (save) quiet(saveTaskColumns(next));
-  }
   return (
-    // El envoltorio de arrastre va por fuera de la tabla (mete elementos de accesibilidad que una tabla no admite).
-    <Sortable ids={tasks.map((t) => t.id)} onReorder={onReorder} disabled={!sortable}>
-    <div className="hidden overflow-x-auto overflow-y-hidden rounded-2xl border border-line bg-surface lg:block">
-      {/* Hasta 1440 px la tabla es compacta (entra desde 1024): Categoría y Prioridad van
-          debajo del nombre, las otras columnas con ancho fijo y la tarea toma lo que sobra. */}
-      <table className="w-full table-fixed text-left text-[14px] max-[90rem]:min-w-[40rem]!" style={{ minWidth: total }}>
+    <div className="hidden overflow-hidden rounded-xl border border-line-strong bg-surface lg:block">
+      <table className="w-full table-fixed border-collapse text-left text-[13.5px]">
         <colgroup>
-          {TASK_COLUMNS.map((c) => (
-            <col key={c.key} style={{ width: widthOf(c.key) }} className={COMPACT_COL[c.key]} />
-          ))}
-          <col className="max-[90rem]:w-[8.5rem]" />
+          <col className="w-[4.5rem]" />
+          <col />
+          <col className={cx("w-[8.5rem]", WIDE_ONLY_COL)} />
+          <col className={cx("w-[6.5rem]", WIDE_ONLY_COL)} />
+          <col className="w-[7.5rem]" />
+          <col className="w-[10.5rem]" />
+          <col className="w-[6rem]" />
         </colgroup>
         <thead>
-          <tr className="border-b border-line text-[12px] text-muted">
-            {TASK_COLUMNS.map((c, i) => (
-              <th
-                key={c.key}
-                className={cx("relative py-3 font-medium", i === 0 ? "pr-3 pl-5" : "px-3", c.key === "scheduled" && "text-center", SECONDARY.has(c.key) && "max-[90rem]:hidden")}
-              >
-                <span className="block truncate">{c.label}</span>
-                <ColumnResizer label={c.label} width={widthOf(c.key)} onResize={(w, save) => resize(c.key, w, save)} />
-              </th>
-            ))}
-            <th className="py-3 pr-5 pl-3 font-medium">Progreso</th>
+          <tr className="border-b border-line-strong bg-surface-2 text-[11px] tracking-[0.06em] text-muted uppercase">
+            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Fecha</th>
+            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Tarea</th>
+            <th className={cx(CELL, "px-3 py-2.5 font-medium", WIDE_ONLY)}>Categoría</th>
+            <th className={cx(CELL, "px-3 py-2.5 font-medium", WIDE_ONLY)}>Prioridad</th>
+            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Vence</th>
+            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Progreso</th>
+            <th className={cx(CELL, "px-2 py-2.5 text-center font-medium")}>Agendada</th>
           </tr>
         </thead>
         <tbody>
-          {tasks.map((t) => {
-            const left = daysLeft(t.deadline, today);
-            const pct = progressPct(t.progress, t.goal);
-            const st = TASK_STATUS[t.status];
-            const done = t.status === "done";
-            return (
-              <SortableItem
-                as="tr"
-                key={t.id}
-                id={t.id}
-                disabled={!sortable}
-                onContextMenu={(e) => onMenu(e, t)}
-                className={cx("group border-b border-line bg-surface transition-colors last:border-b-0 hover:bg-surface-2/60", fresh?.has(t.id) && "reveal")}
-                draggingClass="shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
-              >
-                <td className="py-2 pr-3 pl-3">
-                  <div className="flex items-center">
-                  {!done && (
-                    // Arrastrar esta agarradera a un día de la semana agenda la tarea.
-                    // (La fila entera se arrastra para ordenar: esto va aparte.)
-                    <span
-                      draggable
-                      role="button"
-                      tabIndex={-1}
-                      aria-label={`Arrastrar "${t.title}" a un día de la semana para agendarla`}
-                      title="Arrastrala a un día de la semana para agendarla"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData(TASK_DRAG, t.id);
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      className="-ml-1 inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
-                    >
-                      <CalendarPlus size={16} aria-hidden />
-                    </span>
-                  )}
-                  <button type="button" onClick={() => onOpen(t)} className="grid min-h-12 w-full min-w-0 content-center gap-0.5 rounded-lg px-2 text-left">
-                    <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
-                    <TaskMeta t={t} done={done} hideScheduled />
-                    {/* Tabla compacta: categoría y prioridad debajo del nombre. */}
-                    {(t.categoryId || t.priority > 0) && (
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5 min-[90rem]:hidden">
-                        <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
-                        <PriorityTag n={t.priority} />
-                      </span>
+          {groups.map((g) => (
+            <Fragment key={g.status}>
+              <tr className="border-b border-line-strong bg-surface-2">
+                <td colSpan={7} className="px-4 py-2">
+                  <GroupLabel status={g.status} total={g.total} />
+                </td>
+              </tr>
+              {g.tasks.map((t, i) => {
+                const left = daysLeft(t.deadline, today);
+                const done = t.status === "done";
+                return (
+                  <tr
+                    key={t.id}
+                    onContextMenu={(e) => onMenu(e, t)}
+                    className={cx(
+                      "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2",
+                      i % 2 === 1 && "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
+                      fresh?.has(t.id) && "reveal",
                     )}
-                  </button>
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  <StatusPill label={st.label} toneKey={st.tone} />
-                </td>
-                <td className="px-3 py-2 max-[90rem]:hidden">
-                  <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
-                </td>
-                <td className="px-3 py-2 max-[90rem]:hidden">
-                  <PriorityTag n={t.priority} />
-                </td>
-                <td className="px-3 py-2">
-                  <Deadline deadline={t.deadline} left={left} done={done} />
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <ScheduledBox task={t} />
-                </td>
-                <td className="py-2 pr-4 pl-3">
-                  {pct !== null ? (
-                    <span className="flex items-center gap-2">
-                      <ProgressBar pct={pct} label={`${t.progress ?? 0}/${t.goal}`} />
-                      {!done && <ProgressButtons task={t} hover />}
-                    </span>
-                  ) : (
-                    <span className="text-faint" aria-label="Sin progreso">–</span>
-                  )}
-                </td>
-              </SortableItem>
-            );
-          })}
+                  >
+                    <td className={cx(CELL, "px-3 py-1.5")}>
+                      <DateBlock deadline={t.deadline} left={left} done={done} />
+                    </td>
+                    <td className={cx(CELL, "py-1 pr-3 pl-1.5")}>
+                      <div className="flex items-center">
+                        {!done && (
+                          // Arrastrar esta agarradera a un día de la semana agenda la tarea.
+                          <span
+                            draggable
+                            role="button"
+                            tabIndex={-1}
+                            aria-label={`Arrastrar "${t.title}" a un día de la semana para agendarla`}
+                            title="Arrastrala a un día de la semana para agendarla"
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData(TASK_DRAG, t.id);
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
+                          >
+                            <CalendarPlus size={16} aria-hidden />
+                          </span>
+                        )}
+                        <button type="button" onClick={() => onOpen(t)} className={cx("grid min-h-11 w-full min-w-0 content-center gap-0.5 rounded-lg px-2 text-left", done && "pl-10")}>
+                          <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
+                          <TaskMeta t={t} done={done} hideScheduled />
+                          {/* Tabla compacta: categoría y prioridad debajo del nombre. */}
+                          {(t.categoryId || t.priority > 0) && (
+                            <span className="mt-1 flex flex-wrap items-center gap-1.5 min-[90rem]:hidden">
+                              <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
+                              <PriorityTag n={t.priority} />
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className={cx(CELL, "px-3", WIDE_ONLY)}>
+                      <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
+                    </td>
+                    <td className={cx(CELL, "px-3", WIDE_ONLY)}>
+                      <PriorityTag n={t.priority} />
+                    </td>
+                    <td className={cx(CELL, "px-3")}>
+                      {done || left === null ? <span className="text-faint" aria-label="Sin deadline">–</span> : <DueLabel left={left} done={done} />}
+                    </td>
+                    <td className={cx(CELL, "px-3")}>
+                      {t.goal ? (
+                        <span className="flex items-center gap-1">
+                          <Steps progress={t.progress} goal={t.goal} />
+                          {!done && <ProgressButtons task={t} hover />}
+                        </span>
+                      ) : (
+                        <span className="text-faint" aria-label="Sin progreso">–</span>
+                      )}
+                    </td>
+                    <td className={cx(CELL, "px-2 text-center")}>
+                      <ScheduledBox task={t} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </Fragment>
+          ))}
         </tbody>
       </table>
     </div>
-    </Sortable>
-  );
-}
-
-/**
- * Borde derecho de un encabezado: arrastrar cambia el ancho de la columna
- * (se guarda al soltar); doble clic vuelve al ancho de siempre; con teclado, flechas.
- */
-function ColumnResizer({ label, width, onResize }: { label: string; width: number; onResize: (w: number | null, save: boolean) => void }) {
-  const start = useRef<{ x: number; w: number } | null>(null);
-  return (
-    <span
-      role="separator"
-      aria-orientation="vertical"
-      aria-label={`Ancho de ${label}`}
-      aria-valuenow={width}
-      tabIndex={0}
-      title="Arrastrá para cambiar el ancho · doble clic: ancho original"
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        start.current = { x: e.clientX, w: width };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }}
-      onPointerMove={(e) => {
-        if (start.current) onResize(start.current.w + e.clientX - start.current.x, false);
-      }}
-      onPointerUp={(e) => {
-        if (!start.current) return;
-        onResize(start.current.w + e.clientX - start.current.x, true);
-        start.current = null;
-      }}
-      onDoubleClick={() => onResize(null, true)}
-      onKeyDown={(e) => {
-        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-          e.preventDefault();
-          onResize(width + (e.key === "ArrowRight" ? 16 : -16), true);
-        }
-      }}
-      className="group/res absolute inset-y-0 right-0 z-10 flex w-3 cursor-col-resize touch-none justify-end outline-none max-[90rem]:hidden"
-    >
-      <span className="my-2 w-0.5 rounded-full bg-line transition-colors group-hover/res:bg-accent group-focus-visible/res:bg-accent group-active/res:bg-accent" />
-    </span>
   );
 }
 
