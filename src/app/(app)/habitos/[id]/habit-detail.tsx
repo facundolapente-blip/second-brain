@@ -1,5 +1,6 @@
 "use client";
 
+import { useSlide, useSwap } from "@/components/motion";
 import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -76,6 +77,7 @@ export function HabitDetail({
   const daySheet = useRef<DaySheetHandle>(null);
   const openDay = (date: string) => daySheet.current?.show(habit, date);
 
+  const tabSwap = useSwap(tab);
   function changeTab(t: DetailTab) {
     setTab(t);
     const url = new URL(window.location.href);
@@ -125,7 +127,7 @@ export function HabitDetail({
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-3xl px-4 pt-2 lg:max-w-6xl lg:px-10 lg:pt-6">
+      <main key={tab} className={cx("mx-auto grid max-w-3xl px-4 pt-2 lg:max-w-6xl lg:px-10 lg:pt-6", tabSwap)}>
         {tab !== "editar" && habit.tracks.length > 0 && (
           <TrackPicker habit={habit} view={view} onChange={setView} />
         )}
@@ -520,6 +522,7 @@ const MARKER: Record<string, { icon: React.ReactNode; cls: string } | undefined>
 /** Línea del mes: un punto por día con la marca arriba. */
 function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState; today: string }) {
   const [month, setMonth] = useState(today.slice(0, 7));
+  const monthSlide = useSlide(month);
   const scroller = useRef<HTMLDivElement>(null);
   const { from, to } = monthBounds(month);
   const days: string[] = [];
@@ -544,7 +547,7 @@ function MonthTimeline({ stateOf, today }: { stateOf: (iso: string) => DayState;
         ref={scroller}
         className="relative overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="relative flex w-max lg:w-full">
+        <div key={month} className={cx("relative flex w-max lg:w-full", monthSlide)}>
           <span className="absolute inset-x-4 top-[39px] h-px bg-line-strong" />
           {days.map((d) => {
             const m = d <= today ? MARKER[stateOf(d)] : undefined;
@@ -640,8 +643,8 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
         nextDisabled={nextDisabled}
       />
       <div className="grid h-44 grid-flow-col items-end gap-1.5 border-b border-line-strong bg-[linear-gradient(to_top,var(--border)_1px,transparent_1px)] bg-[length:100%_33.33%]">
-        {items.map((it) => (
-          <div key={it.key} className="grid h-full grid-rows-[auto_1fr] justify-items-center gap-1">
+        {items.map((it, i) => (
+          <div key={i} className="grid h-full grid-rows-[auto_1fr] justify-items-center gap-1">
             <span className={cx("font-mono tabular text-[10.5px]", it.current ? "font-semibold text-fg" : "text-muted")}>
               {it.value === null ? "" : it.value}
             </span>

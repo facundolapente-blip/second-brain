@@ -167,7 +167,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
             </div>
           </div>
 
-          {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
+          {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
 
           <div className="grid gap-2">
             <Button type="submit" variant="accent" disabled={pending} className="h-11">

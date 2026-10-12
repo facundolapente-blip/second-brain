@@ -162,7 +162,7 @@ function WeekCard({
               {r.p ? (
                 <span
                   className={cx(
-                    "block w-full max-w-5 rounded-t-[4px] transition-colors",
+                    "block w-full max-w-5 rounded-t-[4px] transition-[height,background-color] duration-[var(--dur-state)] ease-[var(--ease-out)]",
                     r.d === today ? "bg-accent" : "bg-[color-mix(in_oklab,var(--accent)_38%,var(--surface))] group-hover:bg-[color-mix(in_oklab,var(--accent)_60%,var(--surface))]",
                   )}
                   style={{ height: r.pct ? Math.max(3, (r.pct / 100) * (H - 4)) : 2 }}

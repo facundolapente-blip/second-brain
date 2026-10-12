@@ -132,7 +132,7 @@ export function ShareView({ title, text, url, photos, recent }: { title: string;
               />
             )}
             {picking && (
-              <ul className="grid divide-y divide-line overflow-hidden rounded-[20px] border border-line bg-surface">
+              <ul className="reveal grid divide-y divide-line overflow-hidden rounded-[20px] border border-line bg-surface">
                 {recent.map((t) => (
                   <li key={t.id}>
                     <button
@@ -154,9 +154,9 @@ export function ShareView({ title, text, url, photos, recent }: { title: string;
           </section>
         )}
 
-        {busy && <p className="text-[13.5px] text-muted">Guardando…</p>}
+        {busy && <p className="reveal text-[13.5px] text-muted">Guardando…</p>}
         {error && (
-          <p role="alert" className="text-[13.5px] text-danger">
+          <p role="alert" className="reveal text-[13.5px] text-danger">
             {error}
           </p>
         )}

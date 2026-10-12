@@ -1,5 +1,6 @@
 "use client";
 
+import Form from "next/form";
 import Link from "next/link";
 import { useRef } from "react";
 import { MagnifyingGlass, X } from "@phosphor-icons/react";
@@ -59,7 +60,7 @@ export function HistoryView({
     <>
       <PageHeader title="Buscar movimientos" wide tabs={<GastosTabs />} />
       <main className="mx-auto grid max-w-3xl gap-4 px-4 pt-2 pb-10 lg:max-w-6xl lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-10 lg:pt-6">
-        <form action="/gastos/buscar" className="grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:sticky lg:top-28">
+        <Form action="/gastos/buscar" className="grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:sticky lg:top-28">
           <label className="flex h-11 items-center gap-2 rounded-full border border-line-strong bg-surface px-3.5 focus-within:border-accent">
             <MagnifyingGlass size={16} className="text-muted" aria-hidden />
             <input name="q" defaultValue={params.q} placeholder="Buscar: mc, nafta, alquiler…" className="min-w-0 flex-1 bg-transparent text-[14.5px] outline-none" />
@@ -121,7 +122,7 @@ export function HistoryView({
               </Link>
             )}
           </div>
-        </form>
+        </Form>
 
         <section className="grid content-start gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-2xl bg-surface-2 px-4 py-3 text-[13.5px]">

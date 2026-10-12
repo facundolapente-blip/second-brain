@@ -123,7 +123,7 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
               {showSettled ? "Ocultar" : "Ver"} saldadas ({settled.length})
             </button>
             {showSettled && (
-              <ul className="grid divide-y divide-line rounded-2xl border border-line bg-surface">
+              <ul className="reveal grid divide-y divide-line rounded-2xl border border-line bg-surface">
                 {settled.map((d) => (
                   <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-muted">
                     <span className="min-w-0 flex-1 truncate text-[13.5px]">
@@ -199,7 +199,7 @@ function DebtForm({ debt, onDone }: { debt: DebtDTO | null; onDone: () => void }
           <Input name="note" maxLength={500} defaultValue={debt?.note ?? ""} placeholder="Nafta, cena…" />
         </Field>
       </div>
-      {state && !state.ok && <p className="text-[13px] text-danger">{state.error}</p>}
+      {state && !state.ok && <p className="reveal text-[13px] text-danger">{state.error}</p>}
       <Button type="submit" disabled={pending}>
         {pending ? "Guardando…" : "Guardar"}
       </Button>
@@ -286,7 +286,7 @@ function SettleForm({
       <Button variant="ghost" disabled={pending} onClick={() => go(false)}>
         Saldar sin cargar movimiento
       </Button>
-      {error && <p className="text-[13px] text-danger">{error}</p>}
+      {error && <p className="reveal text-[13px] text-danger">{error}</p>}
     </div>
   );
 }

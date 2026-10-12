@@ -1,5 +1,6 @@
 "use client";
 
+import { useSwap } from "@/components/motion";
 import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useOptimistic, useState } from "react";
@@ -101,6 +102,7 @@ export function HistoryLog({
     days.set(k, [...(days.get(k) ?? []), a]);
   }
 
+  const tabSwap = useSwap(`${tab}|${filter}`);
   return (
     <>
       <PageHeader
@@ -124,12 +126,12 @@ export function HistoryLog({
           </div>
         }
       />
-      <main className="mx-auto grid max-w-3xl gap-4 px-4 pt-4 pb-16 lg:px-10 lg:pt-6">
+      <main key={`${tab}-${filter}`} className={cx("mx-auto grid max-w-3xl gap-4 px-4 pt-4 pb-16 lg:px-10 lg:pt-6", tabSwap)}>
         {msg && (
           <p
             role="status"
             className={cx(
-              "rounded-xl px-4 py-3 text-[13.5px]",
+              "reveal rounded-xl px-4 py-3 text-[13.5px]",
               msg.ok ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
             )}
           >

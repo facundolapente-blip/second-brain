@@ -1,4 +1,5 @@
 import { isISODate, todayISO } from "@/lib/dates";
+import { SlideOnChange } from "@/components/motion-wrap";
 import { getWeeklyReview } from "@/lib/review";
 import { ReviewView } from "./review-view";
 
@@ -10,7 +11,9 @@ export default async function SemanaPage({ searchParams }: PageProps<"/semana">)
   const r = await getWeeklyReview(isISODate(semana) ? semana : todayISO());
   return (
     <div data-module="inicio" className="min-h-dvh">
-      <ReviewView key={r.monday} r={r} />
+      <SlideOnChange k={r.monday}>
+        <ReviewView r={r} />
+      </SlideOnChange>
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function BalanceAdjuster({
     );
   }
   return (
-    <div className="grid gap-3 rounded-2xl border border-line bg-surface-2 p-4">
+    <div className="reveal grid gap-3 rounded-2xl border border-line bg-surface-2 p-4">
       <div className="grid gap-1">
         <p className="text-[14px] font-medium">Ajustar saldo</p>
         <p className="text-[12.5px] leading-relaxed text-muted">
@@ -54,7 +54,7 @@ export function BalanceAdjuster({
           <Input type="date" value={date} max={todayISO()} onChange={(e) => e.target.value && setDate(e.target.value)} />
         </Field>
       </div>
-      {error && <p className="text-[13px] text-danger">{error}</p>}
+      {error && <p className="reveal text-[13px] text-danger">{error}</p>}
       <div className="flex gap-2">
         <Button
           type="button"

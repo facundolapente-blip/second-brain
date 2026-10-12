@@ -1,5 +1,6 @@
 "use client";
 
+import { useSlide } from "@/components/motion";
 import { useOnNew } from "@/components/nav-add";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "@phosphor-icons/react";
@@ -47,6 +48,8 @@ export function TodayView({
   // Los que tocan hoy, y los que ya se vieron aunque al destildarlos dejen de tocar.
   const sticky = useStickyDay(selected, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected)).map((h) => h.id));
   const visible = sorted.filter((h) => sticky.has(h.id));
+  // Otro día en la tira: la lista entra desde ese lado (al cargar, nada).
+  const daySlide = useSlide(selected);
 
 
   return (
@@ -67,7 +70,7 @@ export function TodayView({
         <section className="min-w-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]">
         <DateStrip days={days} selected={selected} today={today} onSelect={setSelected} />
 
-        <div className="px-4 lg:px-6">
+        <div key={selected} className={cx("px-4 lg:px-6", daySlide)}>
           {habits.length === 0 ? (
             <EmptyState onCreate={() => form.current?.create()} />
           ) : visible.length === 0 ? (
@@ -85,7 +88,8 @@ export function TodayView({
               rowClassName="bg-bg py-1.5 lg:bg-surface lg:py-4"
             />
           )}
-          {visible.length > 0 && <DayComplete {...dayProgress(habits, logs, selected, today)} />}
+          {/* key: cambiar de día no es "completar" (si no, el brillo saltaba al mirar un día completo). */}
+          {visible.length > 0 && <DayComplete key={selected} {...dayProgress(habits, logs, selected, today)} />}
         </div>
         </section>
 

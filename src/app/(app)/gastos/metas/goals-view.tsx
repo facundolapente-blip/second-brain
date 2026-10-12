@@ -226,7 +226,7 @@ function GoalForm({ goal, accounts, onDone }: { goal: GoalDTO | null; accounts: 
           ))}
         </div>
       </div>
-      {state && !state.ok && <p className="text-[13px] text-danger">{state.error}</p>}
+      {state && !state.ok && <p className="reveal text-[13px] text-danger">{state.error}</p>}
       <Button type="submit" disabled={pending}>
         {pending ? "Guardando…" : "Guardar"}
       </Button>
@@ -280,7 +280,7 @@ function AddForm({ goal, onDone }: { goal: GoalDTO; onDone: () => void }) {
       <Field label="Cuánto guardaste" hint="Con un menos adelante lo resta (si sacaste plata).">
         <Input inputMode="decimal" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" />
       </Field>
-      {error && <p className="text-[13px] text-danger">{error}</p>}
+      {error && <p className="reveal text-[13px] text-danger">{error}</p>}
       <Button type="submit" disabled={pending || !value.trim()}>
         {pending ? "Sumando…" : "Sumar"}
       </Button>

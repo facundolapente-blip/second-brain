@@ -44,6 +44,17 @@ export function ContextMenuHost() {
   const [open, setOpen] = useState<Open | null>(null);
   const [renaming, setRenaming] = useState<FormItem | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  // Al cerrar, un instante con la salida antes de sacarlo.
+  const [leaving, setLeaving] = useState(false);
+  const dismiss = () => setLeaving(true);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(() => {
+      setOpen(null);
+      setLeaving(false);
+    }, 120);
+    return () => clearTimeout(t);
+  }, [leaving]);
   const box = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
 
@@ -51,6 +62,7 @@ export function ContextMenuHost() {
     const h = (e: Event) => {
       returnFocus.current = document.activeElement as HTMLElement | null;
       setOpen((e as CustomEvent<Open>).detail);
+      setLeaving(false);
       setRenaming(null);
       setPos(null);
     };
@@ -74,12 +86,12 @@ export function ContextMenuHost() {
       if (e && e.type === "pointerdown" && box.current?.contains(e.target as Node)) return;
       // Al abrir, el foco en el menú dispara un "scroll" del documento: ese no cuenta.
       if (e && e.type === "scroll" && performance.now() - openedAt < 400) return;
-      setOpen(null);
+      dismiss();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        setOpen(null);
+        dismiss();
         returnFocus.current?.focus?.();
       }
     };
@@ -123,20 +135,20 @@ export function ContextMenuHost() {
       // Se abre desde el punto donde se hizo clic (o desde la esquina que quedó más cerca si se corrió).
       className={cx(
         "fixed z-[60] min-w-52 overflow-hidden rounded-xl border border-line-strong bg-surface py-1 shadow-[0_14px_36px_-14px_rgba(var(--shadow-tint),0.45)] print:hidden",
-        pos && "menu-in",
+        leaving ? "menu-out" : pos && "menu-in",
         pos && (pos.top < open.y ? "origin-bottom-left" : "origin-top-left"),
       )}
     >
       {renaming && "schedule" in renaming ? (
-        <ScheduleForm item={renaming} onDone={() => setOpen(null)} />
+        <ScheduleForm item={renaming} onDone={() => dismiss()} />
       ) : renaming && "rename" in renaming ? (
         <form
-          className="grid gap-2 p-2"
+          className="reveal grid gap-2 p-2"
           onSubmit={(e) => {
             e.preventDefault();
             const v = String(new FormData(e.currentTarget).get("nombre") ?? "").trim();
             if (v && v !== renaming.rename.value) renaming.rename.onSave(v);
-            setOpen(null);
+            dismiss();
           }}
         >
           <label className="px-1 text-[12px] font-medium text-muted" htmlFor="menu-nombre">
@@ -165,7 +177,7 @@ export function ContextMenuHost() {
               onClick={() => {
                 if ("rename" in it || "schedule" in it) setRenaming(it);
                 else {
-                  setOpen(null);
+                  dismiss();
                   it.onSelect();
                 }
               }}
@@ -211,7 +223,7 @@ function ScheduleForm({ item, onDone }: { item: Extract<ContextMenuItem, { sched
   const field = "h-10 rounded-lg border border-line-strong bg-surface px-2.5 text-[14px] outline-none focus:border-accent";
   return (
     <form
-      className="grid w-[19rem] max-w-[86vw] gap-2.5 p-2.5"
+      className="reveal grid w-[19rem] max-w-[86vw] gap-2.5 p-2.5"
       onSubmit={(e) => {
         e.preventDefault();
         if (!date) return;

@@ -8,6 +8,8 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState, useMemo } from "react";
+import { leaveThen, useNewIds } from "@/components/motion";
+import { PillSwitch } from "@/components/pill-switch";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
 import { addDays, formatShort, startOfWeek, weekday } from "@/lib/dates";
@@ -23,9 +25,12 @@ import { BoardHours, BoardList } from "./week-board";
 
 const SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-// Primer día de lo que se miraba antes: para saber hacia qué lado deslizar al
-// avanzar o retroceder (vive entre navegaciones, sin recargar la página).
-let lastStart: string | null = null;
+// Hacia dónde se tocó (flechas, "Hoy"): el próximo montaje desliza desde ese lado
+// y lo consume. Entrar al Plan desde otro módulo no desliza (no es avanzar).
+let pendingSlide: "plan-slide-next" | "plan-slide-prev" | null = null;
+const markSlide = (dir: "next" | "prev") => {
+  pendingSlide = dir === "next" ? "plan-slide-next" : "plan-slide-prev";
+};
 
 /** Preferencias del Plan que lee el servidor al dibujar (un año, solo en /plan). */
 function savePref(name: string, value: string) {
@@ -64,10 +69,19 @@ export function WeekView({
   const isThisWeek = days.includes(today);
   const [selected, setSelected] = useState(isThisWeek ? today : start);
   // Hacia dónde se movió: adelante desliza desde la derecha, atrás desde la izquierda.
-  const [slide] = useState(() => (lastStart && lastStart !== start ? (start > lastStart ? "plan-slide-next" : "plan-slide-prev") : ""));
+  const [slide] = useState(() => pendingSlide ?? "");
   useEffect(() => {
-    lastStart = start;
-  }, [start]);
+    pendingSlide = null;
+  }, []);
+  // Elegir otro día en la tira del celular: la lista entra desde ese lado.
+  const [daySlide, setDaySlide] = useState("");
+  const pickDay = (d: string) => {
+    if (d === selected) return;
+    setDaySlide(d > selected ? "plan-slide-next" : "plan-slide-prev");
+    setSelected(d);
+  };
+  // Lista ↔ Por horas: fundido corto (solo después de tocar, no al cargar).
+  const [viewSwap, setViewSwap] = useState(false);
   const [step, setStepState] = useState<"dia" | "semana">(initialStep);
   const setStep = (s: "dia" | "semana") => {
     setStepState(s);
@@ -83,6 +97,7 @@ export function WeekView({
   const [view, setViewState] = useState<"lista" | "horas">(initialView);
   // La vista elegida se recuerda (al recargar o cambiar de semana sigue igual).
   const setView = (v: "lista" | "horas") => {
+    setViewSwap(true);
     setViewState(v);
     savePref(PLAN_VIEW_COOKIE, v);
   };
@@ -161,10 +176,13 @@ export function WeekView({
           icon: <Trash size={15} />,
           danger: true,
           onSelect: () => {
-            startTransition(async () => {
-              applyDone({ id: b.id, date: "" });
-              await deleteBlock(b.id);
-            });
+            // Se va con una salida corta y recién después se saca de la semana.
+            leaveThen(`[data-leave="${b.id}"]`, () =>
+              startTransition(async () => {
+                applyDone({ id: b.id, date: "" });
+                await deleteBlock(b.id);
+              }),
+            );
             notifyDeleted("Bloque borrado");
           },
         },
@@ -244,6 +262,7 @@ export function WeekView({
           <div className="flex items-center gap-1">
             <Link
               href={prev}
+              onClick={() => markSlide("prev")}
               aria-label={`${unit} anterior`}
               title={`${unit} anterior`}
               className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
@@ -257,6 +276,7 @@ export function WeekView({
             </h2>
             <Link
               href={next}
+              onClick={() => markSlide("next")}
               aria-label={`${unit} siguiente`}
               title={`${unit} siguiente`}
               className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
@@ -265,26 +285,19 @@ export function WeekView({
             </Link>
           </div>
           {/* Qué avanzan las flechas (se recuerda). */}
-          <div role="radiogroup" aria-label="Las flechas avanzan" className="inline-flex rounded-full bg-surface-2 p-1">
-            {(["dia", "semana"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                role="radio"
-                aria-checked={step === s}
-                onClick={() => setStep(s)}
-                className={cx(
-                  "h-8 rounded-full px-3 text-[13px] font-medium transition-colors",
-                  step === s ? "bg-raised text-fg shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)]" : "text-muted hover:text-fg",
-                )}
-              >
-                {s === "dia" ? "Día" : "Semana"}
-              </button>
-            ))}
-          </div>
+          <PillSwitch
+            label="Las flechas avanzan"
+            value={step}
+            options={[
+              { value: "dia", label: "Día" },
+              { value: "semana", label: "Semana" },
+            ]}
+            onChange={setStep}
+          />
           {!isThisWeek && (
             <Link
               href={step === "dia" ? `/plan?desde=${today}` : "/plan"}
+              onClick={() => markSlide(today > start ? "next" : "prev")}
               className="inline-flex min-h-11 items-center text-sm font-medium text-accent-fg hover:underline"
             >
               {step === "dia" ? "Hoy" : "Esta semana"}
@@ -297,7 +310,7 @@ export function WeekView({
           )}
         </div>
         {copyMsg && (
-          <p role="status" className="mb-3 border-l-[1.5px] border-accent py-1 pl-3 text-[14px] text-accent-fg">
+          <p role="status" className="reveal mb-3 border-l-[1.5px] border-accent py-1 pl-3 text-[14px] text-accent-fg">
             {copyMsg}{" "}
             {copyMsg.startsWith("Listo") && (
               <Link href={`/plan?semana=${addDays(monday, 7)}`} className="font-medium underline underline-offset-4">
@@ -320,7 +333,7 @@ export function WeekView({
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setSelected(d)}
+                  onClick={() => pickDay(d)}
                   className={cx(
                     "relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[6px] transition-colors",
                     active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
@@ -352,6 +365,7 @@ export function WeekView({
           <div className="mb-3 flex justify-end">
             <ViewToggle view={view} onChange={setView} />
           </div>
+          <div key={`${view}-${selected}`} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
           {view === "lista" ? (
             <DayList
               day={selected}
@@ -367,6 +381,7 @@ export function WeekView({
             // Por horas en el celular: el calendario del día elegido en la tira.
             <BoardHours {...boardProps} days={[selected]} todoFolded={todoFolded} />
           )}
+          </div>
         </div>
 
         {/* Escritorio: lista de 7 columnas o calendario por horas; los bloques se arrastran. */}
@@ -374,7 +389,7 @@ export function WeekView({
           <div className="mb-3 flex justify-end">
             <ViewToggle view={view} onChange={setView} />
           </div>
-          <div className={slide}>
+          <div key={view} className={slide || (viewSwap ? "swap" : undefined)}>
             {view === "lista" ? (
               <BoardList {...boardProps} />
             ) : (
@@ -411,6 +426,8 @@ function DayList({
 }) {
   // Mantener apretado un bloque sin hora y moverlo: queda en ese lugar del día
   // (entre los vecinos, como en la columna de la compu). Los que tienen hora van por horario.
+  // Un bloque recién creado, movido o restaurado entra con un fundido (no al cargar).
+  const fresh = useNewIds(blocks.map((b) => b.id));
   function reorder(_ids: string[], moved: { id: string; to: number }) {
     const b = blocks.find((x) => x.id === moved.id);
     if (!b || b.startTime) return;
@@ -438,7 +455,7 @@ function DayList({
               key={b.id}
               id={b.id}
               disabled={!!b.startTime}
-              className={cx("grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25 bg-bg", isFreeBlock(b) && "free-row")}
+              className={cx("grid grid-cols-[52px_1fr] items-start gap-3 border-b-2 border-fg/25 bg-bg", isFreeBlock(b) && "free-row", fresh.has(b.id) && "reveal")}
               draggingClass="rounded-xl shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
             >
               <span className="pt-3 text-right font-mono text-[13px] leading-tight font-medium text-fg/80 tabular">
@@ -479,6 +496,7 @@ export function BlockCard({
   const [tapped, setTapped] = useState(false);
   return (
     <article
+      data-leave={b.id}
       className={cx(
         "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
         // En la columna de la compu cada bloque es una tarjeta (bien separada de la siguiente).
@@ -581,22 +599,15 @@ export function BlockCard({
 /** Lista o Por horas (en el celular y en la compu). */
 function ViewToggle({ view, onChange }: { view: "lista" | "horas"; onChange: (v: "lista" | "horas") => void }) {
   return (
-    <div role="radiogroup" aria-label="Vista" className="inline-flex rounded-full bg-surface-2 p-1">
-      {(["lista", "horas"] as const).map((v) => (
-        <button
-          key={v}
-          type="button"
-          role="radio"
-          aria-checked={view === v}
-          onClick={() => onChange(v)}
-          className={cx(
-            "h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors",
-            view === v ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
-          )}
-        >
-          {v === "lista" ? "Lista" : "Por horas"}
-        </button>
-      ))}
-    </div>
+    <PillSwitch
+      label="Vista"
+      value={view}
+      options={[
+        { value: "lista", label: "Lista" },
+        { value: "horas", label: "Por horas" },
+      ]}
+      onChange={onChange}
+      item="h-8 px-3.5 text-[12.5px]"
+    />
   );
 }

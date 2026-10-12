@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SlideOnChange, SwapOnChange } from "@/components/motion-wrap";
+import Form from "next/form";
 import { CaretDown, CaretLeft, CaretRight, MagnifyingGlass, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getMonthEntries, getRangeEntries } from "@/lib/journal";
 import { addDays, diffDays, formatLong, formatMonth, formatShort, isISODate, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
@@ -92,7 +94,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
             </Link>
           </div>
 
-          {/* Ir directo a un mes o elegir un período (formularios comunes: andan sin JavaScript). */}
+          {/* Ir directo a un mes o elegir un período (Form de Next: navega sin recargar la página entera). */}
           <details className="group rounded-xl border border-line px-3 py-2" open={!!range}>
             <summary className="flex min-h-9 cursor-pointer list-none items-center gap-2 text-[13.5px] font-medium text-muted marker:hidden hover:text-fg">
               <MagnifyingGlass size={15} aria-hidden />
@@ -100,7 +102,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               <CaretDown size={13} aria-hidden className="ml-auto transition-transform group-open:rotate-180" />
             </summary>
             <div className="grid gap-3 pt-2 pb-1">
-              <form action="/journal/calendario" className="flex flex-wrap items-end gap-2">
+              <Form action="/journal/calendario" className="flex flex-wrap items-end gap-2">
                 <label className="grid gap-1 text-[12.5px] text-muted">
                   Ir a un mes
                   <input type="month" name="mes" defaultValue={month} required className={field} />
@@ -108,8 +110,8 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                 <button type="submit" className={goBtn}>
                   Ir
                 </button>
-              </form>
-              <form action="/journal/calendario" className="flex flex-wrap items-end gap-2">
+              </Form>
+              <Form action="/journal/calendario" className="flex flex-wrap items-end gap-2">
                 <label className="grid gap-1 text-[12.5px] text-muted">
                   Desde
                   <input type="date" name="desde" defaultValue={range?.from ?? monthBounds(month).from} required className={field} />
@@ -126,11 +128,11 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                     Quitar período
                   </Link>
                 )}
-              </form>
+              </Form>
             </div>
           </details>
 
-          <div className="grid grid-cols-7 justify-items-center gap-y-1 lg:gap-y-2">
+          <SlideOnChange k={month}><div className="grid grid-cols-7 justify-items-center gap-y-1 lg:gap-y-2">
             {WEEK_HEAD.map((w) => (
               <span key={w} aria-hidden className="kicker pb-1">
                 {w}
@@ -170,7 +172,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                 </Link>
               );
             })}
-          </div>
+          </div></SlideOnChange>
 
           <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[12.5px] text-muted" aria-label="Referencias de color">
             <li className="inline-flex items-center gap-1.5">
@@ -187,6 +189,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
         </section>
 
         <section className="grid content-start gap-3">
+          <SwapOnChange k={`${selected}|${range?.from ?? ""}|${range?.to ?? ""}`} className="grid content-start gap-3">
           {rangeEntries && (
             <div className="grid gap-3">
               <div className="grid gap-1 border-b border-fg/80 pb-3">
@@ -258,6 +261,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               </ul>
             </div>
           )}
+          </SwapOnChange>
         </section>
       </main>
     </>

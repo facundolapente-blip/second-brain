@@ -1,9 +1,10 @@
 "use client";
 
+import { useNewIds } from "@/components/motion";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
-import { useOptimistic, useRef, useState } from "react";
+import { useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { bumpTaskProgress, reorderTasks, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
@@ -21,6 +22,9 @@ const LIMIT = 6;
  * Notion): vistas guardadas, tabla en la computadora y lista en el celular.
  * Muestra las primeras 6 y el resto con "Ver todas".
  */
+/** Vista y "Ver todas" del tablero: viven mientras la app está abierta (cambiar de semana no los pierde). */
+const savedBoard: { view: TaskView; all: boolean } = { view: "todo", all: false };
+
 export function TasksBoard({
   tasks,
   categories,
@@ -40,18 +44,27 @@ export function TasksBoard({
   columns?: TaskColumnWidths;
 }) {
   const [folded, setFolded] = useState(foldedInitial);
-  // Solo se anima al desplegarlas con un toque (no al cargar).
-  const [unfolded, setUnfolded] = useState(false);
   function toggleFold() {
-    setUnfolded(folded);
     const next = !folded;
     setFolded(next);
     document.cookie = `${TASKS_FOLD_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
   }
   const open = tasks.filter((t) => t.status !== "done");
   const overdue = open.filter((t) => (daysLeft(t.deadline, today) ?? 0) < 0).length;
-  const [view, setView] = useState<TaskView>("todo");
-  const [all, setAll] = useState(false);
+  // La vista y "Ver todas" sobreviven al cambio de semana (la página vuelve a montar el tablero).
+  const [view, setViewState] = useState<TaskView>(() => savedBoard.view);
+  const [all, setAllState] = useState(() => savedBoard.all);
+  // Cambiar de vista: fundido corto (solo después de tocar, no al cargar).
+  const [swapped, setSwapped] = useState(false);
+  const setView = (v: TaskView) => {
+    setSwapped(true);
+    setViewState(v);
+  };
+  const setAll = setAllState;
+  useEffect(() => {
+    savedBoard.view = view;
+    savedBoard.all = all;
+  }, [view, all]);
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
@@ -71,6 +84,7 @@ export function TasksBoard({
     startOrder(() => reorderTasks(full));
   }
   const visible = all ? matching : matching.slice(0, LIMIT);
+  const fresh = useNewIds(visible.map((t) => t.id));
   const hidden = matching.length - visible.length;
   // Clic derecho en una tarea (tabla de la compu).
   const [, startMenu] = useSafeTransition();
@@ -129,14 +143,16 @@ export function TasksBoard({
             size={14}
             weight="bold"
             aria-hidden
-            className={cx("shrink-0 text-muted transition-transform duration-200 lg:hidden", folded && "-rotate-90")}
+            className={cx("shrink-0 text-muted transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)] lg:hidden", folded && "-rotate-90")}
           />
         </button>
         <Button variant="outline" size="sm" className="ml-auto" onClick={() => sheet.current?.open()}>
           <Plus size={15} weight="bold" /> Nueva tarea
         </Button>
       </div>
-      <div id="tareas-cuerpo" className={cx(folded && "max-lg:hidden", unfolded && "reveal")}>
+      {/* En el celular se pliega con el alto animado (en la compu siempre se ve). */}
+      <div id="tareas-cuerpo" className="fold fold-mobile" data-closed={folded || undefined}>
+      <div>
       <div
         role="tablist"
         aria-label="Vistas"
@@ -166,6 +182,7 @@ export function TasksBoard({
         })}
       </div>
 
+      <div key={view} className={swapped ? "swap" : undefined}>
       {visible.length === 0 ? (
         <div className="grid justify-items-start gap-3 border-y border-line py-6">
           <p className="text-[15px] text-muted">
@@ -174,13 +191,14 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable tasks={visible} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} columns={columns} onMenu={taskMenu} />
+          <TaskTable tasks={visible} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} sortable={canSort} onReorder={reorder} columns={columns} onMenu={taskMenu} />
           {/* Celular: mantener apretada una tarea y moverla para cambiar el orden. */}
           <Sortable ids={visible.map((t) => t.id)} onReorder={reorder} disabled={!canSort}>
           <ul className="grid border-t border-line lg:hidden">
             {visible.map((t) => (
               <TaskRow
                 key={t.id}
+                fresh={fresh.has(t.id)}
                 task={t}
                 category={t.categoryId ? cats.get(t.categoryId) : null}
                 today={today}
@@ -202,6 +220,8 @@ export function TasksBoard({
         </button>
       )}
       </div>
+      </div>
+      </div>
 
       <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} />
       <BlockSheet
@@ -219,19 +239,22 @@ function TaskRow({
   today,
   onOpen,
   sortable,
+  fresh,
 }: {
   task: TaskDTO;
   category?: CategoryDTO | null;
   today: string;
   onOpen: () => void;
   sortable: boolean;
+  /** Recién aparecida ("Ver todas", nueva): entra con un fundido. */
+  fresh?: boolean;
 }) {
   const left = daysLeft(t.deadline, today);
   const pct = progressPct(t.progress, t.goal);
   const st = TASK_STATUS[t.status];
   const done = t.status === "done";
   return (
-    <SortableItem id={t.id} disabled={!sortable} className="border-b border-line bg-bg">
+    <SortableItem id={t.id} disabled={!sortable} className={cx("border-b border-line bg-bg", fresh && "reveal")}>
       <button type="button" onClick={onOpen} className="grid w-full gap-2.5 px-1 py-3.5 text-left">
         <span className="flex items-start gap-3">
           <span className="grid min-w-0 flex-1 gap-0.5">
@@ -304,7 +327,10 @@ function TaskTable({
   onReorder,
   columns,
   onMenu,
+  fresh,
 }: {
+  /** Filas recién aparecidas: entran con un fundido. */
+  fresh?: Set<string>;
   tasks: TaskDTO[];
   cats: Map<string, CategoryDTO>;
   today: string;
@@ -363,7 +389,7 @@ function TaskTable({
                 id={t.id}
                 disabled={!sortable}
                 onContextMenu={(e) => onMenu(e, t)}
-                className="group border-b border-line bg-surface transition-colors last:border-b-0 hover:bg-surface-2/60"
+                className={cx("group border-b border-line bg-surface transition-colors last:border-b-0 hover:bg-surface-2/60", fresh?.has(t.id) && "reveal")}
                 draggingClass="shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
               >
                 <td className="py-2 pr-3 pl-3">
@@ -475,18 +501,20 @@ function ColumnResizer({ label, width, onResize }: { label: string; width: numbe
 function ScheduledBox({ task }: { task: TaskDTO }) {
   const [on, setOn] = useOptimistic(task.scheduled);
   const [, start] = useSafeTransition();
+  const [tapped, setTapped] = useState(false);
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={on}
       aria-label={`${task.title}: ${on ? "agendada" : "sin agendar"}`}
-      onClick={() =>
+      onClick={() => {
+        setTapped(true);
         start(async () => {
           setOn(!on);
           await setTaskScheduled(task.id, !on);
-        })
-      }
+        });
+      }}
       className="inline-flex size-11 items-center justify-center rounded-full"
     >
       <span
@@ -495,7 +523,7 @@ function ScheduledBox({ task }: { task: TaskDTO }) {
           on ? "border-[var(--st-done-line)] bg-[var(--st-done-line)] text-on-accent" : "border-fg/45 hover:border-fg/70",
         )}
       >
-        {on && <Check size={14} weight="bold" />}
+        {on && <Check size={14} weight="bold" className={tapped ? "mark-pop" : undefined} />}
       </span>
     </button>
   );

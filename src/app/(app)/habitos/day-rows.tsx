@@ -185,7 +185,7 @@ export function DayComplete({ done, total }: { done: number; total: number }) {
   const celebrate = useJustCompleted(complete);
   if (!complete) return null;
   return (
-    <p className="flex items-center justify-center gap-2.5 py-6 text-[14px] font-medium text-fg" role="status">
+    <p className="reveal flex items-center justify-center gap-2.5 py-6 text-[14px] font-medium text-fg" role="status">
       <span
         className={cx(
           "inline-flex size-8 items-center justify-center rounded-full border-[1.5px] border-[var(--st-done-line)] bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",

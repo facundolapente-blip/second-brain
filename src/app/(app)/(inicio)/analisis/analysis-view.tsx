@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useSwap } from "@/components/motion";
+import { PillSwitch } from "@/components/pill-switch";
 import { useState } from "react";
 import { Lightbulb } from "@phosphor-icons/react";
 import type { Corr, Insight } from "@/lib/insights";
@@ -38,6 +39,8 @@ export function AnalysisView({
   weeks: Week[];
   checkinDays: number;
 }) {
+  // Otro rango: el contenido cambia con un fundido (no al cargar).
+  const rangeSwap = useSwap(String(range));
   return (
     <>
       <PageHeader
@@ -45,25 +48,16 @@ export function AnalysisView({
         kicker={`Últimos ${range} días, hasta ayer`}
         wide
         actions={
-          <div role="radiogroup" aria-label="Período" className="inline-flex rounded-full bg-surface-2 p-1">
-            {ranges.map((r) => (
-              <Link
-                key={r}
-                href={`/analisis?dias=${r}`}
-                role="radio"
-                aria-checked={r === range}
-                className={cx(
-                  "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors",
-                  r === range ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
-                )}
-              >
-                {r === 365 ? "1 año" : `${r}d`}
-              </Link>
-            ))}
-          </div>
+          <PillSwitch
+            label="Período"
+            value={String(range)}
+            options={ranges.map((r) => ({ value: String(r), label: r === 365 ? "1 año" : `${r}d` }))}
+            hrefOf={(r) => `/analisis?dias=${r}`}
+            item="h-8 px-3 text-[12.5px]"
+          />
         }
       />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+      <main key={range} className={cx("mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4", rangeSwap)}>
         <Card title="Lo que se ve en tus datos" className="xl:col-span-12">
           {insights.length === 0 ? (
             <p className="text-[14px] leading-relaxed text-muted">

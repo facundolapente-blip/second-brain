@@ -247,7 +247,7 @@ export function AccountsView({
                     {!sorting && <CaretRight size={14} className="text-muted lg:hidden" aria-hidden />}
                   </button>
                   {sorting && (
-                    <span className="flex">
+                    <span className="reveal flex">
                       <IconBtn label="Subir" disabled={i === 0} onClick={() => move(a.id, -1)}>
                         <ArrowUp size={16} weight="bold" />
                       </IconBtn>
@@ -418,8 +418,8 @@ export function AccountsView({
             </div>
           </div>
 
-          {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
-          {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
+          {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
+          {deleteError && <p className="reveal text-sm text-danger">{deleteError}</p>}
 
           <div className="grid gap-2">
             <Button type="submit" variant="accent" disabled={pending} className="h-11">

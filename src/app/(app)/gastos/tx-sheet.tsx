@@ -1,5 +1,6 @@
 "use client";
 
+import { useSwap } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
@@ -98,6 +99,7 @@ export const TxSheet = forwardRef<
     };
   };
   const [d, setD] = useState<Draft>(blank);
+  const kindSwap = useSwap(d.kind);
   // Comprobantes elegidos antes de guardar un movimiento nuevo: se suben al guardarlo.
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
   const photoInput = useRef<HTMLInputElement>(null);
@@ -294,7 +296,7 @@ export const TxSheet = forwardRef<
               <span
                 aria-hidden
                 className={cx(
-                  "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium",
+                  "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium transition-colors duration-[var(--dur-quick)]",
                   d.kind === "income" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-muted",
                 )}
               >
@@ -309,6 +311,8 @@ export const TxSheet = forwardRef<
           onChange={(v) => set({ amount: v })}
         />
 
+        {/* Lo que depende del tipo (gasto, ingreso, transferencia) cambia con un fundido. */}
+        <div key={d.kind} className={cx("grid grid-cols-[minmax(0,1fr)] gap-5", kindSwap)}>
         {d.kind !== "transfer" && (
           <Field label="Título">
             <Input
@@ -474,7 +478,10 @@ export const TxSheet = forwardRef<
           </div>
         )}
 
+        </div>
+
         {!d.id && d.kind === "expense" && accounts.find((a) => a.id === d.accountId)?.type === "card" && (
+          <div className="reveal">
           <Field label="Cuotas" hint={installmentHint(d, accounts.find((a) => a.id === d.accountId)?.currency ?? "UYU")}>
             <select
               name="installments"
@@ -489,6 +496,7 @@ export const TxSheet = forwardRef<
               ))}
             </select>
           </Field>
+          </div>
         )}
 
         {d.id && d.installment && (
@@ -517,7 +525,7 @@ export const TxSheet = forwardRef<
               {pendingPhotos.length > 0 && (
                 <ul className="flex flex-wrap gap-1.5">
                   {pendingPhotos.map((f, i) => (
-                    <li key={i} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-2 pr-1 pl-3 text-[13px]">
+                    <li key={i} className="reveal inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-2 pr-1 pl-3 text-[13px]">
                       <Camera size={14} aria-hidden />
                       Foto {i + 1}
                       <button
@@ -608,7 +616,7 @@ export const TxSheet = forwardRef<
         {/* Guardar queda siempre a mano, pegado abajo de la hoja, aunque la lista de categorías sea larga. */}
         <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-line bg-surface/95 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md">
           {state && !state.ok && (
-            <p id="tx-error" role="alert" className="text-sm text-danger">
+            <p id="tx-error" role="alert" className="reveal text-sm text-danger">
               {state.error}
             </p>
           )}
@@ -699,7 +707,7 @@ function CategoryChip({
       {children}
       <span className="line-clamp-2 text-[11.5px] leading-tight">{label}</span>
       {selected && (
-        <span className="absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-ink text-on-ink">
+        <span className="mark-pop absolute top-1 right-1 inline-flex size-4 items-center justify-center rounded-full bg-ink text-on-ink">
           <Check size={10} weight="bold" />
         </span>
       )}
@@ -758,7 +766,17 @@ function AmountMath({ amount, currency, onChange }: { amount: string; currency: 
     setValue("");
   }
   return (
-    <div className="-mt-3 grid min-w-0 gap-2">
+    <div
+      className="-mt-3 grid min-w-0 gap-2"
+      onKeyDown={(e) => {
+        // Con el cartel abierto, Escape lo cierra a él (no a toda la hoja).
+        if (e.key === "Escape" && op) {
+          e.preventDefault();
+          e.stopPropagation();
+          cancel();
+        }
+      }}
+    >
       <div className="flex gap-1.5" role="group" aria-label="Corregir el monto con una cuenta">
         {MATH_OPS.map((o) => {
           const s = "sign" in o ? o.sign : o.op;
@@ -783,7 +801,7 @@ function AmountMath({ amount, currency, onChange }: { amount: string; currency: 
         })}
       </div>
       {op && base !== null && (
-        <div className="grid min-w-0 gap-1.5 rounded-xl border border-accent bg-surface p-2.5 ring-3 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
+        <div className="reveal grid min-w-0 gap-1.5 rounded-xl border border-accent bg-surface p-2.5 ring-3 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
           <div className="flex min-w-0 items-center gap-2">
             <span className="w-5 shrink-0 text-center font-mono text-[20px] font-medium text-accent-fg" aria-hidden>
               {sign}

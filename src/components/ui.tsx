@@ -162,11 +162,10 @@ export const Sheet = forwardRef<
     reset(d);
     if (!d.open) d.showModal();
   }
-  /** Cierra con la animación de salida (o al toque si se pidió menos movimiento). */
+  /** Cierra con la animación de salida (con menos movimiento, un fundido corto). */
   function close() {
     const d = dlg.current;
     if (!d?.open || d.classList.contains("closing")) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return d.close();
     d.classList.add("closing");
     closing.current = setTimeout(() => {
       d.close();

@@ -514,9 +514,7 @@ dialog.sheet::backdrop {
 }
 .plan-slide-next { animation: plan-slide-next 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .plan-slide-prev { animation: plan-slide-prev 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-@media (prefers-reduced-motion: reduce) {
-  .plan-slide-next, .plan-slide-prev { animation: none; }
-}
+/* (con movimiento reducido, ver el bloque "reduce" de Movimiento: fundido corto) */
 
 /* ─── Movimiento (2026-10-11) ───────────────────────────────────────────────
    App de uso diario: el movimiento acusa recibo, explica qué se abrió o cambió y
@@ -590,6 +588,29 @@ dialog.sheet::backdrop {
     block-size: auto;
   }
 
+  /* Lo que se va (un menú, una fila borrada): se achica apenas y se apaga, más rápido que al llegar. */
+  .menu-out {
+    animation: menu-out 120ms var(--ease-in) forwards;
+  }
+  @keyframes menu-out {
+    to { opacity: 0; scale: 0.97; }
+  }
+  .leave {
+    animation: leave var(--dur-quick) var(--ease-in) forwards;
+  }
+  @keyframes leave {
+    to { opacity: 0; scale: 0.98; }
+  }
+
+  /* Contenido que se reemplaza en la misma pantalla (otro día, mes, cuenta, pestaña,
+     vista): un fundido corto con un mínimo corrimiento, para que el cambio se lea. */
+  .swap {
+    animation: swap var(--dur-state) var(--ease-out);
+  }
+  @keyframes swap {
+    from { opacity: 0.25; translate: 0 4px; }
+  }
+
   /* Barras de progreso: cuando cambia el número, avanzan (al cargar no se mueven; los anillos ya lo hacían). */
   .bar-anim {
     transition: width 480ms var(--ease-out);
@@ -597,12 +618,25 @@ dialog.sheet::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Sin desplazamientos: lo que se abre o se va, en un fundido corto. */
+  /* Sin desplazamientos ni escalas: todo lo que aparece, cambia o se va, en un fundido corto
+     (antes las hojas, el aviso y el cambio de pantalla quedaban de golpe). */
   .menu-in,
-  .reveal {
+  .reveal,
+  .swap,
+  .toast-in,
+  .page-fade,
+  .mark-pop,
+  .plan-slide-next,
+  .plan-slide-prev,
+  dialog.sheet[open],
+  dialog.sheet[open]::backdrop {
     animation: fade-only 120ms ease-out;
   }
-  .toast-out {
+  .toast-out,
+  .menu-out,
+  .leave,
+  dialog.sheet.closing,
+  dialog.sheet.closing::backdrop {
     animation: fade-only-out 120ms ease-in forwards;
   }
   @keyframes fade-only {
@@ -610,5 +644,64 @@ dialog.sheet::backdrop {
   }
   @keyframes fade-only-out {
     to { opacity: 0; }
+  }
+}
+
+/* Cambio de tema: claro y oscuro se cruzan en un fundido (View Transitions) en vez de saltar. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease-out);
+}
+
+/* Plegable: el alto se anima de 0 a su contenido (grid 0fr ↔ 1fr) y al cerrarse queda
+   invisible (fuera del Tab). Uso: <div class="fold" data-open> con un solo hijo. */
+.fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--dur-state) var(--ease-out),
+    opacity var(--dur-state) var(--ease-out),
+    visibility var(--dur-state) allow-discrete;
+}
+.fold > * {
+  min-height: 0;
+  overflow: clip;
+}
+.fold[data-closed] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+}
+@media (min-width: 1024px) {
+  .fold.fold-mobile[data-closed] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fold { transition: opacity 120ms ease-out, visibility 120ms allow-discrete; }
+}
+
+/* Aparece en un fundido corto, sin moverse (cuadros de ayuda de los gráficos). */
+.fade-in {
+  animation: fade-in 120ms ease-out;
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+/* Al llegar el contenido después del esqueleto de carga, entra con el mismo fundido corto
+   (sin esto, el esqueleto se reemplazaba de golpe). `:where` deja que las clases de cada
+   pantalla (swap, plan-slide…) ganen cuando corresponde. */
+@media (prefers-reduced-motion: no-preference) {
+  :where(#contenido main) {
+    animation: page-fade 150ms ease-out;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(#contenido main) {
+    animation: fade-in 120ms ease-out;
   }
 }

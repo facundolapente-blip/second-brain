@@ -135,7 +135,7 @@ export function PhotoStrip({
         />
       )}
       {error && (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="reveal text-[13px] text-danger">
           {error}
         </p>
       )}

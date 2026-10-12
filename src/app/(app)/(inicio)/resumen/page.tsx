@@ -1,4 +1,5 @@
 import { formatMonth, todayISO } from "@/lib/dates";
+import { SlideOnChange } from "@/components/motion-wrap";
 import { getMonthlySummary, getYearSummary } from "@/lib/monthly";
 import { SummaryView } from "./summary-view";
 
@@ -28,7 +29,10 @@ export default async function ResumenPage({ searchParams }: PageProps<"/resumen"
   const s = y ? await getYearSummary(y) : await getMonthlySummary(monthOf(sp.mes));
   return (
     <div data-module="inicio" className="min-h-dvh">
-      <SummaryView key={`${s.period.kind}-${s.period.key}`} s={s} />
+      {/* Otro mes o año: entra desde ese lado (pasar de mes a año, con el mismo deslizamiento). */}
+      <SlideOnChange k={`${s.period.key}`}>
+        <SummaryView s={s} />
+      </SlideOnChange>
     </div>
   );
 }

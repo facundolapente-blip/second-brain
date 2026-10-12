@@ -71,7 +71,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
         </button>
       </form>
       {/* La ayuda aparece solo mientras se usa (o con el resultado), así no ocupa lugar siempre. */}
-      <p className={cx("px-4 text-[12.5px] text-muted", !(focused || text.trim() || done || error) && "sr-only")} aria-live="polite">
+      <p className={cx("px-4 text-[12.5px] text-muted", focused || text.trim() || done || error ? "reveal" : "sr-only")} aria-live="polite">
         {error ? (
           <span className="text-danger">{error}</span>
         ) : done ? (

@@ -240,7 +240,7 @@ export function AccountChips({
                   on ? "border-on-ink" : "border-line-strong",
                 )}
               >
-                {on && <Check size={11} weight="bold" />}
+                {on && <Check size={11} weight="bold" className="mark-pop" />}
               </span>
             ) : (
               <AccountAvatar account={a} size={20} />

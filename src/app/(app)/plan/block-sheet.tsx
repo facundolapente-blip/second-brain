@@ -150,7 +150,7 @@ function BlockForm({
       </div>
 
       {state && !state.ok && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="reveal text-sm text-danger">
           {state.error}
         </p>
       )}

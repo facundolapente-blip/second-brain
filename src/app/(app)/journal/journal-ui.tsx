@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -122,6 +123,13 @@ export function EntryCard({
   selected?: boolean;
 }) {
   const router = useRouter();
+  // En la compu se marca al toque (la entrada tarda un poco en llegar al panel).
+  const [picking, setPicking] = useState(false);
+  const [wasSelected, setWasSelected] = useState(selected);
+  if (wasSelected !== selected) {
+    setWasSelected(selected);
+    setPicking(false);
+  }
   const [day, month] = formatShort(entry.date).split(" ");
   const wd = WEEKDAY_SHORT[new Date(`${entry.date}T00:00:00Z`).getUTCDay()];
   return (
@@ -132,12 +140,13 @@ export function EntryCard({
         if (!selectHref || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
         if (!window.matchMedia("(min-width: 1024px)").matches) return;
         e.preventDefault();
+        setPicking(true);
         router.replace(selectHref, { scroll: false });
       }}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
       className={cx(
         "rise group -mx-2 grid grid-cols-[3rem_minmax(0,1fr)] gap-x-4 rounded-[6px] border-b border-line px-2 py-5 transition-colors duration-200 last:border-b-0 hover:bg-surface-2/70 active:bg-surface-2 lg:-mx-3 lg:grid-cols-[3.5rem_minmax(0,1fr)] lg:gap-x-5 lg:rounded-xl lg:px-4 lg:py-5",
-        selected && "lg:border-transparent lg:bg-surface lg:shadow-[var(--card-shadow),0_0_0_1px_var(--card-ring)] lg:hover:bg-surface",
+        (selected || picking) && "lg:border-transparent lg:bg-surface lg:shadow-[var(--card-shadow),0_0_0_1px_var(--card-ring)] lg:hover:bg-surface",
       )}
     >
       <span className="grid content-start justify-items-center gap-0.5 pt-0.5 text-center" aria-hidden>
@@ -201,7 +210,7 @@ export function WriteDayButton({
       onClick={() => write(date, nueva)}
       disabled={pending}
       className={cx(
-        "inline-flex h-11 items-center justify-center gap-2 rounded-[4px] px-4 text-sm font-medium whitespace-nowrap transition-[opacity,transform,background-color] active:scale-[0.98] disabled:opacity-60",
+        "inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium whitespace-nowrap transition-[opacity,scale,background-color] duration-[var(--dur-quick)] disabled:opacity-60",
         variant === "accent" ? "bg-ink text-on-ink hover:opacity-85" : "border border-line-strong text-fg hover:bg-surface-2",
       )}
     >

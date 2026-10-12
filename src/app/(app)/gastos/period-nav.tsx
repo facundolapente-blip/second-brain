@@ -60,7 +60,7 @@ export function PeriodNav({
       </div>
 
       {mode === "month" && period.kind === "month" && (
-        <div className="-ml-3 flex items-center gap-0.5">
+        <div className="reveal -ml-3 flex items-center gap-0.5">
           <Link href={periodHref({ kind: "month", month: shiftMonth(period.month, -1) }, today, basePath)} aria-label="Mes anterior" className={arrow}>
             <CaretLeft size={18} />
           </Link>
@@ -77,7 +77,7 @@ export function PeriodNav({
       )}
 
       {mode === "year" && period.kind === "year" && (
-        <div className="-ml-3 flex items-center gap-0.5">
+        <div className="reveal -ml-3 flex items-center gap-0.5">
           <Link href={periodHref({ kind: "year", year: String(Number(period.year) - 1) }, today, basePath)} aria-label="Año anterior" className={arrow}>
             <CaretLeft size={18} />
           </Link>
@@ -95,7 +95,7 @@ export function PeriodNav({
 
       {mode === "range" && (
         <form
-          className="grid gap-2"
+          className="reveal grid gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (from && to) go({ kind: "range", from, to });

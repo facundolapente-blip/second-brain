@@ -23,7 +23,7 @@ export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: 
   return (
     <article
       aria-label="Entrada elegida"
-      className="rise rounded-2xl border border-line bg-surface"
+      className="reveal rounded-2xl border border-line bg-surface"
     >
       <div className="flex items-center gap-2 border-b border-line py-2.5 pr-2.5 pl-7">
         <p className="kicker min-w-0 flex-1 truncate">

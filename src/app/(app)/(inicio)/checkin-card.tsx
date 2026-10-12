@@ -1,5 +1,6 @@
 "use client";
 
+import { PillSwitch } from "@/components/pill-switch";
 import { usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
 import { useEffect, useRef, useState } from "react";
@@ -53,8 +54,8 @@ export function CheckinCard({
   const filled = countFilled(cur);
   // Con el de hoy completo arranca plegado: una línea con lo cargado.
   const [open, setOpen] = useState(() => countFilled(today) < 5);
-  // Solo se anima al desplegarlo con un toque (no al cargar Inicio).
-  const [unfolded, setUnfolded] = useState(false);
+  // Hoy ↔ Ayer: fundido de los valores (solo tras tocar).
+  const [daySwap, setDaySwap] = useState(false);
   const summary = [
     MOODS.find((m) => m.value === cur.mood)?.label,
     cur.energy ? `Energía ${ENERGY_LABELS[cur.energy - 1].toLowerCase()}` : null,
@@ -118,10 +119,7 @@ export function CheckinCard({
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
-          onClick={() => {
-            setUnfolded(!open);
-            setOpen((o) => !o);
-          }}
+          onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls="checkin-cuerpo"
           className="-my-2 -ml-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
@@ -139,33 +137,33 @@ export function CheckinCard({
             `${filled} de 5`
           )}
         </span>
-        <div role="radiogroup" aria-label="Día" className="ml-auto inline-flex rounded-full bg-surface-2 p-1">
-          {(["today", "yesterday"] as const).map((d) => (
-            <button
-              key={d}
-              type="button"
-              role="radio"
-              aria-checked={day === d}
-              onClick={() => setDay(d)}
-              className={cx(
-                "h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors",
-                day === d ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
-              )}
-            >
-              {d === "today" ? "Hoy" : "Ayer"}
-            </button>
-          ))}
-        </div>
+        <PillSwitch
+          label="Día"
+          className="ml-auto"
+          value={day}
+          options={[
+            { value: "today", label: "Hoy" },
+            { value: "yesterday", label: "Ayer" },
+          ]}
+          onChange={(d) => {
+            setDaySwap(true);
+            setDay(d);
+          }}
+          item="h-8 px-3.5 text-[12.5px]"
+        />
       </header>
 
       {!open && summary && (
-        <button type="button" onClick={() => setOpen(true)} className="-mt-2 truncate text-left text-[13.5px] text-muted">
+        <button type="button" onClick={() => setOpen(true)} className="reveal -mt-2 truncate text-left text-[13.5px] text-muted">
           {summary}
         </button>
       )}
+      {/* Plegado con el alto animado (lo de abajo sube de a poco, no de golpe). */}
+      <div className="fold" data-closed={!open || undefined}>
       <div
         id="checkin-cuerpo"
-        className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", !open && "hidden", unfolded && "reveal")}
+        key={day}
+        className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", daySwap && "swap")}
       >
         <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label}>
           <div className="grid grid-cols-5 gap-1.5">
@@ -207,6 +205,7 @@ export function CheckinCard({
         <Row icon={<Scales size={15} aria-hidden />} label="Peso">
           <Weight key={`${day}-${cur.weightG}`} value={cur.weightG} placeholderG={lastWeightG} onSave={(g) => set({ weightG: g })} />
         </Row>
+      </div>
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSlide } from "@/components/motion";
 import { useSafeTransition } from "@/components/safe-action";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -288,6 +289,7 @@ export function CalendarMonth({
   for (let i = lead; i > 0; i--) cells.push({ date: addDays(from, -i), inMonth: false });
   for (let d = from; d <= to; d = addDays(d, 1)) cells.push({ date: d, inMonth: true });
   while (cells.length % 7 !== 0) cells.push({ date: addDays(cells[cells.length - 1].date, 1), inMonth: false });
+  const monthSlide = useSlide(month);
 
   return (
     <div className="grid gap-4">
@@ -297,7 +299,7 @@ export function CalendarMonth({
         onPrev={() => setMonth(shiftMonth(month, -1))}
         onNext={() => setMonth(shiftMonth(month, 1))}
       />
-      <div className="grid grid-cols-7 justify-items-center gap-y-2">
+      <div key={month} className={cx("grid grid-cols-7 justify-items-center gap-y-2", monthSlide)}>
         {WEEK_HEAD.map((w, i) => (
           <span key={w} className={cx("kicker pb-1", i >= 5 && "text-accent-fg!")}>
             {w}
@@ -464,7 +466,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
             </label>
 
             {(noteChanged || marked) && (
-              <div className="grid gap-2">
+              <div className="reveal grid gap-2">
                 {noteChanged && (
                   <Button
                     variant="outline"

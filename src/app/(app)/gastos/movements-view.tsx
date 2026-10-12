@@ -1,5 +1,6 @@
 "use client";
 
+import { leaveThen, useChangeMotion, useNewIds } from "@/components/motion";
 import { PendingFinance } from "./pending-list";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
@@ -125,7 +126,8 @@ export function MovementsView({
           icon: <Trash size={15} />,
           danger: true,
           onSelect: () => {
-            startMenu(() => deleteTransaction(t.id));
+            // Se va con una salida corta (la lista lo saca cuando responde el servidor).
+            leaveThen(`[data-leave="${t.id}"]`, () => startMenu(() => deleteTransaction(t.id)));
             notifyDeleted("Movimiento borrado");
           },
         },
@@ -136,6 +138,10 @@ export function MovementsView({
 
   // "Todas" son las personales: lo de las cuentas de trabajo se ve solo si se eligen.
   const visible = useMemo(() => txs.filter((t) => touchesSelection(t, scope)), [txs, scope]);
+  // Otro período: los datos entran desde ese lado; otras cuentas: fundido. Lo nuevo entra suave.
+  const dataKey = `${period.from}|${period.to}|${scope?.join(",") ?? "todas"}`;
+  const dataMotion = useChangeMotion(period.from, scope?.join(",") ?? "todas");
+  const freshTx = useNewIds(visible.map((t) => t.id));
   const groups = useMemo(() => groupByDay(visible, scope, lk.currencyOf), [visible, scope, lk]);
   // Ingresos y gastos del mes por moneda (sin transferencias), para el resumen.
   const flows = useMemo(() => {
@@ -210,7 +216,7 @@ export function MovementsView({
               <QuickAdd accounts={accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency }))} />
               <div className="grid gap-3">
                 <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} />
-                <div className="grid gap-1">
+                <div key={dataKey} className={cx("grid gap-1", dataMotion)}>
                   <span className="kicker">Saldo actual · {selectionLabel(accounts, selection)}</span>
                   <BalanceHero totals={balance} />
                   {Object.keys(net).length > 0 && (
@@ -276,7 +282,7 @@ export function MovementsView({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-6 pt-2 lg:col-start-1 lg:row-start-2">
+              <div key={dataKey} className={cx("grid gap-6 pt-2 lg:col-start-1 lg:row-start-2", dataMotion)}>
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -296,7 +302,7 @@ export function MovementsView({
                       </header>
                       <ul>
                         {g.txs.map((t) => (
-                          <li key={t.id}>
+                          <li key={t.id} data-leave={t.id} className={cx(freshTx.has(t.id) && "reveal")}>
                             <TxRow
                               tx={t}
                               lk={lk}

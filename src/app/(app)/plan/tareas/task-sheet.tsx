@@ -1,5 +1,6 @@
 "use client";
 
+import { useNewIds } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
@@ -160,7 +161,7 @@ function TaskForm({
       <LinksField key={task?.id ?? "nueva"} initial={task?.links ?? []} />
 
       {state && !state.ok && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="reveal text-sm text-danger">
           {state.error}
         </p>
       )}
@@ -211,7 +212,10 @@ function TaskForm({
 
 /** Pasos de una tarea: se tildan, se agregan y se sacan al instante. */
 function Subtasks({ task }: { task: TaskDTO }) {
-  const [items, setItems] = useState(task.subtasks);
+  const [items, setItems] = useState<(TaskDTO["subtasks"][number] & { k?: string })[]>(task.subtasks);
+  // Lo agregado entra con un fundido; la tilde aparece con un golpe tras tocarla.
+  const fresh = useNewIds(items.map((s) => s.k ?? s.id));
+  const [tappedStep, setTappedStep] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [, start] = useSafeTransition();
   const done = items.filter((s) => s.done).length;
@@ -232,7 +236,8 @@ function Subtasks({ task }: { task: TaskDTO }) {
       const id = r && "id" in r ? r.id : null;
       if (!id) return; // sin señal: quedó en la cola, se ve igual
       realId.current.set(tmp, id);
-      setItems((x) => x.map((y) => (y.id === tmp ? { ...y, id } : y)));
+      // Se queda con su clave provisional (`k`): así no se vuelve a montar (ni a animar) al llegar el id real.
+      setItems((x) => x.map((y) => (y.id === tmp ? { ...y, id, k: tmp } : y)));
       const w = waiting.current.get(tmp);
       waiting.current.delete(tmp);
       if (w?.deleted) await deleteSubtask(id);
@@ -258,23 +263,24 @@ function Subtasks({ task }: { task: TaskDTO }) {
       {items.length > 0 && (
         <ul className="grid divide-y divide-line rounded-xl border border-line">
           {items.map((s) => (
-            <li key={s.id} className="flex items-center gap-2 px-2">
+            <li key={s.k ?? s.id} className={cx("flex items-center gap-2 px-2", fresh.has(s.k ?? s.id) && "reveal")}>
               <button
                 type="button"
                 aria-pressed={s.done}
                 onClick={() => {
                   setItems((x) => x.map((y) => (y.id === s.id ? { ...y, done: !y.done } : y)));
+                  setTappedStep(s.k ?? s.id);
                   sync(s, { done: !s.done });
                 }}
                 className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 text-left"
               >
                 <span
                   className={cx(
-                    "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border",
+                    "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border transition-colors duration-[var(--dur-quick)]",
                     s.done ? "border-accent bg-accent text-on-accent" : "border-line-strong",
                   )}
                 >
-                  {s.done && <Check size={12} weight="bold" />}
+                  {s.done && <Check size={12} weight="bold" className={tappedStep === (s.k ?? s.id) ? "mark-pop" : undefined} />}
                 </span>
                 <span className={cx("truncate text-[14px]", s.done && "text-muted line-through")}>{s.title}</span>
               </button>
@@ -345,6 +351,7 @@ function LinksField({ initial }: { initial: TaskLink[] }) {
     }
   };
   const rename = (u: string, n: string) => setLinks(links.map((l) => (l.url === u ? { ...l, name: n.trim().slice(0, 80) } : l)));
+  const freshLinks = useNewIds(links.map((l) => l.url));
   return (
     <div className="grid gap-2">
       <span className="text-sm font-medium">Links (opcional)</span>
@@ -352,7 +359,7 @@ function LinksField({ initial }: { initial: TaskLink[] }) {
       {links.length > 0 && (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           {links.map((l) => (
-            <li key={l.url} className="flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-surface-2 py-1.5 pr-1 pl-3">
+            <li key={l.url} className={cx("flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-surface-2 py-1.5 pr-1 pl-3", freshLinks.has(l.url) && "reveal")}>
               <LinkIcon size={16} className="shrink-0 text-muted" aria-hidden />
               {editing === l.url ? (
                 <Input

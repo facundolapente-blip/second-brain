@@ -90,7 +90,7 @@ export function AdjustAssistant({
                 )}
               </div>
               {transferFor === t.id && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 p-2.5">
+                <div className="reveal flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 p-2.5">
                   <span className="text-[13px] text-muted">{t.kind === "income" ? "Vino desde" : "Fue hacia"}</span>
                   <select value={other} onChange={(e) => setOther(e.target.value)} className={cx(inputClass, "h-10 w-auto min-w-36 flex-1")}>
                     {same.map((a) => (

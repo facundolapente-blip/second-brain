@@ -1,5 +1,6 @@
 "use client";
 
+import { useSwap } from "@/components/motion";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { ArrowDownRight, ArrowSquareOut, ArrowUpRight, CaretDown, ChartBar } from "@phosphor-icons/react";
@@ -70,6 +71,7 @@ export function ReportsView({
   const [pickedCurrency, setCurrency] = useState<string>("UYU");
   const currency = currencies.includes(pickedCurrency) ? pickedCurrency : (currencies[0] ?? "UYU");
   const [kind, setKind] = useState<"expense" | "income">("expense");
+  const catSwap = useSwap(`${currency}-${kind}`);
 
   const scoped = useMemo(
     () => rows.filter((r) => isSelected(scope, r.accountId) && lk.currencyOf(r.accountId) === currency),
@@ -283,6 +285,8 @@ export function ReportsView({
                 </p>
               ) : (
                 <CategoryBars
+                  key={`${currency}-${kind}`}
+                  swap={catSwap}
                   items={cats.map((c) => ({
                     key: c.categoryId ?? "none",
                     category: lk.category(c.categoryId),
@@ -543,7 +547,7 @@ function PaceChart({
               {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
               {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
               <div
-                className="lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
+                className="fade-in lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
                 style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
               >
                 <span className="text-muted">Día {h}</span>
@@ -626,6 +630,7 @@ function CategoryBars({
   rows,
   range,
   today,
+  swap,
 }: {
   /** avg: promedio de los tres meses anteriores (o lo del año anterior), para el "vs." de cada fila. */
   items: { key: string; category?: CategoryDTO; cents: number; avg?: number }[];
@@ -636,6 +641,8 @@ function CategoryBars({
   vsLabel?: string;
   /** Los movimientos del período (de este tipo): al tocar una categoría se ven los suyos. */
   rows: FlowRow[];
+  /** Fundido al cambiar de moneda o de Gastos/Ingresos. */
+  swap?: string;
   range: { from: string; to: string };
   today: string;
 }) {
@@ -679,7 +686,7 @@ function CategoryBars({
             </span>
             <span className="block h-2" aria-hidden>
               <span
-                className="block h-2 rounded-r-[4px]"
+                className="bar-anim block h-2 rounded-r-[4px]"
                 style={{ width: `${Math.max(1.5, (it.cents / max) * 100)}%`, background: color }}
               />
             </span>
@@ -704,7 +711,7 @@ function CategoryBars({
         );
   };
   return (
-    <div className="grid gap-3.5">
+    <div className={cx("grid gap-3.5", swap)}>
       <ul className="grid gap-3.5">{items.slice(0, TOP).map(row)}</ul>
       {items.length > TOP && (
         <details className="group">
@@ -745,6 +752,7 @@ function CategoryDetail({
 }) {
   const [mode, setMode] = useState<"each" | "name">("each");
   const [all, setAll] = useState(false);
+  const modeSwap = useSwap(`${mode}-${all}`);
   const year = today.slice(0, 4);
   const day = (iso: string) =>
     shortDay.format(new Date(`${iso}T00:00:00Z`)).replace(".", "") + (iso.slice(0, 4) !== year ? ` ${iso.slice(0, 4)}` : "");
@@ -792,7 +800,7 @@ function CategoryDetail({
           </div>
         )}
       </div>
-      <ul className="grid" aria-label={`Movimientos de ${name}`}>
+      <ul key={`${mode}-${all}`} className={cx("grid", modeSwap)} aria-label={`Movimientos de ${name}`}>
         {mode === "each"
           ? (all ? each : each.slice(0, LIMIT)).map((r) => (
               <li key={r.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-2 last:border-b-0">
@@ -929,7 +937,7 @@ function MonthlyColumns({
 
           {hover !== null && (
             <div
-              className="lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
+              className="fade-in lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
               style={{
                 left: `${((hover + 0.5) / data.length) * 100}%`,
                 transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,

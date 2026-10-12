@@ -343,6 +343,8 @@ function PlanToday({ d }: { d: Dashboard }) {
   const real = blocks.filter((b) => !isFreeBlock(b));
   const doneN = real.filter((b) => b.done).length;
 
+  // La tilde aparece con un golpe, solo tras tocarla.
+  const [tappedBlock, setTappedBlock] = useState<string | null>(null);
   return (
     <Card title="Plan de hoy" href="/plan" hrefLabel="Ver la semana" color="var(--c-plan)" className="lg:col-span-7" i={2}>
       {real.length > 0 && (
@@ -372,12 +374,13 @@ function PlanToday({ d }: { d: Dashboard }) {
                   type="button"
                   disabled={free}
                   aria-pressed={b.done}
-                  onClick={() =>
+                  onClick={() => {
+                    setTappedBlock(b.id);
                     start(async () => {
                       setDone({ id: b.id, done: !b.done });
                       await setBlockDone(b.id, !b.done);
-                    })
-                  }
+                    });
+                  }}
                   className={cx(
                     "relative flex min-h-11 w-full items-center gap-3 rounded-xl py-1 pr-2 text-left transition-colors hover:bg-surface-2 disabled:hover:bg-transparent",
                   )}
@@ -392,10 +395,10 @@ function PlanToday({ d }: { d: Dashboard }) {
                       b.done ? "border-[var(--c-plan)] bg-[var(--c-plan)] text-white" : "border-line-strong",
                     )}
                   >
-                    {b.done && <Check size={10} weight="bold" />}
+                    {b.done && <Check size={10} weight="bold" className={tappedBlock === b.id ? "mark-pop" : undefined} />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={cx("block truncate text-[14px]", b.done && "text-muted line-through decoration-faint")}>
+                    <span className={cx("block truncate text-[14px] transition-colors duration-[var(--dur-state)]", b.done && "text-muted line-through decoration-faint")}>
                       {b.title}
                     </span>
                     {(range || b.category) && (

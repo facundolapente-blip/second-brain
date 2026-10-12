@@ -44,7 +44,7 @@ export function JournalNav() {
   const { pending, write } = useWrite();
   if (isEditor(pathname)) return null;
   return (
-    <nav aria-label="Journal" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+    <nav aria-label="Journal" className="page-fade fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-3 items-start">
         <SideLink href="/journal/calendario" label="Calendario" icon={CalendarBlank} active={pathname === "/journal/calendario"} />
         <div className="flex justify-center">

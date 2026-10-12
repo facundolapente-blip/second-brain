@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SwapOnChange } from "@/components/motion-wrap";
 import { Fire, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { getAllTags, getEntries, getEntry, getHome, getQuickStats } from "@/lib/journal";
@@ -120,7 +121,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
             <EmptyJournal />
           )
         ) : (
-          <div className="grid gap-10">
+<SwapOnChange k={`${q}|${tag}|${mood}`}>          <div className="grid gap-10">
             {years.map((g) => (
               <section key={g.year} className="grid">
                 <h2 className="figure z-10 -mx-4 flex items-baseline gap-3 border-b border-fg/80 bg-bg/92 px-4 pt-2 pb-2 text-[30px] backdrop-blur-md max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0 lg:text-[36px]">
@@ -143,12 +144,12 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <Link
                 href={`/journal?${more}`}
                 scroll={false}
-                className="mx-auto inline-flex h-11 items-center rounded-[4px] border border-line-strong px-5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.98]"
+                className="mx-auto inline-flex h-11 items-center rounded-full border border-line-strong px-5 text-sm font-medium transition-[background-color,scale] duration-[var(--dur-quick)] hover:bg-surface-2"
               >
                 Ver más entradas
               </Link>
             )}
-          </div>
+          </div></SwapOnChange>
         )}
       </div>
 
@@ -190,7 +191,7 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="flex items-center gap-3 border-y border-line py-3 text-[15px]">
+    <div className="reveal flex items-center gap-3 border-y border-line py-3 text-[15px]">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
           {count}

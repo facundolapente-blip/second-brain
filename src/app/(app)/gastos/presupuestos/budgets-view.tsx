@@ -370,7 +370,7 @@ function BudgetForm({ category, budget, onDone }: { category: CategoryDTO; budge
         <Input inputMode="decimal" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" />
       </Field>
       {error && (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="reveal text-[13px] text-danger">
           {error}
         </p>
       )}
@@ -462,7 +462,7 @@ export function ProjectForm({ project, onDone }: { project?: ProjectDTO; onDone:
         <Input name="note" maxLength={2000} defaultValue={project?.note ?? ""} placeholder="Opcional" />
       </Field>
       {state && !state.ok && (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="reveal text-[13px] text-danger">
           {state.error}
         </p>
       )}

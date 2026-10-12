@@ -1,5 +1,6 @@
 "use client";
 
+import { useNewIds } from "@/components/motion";
 import { useEffect, useState } from "react";
 import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
@@ -42,6 +43,8 @@ function dropIndex(section: HTMLElement, y: number, skip: string | null): number
 }
 
 export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, onDropTask }: Props) {
+  // Un bloque recién creado, movido a otra columna o restaurado entra con un fundido (no al cargar).
+  const fresh = useNewIds(days.flatMap((d) => byDay.get(d)!.map((b) => `${d}:${b.id}`)));
   const [over, setOver] = useState<string | null>(null);
   // Lo que se arrastra (durante el arrastre el navegador no deja leer los datos) y dónde caería.
   const [dragging, setDragging] = useState<BlockDTO | null>(null);
@@ -149,6 +152,7 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                 }}
                 className={cx(
                   "relative cursor-grab active:cursor-grabbing",
+                  fresh.has(`${d}:${b.id}`) && "reveal",
                   dragging?.id === b.id && "opacity-40",
                   // Línea donde va a caer el bloque.
                   lineBefore && "before:absolute before:inset-x-0 before:-top-[5px] before:h-0.5 before:rounded-full before:bg-accent",
@@ -191,6 +195,7 @@ const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
  * hora; tocar un hueco crea un bloque a esa hora; arrastrar mueve día y hora.
  */
 export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, onMove, onMenu, onDropTask, todoFolded = false }: Props & { todoFolded?: boolean }) {
+  const fresh = useNewIds(days.flatMap((d) => byDay.get(d)!.map((b) => `${d}:${b.id}:${b.startTime ?? ""}`)));
   const [over, setOver] = useState<string | null>(null);
   // Los bloques sin hora son pendientes del día: lista corta arriba que se pliega (cookie: se recuerda entre visitas).
   const [folded, setFolded] = useState(todoFolded);
@@ -218,7 +223,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
           title={folded ? "Mostrar los pendientes sin hora" : "Plegar los pendientes sin hora"}
           className="flex items-start justify-center pt-2.5 text-muted hover:text-fg"
         >
-          <CaretDown size={14} weight="bold" aria-hidden className={cx("transition-transform duration-200", folded && "-rotate-90")} />
+          <CaretDown size={14} weight="bold" aria-hidden className={cx("transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)]", folded && "-rotate-90")} />
           <span className="sr-only">{folded ? "Mostrar pendientes" : "Plegar pendientes"}</span>
         </button>
         {days.map((d) => {
@@ -259,12 +264,14 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                   </span>
                 )}
               </button>
-              {!folded && todo.length > 0 && (
-                <ul className="grid min-w-0">
-                  {todo.map((b) => (
-                    <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} />
-                  ))}
-                </ul>
+              {todo.length > 0 && (
+                <div className="fold" data-closed={folded || undefined}>
+                  <ul className="grid min-w-0">
+                    {todo.map((b) => (
+                      <TodoRow key={b.id} b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} />
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           );
@@ -318,7 +325,8 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                   return (
                     <div
                       key={b.id}
-                      className="absolute"
+                      data-leave={b.id}
+                      className={cx("absolute", fresh.has(`${d}:${b.id}:${b.startTime ?? ""}`) && "reveal")}
                       style={{ top, height, left: `calc(${(lane / lanes) * 100}% + 3px)`, width: `calc(${100 / lanes}% - 6px)` }}
                     >
                       <Chip b={b} cats={cats} onEdit={onEdit} onToggle={onToggle} onMenu={onMenu} full />
@@ -391,6 +399,7 @@ function TodoRow({
   const [tapped, setTapped] = useState(false);
   return (
     <li
+      data-leave={b.id}
       onContextMenu={(e) => onMenu?.(e, b)}
       draggable
       onDragStart={(e) => {
@@ -448,6 +457,7 @@ function Chip({
   onMenu?: (e: React.MouseEvent, b: BlockDTO) => void;
   full?: boolean;
 }) {
+  const [tapped, setTapped] = useState(false);
   const c = b.categoryId ? cats.get(b.categoryId) : null;
   const priority = PRIORITIES.find((p) => p.value === b.priority);
   return (
@@ -461,7 +471,7 @@ function Chip({
       // "Libre": verde suave en vez del color de su categoría.
       style={tone(isFreeBlock(b) ? "green" : (c?.color ?? "stone"))}
       className={cx(
-        "group flex cursor-grab items-start gap-1 overflow-hidden rounded-lg bg-tone px-1.5 py-1 text-tone-fg active:cursor-grabbing",
+        "group flex cursor-grab items-start gap-1 overflow-hidden rounded-lg bg-tone px-1.5 py-1 text-tone-fg transition-opacity duration-[var(--dur-state)] active:cursor-grabbing",
         full && "h-full",
         b.done && "opacity-60",
       )}
@@ -489,14 +499,18 @@ function Chip({
       {!isFreeBlock(b) && (
         <button
           type="button"
-          onClick={() => onToggle(b)}
+          onClick={() => {
+            navigator.vibrate?.(8);
+            setTapped(true);
+            onToggle(b);
+          }}
           aria-label={b.done ? "Marcar como no hecho" : "Marcar como hecho"}
           className={cx(
-            "inline-flex size-4 shrink-0 items-center justify-center rounded-full border",
+            "inline-flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-[var(--dur-quick)]",
             b.done ? "border-current bg-current" : "border-current/60",
           )}
         >
-          {b.done && <Check size={9} weight="bold" className="text-surface" />}
+          {b.done && <Check size={9} weight="bold" className={cx("text-surface", tapped && "mark-pop")} />}
         </button>
       )}
     </div>

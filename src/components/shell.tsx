@@ -1,5 +1,6 @@
 "use client";
 
+import { PillSwitch } from "./pill-switch";
 import { notifyInfo, UndoToast } from "./undo-toast";
 import { ContextMenuHost } from "./context-menu";
 import Link from "next/link";
@@ -119,8 +120,14 @@ function Brand() {
 
 /** Aplica el tema en la página y lo recuerda un año (la cookie la lee el servidor). */
 function applyTheme(t: Theme) {
-  document.documentElement.dataset.theme = t;
   document.cookie = `${THEME_COOKIE}=${t}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+  const set = () => {
+    document.documentElement.dataset.theme = t;
+  };
+  // Claro y oscuro se cruzan en un fundido donde el navegador lo permite (si no, cambia directo).
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+  if (doc.startViewTransition) doc.startViewTransition(set);
+  else set();
 }
 
 /** Elegir el tema: se guarda en una cookie (la lee el servidor) y se aplica al instante. */
@@ -178,23 +185,18 @@ function ThemePicker({ initial }: { initial: Theme }) {
   return (
     <div className="grid gap-2 px-1">
       <span className="px-2 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Tema</span>
-      <div role="radiogroup" aria-label="Tema" className="grid grid-cols-2 gap-1 rounded-full bg-side-on-bg p-1">
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="radio"
-            aria-checked={theme === t.id}
-            onClick={() => pick(t.id)}
-            className={cx(
-              "h-8 rounded-full text-[12px] font-medium transition-colors duration-200",
-              theme === t.id ? "bg-side-on text-side" : "text-side-fg hover:text-side-on",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <PillSwitch
+        label="Tema"
+        value={theme}
+        options={THEMES.map((t) => ({ value: t.id, label: t.label }))}
+        onChange={pick}
+        className="grid w-full"
+        track="bg-side-on-bg"
+        thumb="bg-side-on"
+        on="text-side"
+        off="text-side-fg hover:text-side-on"
+        item="h-8 text-[12px]"
+      />
     </div>
   );
 }
@@ -319,7 +321,8 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
           <div
             onClick={() => setDrawer(false)}
             className={cx(
-              "absolute inset-0 bg-[rgba(20,18,14,0.45)] transition-opacity duration-300 motion-reduce:transition-none",
+              "absolute inset-0 bg-[rgba(20,18,14,0.45)] transition-opacity",
+              drawer ? "duration-[280ms] ease-[var(--ease-out)]" : "duration-200 ease-[var(--ease-in)]",
               drawer ? "opacity-100" : "opacity-0",
             )}
           />
@@ -329,7 +332,9 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
             aria-modal="true"
             aria-label="Menú"
             className={cx(
-              "absolute inset-y-0 left-0 flex w-[17.5rem] flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+              // Entra en 280 ms y se va en 200 (más rápido); con menos movimiento, solo un fundido en su lugar.
+              "absolute inset-y-0 left-0 flex w-[17.5rem] flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
+              drawer ? "duration-[280ms] ease-[var(--ease-out)]" : "duration-200 ease-[var(--ease-in)] motion-reduce:opacity-0",
               drawer ? "translate-x-0" : "-translate-x-full",
             )}
           >
@@ -343,15 +348,18 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
         </div>
 
         <div id="contenido" tabIndex={-1} className="min-w-0 outline-none">
-          {(offline || pending > 0) && (
-            <p role="status" className="sticky top-0 z-40 print:hidden bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
+          {/* Aviso de arriba: se despliega y se pliega (no empuja la pantalla de golpe). */}
+          <div className="fold sticky top-0 z-40 print:hidden" data-closed={!(offline || pending > 0) || undefined}>
+            <div>
+            <p role="status" className="bg-[var(--st-skip-bg)] px-4 py-2 text-center text-[13px] text-[var(--st-skip-fg)]">
               {offline
                 ? `Sin conexión: lo que hagas se guarda en este aparato y se sube cuando vuelva la señal.${pending ? ` ${pending === 1 ? "1 cambio pendiente" : `${pending} cambios pendientes`}.` : ""}`
                 : syncing
                   ? `Subiendo ${pending === 1 ? "1 cambio" : `${pending} cambios`} hechos sin conexión…`
                   : `${pending === 1 ? "1 cambio hecho sin conexión" : `${pending} cambios hechos sin conexión`} todavía sin subir. Se reintenta solo.`}
             </p>
-          )}
+            </div>
+          </div>
           {children}
         </div>
       </div>

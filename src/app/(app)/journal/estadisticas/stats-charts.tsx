@@ -94,7 +94,7 @@ export function MonthHeatmap({
                   onBlur={() => setFocus((f) => (f === m ? null : f))}
                   style={{ background: RAMP[b] }}
                   className={cx(
-                    "aspect-square rounded-[2px] transition-[transform,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)] motion-reduce:hover:scale-100",
+                    "aspect-square rounded-[2px] transition-[scale,box-shadow] duration-150 hover:scale-110 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--text)] motion-reduce:hover:scale-100",
                     m === currentMonth && "shadow-[0_0_0_2px_var(--bg),0_0_0_3px_var(--accent)]",
                   )}
                 />
@@ -207,7 +207,7 @@ export function MonthColumns({
               >
                 <span
                   className={cx(
-                    "relative block w-full max-w-6 rounded-t-[4px] transition-colors",
+                    "relative block w-full max-w-6 rounded-t-[4px] transition-[height,background-color] duration-[480ms] ease-[var(--ease-out)]",
                     isSel ? "bg-accent" : "bg-surface-3 group-hover:bg-line-strong",
                   )}
                   style={{ height: v ? Math.max(3, (v / max) * (H - 18)) : 0 }}

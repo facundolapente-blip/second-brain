@@ -1,5 +1,6 @@
 "use client";
 
+import { useNewIds } from "@/components/motion";
 import { pendingActions as pendingActionsNow, usePendingActions } from "@/lib/offline/queue";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
@@ -360,7 +361,9 @@ function SaveStatus({ status }: { status: Status }) {
       ) : (
         <Check size={13} weight="bold" aria-hidden />
       )}
-      {busy ? "Guardando" : status === "error" ? "Sin guardar" : status === "local" ? "Guardado en el aparato" : "Guardado"}
+      <span key={busy ? "busy" : status} className="reveal inline-flex items-center gap-1.5">
+        {busy ? "Guardando" : status === "error" ? "Sin guardar" : status === "local" ? "Guardado en el aparato" : "Guardado"}
+      </span>
     </span>
   );
 }
@@ -408,6 +411,7 @@ function TagEditor({
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
   const q = normalizeTag(text);
+  const freshTags = useNewIds(tags);
   const suggestions = allTags.filter((t) => !tags.includes(t) && (!q || t.includes(q))).slice(0, 8);
 
   /** Agrega una o varias (pegadas con coma o saltos de línea) de una sola vez. */
@@ -425,7 +429,7 @@ function TagEditor({
     <div className="grid gap-2.5 border-t border-line pt-5">
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-9 items-center gap-0.5 rounded-full border border-line-strong pr-1 pl-3 text-[13px] text-accent-fg">
+          <span key={t} className={cx("inline-flex h-9 items-center gap-0.5 rounded-full border border-line-strong pr-1 pl-3 text-[13px] text-accent-fg", freshTags.has(t) && "reveal")}>
             #{t}
             <button
               type="button"
@@ -468,7 +472,7 @@ function TagEditor({
         />
       </div>
       {focused && suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="reveal flex flex-wrap gap-1.5">
           {suggestions.map((t) => (
             <button
               key={t}

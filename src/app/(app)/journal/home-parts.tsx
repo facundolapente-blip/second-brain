@@ -78,7 +78,7 @@ export function HomeActions({
       </IconButton>
 
       {searching && (
-        <div className="absolute inset-x-0 top-[env(safe-area-inset-top)] z-10 bg-bg">
+        <div className="menu-in absolute inset-x-0 top-[env(safe-area-inset-top)] z-10 origin-top bg-bg">
           <div className="mx-auto flex h-16 max-w-3xl items-center gap-2 px-4 lg:h-24 lg:max-w-6xl lg:px-10">
             <MagnifyingGlass size={18} className="shrink-0 text-muted" />
             <input
@@ -202,6 +202,7 @@ function yearsAgo(date: string, today: string) {
  */
 export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string }) {
   const [hidden, setHidden] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [all, setAll] = useState(false);
   if (hidden) return null;
   const { title, line } = memoryText(memory, today);
@@ -211,10 +212,13 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
   function dismiss() {
     // Se cierra por hoy; mañana puede aparecer otro recuerdo.
     document.cookie = `${MEMORY_COOKIE}=${today}; path=/journal; max-age=172800; samesite=lax`;
-    setHidden(true);
+    // Se pliega (alto y opacidad) y recién después se saca: la lista sube de a poco.
+    setClosing(true);
+    setTimeout(() => setHidden(true), 260);
   }
 
   return (
+    <div className="fold" data-closed={closing || undefined}>
     <section
       aria-label={title}
       className="rise relative grid grid-cols-[minmax(0,1fr)] gap-4 border-y border-line py-5"
@@ -248,8 +252,8 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
       {rest.length > 0 && (
         <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line border-t border-line">
-          {(all ? rest : rest.slice(0, 3)).map((e) => (
-            <li key={e.id}>
+          {(all ? rest : rest.slice(0, 3)).map((e, i) => (
+            <li key={e.id} className={cx(i >= 3 && "reveal")}>
               <Link
                 href={`/journal/${e.id}`}
                 className="flex min-h-11 items-center gap-3 px-1 py-2 transition-colors hover:bg-surface-2 active:bg-surface-2"
@@ -282,6 +286,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
         </ul>
       )}
     </section>
+    </div>
   );
 }
 

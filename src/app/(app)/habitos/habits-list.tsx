@@ -128,7 +128,7 @@ export function HabitsList({
 
       <main className="mx-auto grid max-w-3xl px-4 pt-3 lg:max-w-6xl lg:px-10 lg:pt-6">
         {(searching || activeCategory) && (
-          <div className="flex flex-wrap items-center gap-2 pb-3">
+          <div className="reveal flex flex-wrap items-center gap-2 pb-3">
             {searching && (
               <input
                 autoFocus

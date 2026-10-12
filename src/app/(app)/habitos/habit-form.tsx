@@ -175,7 +175,7 @@ export function HabitFormBody({
           ]}
         />
         {draft.frequency === "weekdays" && (
-          <div className="grid grid-cols-7 gap-1.5 pt-1">
+          <div className="reveal grid grid-cols-7 gap-1.5 pt-1">
             {WEEK_ORDER.map((d) => {
               const on = draft.weekdays.includes(d);
               return (
@@ -203,7 +203,7 @@ export function HabitFormBody({
           </div>
         )}
         {draft.frequency === "weekly" && (
-          <div className="flex items-center gap-3 pt-1">
+          <div className="reveal flex items-center gap-3 pt-1">
             <Stepper
               name="timesPerWeek"
               value={draft.timesPerWeek}
@@ -229,7 +229,7 @@ export function HabitFormBody({
           ]}
         />
         {draft.kind === "count" && (
-          <div className="grid grid-cols-[auto_1fr] items-center gap-3 pt-1">
+          <div className="reveal grid grid-cols-[auto_1fr] items-center gap-3 pt-1">
             <Stepper name="target" value={draft.target} min={1} max={100000} onChange={(v) => set("target", v)} />
             <Input
               name="unit"
@@ -298,7 +298,7 @@ export function HabitFormBody({
         />
       </Field>
 
-      {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
+      {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
 
       <Button type="submit" variant="accent" disabled={pending} className="w-full">
         {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear hábito"}

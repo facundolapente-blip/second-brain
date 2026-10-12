@@ -290,7 +290,7 @@ function ScheduleForm({
       </Field>
 
       {state && !state.ok && (
-        <p role="alert" className="text-[13px] text-danger">
+        <p role="alert" className="reveal text-[13px] text-danger">
           {state.error}
         </p>
       )}

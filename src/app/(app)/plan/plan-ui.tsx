@@ -130,9 +130,9 @@ export function ProgressBar({ pct, label }: { pct: number | null; label?: string
   if (pct === null) return null;
   return (
     <span className="inline-flex min-w-0 flex-1 items-center gap-2.5" aria-label={`Avance ${pct}%`}>
-      <span className="bar-anim h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+      <span className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
         <span
-          className={cx("block h-full rounded-full", pct >= 100 ? "bg-[var(--st-done-line)]" : "bg-accent")}
+          className={cx("bar-anim block h-full rounded-full", pct >= 100 ? "bg-[var(--st-done-line)]" : "bg-accent")}
           style={{ width: `${pct}%` }}
         />
       </span>

@@ -54,8 +54,18 @@ export function ObjectivesView({
   year: number;
   years: number[];
 }) {
-  const [quarter, setQuarter] = useState<Quarter>("all");
-  const [showClosed, setShowClosed] = useState(true);
+  const [quarter, setQuarterState] = useState<Quarter>("all");
+  const [showClosed, setShowClosedState] = useState(true);
+  // Cambiar de trimestre o mostrar/ocultar terminados: fundido corto (solo tras tocar).
+  const [swapped, setSwapped] = useState(false);
+  const setQuarter = (q: Quarter) => {
+    setSwapped(true);
+    setQuarterState(q);
+  };
+  const setShowClosed = (v: boolean | ((x: boolean) => boolean)) => {
+    setSwapped(true);
+    setShowClosedState(v);
+  };
   const sheet = useRef<KrSheetHandle>(null);
   useOnNew(() => sheet.current?.open());
   const objSheet = useRef<SheetHandle>(null);
@@ -154,7 +164,7 @@ export function ObjectivesView({
             </div>
           </div>
         ) : (
-          <div className="grid gap-12 pt-2 pb-4 lg:grid-cols-2 lg:items-start lg:gap-5">
+          <div key={`${quarter}-${showClosed}`} className={cx("grid gap-12 pt-2 pb-4 lg:grid-cols-2 lg:items-start lg:gap-5", swapped && "swap")}>
             {groups.map((g, gi) => {
               const pct = objectivePct(g);
               return (
@@ -234,7 +244,7 @@ function ObjectiveForm({ objective, year, onDone }: { objective: ObjectiveDTO | 
       <Field label="Objetivo">
         <Input name="title" defaultValue={objective?.title} required maxLength={120} autoFocus placeholder="Salud, Carrera, Finanzas…" />
       </Field>
-      {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
+      {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
       <Button type="submit" variant="accent" disabled={pending} className="h-11">
         {pending ? "Guardando…" : objective ? "Guardar" : "Crear objetivo"}
       </Button>
@@ -330,7 +340,7 @@ function PlanYearForm({
           ))}
         </ul>
       )}
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="reveal text-sm text-danger">{error}</p>}
       <div className="grid gap-2">
         <Button
           variant="accent"
@@ -545,7 +555,7 @@ function KrForm({
       </div>
 
       {state && !state.ok && (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="reveal text-sm text-danger">
           {state.error}
         </p>
       )}

@@ -153,7 +153,7 @@ function ImportCard({
         <p
           role="status"
           className={cx(
-            "flex gap-2 rounded-xl p-3 text-[13px] leading-relaxed",
+            "reveal flex gap-2 rounded-xl p-3 text-[13px] leading-relaxed",
             state.ok ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
           )}
         >

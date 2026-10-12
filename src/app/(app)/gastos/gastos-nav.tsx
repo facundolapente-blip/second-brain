@@ -67,7 +67,7 @@ export function GastosNav() {
                 aria-hidden
                 className={cx("absolute top-0 h-[2px] w-8 rounded-full transition-colors", active ? "bg-accent" : "bg-transparent")}
               />
-              <Ico size={22} weight={active ? "fill" : "regular"} className={active ? "text-fg" : "text-muted"} />
+              <Ico size={22} weight={active ? "fill" : "regular"} className={cx("transition-colors duration-[var(--dur-quick)]", active ? "text-fg" : "text-muted")} />
               <span className={cx("text-[11.5px]", active ? "font-semibold text-fg" : "text-muted")}>{t.label}</span>
             </Link>
           );
