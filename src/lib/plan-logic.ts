@@ -75,13 +75,15 @@ export function linkLabel(url: string): string {
 
 /** Columnas de la tabla de tareas (compu) con su ancho por defecto en px. La última (Progreso) toma lo que sobra. */
 export const TASK_COLUMNS = [
-  { key: "title", label: "Tarea", width: 300 },
-  { key: "status", label: "Estado", width: 130 },
-  { key: "category", label: "Categoría", width: 130 },
-  { key: "priority", label: "Prioridad", width: 120 },
-  { key: "deadline", label: "Deadline", width: 130 },
-  { key: "scheduled", label: "Agendada", width: 100 },
+  { key: "date", label: "Fecha", width: 76 },
+  { key: "title", label: "Tarea", width: 340 },
+  { key: "category", label: "Categoría", width: 136 },
+  { key: "priority", label: "Prioridad", width: 104 },
+  { key: "deadline", label: "Vence", width: 120 },
+  { key: "scheduled", label: "Agendada", width: 96 },
 ] as const;
+/** Progreso no tiene ancho propio: toma lo que sobra (como mínimo esto). */
+export const TASK_PROGRESS_MIN = 168;
 export type TaskColumnKey = (typeof TASK_COLUMNS)[number]["key"];
 export type TaskColumnWidths = Partial<Record<TaskColumnKey, number>>;
 export const TASK_COLUMN_MIN = 72;

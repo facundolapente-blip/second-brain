@@ -3,12 +3,12 @@
 import { useNewIds } from "@/components/motion";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
-import { useSafeTransition } from "@/components/safe-action";
+import { quiet, useSafeTransition } from "@/components/safe-action";
 import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { bumpTaskProgress, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
+import { bumpTaskProgress, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, TASK_PROGRESS_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, ProgressBar } from "../plan-ui";
@@ -61,6 +61,7 @@ export function TasksBoard({
   today,
   manualOrder = false,
   folded: foldedInitial = false,
+  columns = {},
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
@@ -69,7 +70,7 @@ export function TasksBoard({
   manualOrder?: boolean;
   /** En el celular, las tareas se pliegan en una línea de resumen. */
   folded?: boolean;
-  /** Ya no se usa: la tabla tiene anchos fijos. */
+  /** Anchos de columna guardados (tabla de la compu). */
   columns?: TaskColumnWidths;
 }) {
   const [folded, setFolded] = useState(foldedInitial);
@@ -210,7 +211,7 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} />
+          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} columns={columns} />
           {/* Celular: la misma agrupación, con la fecha a la izquierda. */}
           <ul className="grid border-t border-line lg:hidden">
             {groups.map((g) => (
@@ -388,8 +389,17 @@ const CELL = "border-l border-line first:border-l-0";
  * Columnas que en la tabla compacta (menos de 1440 px) pasan debajo del nombre.
  * Se achican a 0 en vez de ocultarse: una celda con display:none corre a las de al lado de columna.
  */
-const WIDE_ONLY_COL = "max-[90rem]:w-0";
 const WIDE_ONLY = "max-[90rem]:invisible max-[90rem]:overflow-hidden max-[90rem]:border-l-0 max-[90rem]:px-0";
+/** Anchos de la tabla compacta (pisan los guardados): la tarea toma lo que sobra. */
+const COMPACT_COL: Record<TaskColumnKey, string> = {
+  date: "max-[90rem]:w-[4.5rem]!",
+  title: "max-[90rem]:w-auto!",
+  category: "max-[90rem]:w-0!",
+  priority: "max-[90rem]:w-0!",
+  deadline: "max-[90rem]:w-[7.5rem]!",
+  scheduled: "max-[90rem]:w-[6rem]!",
+};
+const COMPACT_HIDDEN = new Set<TaskColumnKey>(["category", "priority"]);
 
 /**
  * En la computadora, una planilla agrupada por estado (como los grupos de
@@ -403,8 +413,11 @@ function TaskTable({
   onOpen,
   onMenu,
   fresh,
+  columns,
 }: {
   groups: ReturnType<typeof groupsOf>;
+  /** Anchos guardados; se cambian arrastrando el borde del encabezado. */
+  columns: TaskColumnWidths;
   /** Filas recién aparecidas: entran con un fundido. */
   fresh?: Set<string>;
   cats: Map<string, CategoryDTO>;
@@ -412,27 +425,49 @@ function TaskTable({
   onOpen: (t: TaskDTO) => void;
   onMenu: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
+  const [widths, setWidths] = useState<TaskColumnWidths>(columns);
+  const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
+  const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0) + TASK_PROGRESS_MIN;
+  function resize(k: TaskColumnKey, w: number | null, save: boolean) {
+    const next = { ...widths };
+    if (w === null) delete next[k];
+    else next[k] = Math.round(Math.min(TASK_COLUMN_MAX, Math.max(TASK_COLUMN_MIN, w)));
+    setWidths(next);
+    if (save) quiet(saveTaskColumns(next));
+  }
+  // Orden de las columnas en pantalla: Progreso (sin ancho propio) va antes de Agendada.
+  const cols = [...TASK_COLUMNS.slice(0, 5).map((c) => c.key), "progress" as const, "scheduled" as const];
+  const head = (k: (typeof cols)[number]) =>
+    k === "progress" ? { label: "Progreso" } : { label: TASK_COLUMNS.find((c) => c.key === k)!.label };
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-line-strong bg-surface lg:block">
-      <table className="w-full table-fixed border-collapse text-left text-[13.5px]">
+    // Si los anchos guardados suman más que la pantalla, la tabla se corre de costado.
+    <div className="hidden overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block">
+      <table className="w-full table-fixed border-collapse text-left text-[13.5px] max-[90rem]:min-w-0!" style={{ minWidth: total }}>
         <colgroup>
-          <col className="w-[4.5rem]" />
-          <col />
-          <col className={cx("w-[8.5rem]", WIDE_ONLY_COL)} />
-          <col className={cx("w-[6.5rem]", WIDE_ONLY_COL)} />
-          <col className="w-[7.5rem]" />
-          <col className="w-[10.5rem]" />
-          <col className="w-[6rem]" />
+          {cols.map((k) =>
+            k === "progress" ? (
+              <col key={k} className="max-[90rem]:w-[10.5rem]" />
+            ) : (
+              <col key={k} style={{ width: widthOf(k) }} className={COMPACT_COL[k]} />
+            ),
+          )}
         </colgroup>
         <thead>
           <tr className="border-b border-line-strong bg-surface-2 text-[11px] tracking-[0.06em] text-muted uppercase">
-            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Fecha</th>
-            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Tarea</th>
-            <th className={cx(CELL, "px-3 py-2.5 font-medium", WIDE_ONLY)}>Categoría</th>
-            <th className={cx(CELL, "px-3 py-2.5 font-medium", WIDE_ONLY)}>Prioridad</th>
-            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Vence</th>
-            <th className={cx(CELL, "px-3 py-2.5 font-medium")}>Progreso</th>
-            <th className={cx(CELL, "px-2 py-2.5 text-center font-medium")}>Agendada</th>
+            {cols.map((k) => (
+              <th
+                key={k}
+                className={cx(
+                  CELL,
+                  "relative py-2.5 font-medium",
+                  k === "scheduled" ? "px-2 text-center" : "px-3",
+                  k !== "progress" && COMPACT_HIDDEN.has(k) && WIDE_ONLY,
+                )}
+              >
+                <span className="block truncate">{head(k).label}</span>
+                {k !== "progress" && <ColumnResizer label={head(k).label} width={widthOf(k)} onResize={(w, save) => resize(k, w, save)} />}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -521,6 +556,48 @@ function TaskTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Borde derecho de un encabezado: arrastrar cambia el ancho de la columna
+ * (se guarda al soltar); doble clic vuelve al ancho de siempre; con teclado, flechas.
+ */
+function ColumnResizer({ label, width, onResize }: { label: string; width: number; onResize: (w: number | null, save: boolean) => void }) {
+  const start = useRef<{ x: number; w: number } | null>(null);
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Ancho de ${label}`}
+      aria-valuenow={width}
+      tabIndex={0}
+      title="Arrastrá para cambiar el ancho · doble clic: ancho original"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        start.current = { x: e.clientX, w: width };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (start.current) onResize(start.current.w + e.clientX - start.current.x, false);
+      }}
+      onPointerUp={(e) => {
+        if (!start.current) return;
+        onResize(start.current.w + e.clientX - start.current.x, true);
+        start.current = null;
+      }}
+      onDoubleClick={() => onResize(null, true)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          onResize(width + (e.key === "ArrowRight" ? 16 : -16), true);
+        }
+      }}
+      className="group/res absolute inset-y-0 right-0 z-10 flex w-3 cursor-col-resize touch-none justify-end outline-none max-[90rem]:hidden"
+    >
+      <span className="my-2 w-0.5 rounded-full bg-line transition-colors group-hover/res:bg-accent group-focus-visible/res:bg-accent group-active/res:bg-accent" />
+    </span>
   );
 }
 
