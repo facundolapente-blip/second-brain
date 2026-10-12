@@ -409,8 +409,9 @@ function PlanToday({ d }: { d: Dashboard }) {
                   <span
                     aria-hidden
                     className={cx(
-                      "relative z-10 inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 bg-surface transition-colors",
-                      b.done ? "border-[var(--c-plan)] bg-[var(--c-plan)] text-white" : "border-line-strong",
+                      "relative z-10 inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                      // El fondo va en cada caso: con bg-surface siempre puesto, el blanco tapaba el color de hecho.
+                      b.done ? "border-[var(--c-plan)] bg-[var(--c-plan)] text-white" : "border-line-strong bg-surface",
                     )}
                   >
                     {b.done && <Check size={10} weight="bold" className={tappedBlock === b.id ? "mark-pop" : undefined} />}
