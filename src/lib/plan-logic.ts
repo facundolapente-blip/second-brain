@@ -322,8 +322,8 @@ export function progressPct(p: number | null, goal: number | null): number | nul
 
 export type TaskView = "todo" | "deadline" | "priority" | "chill" | "backlog" | "done";
 
+/** Sin "Para hacer" (pedido de Facu, 2026-10-13): Con deadline, Prioridades (3 y 4) y Más chill (1 y 2) cubren todo. */
 export const TASK_VIEWS: { id: TaskView; label: string }[] = [
-  { id: "todo", label: "Para hacer" },
   { id: "deadline", label: "Con deadline" },
   { id: "priority", label: "Prioridades" },
   { id: "chill", label: "Más chill" },
@@ -342,16 +342,19 @@ export function applyTaskView(tasks: TaskDTO[], view: TaskView, manualOrder = fa
   const byOrder = (a: TaskDTO, b: TaskDTO) => a.order - b.order;
   const manual = manualOrder && SORTABLE_VIEWS.includes(view);
   switch (view) {
+    // Ya no está entre las vistas (queda por si alguna dirección vieja la pide): todas las abiertas.
     case "todo":
       return tasks
         .filter(active)
         .sort(manual ? byOrder : (a, b) => (a.status === b.status ? byPriority(a, b) : a.status === "doing" ? -1 : 1));
     case "deadline":
       return tasks.filter((t) => active(t) && t.deadline).sort(byDeadline);
+    // Prioridades = Alta o Urgente; Más chill = Baja o Media (o sin prioridad); Con deadline = todas las que
+    // tienen fecha. Las tres sin importar lo demás (pedido de Facu, 2026-10-13).
     case "priority":
       return tasks.filter((t) => active(t) && t.priority >= 3).sort(manual ? byOrder : byPriority);
     case "chill":
-      return tasks.filter((t) => active(t) && t.priority <= 1).sort(manual ? byOrder : byDeadline);
+      return tasks.filter((t) => active(t) && t.priority <= 2).sort(manual ? byOrder : byDeadline);
     case "backlog":
       return tasks.filter((t) => t.status === "backlog").sort(manual ? byOrder : byPriority);
     case "done":

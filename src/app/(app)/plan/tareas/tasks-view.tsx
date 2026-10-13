@@ -11,7 +11,7 @@ import { formatShort } from "@/lib/dates";
 import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, TASK_PROGRESS_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
-import { CategoryTag, categoryMap, PriorityTag, ProgressBar } from "../plan-ui";
+import { CategoryTag, categoryMap, PriorityTag } from "../plan-ui";
 import { tone } from "@/lib/palette";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
 
@@ -53,7 +53,7 @@ function groupsOf(visible: TaskDTO[], matching: TaskDTO[]) {
  * Muestra las primeras 6 y el resto con "Ver todas".
  */
 /** Vista y "Ver todas" del tablero: viven mientras la app está abierta (cambiar de semana no los pierde). */
-const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths } = { view: "todo", all: false };
+const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths } = { view: "deadline", all: false };
 
 export function TasksBoard({
   tasks,
@@ -300,7 +300,7 @@ function TaskRow({
       {t.goal ? (
         <div className="flex items-center gap-2 pr-1 pb-3 pl-[3.75rem]">
           <Steps progress={t.progress} goal={t.goal} />
-          {!done && <ProgressButtons task={t} />}
+          {!done && !t.subtasks.length && <ProgressButtons task={t} />}
         </div>
       ) : null}
     </li>
@@ -358,15 +358,30 @@ function DueLabel({ left, done }: { left: number | null; done: boolean }) {
   );
 }
 
-/** Progreso en segmentos, uno por paso (con metas grandes, barra). */
+/** Progreso en segmentos, uno por paso (con metas grandes, barra). Con pasos, sale de los pasos. */
 function Steps({ progress, goal }: { progress: number | null; goal: number }) {
   const n = Math.max(0, Math.min(progress ?? 0, goal));
-  if (goal > 10) return <ProgressBar pct={progressPct(progress, goal)} label={`${progress ?? 0}/${goal}`} />;
+  if (goal > 10) {
+    const pct = progressPct(progress, goal) ?? 0;
+    return (
+      <span className="inline-flex items-center gap-2" aria-label={`Avance ${n} de ${goal}`}>
+        <span className="h-2.5 w-24 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+          <span className={cx("bar-anim block h-full rounded-full", pct >= 100 ? "bg-[var(--st-done-line)]" : "bg-accent")} style={{ width: `${pct}%` }} />
+        </span>
+        <span className="font-mono text-[12px] text-muted tabular" aria-hidden>
+          {progress ?? 0}/{goal}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-2" aria-label={`Avance ${n} de ${goal}`}>
-      <span className="flex gap-0.5" aria-hidden>
+      <span className="flex gap-[3px]" aria-hidden>
         {Array.from({ length: goal }, (_, i) => (
-          <span key={i} className={cx("h-1.5 w-3 rounded-[2px]", i < n ? (n >= goal ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")} />
+          <span
+            key={i}
+            className={cx("h-2.5 rounded-[3px]", goal <= 6 ? "w-[18px]" : "w-3", i < n ? (n >= goal ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")}
+          />
         ))}
       </span>
       <span className="font-mono text-[12px] text-muted tabular" aria-hidden>
@@ -543,7 +558,7 @@ function TaskTable({
                       {t.goal ? (
                         <span className="flex items-center gap-1">
                           <Steps progress={t.progress} goal={t.goal} />
-                          {!done && <ProgressButtons task={t} hover />}
+                          {!done && !t.subtasks.length && <ProgressButtons task={t} hover />}
                         </span>
                       ) : (
                         <span className="text-faint" aria-label="Sin progreso">–</span>
@@ -639,7 +654,8 @@ function ScheduledBox({ task }: { task: TaskDTO }) {
 
 /** Debajo del título: pasos, si se repite, cuántos links y si está agendada (en la tabla, eso va en su columna). */
 function TaskMeta({ t, done, hideScheduled }: { t: TaskDTO; done: boolean; hideScheduled?: boolean }) {
-  const steps = t.subtasks.length ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length} pasos` : null;
+  // Los pasos ya se ven en Progreso (van juntos): acá solo cuando la tarea no muestra progreso.
+  const steps = t.subtasks.length && !t.goal ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length} pasos` : null;
   const rep = repeatLabel(t.repeat, t.repeatEvery);
   const links = t.links.length ? (t.links.length === 1 ? "1 link" : `${t.links.length} links`) : null;
   const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, links, t.scheduled && !done && !hideScheduled ? "agendada" : null].filter(Boolean);

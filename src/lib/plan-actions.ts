@@ -325,6 +325,8 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     // Después de guardar, así la siguiente sale con la repetición recién elegida
     // y la terminada queda sin repetirse.
     if (status === "done" && before.status !== "done") await spawnNext(id);
+    // Con pasos, el progreso no es el escrito a mano: lo dan los pasos.
+    await syncStepsProgress(id, false);
     refrescar();
     return { ok: true, id };
   }
@@ -344,6 +346,7 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
       subtasks: { create: steps.map((title, order) => ({ title: title.slice(0, 200), order })) },
     },
   });
+  if (steps.length) await syncStepsProgress(created.id, false);
   await logActivity("created", "task", created.id, title);
   refrescar();
   return { ok: true, id: created.id };
@@ -363,11 +366,25 @@ export async function setTaskStatus(id: string, status: TaskStatus) {
   refrescar();
 }
 
-/** Suma (o resta) uno al progreso de una tarea. */
+/**
+ * Con pasos, el progreso de la tarea son los pasos (pedido de Facu): meta = cuántos
+ * hay, progreso = cuántos están tildados. Si se saca el último paso, la tarea queda
+ * sin progreso. Se llama después de todo lo que toca pasos.
+ */
+async function syncStepsProgress(taskId: string, hadSteps = true) {
+  const [total, done] = await Promise.all([
+    prisma.planSubtask.count({ where: { taskId } }),
+    prisma.planSubtask.count({ where: { taskId, done: true } }),
+  ]);
+  if (total > 0) await prisma.planTask.updateMany({ where: { id: taskId }, data: { goal: total, progress: done } });
+  else if (hadSteps) await prisma.planTask.updateMany({ where: { id: taskId }, data: { goal: null, progress: null } });
+}
+
+/** Suma (o resta) uno al progreso de una tarea (las que tienen pasos siguen a los pasos). */
 export async function bumpTaskProgress(id: string, delta: 1 | -1) {
   await exigirSesion();
-  const t = await prisma.planTask.findUnique({ where: { id }, select: { progress: true, goal: true } });
-  if (!t) return;
+  const t = await prisma.planTask.findUnique({ where: { id }, select: { progress: true, goal: true, _count: { select: { subtasks: true } } } });
+  if (!t || t._count.subtasks > 0) return;
   const next = Math.max(0, (t.progress ?? 0) + delta);
   await prisma.planTask.update({ where: { id }, data: { progress: t.goal ? Math.min(t.goal, next) : next } });
   refrescar();
@@ -668,19 +685,23 @@ export async function addSubtask(taskId: string, title: string): Promise<{ id: s
   if (!tt) return;
   const max = await prisma.planSubtask.aggregate({ where: { taskId }, _max: { order: true } });
   const created = await prisma.planSubtask.create({ data: { taskId, title: tt, order: (max._max.order ?? -1) + 1 }, select: { id: true } });
+  await syncStepsProgress(taskId);
   refrescar();
   return { id: created.id };
 }
 
 export async function toggleSubtask(id: string, done: boolean) {
   await exigirSesion();
-  await prisma.planSubtask.update({ where: { id }, data: { done } });
+  const s = await prisma.planSubtask.update({ where: { id }, data: { done }, select: { taskId: true } });
+  await syncStepsProgress(s.taskId);
   refrescar();
 }
 
 export async function deleteSubtask(id: string) {
   await exigirSesion();
+  const s = await prisma.planSubtask.findUnique({ where: { id }, select: { taskId: true } });
   await prisma.planSubtask.deleteMany({ where: { id } });
+  if (s) await syncStepsProgress(s.taskId);
   refrescar();
 }
 
