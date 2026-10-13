@@ -5,10 +5,10 @@ import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
-import { CaretDown, Check, Minus, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { bumpTaskProgress, saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
+import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
+import { saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, TASK_PROGRESS_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, TASK_FLEX_COLUMN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag } from "../plan-ui";
@@ -297,12 +297,11 @@ function TaskRow({
           </span>
         </span>
       </button>
-      {t.goal ? (
+      {t.subtasks.length > 0 && (
         <div className="flex items-center gap-2 pr-1 pb-3 pl-[3.75rem]">
-          <Steps progress={t.progress} goal={t.goal} />
-          {!done && !t.subtasks.length && <ProgressButtons task={t} />}
+          <Steps task={t} />
         </div>
-      ) : null}
+      )}
     </li>
   );
 }
@@ -358,52 +357,28 @@ function DueLabel({ left, done }: { left: number | null; done: boolean }) {
   );
 }
 
-/** Progreso en segmentos, uno por paso (con metas grandes, barra). Con pasos, sale de los pasos. */
-function Steps({ progress, goal }: { progress: number | null; goal: number }) {
-  const n = Math.max(0, Math.min(progress ?? 0, goal));
-  if (goal > 10) {
-    const pct = progressPct(progress, goal) ?? 0;
-    return (
-      <span className="inline-flex items-center gap-2" aria-label={`Avance ${n} de ${goal}`}>
-        <span className="h-2.5 w-24 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-          <span className={cx("bar-anim block h-full rounded-full", pct >= 100 ? "bg-[var(--st-done-line)]" : "bg-accent")} style={{ width: `${pct}%` }} />
-        </span>
-        <span className="font-mono text-[12px] text-muted tabular" aria-hidden>
-          {progress ?? 0}/{goal}
-        </span>
-      </span>
-    );
-  }
+/** Progreso = pasos tildados de la tarea, en segmentos (uno por paso; con más de 10, barra). */
+function Steps({ task }: { task: TaskDTO }) {
+  const goal = task.subtasks.length;
+  const n = task.subtasks.filter((s) => s.done).length;
+  const full = n >= goal;
+  // Ocupa todo el ancho de la columna (Facu: sobraba espacio); hasta 10 pasos, un segmento por paso.
   return (
-    <span className="inline-flex items-center gap-2" aria-label={`Avance ${n} de ${goal}`}>
-      <span className="flex gap-[3px]" aria-hidden>
-        {Array.from({ length: goal }, (_, i) => (
-          <span
-            key={i}
-            className={cx("h-2.5 rounded-[3px]", goal <= 6 ? "w-[18px]" : "w-3", i < n ? (n >= goal ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")}
-          />
-        ))}
+    <span className="flex w-full min-w-0 items-center gap-2.5" aria-label={`Avance: ${n} de ${goal} pasos`}>
+      {goal > 10 ? (
+        <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+          <span className={cx("bar-anim block h-full rounded-full", full ? "bg-[var(--st-done-line)]" : "bg-accent")} style={{ width: `${progressPct(n, goal) ?? 0}%` }} />
+        </span>
+      ) : (
+        <span className="flex min-w-0 flex-1 gap-1" aria-hidden>
+          {Array.from({ length: goal }, (_, i) => (
+            <span key={i} className={cx("h-3 min-w-0 flex-1 rounded-[3px] transition-colors", i < n ? (full ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")} />
+          ))}
+        </span>
+      )}
+      <span className="shrink-0 font-mono text-[12.5px] text-muted tabular" aria-hidden>
+        {n}/{goal}
       </span>
-      <span className="font-mono text-[12px] text-muted tabular" aria-hidden>
-        {progress ?? 0}/{goal}
-      </span>
-    </span>
-  );
-}
-
-/** Botones de +1 / −1 del progreso (en la tabla aparecen al pasar el mouse). */
-function ProgressButtons({ task: t, hover }: { task: TaskDTO; hover?: boolean }) {
-  const [, start] = useSafeTransition();
-  const cls =
-    "relative inline-flex size-8 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1.5 hover:bg-surface-3 hover:text-fg";
-  return (
-    <span className={cx("flex shrink-0", hover && "opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100")}>
-      <button type="button" onClick={() => start(() => bumpTaskProgress(t.id, -1))} aria-label={`Restar uno al progreso de ${t.title}`} className={cls}>
-        <Minus size={13} weight="bold" />
-      </button>
-      <button type="button" onClick={() => start(() => bumpTaskProgress(t.id, 1))} aria-label={`Sumar uno al progreso de ${t.title}`} className={cls}>
-        <Plus size={13} weight="bold" />
-      </button>
     </span>
   );
 }
@@ -422,6 +397,7 @@ const COMPACT_COL: Record<TaskColumnKey, string> = {
   category: "max-[90rem]:w-0!",
   priority: "max-[90rem]:w-0!",
   deadline: "max-[90rem]:w-[7.5rem]!",
+  progress: "max-[90rem]:w-[10.5rem]!",
   scheduled: "max-[90rem]:w-[6rem]!",
 };
 const COMPACT_HIDDEN = new Set<TaskColumnKey>(["category", "priority"]);
@@ -453,19 +429,19 @@ function TaskTable({
   onMenu: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
   const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
-  const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0) + TASK_PROGRESS_MIN;
-  // Orden de las columnas en pantalla: Progreso (sin ancho propio) va antes de Agendada.
-  const cols = [...TASK_COLUMNS.slice(0, 5).map((c) => c.key), "progress" as const, "scheduled" as const];
-  const head = (k: (typeof cols)[number]) =>
-    k === "progress" ? { label: "Progreso" } : { label: TASK_COLUMNS.find((c) => c.key === k)!.label };
+  // Tarea toma lo que sobra (su ancho es el mínimo); el resto, incluido Progreso, se cambia arrastrando.
+  const flexMin = TASK_COLUMNS.find((c) => c.key === TASK_FLEX_COLUMN)!.width;
+  const total = TASK_COLUMNS.reduce((a, c) => a + (c.key === TASK_FLEX_COLUMN ? flexMin : widthOf(c.key)), 0);
+  const cols = TASK_COLUMNS.map((c) => c.key);
+  const head = (k: TaskColumnKey) => ({ label: TASK_COLUMNS.find((c) => c.key === k)!.label });
   return (
     // Si los anchos guardados suman más que la pantalla, la tabla se corre de costado.
     <div className="hidden overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block">
       <table className="w-full table-fixed border-collapse text-left text-[13.5px] max-[90rem]:min-w-0!" style={{ minWidth: total }}>
         <colgroup>
           {cols.map((k) =>
-            k === "progress" ? (
-              <col key={k} className="max-[90rem]:w-[10.5rem]" />
+            k === TASK_FLEX_COLUMN ? (
+              <col key={k} className={COMPACT_COL[k]} />
             ) : (
               <col key={k} style={{ width: widthOf(k) }} className={COMPACT_COL[k]} />
             ),
@@ -480,11 +456,11 @@ function TaskTable({
                   CELL,
                   "relative py-2.5 font-medium",
                   k === "scheduled" ? "px-2 text-center" : "px-3",
-                  k !== "progress" && COMPACT_HIDDEN.has(k) && WIDE_ONLY,
+                  COMPACT_HIDDEN.has(k) && WIDE_ONLY,
                 )}
               >
                 <span className="block truncate">{head(k).label}</span>
-                {k !== "progress" && <ColumnResizer label={head(k).label} width={widthOf(k)} onResize={(w, save) => resize(k, w, save)} />}
+                {k !== TASK_FLEX_COLUMN && <ColumnResizer label={head(k).label} width={widthOf(k)} onResize={(w, save) => resize(k, w, save)} />}
               </th>
             ))}
           </tr>
@@ -555,11 +531,8 @@ function TaskTable({
                       {done || left === null ? <span className="text-faint" aria-label="Sin deadline">–</span> : <DueLabel left={left} done={done} />}
                     </td>
                     <td className={cx(CELL, "px-3")}>
-                      {t.goal ? (
-                        <span className="flex items-center gap-1">
-                          <Steps progress={t.progress} goal={t.goal} />
-                          {!done && !t.subtasks.length && <ProgressButtons task={t} hover />}
-                        </span>
+                      {t.subtasks.length > 0 ? (
+                        <Steps task={t} />
                       ) : (
                         <span className="text-faint" aria-label="Sin progreso">–</span>
                       )}
@@ -652,13 +625,11 @@ function ScheduledBox({ task }: { task: TaskDTO }) {
   );
 }
 
-/** Debajo del título: pasos, si se repite, cuántos links y si está agendada (en la tabla, eso va en su columna). */
+/** Debajo del título: si se repite, cuántos links y si está agendada (en la tabla, eso va en su columna). */
 function TaskMeta({ t, done, hideScheduled }: { t: TaskDTO; done: boolean; hideScheduled?: boolean }) {
-  // Los pasos ya se ven en Progreso (van juntos): acá solo cuando la tarea no muestra progreso.
-  const steps = t.subtasks.length && !t.goal ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length} pasos` : null;
   const rep = repeatLabel(t.repeat, t.repeatEvery);
   const links = t.links.length ? (t.links.length === 1 ? "1 link" : `${t.links.length} links`) : null;
-  const parts = [steps, rep && `se repite ${rep.toLowerCase()}`, links, t.scheduled && !done && !hideScheduled ? "agendada" : null].filter(Boolean);
+  const parts = [rep && `se repite ${rep.toLowerCase()}`, links, t.scheduled && !done && !hideScheduled ? "agendada" : null].filter(Boolean);
   if (!parts.length) return null;
   return <span className="text-[12px] text-muted first-letter:uppercase">{parts.join(" · ")}</span>;
 }

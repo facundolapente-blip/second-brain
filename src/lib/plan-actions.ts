@@ -304,8 +304,6 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     status,
     priority: entero(fd, "priority", 0, 4) ?? 1,
     deadline: deadline ? toDbDate(deadline) : null,
-    progress: entero(fd, "progress", 0, 1_000_000),
-    goal: entero(fd, "goal", 0, 1_000_000),
     scheduled: fd.get("scheduled") === "on",
     notes: texto(fd, "notes", 4000) || null,
     links: parseTaskLinks(jsonOrEmpty(String(fd.get("links") ?? "[]"))),
@@ -380,7 +378,7 @@ async function syncStepsProgress(taskId: string, hadSteps = true) {
   else if (hadSteps) await prisma.planTask.updateMany({ where: { id: taskId }, data: { goal: null, progress: null } });
 }
 
-/** Suma (o resta) uno al progreso de una tarea (las que tienen pasos siguen a los pasos). */
+/** Ya no se usa desde la pantalla (el progreso son los pasos); queda para lo que siga en alguna cola sin conexión. */
 export async function bumpTaskProgress(id: string, delta: 1 | -1) {
   await exigirSesion();
   const t = await prisma.planTask.findUnique({ where: { id }, select: { progress: true, goal: true, _count: { select: { subtasks: true } } } });

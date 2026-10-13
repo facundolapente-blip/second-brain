@@ -69,11 +69,6 @@ function TaskForm({
   const [categoryId, setCategoryId] = useState(task?.categoryId ?? "");
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "todo");
   const [priority, setPriority] = useState(task?.priority ?? 1);
-  // Pasos tildados / total (la lista de pasos los avisa al cambiar): con pasos, el progreso sale de ahí.
-  const [steps, setSteps] = useState(() => ({
-    done: task?.subtasks.filter((s) => s.done).length ?? 0,
-    total: task?.subtasks.length ?? 0,
-  }));
   const [deleting, startDelete] = useSafeTransition();
   const notify = useEffectEvent(onDone);
   useEffect(() => {
@@ -133,29 +128,6 @@ function TaskForm({
         </Field>
       </div>
 
-      {steps.total > 0 ? (
-        // Con pasos, el progreso son los pasos (se tildan más abajo): no se escribe a mano.
-        <div className="grid gap-1.5">
-          <span className="kicker">Progreso</span>
-          <p className="text-[14px]">
-            <span className="font-mono tabular">
-              {steps.done} de {steps.total}
-            </span>{" "}
-            <span className="text-muted">· sale de los pasos</span>
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {/* Si tenía pasos y se sacaron todos, el progreso venía de ellos: arranca vacío. */}
-          <Field label="Progreso" hint="Opcional, por ejemplo 2. Con pasos, se cuenta solo.">
-            <Input name="progress" inputMode="numeric" defaultValue={task?.subtasks.length ? "" : (task?.progress ?? "")} />
-          </Field>
-          <Field label="Meta" hint="Opcional, por ejemplo 3">
-            <Input name="goal" inputMode="numeric" defaultValue={task?.subtasks.length ? "" : (task?.goal ?? "")} />
-          </Field>
-        </div>
-      )}
-
       <div className="grid grid-cols-[1fr_6rem] gap-3">
         <Field label="Se repite" hint="Al terminarla aparece la siguiente.">
           <select name="repeat" defaultValue={task?.repeat ?? ""} className={inputClass}>
@@ -171,9 +143,9 @@ function TaskForm({
       </div>
 
       {task ? (
-        <Subtasks task={task} onCount={setSteps} />
+        <Subtasks task={task} />
       ) : (
-        <Field label="Pasos (opcional)" hint="Uno por renglón: después los vas tildando.">
+        <Field label="Pasos (opcional)" hint="Uno por renglón: después los vas tildando y son el progreso de la tarea.">
           <textarea name="subtasks" rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} placeholder={"Escribir el guion\nGrabar\nEditar"} />
         </Field>
       )}
@@ -240,7 +212,7 @@ function TaskForm({
 }
 
 /** Pasos de una tarea: se tildan, se agregan y se sacan al instante. */
-function Subtasks({ task, onCount }: { task: TaskDTO; onCount: (c: { done: number; total: number }) => void }) {
+function Subtasks({ task }: { task: TaskDTO }) {
   const [items, setItems] = useState<(TaskDTO["subtasks"][number] & { k?: string })[]>(task.subtasks);
   // Lo agregado entra con un fundido; la tilde aparece con un golpe tras tocarla.
   const fresh = useNewIds(items.map((s) => s.k ?? s.id));
@@ -248,7 +220,6 @@ function Subtasks({ task, onCount }: { task: TaskDTO; onCount: (c: { done: numbe
   const [text, setText] = useState("");
   const [, start] = useSafeTransition();
   const done = items.filter((s) => s.done).length;
-  useEffect(() => onCount({ done, total: items.length }), [done, items.length, onCount]);
   // Un paso recién agregado tiene un id provisional hasta que el servidor da el
   // suyo. Si se tilda o se saca antes, el cambio espera ese id y se manda después.
   const tmpSeq = useRef(0);

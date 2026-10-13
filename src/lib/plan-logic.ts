@@ -80,10 +80,11 @@ export const TASK_COLUMNS = [
   { key: "category", label: "Categoría", width: 136 },
   { key: "priority", label: "Prioridad", width: 104 },
   { key: "deadline", label: "Vence", width: 120 },
+  { key: "progress", label: "Progreso", width: 240 },
   { key: "scheduled", label: "Agendada", width: 96 },
 ] as const;
-/** Progreso no tiene ancho propio: toma lo que sobra (como mínimo esto). */
-export const TASK_PROGRESS_MIN = 168;
+/** La columna que toma el espacio que sobra (su ancho de arriba es el mínimo); las demás se cambian arrastrando. */
+export const TASK_FLEX_COLUMN = "title";
 export type TaskColumnKey = (typeof TASK_COLUMNS)[number]["key"];
 export type TaskColumnWidths = Partial<Record<TaskColumnKey, number>>;
 export const TASK_COLUMN_MIN = 72;
