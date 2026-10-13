@@ -66,7 +66,7 @@
   --st-done-bg: #dcecdf; --st-done-line: #3c855a; --st-done-fg: #22603b;
   --st-fail-bg: #f8e2e0; --st-fail-line: #c4504f; --st-fail-fg: #932c2f;
   --st-skip-bg: #f7eccd; --st-skip-line: #c99b28; --st-skip-fg: #7d5c08;
-  --st-idle-bg: #ebe5d8; --st-idle-fg: #6a665e;
+  --st-idle-bg: #ebe5d8; --st-idle-fg: #57534c;
 
   --p-stone-bg: #ebe8e0; --p-stone-fg: #5c5952; --p-stone-solid: #8a867d;
   --p-red-bg: #f7e5e2; --p-red-fg: #9a302c; --p-red-solid: #cf6a60;
@@ -131,7 +131,7 @@
   --card-shadow: 0 1px 2px rgba(30, 40, 30, 0.05), 0 16px 34px -16px color-mix(in oklab, var(--mod) 35%, transparent);
   --wash: radial-gradient(1200px 420px at 30% -90px, color-mix(in oklab, var(--mod) 38%, transparent), transparent 72%);
   --st-idle-bg: #e9ebe6;
-  --st-idle-fg: #6c7068;
+  --st-idle-fg: #565a53;
 }
 [data-module="habitos"] { --mod: var(--mod-habitos); }
 [data-module="journal"] { --mod: var(--mod-journal); }
@@ -162,7 +162,7 @@
   --st-done-bg: #1f3227; --st-done-line: #5fa779; --st-done-fg: #a2d3b1;
   --st-fail-bg: #382224; --st-fail-line: #d4686c; --st-fail-fg: #efa7a8;
   --st-skip-bg: #352e18; --st-skip-line: #c6a03c; --st-skip-fg: #e6ca7b;
-  --st-idle-bg: #262624; --st-idle-fg: #8f8a7f;
+  --st-idle-bg: #262624; --st-idle-fg: #a29d92;
   --p-stone-bg: #292825; --p-stone-fg: #bab5aa; --p-stone-solid: #8d887e;
   --p-red-bg: #382321; --p-red-fg: #eca39b; --p-red-solid: #cf716a;
   --p-orange-bg: #382a1e; --p-orange-fg: #ebb487; --p-orange-solid: #cf8d57;
