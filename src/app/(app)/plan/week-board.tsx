@@ -548,7 +548,7 @@ function Chip({
             {c && <span className="truncate font-medium">{c.name}</span>}
             {priority && (
               <span role="img" aria-label={`Prioridad ${priority.label.toLowerCase()}`} title={`Prioridad ${priority.label.toLowerCase()}`} className="inline-flex">
-                <PriorityDots n={priority.value} size={6} mono />
+                <PriorityDots n={priority.value} size={7} mono />
               </span>
             )}
           </span>

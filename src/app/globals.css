@@ -71,6 +71,7 @@
   --p-stone-bg: #ebe8e0; --p-stone-fg: #5c5952; --p-stone-solid: #8a867d;
   --p-red-bg: #f7e5e2; --p-red-fg: #9a302c; --p-red-solid: #cf6a60;
   --p-orange-bg: #f8ebdd; --p-orange-fg: #8f4f1d; --p-orange-solid: #d38a4e;
+  --p-brown-bg: #efe5dc; --p-brown-fg: #5c3a1f; --p-brown-solid: #8a6240;
   --p-yellow-bg: #f6eed4; --p-yellow-fg: #835d02; --p-yellow-solid: #cba232;
   --p-green-bg: #e5eee2; --p-green-fg: #33623a; --p-green-solid: #6a9a6b;
   --p-teal-bg: #e0eeeb; --p-teal-fg: #26625c; --p-teal-solid: #4f978e;
@@ -80,8 +81,9 @@
   /* Etiquetas llenas: tonos puros y bien separados (antes salían de mezclar con
      la tinta y rojo, rosa, naranja y amarillo quedaban parecidos). Texto ≥ 4,5:1. */
   --p-stone-chip: #5f5a52; --p-stone-chip-fg: #ffffff;
-  --p-red-chip: #c42b1c; --p-red-chip-fg: #ffffff;
+  --p-red-chip: #d1242f; --p-red-chip-fg: #ffffff;
   --p-orange-chip: #b8560b; --p-orange-chip-fg: #ffffff;
+  --p-brown-chip: #5c3a1f; --p-brown-chip-fg: #ffffff;
   --p-yellow-chip: #f2c230; --p-yellow-chip-fg: #3d2c00;
   --p-green-chip: #2e7d32; --p-green-chip-fg: #ffffff;
   --p-teal-chip: #0f7469; --p-teal-chip-fg: #ffffff;
@@ -164,6 +166,7 @@
   --p-stone-bg: #292825; --p-stone-fg: #bab5aa; --p-stone-solid: #8d887e;
   --p-red-bg: #382321; --p-red-fg: #eca39b; --p-red-solid: #cf716a;
   --p-orange-bg: #382a1e; --p-orange-fg: #ebb487; --p-orange-solid: #cf8d57;
+  --p-brown-bg: #30261e; --p-brown-fg: #dcc0a4; --p-brown-solid: #a98260;
   --p-yellow-bg: #342e1b; --p-yellow-fg: #e5c86f; --p-yellow-solid: #c4a03d;
   --p-green-bg: #222e20; --p-green-fg: #a6cda6; --p-green-solid: #6f9c70;
   --p-teal-bg: #1e2e2b; --p-teal-fg: #92ccc3; --p-teal-solid: #569c92;
@@ -171,8 +174,9 @@
   --p-purple-bg: #2a2535; --p-purple-fg: #c4b6e3; --p-purple-solid: #9282bf;
   --p-pink-bg: #34232b; --p-pink-fg: #e6a9c5; --p-pink-solid: #c47a9c;
   --p-stone-chip: #b3ada2; --p-stone-chip-fg: #141413;
-  --p-red-chip: #f2766a; --p-red-chip-fg: #141413;
+  --p-red-chip: #f87171; --p-red-chip-fg: #141413;
   --p-orange-chip: #f39a4c; --p-orange-chip-fg: #141413;
+  --p-brown-chip: #c79d76; --p-brown-chip-fg: #141413;
   --p-yellow-chip: #f4d04e; --p-yellow-chip-fg: #141413;
   --p-green-chip: #6cc47c; --p-green-chip-fg: #141413;
   --p-teal-chip: #45c3b3; --p-teal-chip-fg: #141413;

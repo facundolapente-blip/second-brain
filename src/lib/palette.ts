@@ -3,7 +3,7 @@
  * identidad. Cada uno resuelve a variables CSS definidas en globals.css, así el
  * modo oscuro tiene su propia versión sin lógica en los componentes.
  */
-export const PALETTE = ["stone", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"] as const;
+export const PALETTE = ["stone", "red", "orange", "brown", "yellow", "green", "teal", "blue", "purple", "pink"] as const;
 export type PaletteKey = (typeof PALETTE)[number];
 
 export function isPaletteKey(v: unknown): v is PaletteKey {

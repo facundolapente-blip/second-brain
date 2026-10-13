@@ -18,14 +18,14 @@ import type {
 
 /** Categorías con las que arranca, las mismas del Notion de Facu. */
 const DEFAULT_CATEGORIES = [
-  { name: "Trabajo", color: "pink" },
+  { name: "Trabajo", color: "purple" },
   { name: "ORT", color: "red" },
   { name: "Personal", color: "yellow" },
   { name: "Deporte", color: "green" },
   { name: "DJ", color: "blue" },
   { name: "Producción", color: "purple" },
   { name: "Nuevos Ingresos", color: "teal" },
-  { name: "Casa", color: "orange" },
+  { name: "Casa", color: "brown" },
 ];
 
 export async function ensurePlanCategories() {

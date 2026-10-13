@@ -56,7 +56,7 @@ export const PRIORITIES: { value: number; label: string; tone: string }[] = [
 
 /** Las cuatro barras que crecen; llenas hasta el nivel. `mono`: en el color del texto (sobre fondos de color). */
 /** Cuatro puntos, llenos hasta el nivel. `size`: diámetro en px. `mono`: en el color del texto (sobre fondos de color). */
-export function PriorityDots({ n, size = 8, mono }: { n: number; size?: number; mono?: boolean }) {
+export function PriorityDots({ n, size = 10, mono }: { n: number; size?: number; mono?: boolean }) {
   const p = PRIORITIES.find((x) => x.value === n);
   if (!p) return null;
   return (
