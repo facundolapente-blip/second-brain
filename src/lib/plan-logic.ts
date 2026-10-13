@@ -83,11 +83,10 @@ export const TASK_COLUMNS = [
   { key: "progress", label: "Progreso", width: 240 },
   { key: "scheduled", label: "Agendada", width: 96 },
 ] as const;
-/** La columna que toma el espacio que sobra (su ancho de arriba es el mínimo); las demás se cambian arrastrando. */
-export const TASK_FLEX_COLUMN = "title";
+/** Todas las columnas tienen ancho propio y se cambian arrastrando; la tabla mide la suma (ninguna se estira sola). */
 export type TaskColumnKey = (typeof TASK_COLUMNS)[number]["key"];
 export type TaskColumnWidths = Partial<Record<TaskColumnKey, number>>;
-export const TASK_COLUMN_MIN = 72;
+export const TASK_COLUMN_MIN = 48;
 export const TASK_COLUMN_MAX = 900;
 
 /** Anchos guardados (`AppSetting "tareas_columnas"`), solo los válidos. */

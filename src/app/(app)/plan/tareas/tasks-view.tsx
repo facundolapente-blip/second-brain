@@ -8,7 +8,7 @@ import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, TASK_FLEX_COLUMN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag } from "../plan-ui";
@@ -429,23 +429,20 @@ function TaskTable({
   onMenu: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
   const widthOf = (k: TaskColumnKey) => widths[k] ?? TASK_COLUMNS.find((c) => c.key === k)!.width;
-  // Tarea toma lo que sobra (su ancho es el mínimo); el resto, incluido Progreso, se cambia arrastrando.
-  const flexMin = TASK_COLUMNS.find((c) => c.key === TASK_FLEX_COLUMN)!.width;
-  const total = TASK_COLUMNS.reduce((a, c) => a + (c.key === TASK_FLEX_COLUMN ? flexMin : widthOf(c.key)), 0);
+  // Cada columna tiene su ancho y la tabla mide la suma: arrastrar un borde cambia solo esa
+  // columna y el borde sigue al mouse (lo de la derecha se corre, como en Notion). Ninguna se estira sola.
+  const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0);
   const cols = TASK_COLUMNS.map((c) => c.key);
   const head = (k: TaskColumnKey) => ({ label: TASK_COLUMNS.find((c) => c.key === k)!.label });
   return (
     // Si los anchos guardados suman más que la pantalla, la tabla se corre de costado.
-    <div className="hidden overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block">
-      <table className="w-full table-fixed border-collapse text-left text-[13.5px] max-[90rem]:min-w-0!" style={{ minWidth: total }}>
+    <div className="hidden max-w-full overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block lg:w-fit max-[90rem]:w-auto">
+      <div className="relative w-max max-[90rem]:w-full">
+      <table className="table-fixed border-collapse text-left text-[13.5px] max-[90rem]:w-full! max-[90rem]:min-w-0!" style={{ width: total, minWidth: total }}>
         <colgroup>
-          {cols.map((k) =>
-            k === TASK_FLEX_COLUMN ? (
-              <col key={k} className={COMPACT_COL[k]} />
-            ) : (
-              <col key={k} style={{ width: widthOf(k) }} className={COMPACT_COL[k]} />
-            ),
-          )}
+          {cols.map((k) => (
+            <col key={k} style={{ width: widthOf(k) }} className={COMPACT_COL[k]} />
+          ))}
         </colgroup>
         <thead>
           <tr className="border-b border-line-strong bg-surface-2 text-[11px] tracking-[0.06em] text-muted uppercase">
@@ -460,7 +457,6 @@ function TaskTable({
                 )}
               >
                 <span className="block truncate">{head(k).label}</span>
-                {k !== TASK_FLEX_COLUMN && <ColumnResizer label={head(k).label} width={widthOf(k)} onResize={(w, save) => resize(k, w, save)} />}
               </th>
             ))}
           </tr>
@@ -547,49 +543,85 @@ function TaskTable({
           ))}
         </tbody>
       </table>
+      {/* Bordes para cambiar el ancho, como en Notion: uno por columna, a todo el alto de la tabla. */}
+      <ColumnResizers
+        cols={cols.map((k) => ({ key: k, label: head(k).label, width: widthOf(k) }))}
+        onResize={(k, w, save) => resize(k, w, save)}
+      />
+      </div>
     </div>
   );
 }
 
 /**
- * Borde derecho de un encabezado: arrastrar cambia el ancho de la columna
- * (se guarda al soltar); doble clic vuelve al ancho de siempre; con teclado, flechas.
+ * Bordes de las columnas, como en Notion: una franja invisible sobre cada borde, a todo el
+ * alto de la tabla; al pasar el mouse o arrastrar se ve una línea de color. Arrastrar mueve
+ * solo ese borde y sigue al mouse exacto (cambia solo esa columna; lo de la derecha se corre).
+ * Se guarda al soltar. Con teclado: flechas.
  */
-function ColumnResizer({ label, width, onResize }: { label: string; width: number; onResize: (w: number | null, save: boolean) => void }) {
-  const start = useRef<{ x: number; w: number } | null>(null);
+function ColumnResizers({
+  cols,
+  onResize,
+}: {
+  cols: { key: TaskColumnKey; label: string; width: number }[];
+  onResize: (k: TaskColumnKey, w: number, save: boolean) => void;
+}) {
+  const drag = useRef<{ key: TaskColumnKey; x: number; w: number } | null>(null);
+  const [active, setActive] = useState<TaskColumnKey | null>(null);
+  // Dónde termina cada columna (suma de los anchos hasta ella).
+  const ends = cols.map((_, i) => cols.slice(0, i + 1).reduce((a, c) => a + c.width, 0));
   return (
-    <span
-      role="separator"
-      aria-orientation="vertical"
-      aria-label={`Ancho de ${label}`}
-      aria-valuenow={width}
-      tabIndex={0}
-      title="Arrastrá para cambiar el ancho · doble clic: ancho original"
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        start.current = { x: e.clientX, w: width };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }}
-      onPointerMove={(e) => {
-        if (start.current) onResize(start.current.w + e.clientX - start.current.x, false);
-      }}
-      onPointerUp={(e) => {
-        if (!start.current) return;
-        onResize(start.current.w + e.clientX - start.current.x, true);
-        start.current = null;
-      }}
-      onDoubleClick={() => onResize(null, true)}
-      onKeyDown={(e) => {
-        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-          e.preventDefault();
-          onResize(width + (e.key === "ArrowRight" ? 16 : -16), true);
-        }
-      }}
-      className="group/res absolute inset-y-0 right-0 z-10 flex w-3 cursor-col-resize touch-none justify-end outline-none max-[90rem]:hidden"
-    >
-      <span className="my-2 w-0.5 rounded-full bg-line transition-colors group-hover/res:bg-accent group-focus-visible/res:bg-accent group-active/res:bg-accent" />
-    </span>
+    <div className="pointer-events-none absolute inset-0 max-[90rem]:hidden">
+      {cols.map((c, i) => {
+        const on = active === c.key;
+        return (
+          <span
+            key={c.key}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={`Ancho de ${c.label}`}
+            aria-valuenow={c.width}
+            tabIndex={0}
+            // El último borde va adentro de la tabla (afuera lo corta el contenedor).
+            style={{ left: ends[i] - (i === cols.length - 1 ? 10 : 5) }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              drag.current = { key: c.key, x: e.clientX, w: c.width };
+              setActive(c.key);
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const d = drag.current;
+              if (d) onResize(d.key, d.w + e.clientX - d.x, false);
+            }}
+            onPointerUp={(e) => {
+              const d = drag.current;
+              drag.current = null;
+              setActive(null);
+              if (d) onResize(d.key, d.w + e.clientX - d.x, true);
+            }}
+            onPointerCancel={() => {
+              drag.current = null;
+              setActive(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                e.preventDefault();
+                onResize(c.key, c.width + (e.key === "ArrowRight" ? 16 : -16), true);
+              }
+            }}
+            className="group/res pointer-events-auto absolute inset-y-0 z-10 flex w-[10px] cursor-col-resize touch-none justify-center outline-none"
+          >
+            <span
+              className={cx(
+                "h-full w-[3px] transition-colors",
+                on ? "bg-accent" : "bg-transparent group-hover/res:bg-accent/70 group-focus-visible/res:bg-accent",
+              )}
+            />
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
