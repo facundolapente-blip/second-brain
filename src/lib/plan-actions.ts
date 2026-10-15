@@ -6,7 +6,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch } from "./plan-logic";
+import { isTime, normalizeTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -93,8 +93,9 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
   if (!title) return { ok: false, error: "Ponele un nombre." };
   const date = fecha(fd, "date");
   if (!date) return { ok: false, error: "Elegí el día." };
-  const start = texto(fd, "startTime", 5);
-  const end = texto(fd, "endTime", 5);
+  // Se escribe a mano en el celular ("930", "21"): se pasa a HH:MM.
+  const start = normalizeTime(texto(fd, "startTime", 8)) ?? texto(fd, "startTime", 8);
+  const end = normalizeTime(texto(fd, "endTime", 8)) ?? "";
   const startTime = isTime(start) ? start : null;
   const endTime = startTime && isTime(end) && end > startTime ? end : null;
   if (start && !startTime) return { ok: false, error: "La hora de inicio no es válida." };

@@ -10,6 +10,7 @@ import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { PriorityPicker } from "./plan-ui";
+import { TimeInput } from "@/components/time-input";
 
 export type BlockDraft = Partial<BlockDTO> & { date: string };
 export type BlockSheetHandle = { open: (draft: BlockDraft) => void };
@@ -100,10 +101,10 @@ function BlockForm({
           <Input type="date" name="date" defaultValue={initial.date} required className="min-w-0 !px-2 sm:!px-3" />
         </Field>
         <Field label="Desde" className="min-w-0">
-          <Input type="time" name="startTime" defaultValue={initial.startTime ?? ""} className="min-w-0 !px-2 sm:!px-3" />
+          <TimeInput name="startTime" defaultValue={initial.startTime} className="min-w-0 !px-3" />
         </Field>
         <Field label="Hasta" className="min-w-0">
-          <Input type="time" name="endTime" defaultValue={initial.endTime ?? ""} className="min-w-0 !px-2 sm:!px-3" />
+          <TimeInput name="endTime" defaultValue={initial.endTime} className="min-w-0 !px-3" />
         </Field>
       </div>
       <p className="-mt-3 text-xs text-muted">Sin hora de inicio, queda para todo el día.</p>

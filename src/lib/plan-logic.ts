@@ -208,6 +208,31 @@ export function isTime(s: unknown): s is string {
   return typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 }
 
+/**
+ * Hora escrita a mano → "HH:MM" ("" si está vacía, null si no es una hora):
+ * "9" → 09:00, "930" → 09:30, "2130" → 21:30, "9:5" → 09:05, "21.30" o "21 30" → 21:30.
+ */
+export function normalizeTime(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return "";
+  let h: number;
+  let m: number;
+  const parts = t.split(/[:.,\s]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    h = Number(parts[0]);
+    m = Number(parts[1]);
+  } else {
+    const d = t.replace(/\D/g, "");
+    if (!d || d !== t) return null;
+    if (d.length <= 2) [h, m] = [Number(d), 0];
+    else if (d.length === 3) [h, m] = [Number(d[0]), Number(d.slice(1))];
+    else if (d.length === 4) [h, m] = [Number(d.slice(0, 2)), Number(d.slice(2))];
+    else return null;
+  }
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 /** "9:00 a 12:00", "22:00" o null (todo el día). */
 export function timeRange(b: Pick<BlockDTO, "startTime" | "endTime">): string | null {
   const f = (t: string) => t.replace(/^0(\d)/, "$1");
