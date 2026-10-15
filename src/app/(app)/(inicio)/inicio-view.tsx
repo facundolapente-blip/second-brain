@@ -403,7 +403,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                     "relative flex min-h-11 w-full items-center gap-3 rounded-xl py-1 pr-2 text-left transition-colors hover:bg-surface-2 disabled:hover:bg-transparent",
                   )}
                 >
-                  <span className="tabular w-14 shrink-0 text-right font-mono text-[11.5px] text-muted">
+                  <span className="tabular w-14 shrink-0 text-right font-mono text-[11.5px] text-fg/75">
                     {b.startTime ?? "Todo el día"}
                   </span>
                   <span
@@ -421,7 +421,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                       {b.title}
                     </span>
                     {(range || b.category) && (
-                      <span className="flex items-center gap-1.5 text-[12px] text-muted">
+                      <span className="flex items-center gap-1.5 text-[12px] text-fg/75">
                         {range && <span className="tabular">{range}</span>}
                         <CategoryTag category={b.category} />
                       </span>
