@@ -1,6 +1,7 @@
 "use client";
 
 import { useSafeTransition } from "@/components/safe-action";
+import { QuoteCard } from "./quote-card";
 import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
 import { dayProgress } from "@/lib/habit-logic";
@@ -86,6 +87,7 @@ export function InicioView({ d }: { d: Dashboard }) {
             <span className="min-w-0 flex-1">{d.backup} Revisalo en Datos.</span>
           </Link>
         )}
+        <QuoteCard day={d.today} hour={d.hour} />
         {/* Resumen del día */}
         <section aria-label="Resumen" className="hero rise relative overflow-hidden rounded-[22px] p-5 lg:col-span-12 lg:p-7">
           <p className="hero-sub max-w-2xl text-[15px] leading-relaxed lg:text-[17px]">
