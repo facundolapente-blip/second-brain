@@ -131,7 +131,10 @@ export function ContextMenuHost() {
       role={renaming ? "dialog" : "menu"}
       aria-label={renaming ? renaming.label : open.title ?? "Opciones"}
       onKeyDown={renaming ? undefined : onMenuKey}
-      onContextMenu={(e) => e.preventDefault()}
+      // Dentro del campo de "Cambiar nombre" queda el menú del navegador (sugerencias de ortografía).
+      onContextMenu={(e) => {
+        if (!(e.target as HTMLElement).closest("input, textarea")) e.preventDefault();
+      }}
       style={{ left: pos?.left ?? open.x, top: pos?.top ?? open.y, visibility: pos ? "visible" : "hidden" }}
       // Se abre desde el punto donde se hizo clic (o desde la esquina que quedó más cerca si se corrió).
       className={cx(
@@ -163,6 +166,8 @@ export function ContextMenuHost() {
             onFocus={(e) => e.currentTarget.select()}
             maxLength={160}
             autoComplete="off"
+            spellCheck
+            lang="es"
             className="h-10 w-72 max-w-[80vw] rounded-lg border border-accent bg-surface px-3 text-[14px] outline-none ring-3 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]"
           />
           <span className="px-1 text-[11.5px] text-muted">Enter guarda · Esc cancela</span>

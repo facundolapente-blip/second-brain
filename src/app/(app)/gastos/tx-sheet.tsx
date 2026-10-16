@@ -506,7 +506,7 @@ export const TxSheet = forwardRef<
         )}
 
         <Field label="Nota">
-          <textarea
+          <textarea spellCheck lang="es"
             name="note"
             value={d.note}
             onChange={(e) => set({ note: e.target.value })}

@@ -320,7 +320,7 @@ export function HabitFormBody({
         </label>
 
         <Field label="Nota (opcional)">
-        <textarea
+        <textarea spellCheck lang="es"
           name="description"
           value={draft.description}
           onChange={(e) => set("description", e.target.value)}

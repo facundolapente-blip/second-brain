@@ -259,7 +259,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
         />
 
         <div className="grid gap-3">
-          <textarea
+          <textarea spellCheck lang="es"
             rows={1}
             value={title}
             maxLength={TITLE_MAX}
@@ -279,7 +279,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             aria-label="Título"
             className="display autogrow w-full resize-none bg-transparent text-[32px] leading-[1.12] text-wrap outline-none! placeholder:text-faint lg:text-[40px]"
           />
-          <textarea
+          <textarea spellCheck lang="es"
             ref={bodyRef}
             value={body}
             onChange={(e) => {

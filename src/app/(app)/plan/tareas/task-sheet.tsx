@@ -146,7 +146,7 @@ function TaskForm({
         <Subtasks task={task} />
       ) : (
         <Field label="Pasos (opcional)" hint="Uno por renglón: después los vas tildando y son el progreso de la tarea.">
-          <textarea name="subtasks" rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} placeholder={"Escribir el guion\nGrabar\nEditar"} />
+          <textarea spellCheck lang="es" name="subtasks" rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} placeholder={"Escribir el guion\nGrabar\nEditar"} />
         </Field>
       )}
 
@@ -156,7 +156,7 @@ function TaskForm({
       </label>
 
       <Field label="Notas (opcional)">
-        <textarea name="notes" defaultValue={task?.notes ?? ""} rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} />
+        <textarea spellCheck lang="es" name="notes" defaultValue={task?.notes ?? ""} rows={3} maxLength={4000} className={cx(inputClass, "h-auto py-2")} />
       </Field>
 
       <LinksField key={task?.id ?? "nueva"} initial={task?.links ?? []} />

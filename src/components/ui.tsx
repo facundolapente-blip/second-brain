@@ -79,8 +79,11 @@ export const inputClass =
   "h-11 w-full rounded-[4px] border border-line-strong bg-surface px-3 text-[15px] text-fg placeholder:text-faint outline-none transition-colors focus:border-fg/50 focus:ring-2 focus:ring-[var(--focus)]";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  function Input({ className, ...props }, ref) {
-    return <input ref={ref} {...props} className={cx(inputClass, className)} />;
+  function Input({ className, spellCheck, ...props }, ref) {
+    // Corrector del navegador en español (subrayado rojo y sugerencias con clic derecho) en
+    // todo campo de texto; no en números, montos, fechas ni horas.
+    const textual = (!props.type || props.type === "text" || props.type === "search") && props.inputMode !== "numeric" && props.inputMode !== "decimal";
+    return <input ref={ref} lang="es" spellCheck={spellCheck ?? (textual || undefined)} {...props} className={cx(inputClass, className)} />;
   },
 );
 

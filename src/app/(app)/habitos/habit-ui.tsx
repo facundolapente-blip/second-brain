@@ -512,7 +512,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
 
             <label className="grid gap-1.5">
               <span className="kicker">Nota del día</span>
-              <textarea
+              <textarea spellCheck lang="es"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
