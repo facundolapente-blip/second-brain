@@ -5,7 +5,7 @@
  * Uso: node --env-file=.env scripts/seed-gastos-demo.ts
  * Se niega a correr si DATABASE_URL no apunta a localhost. Si ya hay
  * movimientos, no agrega nada: solo ajusta los saldos iniciales para que los
- * saldos de hoy coincidan con los de las capturas.
+ * saldos de hoy coincidan con los de TARGET.
  */
 import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 
@@ -22,15 +22,15 @@ const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
 const between = (a: number, b: number) => Math.round(a + rand() * (b - a));
 
-/** Saldos que se ven en las capturas de la app de Facu (aproximados). */
+/** Saldos de ejemplo (inventados) para la demo. */
 const TARGET: Record<string, number> = {
-  Itau: 0,
+  Itau: 18450,
   "Banque Heritage": 0,
-  Dolares: 0,
+  Dolares: 1250.5,
   Efectivo: 0,
-  "Inversiones prex": 0,
+  "Inversiones prex": 22000,
   "Mercado Pago": 0,
-  Santander: 0,
+  Santander: 9320,
 };
 
 /** Ajusta el saldo inicial de cada cuenta para que el saldo de hoy dé el de TARGET. */

@@ -16,17 +16,27 @@ import { ensureAdjustmentCategories } from "./adjustments.ts";
 /** Día de las capturas: SALDOS_HOY es el saldo al cierre de ese día. */
 export const FECHA_SALDOS = "2026-10-02";
 
-/** Saldos según la app en FECHA_SALDOS. */
-export const SALDOS_HOY: Record<string, number> = {
-  // Saldos de las capturas de la app (datos personales, fuera de git).
-  Itau: 0,
-  "Banque Heritage": 0,
-  Dolares: 0,
-  Efectivo: 0,
-  "Inversiones prex": 0,
-  "Mercado Pago": 0,
-  Santander: 0,
-};
+/**
+ * Saldos según la app en FECHA_SALDOS, por nombre de cuenta. Son datos
+ * personales: viven en la variable de entorno SALDOS_INICIALES (JSON, por
+ * ejemplo {"Itau": 1000, "Dolares": 50}), nunca en el código. Sin la variable
+ * no se recalibra nada.
+ */
+export const SALDOS_HOY: Record<string, number> = leerSaldos();
+
+function leerSaldos(): Record<string, number> {
+  const raw = process.env.SALDOS_INICIALES;
+  if (!raw) return {};
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(obj).filter((e): e is [string, number] => typeof e[1] === "number"),
+    );
+  } catch {
+    console.error("SALDOS_INICIALES no es un JSON válido; no se recalibran saldos.");
+    return {};
+  }
+}
 
 const CAL_SOURCE = "calibracion";
 

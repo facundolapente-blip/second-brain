@@ -55,3 +55,7 @@ next-env.d.ts
 
 # registros del navegador de pruebas
 /.playwright-cli/
+
+# Capturas de diseño con datos personales (se movieron a data/diseno-privado)
+/diseno-tipografias/
+/toast.png
