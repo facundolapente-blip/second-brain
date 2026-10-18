@@ -6,7 +6,7 @@ import { ContextMenuHost } from "./context-menu";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { CalendarCheck, ChartLineUp, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
+import { CalendarCheck, ChartLineUp, Compass, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
 import { signOut } from "@/lib/auth-client";
 import { THEME_COLOR, THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
@@ -26,6 +26,7 @@ const MODULES: Module[] = [
 
 /** Herramientas que cruzan los módulos. */
 const TOOLS: { href: string; label: string; icon: Icon }[] = [
+  { href: "/valores", label: "Valores", icon: Compass },
   { href: "/semana", label: "Revisión semanal", icon: ClipboardText },
   { href: "/resumen", label: "Resumen mes y año", icon: CalendarCheck },
   { href: "/analisis", label: "Análisis", icon: ChartLineUp },

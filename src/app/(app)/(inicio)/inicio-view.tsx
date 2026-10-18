@@ -2,6 +2,7 @@
 
 import { useSafeTransition } from "@/components/safe-action";
 import { QuoteCard } from "./quote-card";
+import type { ValueNote } from "@/lib/values";
 import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
 import { dayProgress } from "@/lib/habit-logic";
@@ -60,7 +61,7 @@ function pct(a: number, b: number) {
   return b === 0 ? 0 : Math.round((a / b) * 100);
 }
 
-export function InicioView({ d }: { d: Dashboard }) {
+export function InicioView({ d, notes }: { d: Dashboard; notes: ValueNote[] }) {
   const prevName = formatMonth(shiftMonth(d.gastos.month, -1)).split(" ")[0];
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
 
@@ -87,7 +88,7 @@ export function InicioView({ d }: { d: Dashboard }) {
             <span className="min-w-0 flex-1">{d.backup} Revisalo en Datos.</span>
           </Link>
         )}
-        <QuoteCard day={d.today} hour={d.hour} />
+        <QuoteCard day={d.today} hour={d.hour} notes={notes} />
         {/* Resumen del día */}
         <section aria-label="Resumen" className="hero rise relative overflow-hidden rounded-[22px] p-5 lg:col-span-12 lg:p-7">
           <p className="hero-sub max-w-2xl text-[15px] leading-relaxed lg:text-[17px]">
