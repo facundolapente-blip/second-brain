@@ -23,7 +23,7 @@ if (!file) {
   process.exit(1);
 }
 
-const SKIP = new Set(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit", "ActionReceipt"]);
+const SKIP = new Set(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit", "ActionReceipt", "PushSubscription"]);
 const raw = readFileSync(file);
 const json = JSON.parse((file.endsWith(".gz") ? gunzipSync(raw) : raw).toString("utf8")) as {
   app?: string;

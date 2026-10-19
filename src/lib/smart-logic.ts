@@ -144,20 +144,36 @@ export function parseQuick(text: string, accounts: QuickAccount[]): QuickParse |
   let amountCents: number | null = null;
   const tokens = rest.split(/\s+/).filter(Boolean);
   const kept: string[] = [];
+  const consumed: string[] = [];
   for (const t of tokens) {
     const a: number | null = amountCents === null ? amountOf(t) : null;
-    if (a !== null) amountCents = a;
-    else if (!/^\+$/.test(t)) kept.push(t);
+    if (a !== null) {
+      amountCents = a;
+      consumed.push(t);
+    } else if (!/^\+$/.test(t)) kept.push(t);
+    else consumed.push(t);
   }
   if (amountCents === null) return null;
-  // El título sale del texto original (con sus mayúsculas), sin lo que ya se usó.
-  const used = new Set(tokens.filter((t) => !kept.includes(t)));
+  // El título sale del texto original (con sus mayúsculas), sin lo que ya se usó: se saca la
+  // primera aparición de lo usado (el monto), así "20 almuerzo 20" queda "Almuerzo 20".
+  const left = [...kept];
   const words = original
     .replace(/^\s*[+-]\s*/, "")
     .replace(/(^|\s)\$(?=\s|$)/g, " ")
     .trim()
     .split(/\s+/)
-    .filter((w) => kept.includes(fold(w)) && !used.has(fold(w)));
+    .filter((w) => {
+      const f = fold(w);
+      const c = consumed.indexOf(f);
+      if (c >= 0) {
+        consumed.splice(c, 1);
+        return false;
+      }
+      const k = left.indexOf(f);
+      if (k < 0) return false;
+      left.splice(k, 1);
+      return true;
+    });
   const titleRaw = words
     .filter((w) => !["cobre", "ingreso"].includes(fold(w)))
     .join(" ")

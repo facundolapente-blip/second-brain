@@ -685,3 +685,22 @@ model ActionReceipt {
 
   @@index([createdAt])
 }
+
+// ─── Avisos ─────────────────────────────────────────────────────────────────
+
+/// Un aparato que aceptó avisos (Web Push). `endpoint` es la dirección del servicio
+/// de push de ese navegador; `p256dh` y `auth`, las claves para cifrar el mensaje.
+/// No entra al respaldo: es propio de cada aparato y se vuelve a crear activando.
+/// Si el servicio responde 404/410 (se desinstaló o venció), se borra sola.
+/// Qué avisos van y a qué hora está en `AppSetting "avisos"`.
+model PushSubscription {
+  id         String    @id @default(cuid())
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  /// Navegador y sistema del aparato, para reconocerlo en la lista.
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  /// Último aviso que llegó bien al servicio de push.
+  lastUsedAt DateTime?
+}

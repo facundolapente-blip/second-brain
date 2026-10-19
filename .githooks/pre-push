@@ -1,7 +1,8 @@
 #!/bin/sh
-# Antes de subir: tipos, lint y chequeo visual (desbordes, consola, contraste).
+# Antes de subir: tipos, lint, pruebas de los cálculos y chequeo visual (desbordes, consola, contraste).
 # Saltearlo una vez: git push --no-verify
 set -e
 npx tsc --noEmit
 npx eslint src
+npm test
 node scripts/chequeo-visual.mjs

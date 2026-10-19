@@ -42,3 +42,33 @@ export function parseValueNotes(raw: string | null | undefined): ValueNote[] {
   // Sin marcas de Markdown sueltas (negritas o cursivas pegadas desde Notion).
   return notes.map((n) => ({ ...n, text: n.text.replace(/\*\*|__|`/g, "") }));
 }
+
+/**
+ * Agrega "- <texto>" al final de la sección "# Notas" (la usa el bot de WhatsApp): después
+ * del último renglón con algo de esa sección, antes del título siguiente del mismo nivel o
+ * más alto. Si no hay sección "Notas", la crea al final del texto.
+ */
+export function appendValueNote(raw: string | null | undefined, note: string, section = "Notas"): string {
+  const text = note.replace(/\s+/g, " ").trim();
+  const lines = (raw ?? "").split(/\r?\n/);
+  const level = (l: string) => l.match(/^\s*(#{1,6})\s+/)?.[1].length ?? 0;
+  const name = (l: string) => l.replace(HEADING, "").replace(/[*_`]/g, "").trim().toLowerCase();
+  const start = lines.findIndex((l) => level(l) > 0 && name(l) === section.toLowerCase());
+  if (start < 0) {
+    const body = (raw ?? "").replace(/\s+$/, "");
+    return `${body}${body ? "\n\n" : ""}# ${section}\n- ${text}\n`;
+  }
+  const lv = level(lines[start]);
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    const l = level(lines[i]);
+    if (l > 0 && l <= lv) {
+      end = i;
+      break;
+    }
+  }
+  let last = start;
+  for (let i = start + 1; i < end; i++) if (lines[i].trim()) last = i;
+  lines.splice(last + 1, 0, `- ${text}`);
+  return lines.join("\n");
+}

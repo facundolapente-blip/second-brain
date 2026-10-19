@@ -2,7 +2,7 @@
  * Service worker de Second Brain.
  * - Archivos de la app (/_next/static, íconos): primero la copia guardada (no cambian).
  * - Páginas y datos de la app: primero la red; si no hay señal, la última copia.
- * Nunca guarda nada de /api ni de /login.
+ * Nunca guarda nada de /api ni de /login. Al final: los avisos (push y tocar el aviso).
  * Al activar una VERSION nueva se borran las cachés de las anteriores; además la
  * de archivos tiene tope (MAX_STATIC), porque cada publicación agrega archivos.
  */
@@ -135,3 +135,53 @@ async function receiveShare(req) {
   }
   return Response.redirect(new URL(`/compartir?${params}`, self.location.origin).href, 303);
 }
+
+/*
+ * Avisos (Web Push). El servidor manda { title, body, url, tag } (ver src/lib/push.ts);
+ * tocar el aviso enfoca la app si ya está abierta (y la lleva a esa pantalla) o la abre.
+ */
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Second Brain", {
+      body: data.body || "",
+      icon: "/icon-192",
+      badge: "/icon-badge",
+      lang: "es-UY",
+      // Uno nuevo del mismo tipo reemplaza al anterior en vez de apilarse.
+      tag: data.tag || undefined,
+      renotify: Boolean(data.tag),
+      data: { url: typeof data.url === "string" ? data.url : "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+  // Solo direcciones de la app.
+  const url = target.origin === self.location.origin ? target.href : self.location.origin + "/";
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const same = wins.find((c) => c.url === url);
+      if (same) return same.focus();
+      const any = wins.find((c) => new URL(c.url).origin === self.location.origin);
+      if (any) {
+        try {
+          const w = await any.focus();
+          if ("navigate" in w) return await w.navigate(url);
+          return w;
+        } catch {
+          // ventana sin control del service worker: se abre una nueva
+        }
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
+});

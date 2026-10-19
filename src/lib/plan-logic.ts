@@ -31,7 +31,10 @@ export const QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const;
 export function normalizeLink(raw: string): string | null {
   const t = raw.trim();
   if (!t || t.length > 600) return null;
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+  // "ejemplo.com:8080" o "localhost:3000" no traen esquema (lo de antes de ":" es el dominio):
+  // solo cuenta como esquema "algo://" o uno conocido sin barras (javascript:, mailto:…, que se rechazan abajo).
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(t) || /^(javascript|data|vbscript|mailto|file|blob|about|tel|sms):/i.test(t);
+  const withScheme = hasScheme ? t : `https://${t}`;
   try {
     const u = new URL(withScheme);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
@@ -217,8 +220,10 @@ export function normalizeTime(raw: string): string | null {
   if (!t) return "";
   let h: number;
   let m: number;
+  if (/[^\d:.,\s]/.test(t)) return null; // "9:30 pm" y similares no: solo números y separadores
   const parts = t.split(/[:.,\s]+/).filter(Boolean);
-  if (parts.length >= 2) {
+  if (parts.length > 2) return null;
+  if (parts.length === 2) {
     h = Number(parts[0]);
     m = Number(parts[1]);
   } else {

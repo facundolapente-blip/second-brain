@@ -324,7 +324,12 @@ export function periodFromParams(sp: { mes?: unknown; anio?: unknown; desde?: un
   if (isISODate(from) && isISODate(to)) {
     if (from > to) [from, to] = [to, from];
     // Tope de 5 años para no traer la base entera de una vez.
-    if (diffDays(to, from) > MAX_RANGE_DAYS) from = to.slice(0, 4) === from.slice(0, 4) ? from : `${Number(to.slice(0, 4)) - 5}${to.slice(4)}`;
+    if (diffDays(to, from) > MAX_RANGE_DAYS && to.slice(0, 4) !== from.slice(0, 4)) {
+      const year = Number(to.slice(0, 4)) - 5;
+      const start = `${year}${to.slice(4)}`;
+      // Un fin el 29 de febrero daría un inicio que no existe (el año de 5 antes no es bisiesto).
+      from = isISODate(start) ? start : `${year}-02-28`;
+    }
     return { kind: "range", from, to };
   }
   const anio = s(sp.anio);

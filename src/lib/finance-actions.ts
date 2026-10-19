@@ -9,10 +9,10 @@ import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { calibrarSaldos } from "./importers/gastos-saldos";
 import { FIXED_IGNORED, getClassifier, REPORT_RATE } from "./finance";
 import { logActivity, trashAndDelete } from "./trash";
-import { parseQuick } from "./smart-logic";
+import { createQuickTransaction } from "./quick-add";
 import { dayIn, installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
-import { ACCOUNT_TYPES, CURRENCIES, moneyCents } from "./format";
+import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
@@ -714,61 +714,14 @@ export async function quickAddContext(): Promise<{
 
 /**
  * Carga rápida escribiendo: "350 almuerzo itau", "+2450 disco santander ayer".
- * Sin cuenta en el texto usa la del último movimiento cargado de esa moneda.
- * `picked`: cuenta o categoría elegidas a mano en la vista previa (categoryId null =
- * sin clasificar); lo que no se elige se detecta como siempre.
+ * La lógica está en `createQuickTransaction` (`quick-add.ts`), compartida con el bot de WhatsApp.
  */
 export async function quickAdd(
   text: string,
   picked?: { accountId?: string | null; categoryId?: string | null },
 ): Promise<ActionResult & { summary?: string }> {
   await exigirSesion();
-  const accounts = await prisma.account.findMany({ where: { archivedAt: null }, select: { id: true, name: true, currency: true } });
-  const p = parseQuick(String(text ?? "").slice(0, 200), accounts);
-  if (!p) return { ok: false, error: "Poné al menos un monto, por ejemplo: 350 almuerzo itau" };
-  const pickedAccount = picked?.accountId ? accounts.find((a) => a.id === String(picked.accountId)) : undefined;
-  if (picked?.accountId && !pickedAccount) return { ok: false, error: "Esa cuenta ya no está (¿la archivaste?)." };
-  let accountId = pickedAccount?.id ?? p.accountId;
-  if (!accountId) {
-    const last = await prisma.transaction.findFirst({
-      where: { account: { archivedAt: null, ...(p.currency ? { currency: p.currency } : {}) } },
-      orderBy: { createdAt: "desc" },
-      select: { accountId: true },
-    });
-    accountId = last?.accountId ?? accounts.find((a) => a.currency === (p.currency ?? "UYU"))?.id ?? accounts[0]?.id ?? null;
-  }
-  if (!accountId) return { ok: false, error: "Creá una cuenta primero." };
-  const acc = accounts.find((a) => a.id === accountId)!;
-  let categoryId: string | null = null;
-  if (picked && picked.categoryId !== undefined) {
-    if (picked.categoryId) {
-      const cat = await prisma.category.findUnique({ where: { id: String(picked.categoryId) } });
-      // Un ingreso con categoría de gasto es un reintegro; los ajustes no se eligen acá.
-      const ok = !!cat && !cat.isAdjustment && (cat.kind === p.kind || (p.kind === "income" && cat.kind === "expense"));
-      if (!ok) return { ok: false, error: "Esa categoría no va con este movimiento." };
-      categoryId = cat.id;
-    }
-  } else {
-    const classify = await getClassifier();
-    categoryId = p.title ? (classify(p.title, p.kind)?.categoryId ?? null) : null;
-  }
-  const date = addDays(todayISO(), -p.daysAgo);
-  const tx = await prisma.transaction.create({
-    data: {
-      kind: p.kind,
-      date: toDbDate(date),
-      title: p.title || null,
-      amount: centsToDecimalString(p.amountCents),
-      accountId,
-      categoryId,
-    },
-    include: { category: { select: { name: true } } },
-  });
-  refrescar();
-  await logActivity("created", "transaction", tx.id, `${p.kind === "income" ? "Ingreso" : "Gasto"} ${centsToDecimalString(p.amountCents)} ${acc.currency}${p.title ? ` · ${p.title}` : ""} (carga rápida)`);
-  const what = `${p.kind === "income" ? "Ingreso" : "Gasto"} de ${moneyCents(p.amountCents, acc.currency)} en ${acc.name}`;
-  const when = p.daysAgo ? (p.daysAgo === 1 ? " · ayer" : " · anteayer") : "";
-  return { ok: true, id: tx.id, summary: `${what} · ${tx.category ? tx.category.name : "sin clasificar"}${when}` };
+  return createQuickTransaction(text, picked);
 }
 
 // ─── Deudas ─────────────────────────────────────────────────────────────────

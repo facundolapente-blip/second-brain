@@ -16,6 +16,8 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/login" || pathname.startsWith("/api/auth")) return NextResponse.next();
   // Los cron de Vercel no tienen sesión: la ruta valida CRON_SECRET.
   if (pathname.startsWith("/api/cron/")) return NextResponse.next();
+  // El webhook de WhatsApp tampoco: la ruta valida la firma de Meta y el número de Facu.
+  if (pathname === "/api/whatsapp") return NextResponse.next();
   if (mailSinLogin()) return NextResponse.next();
 
   // Sin cookie ni se consulta la base; con cookie, se comprueba que la sesión exista y no haya vencido.

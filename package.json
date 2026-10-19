@@ -7,6 +7,7 @@
     "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "chequeo": "node scripts/chequeo-visual.mjs",
     "postinstall": "prisma generate"
   },
@@ -27,7 +28,8 @@
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
     "server-only": "^0.0.1",
-    "unpdf": "^1.8.1"
+    "unpdf": "^1.8.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -35,13 +37,15 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "fflate": "^0.8.3",
     "playwright-core": "^1.56.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.1.11"
   },
   "overrides": {
     "deepmerge-ts": "^8.0.2"
