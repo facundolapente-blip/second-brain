@@ -8,12 +8,14 @@ import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag } from "../plan-ui";
 import { tone } from "@/lib/palette";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
+import { TaskKanban } from "./task-kanban";
+import { PillSwitch } from "@/components/pill-switch";
 
 const LIMIT = 6;
 
@@ -62,6 +64,7 @@ export function TasksBoard({
   manualOrder = false,
   folded: foldedInitial = false,
   columns = {},
+  layout: initialLayout = "tabla",
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
@@ -72,6 +75,8 @@ export function TasksBoard({
   folded?: boolean;
   /** Anchos de columna guardados (tabla de la compu). */
   columns?: TaskColumnWidths;
+  /** Tabla (la de siempre) o Tablero (columnas por estado); se recuerda con una cookie. */
+  layout?: "tabla" | "tablero";
 }) {
   const [folded, setFolded] = useState(foldedInitial);
   function toggleFold() {
@@ -100,6 +105,13 @@ export function TasksBoard({
     setViewState(v);
   };
   const setAll = setAllState;
+  const [layout, setLayoutState] = useState(initialLayout);
+  function setLayout(v: "tabla" | "tablero") {
+    setSwapped(true);
+    setLayoutState(v);
+    document.cookie = `${TASKS_LAYOUT_COOKIE}=${v}; path=/; max-age=31536000; samesite=lax`;
+  }
+  const board = layout === "tablero";
   useEffect(() => {
     savedBoard.view = view;
     savedBoard.all = all;
@@ -189,7 +201,7 @@ export function TasksBoard({
         className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
       >
         {TASK_VIEWS.map((v) => {
-          const n = applyTaskView(ordered, v.id, manual).length;
+          const n = board ? boardTasks(ordered, v.id, today).length : applyTaskView(ordered, v.id, manual).length;
           const on = v.id === view;
           return (
             <button
@@ -210,10 +222,28 @@ export function TasksBoard({
             </button>
           );
         })}
+        <PillSwitch
+          label="Cómo ver las tareas"
+          className="ml-auto shrink-0"
+          value={layout}
+          onChange={setLayout}
+          options={[
+            { value: "tabla", label: "Tabla" },
+            { value: "tablero", label: "Tablero" },
+          ]}
+        />
       </div>
 
-      <div key={view} className={swapped ? "swap" : undefined}>
-      {visible.length === 0 ? (
+      <div key={`${view}-${layout}`} className={swapped ? "swap" : undefined}>
+      {board ? (
+        <TaskKanban
+          tasks={boardTasks(ordered, view, today)}
+          categories={categories}
+          today={today}
+          onOpen={(t) => sheet.current?.open(t)}
+          onNew={(status) => sheet.current?.open(undefined, { status })}
+        />
+      ) : visible.length === 0 ? (
         <div className="grid justify-items-start gap-3 border-y border-line py-6">
           <p className="text-[15px] text-muted">
             {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
@@ -244,7 +274,7 @@ export function TasksBoard({
           </ul>
         </>
       )}
-      {(hidden > 0 || (all && matching.length > LIMIT)) && (
+      {!board && (hidden > 0 || (all && matching.length > LIMIT)) && (
         <button
           type="button"
           onClick={() => setAll((a) => !a)}
@@ -476,8 +506,16 @@ function TaskTable({
                   <tr
                     key={t.id}
                     onContextMenu={(e) => onMenu(e, t)}
+                    // Toda la fila se arrastra a un día de la semana (Lista o Por horas) y ahí se crea el bloque.
+                    draggable={!done}
+                    onDragStart={(e) => {
+                      if (done) return;
+                      e.dataTransfer.setData(TASK_DRAG, t.id);
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
                     className={cx(
                       "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2",
+                      !done && "cursor-grab active:cursor-grabbing",
                       i % 2 === 1 && "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
                       fresh?.has(t.id) && "reveal",
                     )}
@@ -488,17 +526,10 @@ function TaskTable({
                     <td className={cx(CELL, "py-1 pr-3 pl-1.5")}>
                       <div className="flex items-center">
                         {!done && (
-                          // Arrastrar esta agarradera a un día de la semana agenda la tarea.
+                          // Pista de que la fila se arrastra a un día de la semana.
                           <span
-                            draggable
-                            role="button"
-                            tabIndex={-1}
-                            aria-label={`Arrastrar "${t.title}" a un día de la semana para agendarla`}
+                            aria-hidden
                             title="Arrastrala a un día de la semana para agendarla"
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData(TASK_DRAG, t.id);
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
                             className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
                           >
                             <CalendarPlus size={16} aria-hidden />

@@ -195,7 +195,159 @@ export type KeyResultDTO = {
 /** Opciones para vincular un resultado clave. */
 export type KrLinkOption = { value: string; label: string; group: "Hábitos" | "Cuentas" | "Metas de ahorro" };
 
-export type ObjectiveDTO = { id: string; title: string; year: number; keyResults: KeyResultDTO[] };
+export type ObjectiveDTO = {
+  id: string;
+  title: string;
+  year: number;
+  role: string | null;
+  area: string | null;
+  priority: number;
+  deadline: string | null;
+  status: KrStatus;
+  /** Meta propia ("1 de 4"); sin meta, el avance es el promedio de sus resultados clave. */
+  progress: number | null;
+  goal: number | null;
+  keyResults: KeyResultDTO[];
+};
+
+// ─── Objetivos: trimestres y avance ─────────────────────────────────────────
+
+export type Quarter = (typeof QUARTERS)[number];
+
+/** Trimestre de un día ("2026-10-19" → "Q4"). */
+export function quarterOf(iso: string): Quarter {
+  return QUARTERS[Math.floor((Number(iso.slice(5, 7)) - 1) / 3)];
+}
+
+/** Primer y último día de un trimestre. */
+export function quarterRange(year: number, q: Quarter): { from: string; to: string } {
+  const i = QUARTERS.indexOf(q);
+  const from = `${year}-${String(i * 3 + 1).padStart(2, "0")}-01`;
+  const to = addDays(i === 3 ? `${year + 1}-01-01` : `${year}-${String(i * 3 + 4).padStart(2, "0")}-01`, -1);
+  return { from, to };
+}
+
+/** El trimestre siguiente (después del Q4 viene el Q1 del año que sigue). */
+export function nextQuarter(year: number, q: Quarter): { year: number; quarter: Quarter } {
+  const i = QUARTERS.indexOf(q);
+  return i === 3 ? { year: year + 1, quarter: "Q1" } : { year, quarter: QUARTERS[i + 1] };
+}
+
+/**
+ * En qué trimestres va un resultado clave: los marcados; si no tiene, el de su
+ * deadline (Notion pone de deadline el primer día del trimestre siguiente, así
+ * que se mira el día anterior: "1 de julio" es del Q2). Sin nada, ninguno.
+ */
+export function krQuarters(k: Pick<KeyResultDTO, "quarters" | "deadline">): Quarter[] {
+  const marked = k.quarters.filter((q): q is Quarter => (QUARTERS as readonly string[]).includes(q));
+  if (marked.length) return marked;
+  return k.deadline ? [quarterOf(addDays(k.deadline, -1))] : [];
+}
+
+/** El resultado clave con el progreso que cuenta: si se mide solo (hábito, cuenta, meta), el del vínculo. */
+export function effectiveKr(k: KeyResultDTO): KeyResultDTO {
+  return k.auto ? { ...k, progress: k.auto.progress, goal: k.auto.goal ?? k.goal } : k;
+}
+
+/** Avance de un resultado clave: completado = 100; si no, progreso sobre meta. */
+export function krPct(k: KeyResultDTO): number | null {
+  const e = effectiveKr(k);
+  if (e.status === "done") return 100;
+  return progressPct(e.progress, e.goal);
+}
+
+/** Promedio de avance de una lista de resultados clave (null si ninguno tiene meta). */
+export function avgPct(krs: KeyResultDTO[]): number | null {
+  const ps = krs.map(krPct).filter((p): p is number => p !== null);
+  return ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null;
+}
+
+/** Avance de un objetivo: con meta propia, progreso / meta; si no, el promedio de sus resultados clave. */
+export function objectivePct(o: ObjectiveDTO): number | null {
+  if (o.status === "done") return 100;
+  if (o.goal) return progressPct(o.progress, o.goal);
+  return avgPct(o.keyResults);
+}
+
+export const isFinishedKr = (k: Pick<KeyResultDTO, "status">) => k.status === "done" || k.status === "closed";
+
+/**
+ * Qué trimestre toca revisar hoy: el que está por terminar (últimos 10 días) o el
+ * que terminó hace menos de 30. Null el resto del tiempo.
+ */
+export function reviewQuarter(today: string): { year: number; quarter: Quarter } | null {
+  const year = Number(today.slice(0, 4));
+  const q = quarterOf(today);
+  const { from, to } = quarterRange(year, q);
+  if (diffDays(to, today) < 10) return { year, quarter: q };
+  if (diffDays(today, from) < 30) {
+    const i = QUARTERS.indexOf(q);
+    return i === 0 ? { year: year - 1, quarter: "Q4" } : { year, quarter: QUARTERS[i - 1] };
+  }
+  return null;
+}
+
+/** El trimestre anterior al de hoy (para "Revisar Qn" fuera de la ventana). */
+export function previousQuarter(today: string): { year: number; quarter: Quarter } {
+  const year = Number(today.slice(0, 4));
+  const i = QUARTERS.indexOf(quarterOf(today));
+  return i === 0 ? { year: year - 1, quarter: "Q4" } : { year, quarter: QUARTERS[i - 1] };
+}
+
+export const OBJECTIVES_VIEW_COOKIE = "objetivos_vista";
+
+/** En el tablero de tareas, "Terminado" muestra lo de las últimas dos semanas (salvo en la vista Terminadas). */
+export const BOARD_DONE_DAYS = 14;
+
+/**
+ * Qué tareas entran al tablero en cada vista: el mismo filtro que la tabla pero
+ * sin mirar el estado (las columnas son los estados). Con deadline = todas las
+ * que tienen fecha, Prioridades = 3 y 4, Más chill = 1 y 2 (o sin prioridad).
+ */
+export function boardTasks(tasks: TaskDTO[], view: TaskView, today: string): TaskDTO[] {
+  const since = addDays(today, -BOARD_DONE_DAYS);
+  const recent = (t: TaskDTO) => t.status !== "done" || (t.doneAt ?? "").slice(0, 10) >= since;
+  const pick = (t: TaskDTO) => {
+    switch (view) {
+      case "deadline":
+        return !!t.deadline;
+      case "priority":
+        return t.priority >= 3;
+      case "chill":
+        return t.priority <= 2;
+      case "backlog":
+        return t.status === "backlog";
+      case "done":
+        return t.status === "done";
+      case "todo":
+        return t.status !== "done";
+    }
+  };
+  return tasks.filter((t) => pick(t) && (view === "done" || recent(t)));
+}
+/** AppSetting con el último trimestre revisado ("2026-Q3"): su tarjeta ya no aparece. */
+export const REVIEW_DISMISSED_KEY = "objetivos_revision_cerrada";
+
+/** Las tres preguntas de la revisión del trimestre (en la tarjeta y en la entrada del journal). */
+export function quarterReviewQuestions(unfinished: number, next: Quarter): string[] {
+  return [
+    "¿Qué te ayudó a terminar lo que terminaste?",
+    unfinished === 1
+      ? "¿Qué frenó el que quedó sin terminar?"
+      : unfinished
+        ? `¿Qué frenó los ${unfinished} que quedaron sin terminar?`
+        : "¿Qué hizo que esta vez saliera todo?",
+    `¿Qué vas a hacer distinto en el ${next}?`,
+  ];
+}
+
+export function quarterReviewTemplate(unfinished: number, next: Quarter): string {
+  return quarterReviewQuestions(unfinished, next)
+    .flatMap((q) => [q, "", ""])
+    .join("\n")
+    .trimEnd();
+}
+export const TASKS_LAYOUT_COOKIE = "tareas_vista";
 
 // ─── Fechas y horarios ──────────────────────────────────────────────────────
 

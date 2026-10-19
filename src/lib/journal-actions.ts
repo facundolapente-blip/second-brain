@@ -6,7 +6,7 @@ import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
-import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
+import { QUARTER_REVIEW_TAG, REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
 
 function refrescar() {
@@ -46,7 +46,7 @@ export async function writeOnDay(date?: string, nueva = false) {
   if (!nueva) {
     // La reflexión semanal no es "la entrada del día": "Escribir hoy" no la abre.
     const existing = await prisma.journalEntry.findFirst({
-      where: { date: toDbDate(day), NOT: { tags: { has: REVIEW_TAG } } },
+      where: { date: toDbDate(day), NOT: { tags: { hasSome: [REVIEW_TAG, QUARTER_REVIEW_TAG] } } },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
@@ -167,7 +167,7 @@ export async function shareToJournal(text: string): Promise<{ id: string }> {
   const day = todayISO();
   const clean = String(text ?? "").trim().slice(0, 5000);
   const existing = await prisma.journalEntry.findFirst({
-    where: { date: toDbDate(day), NOT: { tags: { has: REVIEW_TAG } } },
+    where: { date: toDbDate(day), NOT: { tags: { hasSome: [REVIEW_TAG, QUARTER_REVIEW_TAG] } } },
     orderBy: { createdAt: "asc" },
   });
   if (existing) {

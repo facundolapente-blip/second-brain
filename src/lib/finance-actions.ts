@@ -7,7 +7,7 @@ import { addDays, fromDbDate, isISODate, shiftMonth, todayISO, toDbDate } from "
 import { isFrequency, nextOnOrAfter } from "./schedule-logic";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { calibrarSaldos } from "./importers/gastos-saldos";
-import { FIXED_IGNORED, getClassifier, REPORT_RATE } from "./finance";
+import { FIXED_IGNORED, getClassifier, REPORT_RATE, RESERVE_GOAL_KEY } from "./finance";
 import { logActivity, trashAndDelete } from "./trash";
 import { createQuickTransaction } from "./quick-add";
 import { dayIn, installmentDate, splitInstallments } from "./card-logic";
@@ -903,6 +903,17 @@ export async function saveReportRate(rate: number): Promise<ActionResult> {
   const value = String(n);
   await prisma.appSetting.upsert({ where: { key: REPORT_RATE }, create: { key: REPORT_RATE, value }, update: { value } });
   revalidatePath("/gastos/informes");
+  return { ok: true };
+}
+
+/** Meta de meses de reserva (Cuentas → Meses de reserva). */
+export async function saveReserveGoal(months: number): Promise<ActionResult> {
+  await exigirSesion();
+  const n = Math.round(Number(months) * 10) / 10;
+  if (!Number.isFinite(n) || n <= 0 || n > 120) return { ok: false, error: "Escribí una meta entre 1 y 120 meses." };
+  const value = String(n);
+  await prisma.appSetting.upsert({ where: { key: RESERVE_GOAL_KEY }, create: { key: RESERVE_GOAL_KEY, value }, update: { value } });
+  revalidatePath("/gastos/cuentas");
   return { ok: true };
 }
 

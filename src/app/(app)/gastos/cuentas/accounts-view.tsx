@@ -21,6 +21,7 @@ import { BalanceAdjuster } from "./balance-adjuster";
 import { CardPanel } from "./card-panel";
 import type { CardSummary } from "@/lib/card-logic";
 import { NetWorth } from "./net-worth";
+import { ReserveCard, type ReserveData } from "./reserve-card";
 import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
 
 type Draft = {
@@ -46,12 +47,14 @@ export function AccountsView({
   today,
   openNew,
   netWorth,
+  reserve,
 }: {
   accounts: AccountDTO[];
   cards: CardSummary[];
   today: string;
   openNew: boolean;
   netWorth: { series: { month: string; cents: number }[]; business: { month: string; cents: number }[] | null; usdRate: number | null };
+  reserve: ReserveData;
 }) {
   const router = useRouter();
   const { setSelection } = useSelection(accounts);
@@ -147,8 +150,9 @@ export function AccountsView({
 
       <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         {active.length > 0 && (
-          <div className="pt-2 lg:pt-6">
+          <div className="grid gap-4 pt-2 lg:pt-6">
             <NetWorth series={netWorth.series} usdRate={netWorth.usdRate} title={netWorth.business ? "Patrimonio personal, en pesos" : undefined} />
+            <ReserveCard data={reserve} />
             {netWorth.business && (
               <NetWorth
                 series={netWorth.business}

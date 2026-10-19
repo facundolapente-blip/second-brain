@@ -21,6 +21,7 @@ import {
   Medal,
   NotePencil,
   Notebook,
+  PiggyBank,
   Wallet,
   WarningCircle,
   type Icon,
@@ -30,7 +31,7 @@ import { addDays, formatLong, formatMonth, formatShort, shiftMonth, weekday } fr
 import { greeting } from "@/lib/journal-logic";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
-import { money, moneyCents, shortNumber } from "@/lib/format";
+import { dec1, money, moneyCents, shortNumber } from "@/lib/format";
 import { daysLeftLabel, isFreeBlock, timeRange } from "@/lib/plan-logic";
 import { setBlockDone } from "@/lib/offline/plan";
 import { writeOnDay } from "@/lib/offline/journal";
@@ -61,7 +62,10 @@ function pct(a: number, b: number) {
   return b === 0 ? 0 : Math.round((a / b) * 100);
 }
 
-export function InicioView({ d, notes }: { d: Dashboard; notes: ValueNote[] }) {
+/** Meses de reserva (`getReserve`): saldo personal en pesos / gasto promedio de 3 meses. */
+export type ReserveSummary = { months: number | null; prevMonths: number | null };
+
+export function InicioView({ d, notes, reserve }: { d: Dashboard; notes: ValueNote[]; reserve: ReserveSummary }) {
   const prevName = formatMonth(shiftMonth(d.gastos.month, -1)).split(" ")[0];
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
 
@@ -94,7 +98,7 @@ export function InicioView({ d, notes }: { d: Dashboard; notes: ValueNote[] }) {
           <p className="hero-sub max-w-2xl text-[15px] leading-relaxed lg:text-[17px]">
             <Summary d={d} />
           </p>
-          <div className="mt-5 grid grid-cols-2 gap-2.5 lg:mt-7 lg:grid-cols-4 lg:gap-3">
+          <div className="mt-5 grid grid-cols-2 gap-2.5 lg:mt-7 lg:grid-cols-5 lg:gap-3">
             <Kpi
               href="/habitos"
               icon={Medal}
@@ -130,6 +134,15 @@ export function InicioView({ d, notes }: { d: Dashboard; notes: ValueNote[] }) {
               label="Plan de la semana"
               value={d.plan.weekTotal ? `${d.plan.weekDone} de ${d.plan.weekTotal}` : "–"}
               sub={d.plan.weekTotal ? `${pct(d.plan.weekDone, d.plan.weekTotal)}% de los bloques hechos` : "Sin bloques esta semana"}
+            />
+            <Kpi
+              href="/gastos/cuentas#reserva"
+              icon={PiggyBank}
+              color="var(--c-gastos)"
+              label="Reserva"
+              className="max-lg:col-span-2"
+              value={reserve.months === null ? "–" : `${dec1(reserve.months)} ${reserve.months === 1 ? "mes" : "meses"}`}
+              sub={reserveSub(reserve, prevName)}
             />
           </div>
         </section>
@@ -202,6 +215,15 @@ function Summary({ d }: { d: Dashboard }) {
   );
 }
 
+/** "sube 0,3 desde setiembre": contra el cierre del mes pasado. */
+function reserveSub(r: ReserveSummary, prevName: string): string {
+  if (r.months === null) return "Faltan gastos de los últimos 3 meses";
+  if (r.prevMonths === null) return "Lo que durarían tus ahorros sin ingresos";
+  const diff = Math.round((r.months - r.prevMonths) * 10) / 10;
+  if (diff === 0) return `Igual que a fin de ${prevName}`;
+  return `${diff > 0 ? "Sube" : "Baja"} ${dec1(Math.abs(diff))} desde ${prevName}`;
+}
+
 function Kpi({
   href,
   icon: Ico,
@@ -209,6 +231,7 @@ function Kpi({
   label,
   value,
   sub,
+  className,
 }: {
   href: string;
   icon: Icon;
@@ -216,11 +239,12 @@ function Kpi({
   label: string;
   value: string;
   sub: string;
+  className?: string;
 }) {
   return (
     <Link
       href={href}
-      className="group grid content-start gap-2 rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10 transition-[background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/15 active:scale-[0.98] lg:p-4"
+      className={cx("group grid content-start gap-2 rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10 transition-[background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/15 active:scale-[0.98] lg:p-4", className)}
     >
       <span className="flex items-center gap-2 text-[12px] font-medium opacity-85">
         <span className="inline-flex size-6 items-center justify-center rounded-full bg-white/90" style={{ color }}>

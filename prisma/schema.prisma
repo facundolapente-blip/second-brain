@@ -617,6 +617,18 @@ model PlanObjective {
   title      String
   year       Int             @default(2026)
   order      Int             @default(0)
+  /// Rol de Notion (Estudiante, Pareja, Deportista...): quién quiere ser con este objetivo.
+  role       String?
+  /// Categoría de Notion (ORT, Salud, Música...).
+  area       String?
+  /// 0 a 4, como las tareas (Notion: 🔥🔥 = 2, 🔥🔥🔥 = 3).
+  priority   Int             @default(0)
+  deadline   DateTime?       @db.Date
+  /// todo | doing | done | closed (los mismos de los resultados clave).
+  status     String          @default("doing")
+  /// Meta propia ("1 de 4"): si tiene meta, su avance es progreso / meta; si no, el promedio de sus resultados clave.
+  progress   Float?
+  goal       Float?
   keyResults PlanKeyResult[]
 
   @@unique([title, year])

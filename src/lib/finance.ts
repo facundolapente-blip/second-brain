@@ -750,6 +750,69 @@ function netWorthOf(
   });
 }
 
+// ─── Meses de reserva ───────────────────────────────────────────────────────
+
+export const RESERVE_GOAL_KEY = "reserva_meta";
+
+/**
+ * Cuántos meses podrías vivir sin ingresos: el saldo personal en pesos (todas las
+ * cuentas personales, los dólares a la cotización de hoy) dividido por lo que se
+ * gasta por mes (promedio de los últimos 3 meses completos, en pesos, sin cuentas
+ * de trabajo, transferencias ni ajustes; los reintegros restan). La serie de 12
+ * meses hace la misma cuenta en cada cierre (con los 3 meses que terminan ahí).
+ */
+export const getReserve = cache(async function getReserve() {
+  const today = todayISO();
+  const month = today.slice(0, 7);
+  const first = shiftMonth(month, -14);
+  const [series, rows, rates, goalRow] = await Promise.all([
+    getNetWorthSeries(12),
+    prisma.transaction.findMany({
+      where: {
+        kind: { in: ["expense", "income"] },
+        date: { gte: toDbDate(monthBounds(first).from), lt: toDbDate(monthBounds(month).from) },
+        ...PERSONAL,
+        ...NOT_ADJUSTMENT,
+      },
+      select: { date: true, kind: true, amount: true, account: { select: { currency: true } }, category: { select: { kind: true } } },
+    }),
+    getRates(),
+    prisma.appSetting.findUnique({ where: { key: RESERVE_GOAL_KEY } }),
+  ]);
+  // Gasto por mes en pesos (un ingreso con categoría de gasto es un reintegro: resta).
+  const spent: Record<string, number> = {};
+  for (const r of rows) {
+    const refund = r.kind === "income" && r.category?.kind === "expense";
+    if (r.kind === "income" && !refund) continue;
+    const m = fromDbDate(r.date).slice(0, 7);
+    const c = toUyu(toCents(r.amount), r.account.currency, rates);
+    spent[m] = (spent[m] ?? 0) + (refund ? -c : c);
+  }
+  /** Promedio de los 3 meses completos que terminan en `last` (null si no hubo gastos). */
+  const avgSpend = (last: string) => {
+    const ms = [0, 1, 2].map((i) => shiftMonth(last, -i));
+    const total = ms.reduce((n, m) => n + Math.max(0, spent[m] ?? 0), 0);
+    return total > 0 ? Math.round(total / 3) : null;
+  };
+  const points = series.personal.map((p) => {
+    // En el mes en curso (incompleto) se usan los 3 anteriores.
+    const spend = avgSpend(p.month === month ? shiftMonth(month, -1) : p.month);
+    return { month: p.month, months: spend ? Math.round((p.cents / spend) * 10) / 10 : null };
+  });
+  const balanceCents = series.personal.at(-1)?.cents ?? 0;
+  const spendCents = avgSpend(shiftMonth(month, -1));
+  const goal = Number(goalRow?.value);
+  return {
+    balanceCents,
+    spendCents,
+    months: spendCents ? Math.round((balanceCents / spendCents) * 10) / 10 : null,
+    /** El del cierre del mes pasado, para "sube 0,3 desde setiembre". */
+    prevMonths: points.at(-2)?.months ?? null,
+    goal: Number.isFinite(goal) && goal > 0 ? goal : 6,
+    series: points,
+  };
+});
+
 // ─── Historial ──────────────────────────────────────────────────────────────
 
 export type HistoryFilters = {

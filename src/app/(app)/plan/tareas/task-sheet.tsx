@@ -12,7 +12,7 @@ import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, IconButton, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { PriorityPicker } from "../plan-ui";
 
-export type TaskSheetHandle = { open: (task?: TaskDTO) => void };
+export type TaskSheetHandle = { open: (task?: TaskDTO, preset?: { status?: TaskStatus }) => void };
 
 /** Hoja para crear o editar una tarea. "Agendar" la lleva a la semana como bloque. */
 export const TaskSheet = forwardRef<
@@ -21,12 +21,14 @@ export const TaskSheet = forwardRef<
 >(function TaskSheet({ categories, onSchedule }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [task, setTask] = useState<TaskDTO | undefined>();
+  const [presetStatus, setPresetStatus] = useState<TaskStatus | undefined>();
   const [key, setKey] = useState(0);
   // Cerrar la hoja (afuera, X, Escape, arrastrar) guarda lo cambiado: lo registra el formulario.
   const dismiss = useRef<(() => void) | null>(null);
   useImperativeHandle(ref, () => ({
-    open(t) {
+    open(t, preset) {
       setTask(t);
+      setPresetStatus(preset?.status);
       setKey((k) => k + 1);
       sheet.current?.open();
     },
@@ -36,6 +38,7 @@ export const TaskSheet = forwardRef<
       <TaskForm
         key={key}
         task={task}
+        initialStatus={presetStatus}
         registerDismiss={(fn) => {
           dismiss.current = fn;
         }}
@@ -56,8 +59,11 @@ function TaskForm({
   onDone,
   onSchedule,
   registerDismiss,
+  initialStatus,
 }: {
   task?: TaskDTO;
+  /** Estado con el que arranca una tarea nueva (el "+" de una columna del tablero). */
+  initialStatus?: TaskStatus;
   categories: CategoryDTO[];
   onDone: () => void;
   onSchedule: (t: TaskDTO) => void;
@@ -67,7 +73,7 @@ function TaskForm({
   const { form, onDismiss } = useSaveOnDismiss(state);
   useEffect(() => registerDismiss(onDismiss));
   const [categoryId, setCategoryId] = useState(task?.categoryId ?? "");
-  const [status, setStatus] = useState<TaskStatus>(task?.status ?? "todo");
+  const [status, setStatus] = useState<TaskStatus>(task?.status ?? initialStatus ?? "todo");
   const [priority, setPriority] = useState(task?.priority ?? 1);
   const [deleting, startDelete] = useSafeTransition();
   const notify = useEffectEvent(onDone);

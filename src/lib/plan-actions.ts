@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { QUARTER_REVIEW_TAG } from "./review-logic";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, normalizeTime, QUARTERS, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch } from "./plan-logic";
+import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -712,19 +714,34 @@ function linkOf(raw: string): { linkType: string | null; linkId: string | null }
 
 // ─── Objetivos por año ──────────────────────────────────────────────────────
 
-/** Crea o renombra un objetivo. */
+/** Crea o edita un objetivo (nombre, rol, categoría, prioridad, deadline, estado y meta propia). */
 export async function saveObjective(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await exigirSesion();
   const id = texto(fd, "id", 40) || null;
   const title = texto(fd, "title", 120);
   if (!title) return { ok: false, error: "Ponele un nombre." };
   const year = entero(fd, "year", 2000, 2100) ?? Number(todayISO().slice(0, 4));
+  const statusRaw = texto(fd, "status") as KrStatus;
+  const deadline = fecha(fd, "deadline");
+  const goal = decimal(fd, "goal");
+  // Solo los campos que vienen en el formulario (renombrar desde otro lado no borra el resto).
+  const extra = fd.has("role")
+    ? {
+        role: texto(fd, "role", 60) || null,
+        area: texto(fd, "area", 60) || null,
+        priority: entero(fd, "priority", 0, 4) ?? 0,
+        deadline: deadline ? toDbDate(deadline) : null,
+        status: KR_STATUSES.includes(statusRaw) ? statusRaw : "doing",
+        goal,
+        progress: goal ? (decimal(fd, "progress") ?? 0) : null,
+      }
+    : {};
   try {
     if (id) {
-      await prisma.planObjective.update({ where: { id }, data: { title } });
+      await prisma.planObjective.update({ where: { id }, data: { title, ...extra } });
       await logActivity("updated", "objective", id, title);
     } else {
-      const o = await prisma.planObjective.create({ data: { title, year, order: await prisma.planObjective.count({ where: { year } }) } });
+      const o = await prisma.planObjective.create({ data: { title, year, ...extra, order: await prisma.planObjective.count({ where: { year } }) } });
       await logActivity("created", "objective", o.id, `${title} (${year})`);
     }
   } catch (e) {
@@ -733,6 +750,105 @@ export async function saveObjective(_prev: ActionResult | null, fd: FormData): P
   }
   refrescar();
   return { ok: true };
+}
+
+/** −1 / +1 a la meta propia de un objetivo ("1 de 4"). */
+export async function bumpObjective(id: string, delta: 1 | -1) {
+  await exigirSesion();
+  const o = await prisma.planObjective.findUnique({ where: { id }, select: { progress: true, goal: true, status: true } });
+  if (!o?.goal) return;
+  const progress = Math.max(0, Math.min(o.goal, (o.progress ?? 0) + (delta > 0 ? 1 : -1)));
+  // Llegar a la meta lo termina; bajar de la meta lo vuelve a "en curso".
+  const status = progress >= o.goal ? "done" : o.status === "done" ? "doing" : o.status;
+  await prisma.planObjective.update({ where: { id }, data: { progress, status } });
+  refrescar();
+}
+
+/**
+ * "Llevar al Qn": copia los resultados clave elegidos al trimestre siguiente, sin
+ * empezar y con el progreso en 0 (como en Notion, cada trimestre es su propia fila).
+ * El del trimestre que terminó queda como está. Del Q4 pasa al Q1 del año que sigue
+ * (con su objetivo, que se copia si hace falta). Correrlo dos veces no duplica.
+ */
+export async function carryOverKrs(input: { krIds: string[]; year: number; quarter: string }): Promise<ActionResult & { count?: number }> {
+  await exigirSesion();
+  const quarter = QUARTERS.find((q) => q === input?.quarter);
+  const year = Math.round(Number(input?.year));
+  if (!quarter || !Number.isInteger(year) || year < 2000 || year > 2100) return { ok: false, error: "Trimestre inválido." };
+  const ids = (Array.isArray(input.krIds) ? input.krIds : []).map(String).slice(0, 200);
+  const krs = await prisma.planKeyResult.findMany({ where: { id: { in: ids } }, include: { objective: true }, orderBy: { createdAt: "asc" } });
+  // Deadline: el último día del trimestre nuevo.
+  const end = quarterRange(year, quarter).to;
+  let count = 0;
+  for (const k of krs) {
+    let objectiveId = k.objectiveId;
+    if (k.objective && k.objective.year !== year) {
+      const o = k.objective;
+      const copy = await prisma.planObjective.upsert({
+        where: { title_year: { title: o.title, year } },
+        create: { title: o.title, year, role: o.role, area: o.area, priority: o.priority, goal: o.goal, progress: o.goal ? 0 : null, order: o.order },
+        update: {},
+      });
+      objectiveId = copy.id;
+    }
+    const exists = await prisma.planKeyResult.findFirst({
+      where: { title: k.title, objectiveId, year, quarters: { has: quarter } },
+      select: { id: true },
+    });
+    if (exists) continue;
+    await prisma.planKeyResult.create({
+      data: {
+        title: k.title,
+        objectiveId,
+        kind: k.kind,
+        status: "todo",
+        quarters: [quarter],
+        deadline: toDbDate(end),
+        progress: k.goal !== null ? 0 : null,
+        goal: k.goal,
+        linkType: k.linkType,
+        linkId: k.linkId,
+        year,
+      },
+    });
+    count++;
+  }
+  if (count) await logActivity("created", "keyResult", null, `${count} resultados clave llevados al ${quarter} ${year}`);
+  refrescar();
+  return { ok: true, count };
+}
+
+/** "Ya lo revisé": la tarjeta de revisión de ese trimestre no vuelve a aparecer. */
+export async function dismissQuarterReview(key: string) {
+  await exigirSesion();
+  if (!/^\d{4}-Q[1-4]$/.test(key)) return;
+  await prisma.appSetting.upsert({ where: { key: REVIEW_DISMISSED_KEY }, create: { key: REVIEW_DISMISSED_KEY, value: key }, update: { value: key } });
+  refrescar();
+}
+
+/**
+ * Abre la reflexión del trimestre (entrada con la etiqueta `revision-trimestral`
+ * y el trimestre en el título) o la crea con las preguntas.
+ */
+export async function writeQuarterReview(year: number, quarter: string, unfinished: number) {
+  await exigirSesion();
+  const q = QUARTERS.find((x) => x === quarter);
+  if (!q || !Number.isInteger(year) || year < 2000 || year > 2100) throw new Error("Trimestre inválido");
+  const title = `Revisión del ${q} ${year}`;
+  const existing = await prisma.journalEntry.findFirst({
+    where: { tags: { has: QUARTER_REVIEW_TAG }, title },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing) redirect(`/journal/${existing.id}`);
+  const next = nextQuarter(year, q).quarter;
+  const created = await prisma.journalEntry.create({
+    data: { date: toDbDate(todayISO()), title, body: quarterReviewTemplate(Math.max(0, Math.round(Number(unfinished) || 0)), next), tags: [QUARTER_REVIEW_TAG] },
+    select: { id: true },
+  });
+  await logActivity("created", "journal", created.id, title);
+  revalidatePath("/journal", "layout");
+  redirect(`/journal/${created.id}`);
 }
 
 /** Borra un objetivo con sus resultados clave (va a la papelera, se puede restaurar). */
