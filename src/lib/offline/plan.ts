@@ -1,7 +1,7 @@
 "use client";
 
 // Las acciones de plan-actions.ts envueltas para funcionar sin conexión (ver offline/queue.ts).
-import { saveBlock as _saveBlock, setBlockDone as _setBlockDone, renameBlock as _renameBlock, duplicateBlock as _duplicateBlock, deleteBlock as _deleteBlock, passToNextWeek as _passToNextWeek, passWeek as _passWeek, copyWeekToNext as _copyWeekToNext, saveTask as _saveTask, setTaskStatus as _setTaskStatus, bumpTaskProgress as _bumpTaskProgress, saveTaskColumns as _saveTaskColumns, setTaskScheduled as _setTaskScheduled, reorderTasks as _reorderTasks, renameTask as _renameTask, duplicateTask as _duplicateTask, deleteTask as _deleteTask, saveKeyResult as _saveKeyResult, deleteKeyResult as _deleteKeyResult, saveCategory as _saveCategory, rescheduleBlock as _rescheduleBlock, moveBlock as _moveBlock, addSubtask as _addSubtask, toggleSubtask as _toggleSubtask, deleteSubtask as _deleteSubtask, saveObjective as _saveObjective, deleteObjective as _deleteObjective, copyToYear as _copyToYear, scheduleTask as _scheduleTask, bumpObjective as _bumpObjective, carryOverKrs as _carryOverKrs, dismissQuarterReview as _dismissQuarterReview } from "../plan-actions";
+import { saveBlock as _saveBlock, setBlockDone as _setBlockDone, renameBlock as _renameBlock, duplicateBlock as _duplicateBlock, deleteBlock as _deleteBlock, passToNextWeek as _passToNextWeek, passWeek as _passWeek, copyWeekToNext as _copyWeekToNext, saveTask as _saveTask, setTaskStatus as _setTaskStatus, bumpTaskProgress as _bumpTaskProgress, saveTaskColumns as _saveTaskColumns, setTaskScheduled as _setTaskScheduled, reorderTasks as _reorderTasks, renameTask as _renameTask, duplicateTask as _duplicateTask, deleteTask as _deleteTask, saveKeyResult as _saveKeyResult, deleteKeyResult as _deleteKeyResult, saveCategory as _saveCategory, rescheduleBlock as _rescheduleBlock, moveBlock as _moveBlock, addSubtask as _addSubtask, toggleSubtask as _toggleSubtask, deleteSubtask as _deleteSubtask, saveObjective as _saveObjective, deleteObjective as _deleteObjective, copyToYear as _copyToYear, scheduleTask as _scheduleTask, bumpObjective as _bumpObjective, carryOverKrs as _carryOverKrs, dismissQuarterReview as _dismissQuarterReview, setTaskDeadline as _setTaskDeadline } from "../plan-actions";
 import { queueable } from "./queue";
 export type { ActionResult } from "../plan-actions";
 
@@ -18,6 +18,7 @@ export const setTaskStatus = queueable("plan.setTaskStatus", _setTaskStatus, { o
 export const bumpTaskProgress = queueable("plan.bumpTaskProgress", _bumpTaskProgress, { once: true });
 export const saveTaskColumns = queueable("plan.saveTaskColumns", _saveTaskColumns, { key: () => "columnas" });
 export const setTaskScheduled = queueable("plan.setTaskScheduled", _setTaskScheduled, { key: (id) => id });
+export const setTaskDeadline = queueable("plan.setTaskDeadline", _setTaskDeadline, { key: (id) => `deadline-${id}` });
 export const reorderTasks = queueable("plan.reorderTasks", _reorderTasks, { key: () => "orden" });
 export const renameTask = queueable("plan.renameTask", _renameTask, { key: (id) => id });
 export const duplicateTask = queueable("plan.duplicateTask", _duplicateTask, { once: true });

@@ -4,9 +4,9 @@ import { useNewIds, useTick } from "@/components/motion";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
-import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
+import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
+import { saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
 import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
@@ -54,6 +54,51 @@ function groupsOf(visible: TaskDTO[], matching: TaskDTO[]) {
  * Notion): vistas guardadas, tabla en la computadora y lista en el celular.
  * Muestra las primeras 6 y el resto con "Ver todas".
  */
+/** Cambiar el deadline desde la fila (lo da `TasksBoard`, que lo muestra enseguida). */
+const DeadlineContext = createContext<(t: TaskDTO, deadline: string | null) => void>(() => {});
+
+/**
+ * Tocar la fecha abre el selector de fecha del aparato y guarda al elegir (en la
+ * compu con `showPicker`; en el celular el campo invisible queda encima y el toque
+ * lo abre directo). "Borrar" en el selector deja la tarea sin fecha.
+ */
+function DeadlinePicker({ task, children, className }: { task: TaskDTO; children: React.ReactNode; className?: string }) {
+  const change = useContext(DeadlineContext);
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <span className={cx("relative inline-flex shrink-0", className)}>
+      <button
+        type="button"
+        draggable={false}
+        onClick={() => {
+          const el = input.current;
+          if (!el) return;
+          try {
+            el.showPicker();
+          } catch {
+            el.focus();
+            el.click();
+          }
+        }}
+        aria-label={task.deadline ? `Cambiar el deadline de ${task.title} (${formatShort(task.deadline)})` : `Ponerle deadline a ${task.title}`}
+        title="Cambiar la fecha"
+        className="press rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+      >
+        {children}
+      </button>
+      <input
+        ref={input}
+        type="date"
+        tabIndex={-1}
+        aria-hidden
+        value={task.deadline ?? ""}
+        onChange={(e) => change(task, e.target.value || null)}
+        className="pointer-events-none absolute inset-0 h-full w-full cursor-pointer opacity-0 pointer-coarse:pointer-events-auto"
+      />
+    </span>
+  );
+}
+
 /** Vista y "Ver todas" del tablero: viven mientras la app está abierta (cambiar de semana no los pierde). */
 const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths } = { view: "deadline", all: false };
 
@@ -121,7 +166,19 @@ export function TasksBoard({
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
   const manual = manualOrder;
-  const ordered = tasks;
+  // El deadline cambiado desde la fila se ve enseguida (si falla, vuelve solo).
+  const [optimisticTasks, setOptimisticDeadline] = useOptimistic(tasks, (list: TaskDTO[], m: { id: string; deadline: string | null }) =>
+    list.map((t) => (t.id === m.id ? { ...t, deadline: m.deadline } : t)),
+  );
+  const [, startDeadline] = useSafeTransition();
+  const changeDeadline = (t: TaskDTO, deadline: string | null) => {
+    if (deadline === t.deadline) return;
+    startDeadline(async () => {
+      setOptimisticDeadline({ id: t.id, deadline });
+      await setTaskDeadline(t.id, deadline);
+    });
+  };
+  const ordered = optimisticTasks;
   const matching = arrange(applyTaskView(ordered, view, manual), view);
   const visible = all ? matching : matching.slice(0, LIMIT);
   const groups = groupsOf(visible, matching);
@@ -164,6 +221,7 @@ export function TasksBoard({
     });
 
   return (
+    <DeadlineContext value={changeDeadline}>
     <section id="tareas" aria-label="Tareas" className="scroll-mt-24 pt-3 lg:pt-5">
       <div className="flex items-center gap-2">
         {/* En el celular el título pliega la lista (queda una línea con el resumen). */}
@@ -294,6 +352,7 @@ export function TasksBoard({
         tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))}
       />
     </section>
+    </DeadlineContext>
   );
 }
 
@@ -315,8 +374,11 @@ function TaskRow({
   const done = t.status === "done";
   return (
     <li className={cx("border-b border-line", fresh && "reveal")}>
-      <button type="button" onClick={onOpen} className="press flex w-full items-start gap-3 px-1 py-3 text-left">
-        <DateBlock deadline={t.deadline} left={left} done={done} />
+      <div className="flex items-start gap-3 px-1 py-3">
+        <DeadlinePicker task={t}>
+          <DateBlock deadline={t.deadline} left={left} done={done} />
+        </DeadlinePicker>
+      <button type="button" onClick={onOpen} className="press flex min-w-0 flex-1 items-start text-left">
         <span className="grid min-w-0 flex-1 gap-1">
           <span className={cx("text-[15.5px] leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
           <TaskMeta t={t} done={done} />
@@ -327,6 +389,7 @@ function TaskRow({
           </span>
         </span>
       </button>
+      </div>
       {t.subtasks.length > 0 && (
         <div className="flex items-center gap-2 pr-1 pb-3 pl-[3.75rem]">
           <Steps task={t} />
@@ -517,7 +580,9 @@ function TaskTable({
                     )}
                   >
                     <td className={cx(CELL, "px-3 py-1.5")}>
-                      <DateBlock deadline={t.deadline} left={left} done={done} />
+                      <DeadlinePicker task={t}>
+                        <DateBlock deadline={t.deadline} left={left} done={done} />
+                      </DeadlinePicker>
                     </td>
                     <td className={cx(CELL, "py-1 pr-3 pl-1.5")}>
                       <div className="flex items-center">
@@ -551,7 +616,11 @@ function TaskTable({
                       <PriorityTag n={t.priority} />
                     </td>
                     <td className={cx(CELL, "px-3")}>
-                      {done || left === null ? <span className="text-faint" aria-label="Sin deadline">–</span> : <DueLabel left={left} done={done} />}
+                      <DeadlinePicker task={t} className="-mx-1.5">
+                        <span className="inline-flex min-h-9 items-center rounded-md px-1.5 hover:bg-surface-2">
+                          {done || left === null ? <span className="text-faint" aria-label="Sin deadline">–</span> : <DueLabel left={left} done={done} />}
+                        </span>
+                      </DeadlinePicker>
                     </td>
                     <td className={cx(CELL, "px-3")}>
                       {t.subtasks.length > 0 ? (

@@ -413,6 +413,18 @@ export async function setTaskScheduled(id: string, scheduled: boolean) {
   refrescar();
 }
 
+/** Cambia el deadline de una tarea desde la tabla, el tablero o la lista (null = sin fecha). */
+export async function setTaskDeadline(id: string, deadline: string | null): Promise<ActionResult> {
+  await exigirSesion();
+  if (deadline !== null && !isISODate(deadline)) return { ok: false, error: "Fecha inválida." };
+  const t = await prisma.planTask.findUnique({ where: { id: String(id) }, select: { title: true } });
+  if (!t) return { ok: false, error: "La tarea ya no existe." };
+  await prisma.planTask.update({ where: { id: String(id) }, data: { deadline: deadline ? toDbDate(deadline) : null } });
+  await logActivity("updated", "task", String(id), `${t.title}: ${deadline ? `vence ${deadline}` : "sin fecha"}`);
+  refrescar();
+  return { ok: true };
+}
+
 /** Orden arrastrado: recibe todas las tareas en el orden nuevo. Desde ahí las vistas lo usan. */
 export async function reorderTasks(ids: string[]) {
   await exigirSesion();
