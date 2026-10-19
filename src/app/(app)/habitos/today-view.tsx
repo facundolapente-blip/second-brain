@@ -1,6 +1,6 @@
 "use client";
 
-import { useSlide } from "@/components/motion";
+import { useKeepHeight, useSlide } from "@/components/motion";
 import { useOnNew } from "@/components/nav-add";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "@phosphor-icons/react";
@@ -50,6 +50,8 @@ export function TodayView({
   const visible = sorted.filter((h) => sticky.has(h.id));
   // Otro día en la tira: la lista entra desde ese lado (al cargar, nada).
   const daySlide = useSlide(selected);
+  // Un día con menos hábitos no achica la página (ver useKeepHeight).
+  const [keepRef, keepStyle, keepHeight] = useKeepHeight<HTMLDivElement>();
 
 
   return (
@@ -68,9 +70,17 @@ export function TodayView({
 
       <main className="mx-auto max-w-3xl lg:grid lg:max-w-6xl lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_340px] lg:px-10 lg:pt-6">
         <section className="min-w-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]">
-        <DateStrip days={days} selected={selected} today={today} onSelect={setSelected} />
+        <DateStrip
+          days={days}
+          selected={selected}
+          today={today}
+          onSelect={(d) => {
+            keepHeight();
+            setSelected(d);
+          }}
+        />
 
-        <div key={selected} className={cx("px-4 lg:px-6", daySlide)}>
+        <div key={selected} ref={keepRef} style={keepStyle} className={cx("px-4 lg:px-6", daySlide)}>
           {habits.length === 0 ? (
             <EmptyState onCreate={() => form.current?.create()} />
           ) : visible.length === 0 ? (

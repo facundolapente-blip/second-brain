@@ -8,7 +8,7 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState, useMemo } from "react";
-import { leaveThen, useNewIds, useTick } from "@/components/motion";
+import { leaveThen, useKeepHeight, useNewIds, useTick } from "@/components/motion";
 import { PillSwitch } from "@/components/pill-switch";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
@@ -75,8 +75,11 @@ export function WeekView({
   }, []);
   // Elegir otro día en la tira del celular: la lista entra desde ese lado.
   const [daySlide, setDaySlide] = useState("");
+  // Un día con menos bloques no achica la página (ver useKeepHeight).
+  const [keepRef, keepStyle, keepHeight] = useKeepHeight<HTMLDivElement>();
   const pickDay = (d: string) => {
     if (d === selected) return;
+    keepHeight();
     setDaySlide(d > selected ? "plan-slide-next" : "plan-slide-prev");
     setSelected(d);
   };
@@ -388,7 +391,7 @@ export function WeekView({
           <div className="mb-3 flex justify-end">
             <ViewToggle view={view} onChange={setView} />
           </div>
-          <div key={`${view}-${selected}`} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
+          <div key={`${view}-${selected}`} ref={keepRef} style={keepStyle} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
           {view === "lista" ? (
             <DayList
               day={selected}

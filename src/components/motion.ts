@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 /**
  * Ids que aparecieron desde el render anterior (el primero no cuenta: al cargar
@@ -87,4 +87,22 @@ export function useTick(value: number | string): { key: string; className?: stri
     return { key: String(next.n), className: next.cls };
   }
   return { key: String(st.n), className: st.cls };
+}
+
+/**
+ * Al cambiar de día con una tira (Hábitos, Plan en el celular), la lista no se achica:
+ * guarda el alto que tenía antes de cambiar y lo usa de mínimo. Si la página se
+ * achicaba hasta no poder bajarse, Chrome en Android volvía a mostrar su barra de
+ * direcciones sin reacomodar la pantalla y la barra de abajo de la app quedaba cortada.
+ * Uso: `const [keepRef, keepStyle, keepHeight] = useKeepHeight<HTMLDivElement>();` →
+ * `keepHeight()` antes de cambiar, y `<div ref={keepRef} style={keepStyle}>`.
+ */
+export function useKeepHeight<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [minHeight, setMinHeight] = useState<number | undefined>();
+  const grab = () => {
+    const h = ref.current?.offsetHeight;
+    if (h) setMinHeight((m) => Math.max(m ?? 0, h));
+  };
+  return [ref, minHeight ? { minHeight } : undefined, grab] as const;
 }
