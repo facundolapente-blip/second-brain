@@ -359,6 +359,20 @@ export function weekDays(iso: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 }
 
+/**
+ * Al cambiar la hora de inicio, la de fin se corre lo mismo (se mantiene la duración):
+ * de 15:00–17:00 a empezar 13:00 queda 13:00–15:00. Sin las tres horas válidas, o si el
+ * fin no era posterior al inicio, null (no se toca). Tope 23:59: un bloque no pasa al otro día.
+ */
+export function shiftEnd(prevStart: string, prevEnd: string, newStart: string): string | null {
+  if (!isTime(prevStart) || !isTime(prevEnd) || !isTime(newStart)) return null;
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  const duration = mins(prevEnd) - mins(prevStart);
+  if (duration <= 0) return null;
+  const end = Math.min(23 * 60 + 59, mins(newStart) + duration);
+  return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
+}
+
 export function isTime(s: unknown): s is string {
   return typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 }

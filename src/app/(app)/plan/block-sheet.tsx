@@ -6,7 +6,7 @@ import { useSaveOnDismiss } from "@/components/save-on-dismiss";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import { deleteBlock, passToNextWeek, saveBlock, duplicateBlock } from "@/lib/offline/plan";
 import { ArrowArcRight, CopySimple } from "@phosphor-icons/react";
-import type { BlockDTO, CategoryDTO, TaskDTO } from "@/lib/plan-logic";
+import { shiftEnd, type BlockDTO, type CategoryDTO, type TaskDTO } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { PriorityPicker } from "./plan-ui";
@@ -67,6 +67,10 @@ function BlockForm({
   const { form, onDismiss } = useSaveOnDismiss(state);
   useEffect(() => registerDismiss(onDismiss));
   const [title, setTitle] = useState(initial.title ?? "");
+  // Horas controladas: al cambiar el inicio, el fin se corre lo mismo.
+  const [start, setStart] = useState(initial.startTime ?? "");
+  const [end, setEnd] = useState(initial.endTime ?? "");
+  const [lastStart, setLastStart] = useState(initial.startTime ?? "");
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
   const [priority, setPriority] = useState(initial.priority ?? 0);
   const [deleting, startDelete] = useSafeTransition();
@@ -101,10 +105,21 @@ function BlockForm({
           <Input type="date" name="date" defaultValue={initial.date} required className="min-w-0 !px-2 sm:!px-3" />
         </Field>
         <Field label="Desde" className="min-w-0">
-          <TimeInput name="startTime" defaultValue={initial.startTime} className="min-w-0 !px-3" />
+          <TimeInput
+            name="startTime"
+            value={start}
+            onValueChange={setStart}
+            onCommit={(v) => {
+              // Se corre el fin y se mantiene la duración (de 15–17 a empezar 13: 13–15).
+              const next = shiftEnd(lastStart, end, v);
+              if (next) setEnd(next);
+              setLastStart(v);
+            }}
+            className="min-w-0 !px-3"
+          />
         </Field>
         <Field label="Hasta" className="min-w-0">
-          <TimeInput name="endTime" defaultValue={initial.endTime} className="min-w-0 !px-3" />
+          <TimeInput name="endTime" value={end} onValueChange={setEnd} className="min-w-0 !px-3" />
         </Field>
       </div>
       <p className="-mt-3 text-xs text-muted">Sin hora de inicio, queda para todo el día.</p>

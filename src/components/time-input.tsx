@@ -12,15 +12,25 @@ import { cx, inputClass } from "./ui";
 export function TimeInput({
   name,
   defaultValue,
+  value: controlled,
+  onValueChange,
+  onCommit,
   className,
   "aria-label": ariaLabel,
 }: {
   name: string;
   defaultValue?: string | null;
+  /** Controlado desde afuera (con `onValueChange`), p. ej. el fin que se corre con el inicio. */
+  value?: string;
+  onValueChange?: (v: string) => void;
+  /** La hora ya acomodada, al salir del campo o con Enter. */
+  onCommit?: (v: string) => void;
   className?: string;
   "aria-label"?: string;
 }) {
-  const [value, setValue] = useState(defaultValue ?? "");
+  const [own, setOwn] = useState(defaultValue ?? "");
+  const value = controlled ?? own;
+  const setValue = (v: string) => (onValueChange ? onValueChange(v) : setOwn(v));
   function fix(el: HTMLInputElement) {
     const n = normalizeTime(el.value);
     if (n === null) {
@@ -29,6 +39,7 @@ export function TimeInput({
     }
     el.setCustomValidity("");
     setValue(n);
+    onCommit?.(n);
   }
   return (
     <input

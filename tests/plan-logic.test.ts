@@ -18,6 +18,7 @@ import {
   topSortKey,
   weekDays,
   type TaskDTO,
+  shiftEnd,
 } from "@/lib/plan-logic";
 
 describe("horas", () => {
@@ -279,5 +280,20 @@ describe("anchos de columnas (parseTaskColumns)", () => {
     expect(parseTaskColumns(null)).toEqual({});
     expect(parseTaskColumns(undefined)).toEqual({});
     expect(parseTaskColumns("{roto")).toEqual({});
+  });
+});
+
+describe("shiftEnd (al cambiar el inicio se mantiene la duración)", () => {
+  it("15–17 y empieza a las 13: termina a las 15", () => {
+    expect(shiftEnd("15:00", "17:00", "13:00")).toBe("15:00");
+    expect(shiftEnd("09:30", "10:15", "18:00")).toBe("18:45");
+  });
+  it("no pasa de las 23:59", () => {
+    expect(shiftEnd("15:00", "17:00", "23:00")).toBe("23:59");
+  });
+  it("sin fin, sin inicio anterior o con el fin antes del inicio: no toca nada", () => {
+    expect(shiftEnd("", "17:00", "13:00")).toBeNull();
+    expect(shiftEnd("15:00", "", "13:00")).toBeNull();
+    expect(shiftEnd("17:00", "15:00", "13:00")).toBeNull();
   });
 });
