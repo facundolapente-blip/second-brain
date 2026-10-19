@@ -1,6 +1,7 @@
 "use client";
 
-import { useSwap } from "@/components/motion";
+import { useChangeMotion, useSwap } from "@/components/motion";
+import { PointerTrack, useDraw } from "../motion";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { quiet } from "@/components/safe-action";
@@ -149,6 +150,12 @@ export function ReportsView({
   const [rate, setRate] = useState(reportRate);
   const [kind, setKind] = useState<"expense" | "income">("expense");
   const catSwap = useSwap(`${allPesos ? ALL : currency}-${kind}`);
+  // Otro mes o año: las cifras entran desde ese lado y los gráficos se dibujan de nuevo;
+  // otras cuentas o moneda: fundido en las cifras y también se dibujan. Al cargar, nada.
+  const lens = `${scope?.join(",") ?? "todas"}|${allPesos ? ALL : currency}`;
+  const statsMotion = useChangeMotion(period.from, lens);
+  const drawKey = `${period.from}|${period.to}|${lens}`;
+  const draw = useDraw(drawKey);
 
   const scoped = useMemo(() => {
     const mine = rows.filter((r) => isSelected(scope, r.accountId));
@@ -301,9 +308,10 @@ export function ReportsView({
         ) : (
           <>
             <section
-              className={`grid grid-cols-2 gap-x-6 gap-y-6 border-y border-line py-6 sm:grid-cols-4 lg:col-span-12 ${CARD}`}
+              className={`grid grid-cols-2 gap-x-6 gap-y-6 overflow-hidden border-y border-line py-6 sm:grid-cols-4 lg:col-span-12 ${CARD}`}
               aria-label={yearMode ? "Cifras del año" : "Cifras del mes"}
             >
+              <div key={drawKey} className={cx("col-span-full grid grid-cols-subgrid gap-y-6", statsMotion)}>
               <Stat
                 label={isCurrent || isCurrentYear ? "Gastado hasta hoy" : "Gastos"}
                 cents={cur.expense}
@@ -323,6 +331,7 @@ export function ReportsView({
               />
               <Stat label="Neto" cents={cur.income - cur.expense} currency={currency} signed />
               <Stat label="Gasto por día" cents={Math.round(cur.expense / Math.max(1, elapsed) / 100) * 100} currency={currency} hint={`en ${elapsed} días`} />
+              </div>
             </section>
 
             <div className="grid min-w-0 content-start gap-12 lg:col-span-7 lg:gap-5">
@@ -332,7 +341,7 @@ export function ReportsView({
                   <h2 className="display text-[28px]">Ritmo del mes</h2>
                   <p className="text-[14px] text-muted">Gasto acumulado día a día contra {monthName(prevMonth)}.</p>
                 </div>
-                <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} />
+                <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} drawKey={drawKey} draw={draw} />
               </section>
               )}
 
@@ -401,10 +410,10 @@ export function ReportsView({
                 )}
               </h2>
               <div className="lg:hidden">
-                <MonthlyColumns data={phoneEvolution} current={month} currency={currency} />
+                <MonthlyColumns data={phoneEvolution} current={month} currency={currency} drawKey={drawKey} draw={draw} />
               </div>
               <div className="hidden lg:block">
-                <MonthlyColumns data={evolution} current={month} currency={currency} height={220} />
+                <MonthlyColumns data={evolution} current={month} currency={currency} height={220} drawKey={drawKey} draw={draw} />
               </div>
             </section>
 
@@ -414,10 +423,10 @@ export function ReportsView({
                 <p className="text-[14px] text-muted">Ingresos menos gastos. Arriba de la línea sobró, abajo faltó.</p>
               </div>
               <div className="lg:hidden">
-                <NetColumns data={phoneEvolution} current={month} currency={currency} />
+                <NetColumns data={phoneEvolution} current={month} currency={currency} drawKey={drawKey} draw={draw} />
               </div>
               <div className="hidden lg:block">
-                <NetColumns data={evolution} current={month} currency={currency} height={200} />
+                <NetColumns data={evolution} current={month} currency={currency} height={200} drawKey={drawKey} draw={draw} />
               </div>
             </section>
           </>
@@ -500,6 +509,8 @@ function PaceChart({
   prevMonth,
   lastDay,
   currency,
+  drawKey,
+  draw,
 }: {
   rows: FlowRow[];
   month: string;
@@ -507,6 +518,9 @@ function PaceChart({
   /** Último día con datos del mes elegido (hoy, si es el mes en curso). */
   lastDay: number;
   currency: string;
+  /** Al cambiar, el gráfico se vuelve a dibujar (crece desde el eje). */
+  drawKey: string;
+  draw?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -574,6 +588,7 @@ function PaceChart({
         </div>
 
         <div
+          key={drawKey}
           ref={box}
           role="img"
           tabIndex={0}
@@ -589,7 +604,7 @@ function PaceChart({
             else return;
             e.preventDefault();
           }}
-          className="relative touch-pan-y rounded-[4px] outline-offset-4"
+          className={cx("relative touch-pan-y rounded-[4px] outline-offset-4", draw)}
           style={{ height: H }}
         >
           {ticks.map((t) => (
@@ -599,7 +614,7 @@ function PaceChart({
               style={{ top: topPct(t * 100), background: t === 0 ? "var(--border-strong)" : "var(--fin-grid)" }}
             />
           ))}
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden>
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="fin-grow-y absolute inset-0 size-full overflow-visible" aria-hidden>
             <path d={path(prevSeries)} fill="none" stroke="var(--faint)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             <path
               d={`${path(curSeries)} L${x(curEnd).toFixed(1)},${H} L0,${H} Z`}
@@ -611,11 +626,11 @@ function PaceChart({
           </svg>
 
           {/* Puntos finales con anillo del color de fondo, en HTML para que no se deformen. */}
-          <Dot left={pct(prevEnd)} top={topPct(prevSeries[prevEnd])} color="var(--faint)" />
-          <Dot left={pct(curEnd)} top={topPct(curSeries[curEnd])} color="var(--fin-out)" />
+          <Dot left={pct(prevEnd)} top={topPct(prevSeries[prevEnd])} color="var(--faint)" className="fin-late" />
+          <Dot left={pct(curEnd)} top={topPct(curSeries[curEnd])} color="var(--fin-out)" className="fin-late" />
           {h === null && (
             <span
-              className="tabular pointer-events-none absolute text-[11px] font-medium whitespace-nowrap text-fg"
+              className="fin-late tabular pointer-events-none absolute text-[11px] font-medium whitespace-nowrap text-fg"
               style={{
                 left: pct(curEnd),
                 top: topPct(curSeries[curEnd]),
@@ -627,19 +642,20 @@ function PaceChart({
           )}
 
           {h !== null && (
-            <>
-              <span className="pointer-events-none absolute inset-y-0 w-px bg-line-strong" style={{ left: pct(h) }} />
-              {h <= curEnd && <Dot left={pct(h)} top={topPct(curSeries[h])} color="var(--fin-out)" />}
-              {h <= prevEnd && <Dot left={pct(h)} top={topPct(prevSeries[h])} color="var(--faint)" />}
+            // La línea, los puntos y el cuadro se deslizan de un día a otro (no saltan).
+            <PointerTrack at={h / span}>
+              <span className="absolute inset-y-0 left-0 w-px bg-line-strong" />
+              {h <= curEnd && <Dot left="0" top={topPct(curSeries[h])} color="var(--fin-out)" />}
+              {h <= prevEnd && <Dot left="0" top={topPct(prevSeries[h])} color="var(--faint)" />}
               <div
-                className="fade-in lift pointer-events-none absolute top-0 z-10 grid min-w-44 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
-                style={{ left: pct(h), transform: `translateX(${h > span / 2 ? "calc(-100% - 10px)" : "10px"})` }}
+                className="fade-in fin-tip lift absolute top-0 left-0 grid min-w-44 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
+                style={{ translate: h > span / 2 ? "calc(-100% - 10px) 0" : "10px 0" }}
               >
                 <span className="text-muted">Día {h}</span>
                 <TooltipRow color="var(--fin-out)" label={monthName(month)} value={h <= curEnd ? moneyWhole(curSeries[h], currency) : "Sin datos"} />
                 <TooltipRow color="var(--faint)" label={monthName(prevMonth)} value={h <= prevEnd ? moneyWhole(prevSeries[h], currency) : "Sin datos"} />
               </div>
-            </>
+            </PointerTrack>
           )}
         </div>
 
@@ -680,11 +696,11 @@ function PaceChart({
   );
 }
 
-function Dot({ left, top, color }: { left: string; top: string; color: string }) {
+function Dot({ left, top, color, className }: { left: string; top: string; color: string; className?: string }) {
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg"
+      className={cx("pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg", className)}
       style={{ left, top, background: color }}
     />
   );
@@ -953,11 +969,15 @@ function MonthlyColumns({
   current,
   currency,
   height = 168,
+  drawKey,
+  draw,
 }: {
   data: { month: string; expense: number; income: number }[];
   current: string;
   currency: string;
   height?: number;
+  drawKey: string;
+  draw?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const top = niceMax(Math.max(...data.flatMap((d) => [d.expense, d.income]), 0) / 100);
@@ -995,7 +1015,7 @@ function MonthlyColumns({
               style={{ top: H - (t / top) * H, background: t === 0 ? "var(--border-strong)" : "var(--fin-grid)" }}
             />
           ))}
-          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
+          <div key={drawKey} className={cx("absolute inset-0 grid", draw)} style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
             {data.map((d, i) => {
               const selected = d.month === current;
               return (
@@ -1013,25 +1033,25 @@ function MonthlyColumns({
                   )}
                 >
                   {/* Solo el gasto lleva etiqueta: dos cifras lado a lado chocan en el celular. */}
-                  <Column cents={d.income} height={h(d.income)} color="var(--fin-in)" label={false} />
-                  <Column cents={d.expense} height={h(d.expense)} color="var(--fin-out)" label={selected} />
+                  <Column cents={d.income} height={h(d.income)} color="var(--fin-in)" label={false} i={i} />
+                  <Column cents={d.expense} height={h(d.expense)} color="var(--fin-out)" label={selected} i={i} />
                 </button>
               );
             })}
           </div>
 
           {hover !== null && (
-            <div
-              className="fade-in lift pointer-events-none absolute top-0 z-10 grid min-w-40 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
-              style={{
-                left: `${((hover + 0.5) / data.length) * 100}%`,
-                transform: `translateX(${hover >= data.length / 2 ? "-105%" : "5%"})`,
-              }}
-            >
-              <span className="text-muted first-letter:uppercase">{formatMonth(data[hover].month)}</span>
-              <TooltipRow color="var(--fin-in)" label="Ingresos" value={moneyWhole(data[hover].income, currency)} />
-              <TooltipRow color="var(--fin-out)" label="Gastos" value={moneyWhole(data[hover].expense, currency)} />
-            </div>
+            // El cuadro se desliza de un mes a otro en vez de saltar.
+            <PointerTrack at={(hover + 0.5) / data.length}>
+              <div
+                className="fade-in fin-tip lift absolute top-0 left-0 grid min-w-40 gap-1 rounded-[4px] border border-line-strong bg-surface p-2.5 text-[12.5px]"
+                style={{ translate: hover >= data.length / 2 ? "calc(-100% - 14px) 0" : "14px 0" }}
+              >
+                <span className="text-muted first-letter:uppercase">{formatMonth(data[hover].month)}</span>
+                <TooltipRow color="var(--fin-in)" label="Ingresos" value={moneyWhole(data[hover].income, currency)} />
+                <TooltipRow color="var(--fin-out)" label="Gastos" value={moneyWhole(data[hover].expense, currency)} />
+              </div>
+            </PointerTrack>
           )}
         </div>
 
@@ -1076,11 +1096,14 @@ function MonthlyColumns({
 }
 
 /** Una columna; en el mes elegido lleva su valor arriba (etiqueta directa selectiva). */
-function Column({ cents, height, color, label }: { cents: number; height: number; color: string; label: boolean }) {
+function Column({ cents, height, color, label, i }: { cents: number; height: number; color: string; label: boolean; i: number }) {
+  // La barra y su rótulo van separados: al dibujarse, la barra crece desde la base
+  // y el rótulo aparece al final (si fuera adentro, se estiraría con ella).
   return (
-    <span className="relative block w-[clamp(8px,28%,24px)] rounded-t-[4px]" style={{ height, background: color }}>
+    <span className="relative block w-[clamp(8px,28%,24px)]" style={{ height }}>
+      <span className="fin-grow-y absolute inset-0 rounded-t-[4px]" style={{ background: color, "--i": i } as React.CSSProperties} />
       {label && cents > 0 && (
-        <span className="tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 rounded-[3px] bg-surface px-1 text-[11px] font-medium whitespace-nowrap text-fg">
+        <span className="fin-late tabular pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 rounded-[3px] bg-surface px-1 text-[11px] font-medium whitespace-nowrap text-fg">
           {compact.format(cents / 100)}
         </span>
       )}
@@ -1147,7 +1170,7 @@ function WeekdaySpend({ values, currency }: { values: number[]; currency: string
           <span className={cx(i === top ? "font-medium text-fg" : "text-muted")}>{WEEKDAYS[i]}</span>
           <span className="block h-2.5" aria-hidden>
             <span
-              className="block h-2.5 rounded-r-[4px]"
+              className="bar-anim block h-2.5 rounded-r-[4px]"
               style={{
                 width: `${Math.max(1.5, (v / max) * 100)}%`,
                 background: i === top ? "var(--fin-out)" : "color-mix(in oklab, var(--fin-out) 42%, var(--surface))",
@@ -1174,11 +1197,15 @@ function NetColumns({
   current,
   currency,
   height = 150,
+  drawKey,
+  draw,
 }: {
   data: { month: string; expense: number; income: number }[];
   current: string;
   currency: string;
   height?: number;
+  drawKey: string;
+  draw?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const nets = data.map((d) => d.income - d.expense);
@@ -1228,7 +1255,7 @@ function NetColumns({
               style={{ top: yOf(t * 100), background: t === 0 ? "var(--border-strong)" : "var(--fin-grid)" }}
             />
           ))}
-          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
+          <div key={drawKey} className={cx("absolute inset-0 grid", draw)} style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
             {data.map((d, i) => {
               const n = nets[i];
               const y = yOf(n);
@@ -1246,20 +1273,18 @@ function NetColumns({
                 >
                   {n !== 0 && (
                     <span
-                      className={cx(
-                        "absolute left-1/2 w-[clamp(10px,40%,34px)] -translate-x-1/2",
-                        n > 0 ? "rounded-t-[4px]" : "rounded-b-[4px]",
-                      )}
-                      style={{
-                        top: n > 0 ? y : base,
-                        height: Math.max(2, Math.abs(base - y)),
-                        background: n > 0 ? "var(--fin-in)" : "var(--fin-out)",
-                      }}
+                      className="absolute left-1/2 w-[clamp(10px,40%,34px)] -translate-x-1/2"
+                      style={{ top: n > 0 ? y : base, height: Math.max(2, Math.abs(base - y)) }}
                     >
+                      {/* Crece desde la línea de cero: hacia arriba lo que sobró, hacia abajo lo que faltó. */}
+                      <span
+                        className={cx("fin-grow-y absolute inset-0", n > 0 ? "rounded-t-[4px]" : "fin-from-top rounded-b-[4px]")}
+                        style={{ background: n > 0 ? "var(--fin-in)" : "var(--fin-out)", "--i": i } as React.CSSProperties}
+                      />
                       {selected && (
                         <span
                           className={cx(
-                            "tabular pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-[3px] bg-surface px-1 text-[11px] font-medium whitespace-nowrap text-fg",
+                            "fin-late tabular pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-[3px] bg-surface px-1 text-[11px] font-medium whitespace-nowrap text-fg",
                             n > 0 ? "bottom-full mb-1" : "top-full mt-1",
                           )}
                         >

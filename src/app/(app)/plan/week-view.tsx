@@ -8,7 +8,7 @@ import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState, useMemo } from "react";
-import { leaveThen, useNewIds } from "@/components/motion";
+import { leaveThen, useNewIds, useTick } from "@/components/motion";
 import { PillSwitch } from "@/components/pill-switch";
 import { ArrowArcRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask } from "@/lib/offline/plan";
@@ -110,6 +110,8 @@ export function WeekView({
   // Solo lo que está en los días que se ven (un bloque recién pasado a otra semana deja de contar enseguida).
   const work = blocks.filter((b) => !isFreeBlock(b) && days.includes(b.date));
   const doneCount = work.filter((b) => b.done).length;
+  // "N de M hechos": al tildar, el número cambia con un corrimiento corto (al cargar, nada).
+  const doneTick = useTick(doneCount);
 
   function toggle(b: BlockDTO) {
     startTransition(async () => {
@@ -321,7 +323,10 @@ export function WeekView({
           )}
           {work.length > 0 && (
             <p className="kicker tabular ml-auto">
-              {doneCount} de {work.length} hechos
+              <span key={doneTick.key} className={doneTick.className}>
+                {doneCount}
+              </span>{" "}
+              de {work.length} hechos
             </p>
           )}
         </div>
@@ -353,6 +358,8 @@ export function WeekView({
                   className={cx(
                     "relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[6px] transition-colors",
                     active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
+                    // El día recién elegido acusa el toque (solo después de tocar, no al cargar).
+                    active && daySlide && "plan-pick",
                   )}
                 >
                   <span
@@ -517,7 +524,8 @@ export function BlockCard({
       className={cx(
         "group relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5 transition-colors",
         // En la columna de la compu cada bloque es una tarjeta (bien separada de la siguiente).
-        compact ? "rounded-xl border border-line bg-surface px-2.5 py-2.5" : "py-2.5 pr-1",
+        // Con el mouse sube 1 px (pista de que se puede agarrar y arrastrar).
+        compact ? "lift plan-hover rounded-xl border border-line bg-surface px-2.5 py-2.5" : "py-2.5 pr-1",
         // "Libre": la misma tarjeta, teñida de verde suave.
         compact && free && "free-block",
       )}

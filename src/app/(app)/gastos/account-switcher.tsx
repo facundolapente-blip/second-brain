@@ -5,6 +5,7 @@ import { Fragment, useRef, useState } from "react";
 import { Briefcase, CaretDown, Check, Checks, GearSix } from "@phosphor-icons/react";
 import { balanceByCurrency, scopeOf, type AccountDTO, type Selection } from "@/lib/finance-logic";
 import { cx, Sheet, type SheetHandle } from "@/components/ui";
+import { useSwap } from "@/components/motion";
 import { AccountAvatar, Balance, TotalsInline } from "./shared";
 
 /** Nombre corto de lo que se está mirando. */
@@ -176,8 +177,13 @@ export function AccountChips({
   const workIds = work.map((a) => a.id);
   const onWork = work.length > 1 && selection !== null && isAll(selection, workIds);
   const [multi, setMulti] = useState(selection !== null && selection.length > 1 && !onWork);
+  // Al pasar a "Varias" (o volver), el ícono de cada cuenta cambia por la casilla con un fundido;
+  // la tilde da su golpe solo después de tocar (al cargar en "Varias", nada se mueve).
+  const iconSwap = useSwap(multi ? "varias" : "una");
+  const [touched, setTouched] = useState(false);
 
   function pick(id: string) {
+    setTouched(true);
     if (!multi) {
       onChange(personal.length === 1 && personal[0] === id ? null : [id]);
       return;
@@ -235,15 +241,19 @@ export function AccountChips({
           >
             {multi ? (
               <span
+                key="casilla"
                 className={cx(
                   "inline-flex size-4 items-center justify-center rounded-[4px] border",
                   on ? "border-on-ink" : "border-line-strong",
+                  iconSwap,
                 )}
               >
-                {on && <Check size={11} weight="bold" className="mark-pop" />}
+                {on && <Check size={11} weight="bold" className={touched ? "mark-pop" : undefined} />}
               </span>
             ) : (
-              <AccountAvatar account={a} size={20} />
+              <span key="icono" className={cx("inline-flex", iconSwap)}>
+                <AccountAvatar account={a} size={20} />
+              </span>
             )}
             {a.name}
           </button>

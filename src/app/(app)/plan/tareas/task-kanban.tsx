@@ -6,10 +6,11 @@ import { Plus } from "@phosphor-icons/react";
 import { useSafeTransition } from "@/components/safe-action";
 import { setTaskStatus } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { daysLeft, daysLeftLabel, progressPct, TASK_DRAG, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
+import { daysLeft, daysLeftLabel, TASK_DRAG, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
-import { CategoryTag, PriorityDots } from "../plan-ui";
+import { useNewIds, useTick } from "@/components/motion";
+import { CategoryTag, PriorityDots, StepBar } from "../plan-ui";
 
 /** Arrastre nativo de una tarjeta entre columnas (además de TASK_DRAG, que la deja agendar en un día). */
 const KANBAN_DRAG = "text/x-tarea-tablero";
@@ -67,6 +68,8 @@ export function TaskKanban({
   );
   const [dragging, setDragging] = useState<TaskDTO | null>(null);
   const fine = useFinePointer();
+  // Una tarjeta que llega a otra columna (o una nueva) se asienta en su lugar; al cargar, nada.
+  const landed = useNewIds(moved.map((t) => `${t.status}:${t.id}`));
   const sensors = useSensors(useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }));
 
   function changeStatus(taskId: string, to: TaskStatus | undefined) {
@@ -104,6 +107,7 @@ export function TaskKanban({
             cats={cats}
             today={today}
             dragging={dragging}
+            landed={landed}
             native={fine}
             onNativeStart={setDragging}
             onNativeDrop={(taskId) => changeStatus(taskId, status)}
@@ -126,6 +130,7 @@ function Column({
   cats,
   today,
   dragging,
+  landed,
   native,
   onNativeStart,
   onNativeDrop,
@@ -137,6 +142,7 @@ function Column({
   cats: Map<string, CategoryDTO>;
   today: string;
   dragging: TaskDTO | null;
+  landed: Set<string>;
   native: boolean;
   onNativeStart: (t: TaskDTO | null) => void;
   onNativeDrop: (taskId: string) => void;
@@ -148,6 +154,7 @@ function Column({
   const isOver = overTouch || overNative;
   const st = TASK_STATUS[status];
   const canDrop = dragging !== null && dragging.status !== status;
+  const count = useTick(tasks.length);
   return (
     <section
       ref={setNodeRef}
@@ -170,15 +177,21 @@ function Column({
           onNativeDrop(id);
         }
       }}
+      // Mientras se arrastra, las otras columnas muestran un borde punteado suave; la de abajo del puntero, lleno.
+      data-drop={canDrop ? (isOver ? "over" : "ready") : undefined}
       className={cx(
-        "grid w-[85%] shrink-0 snap-start content-start gap-2 rounded-2xl bg-surface-2 p-2.5 transition-colors sm:w-[46%] lg:w-auto",
-        isOver && canDrop && "bg-[color-mix(in_oklab,var(--accent)_12%,var(--surface-2))] ring-1 ring-accent",
+        "plan-drop grid w-[85%] shrink-0 snap-start content-start gap-2 rounded-2xl bg-surface-2 p-2.5 transition-colors sm:w-[46%] lg:w-auto",
+        isOver && canDrop && "bg-[color-mix(in_oklab,var(--accent)_12%,var(--surface-2))]",
       )}
     >
       <header className="flex min-h-9 items-center gap-2 px-1.5">
         <span aria-hidden style={tone(st.tone)} className="size-2.5 rounded-[3px] bg-[var(--tone-chip)]" />
         <h3 className="text-[13.5px] font-semibold">{st.label}</h3>
-        <span className="font-mono text-[12px] text-muted tabular">{tasks.length}</span>
+        <span className="font-mono text-[12px] text-muted tabular">
+          <span key={count.key} className={count.className}>
+            {tasks.length}
+          </span>
+        </span>
         {status !== "done" && (
           <button
             type="button"
@@ -198,6 +211,7 @@ function Column({
             category={t.categoryId ? cats.get(t.categoryId) : null}
             today={today}
             native={native}
+            landed={landed.has(`${status}:${t.id}`)}
             onNativeStart={onNativeStart}
             onOpen={() => onOpen(t)}
           />
@@ -206,6 +220,7 @@ function Column({
       {(tasks.length === 0 || canDrop) && (
         <p
           className={cx(
+            canDrop && "reveal",
             "grid min-h-14 place-items-center rounded-xl border border-dashed px-3 text-center text-[12.5px] text-muted",
             isOver && canDrop ? "border-accent" : "border-line-strong",
           )}
@@ -222,6 +237,7 @@ function DraggableCard({
   category,
   today,
   native,
+  landed,
   onNativeStart,
   onOpen,
 }: {
@@ -229,6 +245,8 @@ function DraggableCard({
   category?: CategoryDTO | null;
   today: string;
   native: boolean;
+  /** Recién llegada a esta columna: se asienta (no al cargar). */
+  landed?: boolean;
   onNativeStart: (t: TaskDTO | null) => void;
   onOpen: () => void;
 }) {
@@ -239,7 +257,7 @@ function DraggableCard({
   return (
     <li
       ref={setNodeRef}
-      className={cx("touch-manipulation", native && "cursor-grab active:cursor-grabbing", (isDragging || nativeDragging) && "opacity-40")}
+      className={cx("touch-manipulation", native && "cursor-grab active:cursor-grabbing", landed && "plan-land", (isDragging || nativeDragging) && "plan-drag-source")}
       {...(native ? {} : listeners)}
       draggable={native || undefined}
       onDragStart={
@@ -292,8 +310,9 @@ function Card({
       type="button"
       onClick={onOpen}
       className={cx(
-        "grid w-full gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-shadow hover:shadow-[var(--card-shadow)]",
-        overlay && "rotate-1 shadow-[var(--card-shadow)]",
+        // Sube con el mouse y se hunde al apretar; levantada (celular), se inclina apenas.
+        "grid w-full gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left",
+        overlay ? "plan-pickup shadow-[var(--card-shadow)]" : "lift press",
         done && "opacity-80",
       )}
     >
@@ -319,17 +338,7 @@ function Card({
           )}
           {steps > 0 && (
             <span className="flex min-w-16 flex-1 items-center gap-2" aria-label={`${stepsDone} de ${steps} pasos`}>
-              <span className="flex h-1.5 min-w-0 flex-1 gap-0.5" aria-hidden>
-                {steps > 10 ? (
-                  <span className="h-full flex-1 overflow-hidden rounded-full bg-surface-3">
-                    <span className="block h-full rounded-full bg-accent" style={{ width: `${progressPct(stepsDone, steps) ?? 0}%` }} />
-                  </span>
-                ) : (
-                  Array.from({ length: steps }, (_, i) => (
-                    <span key={i} className={cx("h-full min-w-0 flex-1 rounded-[2px]", i < stepsDone ? (stepsDone >= steps ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")} />
-                  ))
-                )}
-              </span>
+              <StepBar done={stepsDone} total={steps} track="h-1.5 rounded-[2px]" gap="gap-0.5" />
               <span className="font-mono text-[11.5px] text-muted tabular" aria-hidden>
                 {stepsDone}/{steps}
               </span>

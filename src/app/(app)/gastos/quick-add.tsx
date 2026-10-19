@@ -176,7 +176,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
             <span className="text-danger">{error}</span>
           ) : done ? (
             <span className="inline-flex items-center gap-1 text-[var(--st-done-fg)]">
-              <CheckCircle size={14} weight="fill" aria-hidden /> {done}
+              <CheckCircle size={14} weight="fill" className="mark-pop" aria-hidden /> {done}
             </span>
           ) : text.trim() ? (
             "Falta el monto"

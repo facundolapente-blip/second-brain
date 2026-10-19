@@ -490,7 +490,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
           {s.journal.longest && (
             <Link
               href={`/journal/${s.journal.longest.id}`}
-              className="grid gap-0.5 rounded-xl bg-surface-2 p-3 transition-colors hover:bg-surface-3"
+              className="grid gap-0.5 rounded-xl bg-surface-2 p-3 transition-[background-color,scale] duration-[var(--dur-quick)] hover:bg-surface-3 active:scale-[0.98] motion-reduce:active:scale-100"
             >
               <span className="kicker">La entrada más larga</span>
               <span className="truncate text-[14px] font-medium">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSwap } from "@/components/motion";
+import { leaveThen, useSwap } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
@@ -592,8 +592,9 @@ export const TxSheet = forwardRef<
             undo="Movimiento borrado"
             onConfirm={() => {
               const id = d.id!;
-              startTransition(() => deleteTransaction(id));
               sheet.current?.close();
+              // La fila se va con una salida corta cuando la hoja ya bajó (la lista la saca al responder el servidor).
+              afterSheet(() => leaveThen(`[data-leave="${id}"]`, () => startTransition(() => deleteTransaction(id))));
             }}
           >
             Eliminar movimiento
@@ -605,8 +606,8 @@ export const TxSheet = forwardRef<
             undo="Cuotas borradas"
             onConfirm={() => {
               const group = d.installment!.group;
-              startTransition(() => deleteInstallments(group));
               sheet.current?.close();
+              afterSheet(() => leaveThen(`[data-leave-group="${group}"]`, () => startTransition(() => deleteInstallments(group))));
             }}
           >
             Eliminar las {d.installment.count} cuotas
@@ -844,4 +845,9 @@ function AmountMath({ amount, currency, onChange }: { amount: string; currency: 
       )}
     </div>
   );
+}
+
+/** Corre `fn` cuando la hoja terminó de bajar (170 ms), así la salida de la fila se ve. */
+function afterSheet(fn: () => void) {
+  setTimeout(fn, 150);
 }

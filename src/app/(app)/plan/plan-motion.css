@@ -1,0 +1,151 @@
+/* ─── Plan: movimiento propio (2026-10-19) ──────────────────────────────────
+   Arrastres, tablero y pasos. Las mismas reglas que el resto (globals.css,
+   "Movimiento"): nada se mueve al cargar, solo se animan transform/scale/translate
+   y opacidad, y con movimiento reducido quedan fundidos de 120 ms.
+
+   .plan-hover        Con .lift: una tarjeta que no es botón (un <article> con
+                      botones adentro) sube 1 px y alarga la sombra con el mouse.
+   .plan-drag-source  Lo que se está arrastrando: queda apagado y un poco más chico
+                      en su lugar (la imagen que sigue al mouse la saca el navegador
+                      antes, entera).
+   .plan-drop         Zona que recibe: data-drop="ready" mientras se arrastra algo
+                      que puede caer ahí (borde punteado suave), "over" con el
+                      puntero encima (borde lleno). Solo cambia la opacidad del borde.
+   .plan-slot-before / .plan-slot-after
+                      La línea de "va a quedar acá" entre dos bloques aparece
+                      abriéndose desde el centro.
+   .plan-ghost        El recuadro punteado de Por horas: se corre de cuarto de hora
+                      en cuarto de hora (translate) en vez de saltar.
+   .plan-land         Una tarjeta que llega a otra columna del tablero: se asienta.
+   .plan-pickup       La tarjeta levantada del tablero (celular, dnd-kit).
+   .plan-pick         El día recién elegido en la tira del celular.
+   .plan-seg          Segmento de pasos: se llena de izquierda a derecha (scale). */
+
+.plan-drop {
+  position: relative;
+}
+.plan-drop::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1.5px dashed var(--accent);
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-out);
+}
+.plan-drop[data-drop="ready"]::after {
+  opacity: 0.4;
+}
+.plan-drop[data-drop="over"]::after {
+  border-style: solid;
+  opacity: 1;
+}
+
+.plan-drag-source {
+  opacity: 0.4;
+}
+
+/* Plegable (.fold) con una tarjeta adentro: sin esto el recorte le come la sombra. */
+.plan-fold-shadow {
+  overflow-clip-margin: 24px;
+}
+
+.plan-pickup {
+  rotate: 1deg;
+  scale: 1.02;
+}
+
+/* Lo que no anima con movimiento reducido igual queda en su estado final. */
+.plan-seg {
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @media (hover: hover) and (pointer: fine) {
+    .lift.plan-hover:hover,
+    .lift.plan-hover:has(:focus-visible) {
+      translate: 0 -1px;
+    }
+  }
+
+  /* .lift y .press juntos (tarjetas del tablero): cada una pisa la transición de la otra. */
+  .lift.press {
+    transition:
+      translate var(--dur-state) var(--ease-out),
+      box-shadow var(--dur-state) var(--ease-out),
+      scale var(--dur-press) var(--ease-out);
+  }
+
+  .plan-drag-source {
+    scale: 0.97;
+    animation: plan-drag-source var(--dur-quick) var(--ease-out);
+  }
+  @keyframes plan-drag-source {
+    from { opacity: 1; scale: 1; }
+  }
+
+  .plan-slot-before::before,
+  .plan-slot-after::after {
+    animation: plan-slot 140ms var(--ease-out);
+  }
+  @keyframes plan-slot {
+    from { opacity: 0; scale: 0.4 1; }
+  }
+
+  .plan-ghost {
+    transition:
+      translate 90ms var(--ease-out),
+      height 90ms var(--ease-out);
+    animation: fade-in var(--dur-quick) ease-out;
+  }
+
+  .plan-land {
+    animation: plan-land var(--dur-state) var(--ease-out);
+  }
+  @keyframes plan-land {
+    from { opacity: 0.35; scale: 0.96; }
+  }
+
+  .plan-pickup {
+    animation: plan-pickup var(--dur-quick) var(--ease-out);
+  }
+  @keyframes plan-pickup {
+    from { rotate: 0deg; scale: 1; }
+  }
+
+  .plan-pick {
+    animation: plan-pick var(--dur-quick) var(--ease-out);
+  }
+  @keyframes plan-pick {
+    from { scale: 0.92; }
+  }
+
+  .plan-seg {
+    transition:
+      scale 320ms var(--ease-out),
+      opacity 320ms var(--ease-out),
+      background-color var(--dur-state) var(--ease-out);
+  }
+}
+
+/* Sombra larga de .lift también para .plan-hover (la regla de globals.css solo mira botones y enlaces). */
+@media (hover: hover) and (pointer: fine) {
+  .lift.plan-hover.bg-surface.border:hover {
+    box-shadow:
+      0 0 0 1px var(--card-ring),
+      0 2px 4px rgba(var(--shadow-tint), 0.06),
+      0 18px 36px -16px rgba(var(--shadow-tint), 0.32);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-ghost,
+  .plan-land,
+  .plan-pickup {
+    animation: fade-only 120ms ease-out;
+  }
+  .plan-seg {
+    transition: opacity 120ms ease-out;
+  }
+}

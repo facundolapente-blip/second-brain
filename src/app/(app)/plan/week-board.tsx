@@ -28,6 +28,30 @@ const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes(DRAG) || e
 
 const DRAG = "text/x-bloque";
 
+/**
+ * Mientras se arrastra algo que puede caer en la semana (un bloque o una tarea, desde
+ * cualquier lado de la página), las zonas que lo reciben se marcan (`.plan-drop`).
+ */
+function useDragActive() {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const start = (e: DragEvent) => {
+      const types = e.dataTransfer?.types ?? [];
+      if (types.includes(DRAG) || types.includes(TASK_DRAG)) setActive(true);
+    };
+    const stop = () => setActive(false);
+    window.addEventListener("dragstart", start);
+    window.addEventListener("dragend", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragstart", start);
+      window.removeEventListener("dragend", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, []);
+  return active;
+}
+
 /** Escritorio, vista lista: 7 columnas; los bloques se arrastran de un día a otro. */
 /**
  * Lugar donde caería lo arrastrado: antes de la tarjeta cuyo centro queda por
@@ -50,6 +74,7 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
   const [dragging, setDragging] = useState<BlockDTO | null>(null);
   const [slot, setSlot] = useState<{ day: string; index: number } | null>(null);
   const untimed = dragging !== null && !dragging.startTime;
+  const dragActive = useDragActive();
   // Al soltar en otra columna la tarjeta se vuelve a dibujar ahí y el "dragend" le
   // llega a la vieja (que ya no está): sin esto la nueva quedaba transparente.
   useEffect(() => {
@@ -110,8 +135,9 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                 onMove(id, d, undefined, p.key, p.others);
               } else onMove(id, d);
             }}
+            data-drop={over === d ? "over" : dragActive ? "ready" : undefined}
             className={cx(
-              "grid min-h-[60dvh] min-w-0 content-start gap-2 border-r border-line px-2.5 pb-6 transition-colors last:border-r-0",
+              "plan-drop grid min-h-[60dvh] min-w-0 content-start gap-2 border-r border-line px-2.5 pb-6 transition-colors last:border-r-0",
               // Hoy: columna teñida del acento y una franja arriba.
               d === today && "rounded-t-lg bg-[color-mix(in_oklab,var(--accent)_13%,transparent)] shadow-[inset_0_3px_0_var(--accent)]",
               over === d && "bg-[color-mix(in_oklab,var(--accent)_18%,transparent)]",
@@ -155,10 +181,10 @@ export function BoardList({ days, today, byDay, cats, onToggle, onEdit, onNew, o
                 className={cx(
                   "relative cursor-grab active:cursor-grabbing",
                   fresh.has(`${d}:${b.id}`) && "reveal",
-                  dragging?.id === b.id && "opacity-40",
-                  // Línea donde va a caer el bloque.
-                  lineBefore && "before:absolute before:inset-x-0 before:-top-[5px] before:h-0.5 before:rounded-full before:bg-accent",
-                  lineAfter && "after:absolute after:inset-x-0 after:-bottom-[5px] after:h-0.5 after:rounded-full after:bg-accent",
+                  dragging?.id === b.id && "plan-drag-source",
+                  // Línea donde va a caer el bloque (aparece abriéndose desde el centro).
+                  lineBefore && "plan-slot-before before:absolute before:inset-x-0 before:-top-[5px] before:h-0.5 before:rounded-full before:bg-accent",
+                  lineAfter && "plan-slot-after after:absolute after:inset-x-0 after:-bottom-[5px] after:h-0.5 after:rounded-full after:bg-accent",
                 )}
                 title={b.startTime ? "Arrastralo a otro día" : "Arrastralo a otro día o a otro lugar de la columna"}
               >
@@ -208,6 +234,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
   const [drop, setDrop] = useState<{ day: string; min: number; dur: number } | null>(null);
   // Lo que se arrastra (el navegador no deja leer los datos durante el arrastre).
   const grab = useRef<HourDrag | null>(null);
+  const dragActive = useDragActive();
   useEffect(() => {
     const clear = () => {
       grab.current = null;
@@ -276,6 +303,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                 setOver(`${d}|`);
               }}
               onDragLeave={() => setOver(null)}
+              data-drop={over === `${d}|` ? "over" : dragActive ? "ready" : undefined}
               onDrop={(e) => {
                 setOver(null);
                 const taskId = e.dataTransfer.getData(TASK_DRAG);
@@ -285,7 +313,7 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
               }}
               className={cx(
                 // min-w-0: sin esto el título largo de un pendiente estira la celda y pisa el día de al lado.
-                "grid min-w-0 content-start gap-0.5 border-l border-line p-1.5",
+                "plan-drop grid min-w-0 content-start gap-0.5 border-l border-line p-1.5",
                 d === today && "bg-[color-mix(in_oklab,var(--accent)_5%,transparent)]",
                 over === `${d}|` && "bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]",
               )}
@@ -377,12 +405,13 @@ export function BoardHours({ days, today, byDay, cats, onToggle, onEdit, onNew, 
                     </div>
                   );
                 })}
-              {/* Dónde va a quedar: el lugar con su hora (no recibe el puntero). */}
+              {/* Dónde va a quedar: el lugar con su hora (no recibe el puntero). Se corre de
+                  cuarto de hora en cuarto de hora (translate) en vez de saltar. */}
               {drop?.day === d && (
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-[3px] z-[1] rounded-lg border-2 border-dashed border-accent bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] px-1.5 py-0.5"
-                  style={{ top: ((drop.min - from * 60) / 60) * ROW, height: Math.max(22, (drop.dur / 60) * ROW - 2) }}
+                  className="plan-ghost pointer-events-none absolute inset-x-[3px] top-0 z-[1] rounded-lg border-2 border-dashed border-accent bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] px-1.5 py-0.5"
+                  style={{ translate: `0 ${((drop.min - from * 60) / 60) * ROW}px`, height: Math.max(22, (drop.dur / 60) * ROW - 2) }}
                 >
                   <span className="font-mono text-[11px] font-semibold text-accent-fg tabular">{hhmm(drop.min)}</span>
                 </div>
@@ -454,6 +483,7 @@ function TodoRow({
   const free = isFreeBlock(b);
   // La tilde aparece con un golpe corto, solo después de tocarla.
   const [tapped, setTapped] = useState(false);
+  const [dragging, setDragging] = useState(false);
   return (
     <li
       data-leave={b.id}
@@ -463,8 +493,10 @@ function TodoRow({
         e.dataTransfer.setData(DRAG, b.id);
         e.dataTransfer.effectAllowed = "move";
         onGrab?.(0, 60);
+        setDragging(true);
       }}
-      className="flex min-h-9 min-w-0 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2"
+      onDragEnd={() => setDragging(false)}
+      className={cx("flex min-h-9 min-w-0 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2", dragging && "plan-drag-source")}
       title="Arrastralo a una hora para agendarlo"
     >
       {free ? (
@@ -521,6 +553,7 @@ function Chip({
   full?: boolean;
 }) {
   const [tapped, setTapped] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const c = b.categoryId ? cats.get(b.categoryId) : null;
   const priority = PRIORITIES.find((p) => p.value === b.priority);
   return (
@@ -531,13 +564,16 @@ function Chip({
         e.dataTransfer.setData(DRAG, b.id);
         e.dataTransfer.effectAllowed = "move";
         onGrab?.(e.clientY - e.currentTarget.getBoundingClientRect().top, dur);
+        setDragging(true);
       }}
+      onDragEnd={() => setDragging(false)}
       // "Libre": verde suave en vez del color de su categoría.
       style={tone(isFreeBlock(b) ? "green" : (c?.color ?? "stone"))}
       className={cx(
         "group flex cursor-grab items-start gap-1 overflow-hidden rounded-lg bg-tone px-1.5 py-1 text-tone-fg transition-opacity duration-[var(--dur-state)] active:cursor-grabbing",
         full && "h-full",
         b.done && "opacity-60",
+        dragging && "plan-drag-source",
       )}
       title="Arrastralo a otro día u hora"
     >

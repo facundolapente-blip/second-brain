@@ -140,7 +140,7 @@ export function ContextMenuHost() {
       className={cx(
         "fixed z-[60] min-w-52 overflow-hidden rounded-xl border border-line-strong bg-surface py-1 shadow-[0_14px_36px_-14px_rgba(var(--shadow-tint),0.45)] print:hidden",
         leaving ? "menu-out" : pos && "menu-in",
-        pos && (pos.top < open.y ? "origin-bottom-left" : "origin-top-left"),
+        pos && (pos.top < open.y ? (pos.left < open.x ? "origin-bottom-right" : "origin-bottom-left") : pos.left < open.x ? "origin-top-right" : "origin-top-left"),
       )}
     >
       {renaming && "schedule" in renaming ? (

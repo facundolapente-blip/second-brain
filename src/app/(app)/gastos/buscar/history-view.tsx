@@ -8,7 +8,8 @@ import { flowOf, type AccountDTO, type CategoryDTO, type TemplateDTO, type TxDTO
 import { formatMonth, formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
-import { Button, inputClass } from "@/components/ui";
+import { Button, cx, inputClass } from "@/components/ui";
+import { useNewIds } from "@/components/motion";
 import { GastosTabs } from "../gastos-nav";
 import { TxRow, useLookups, type Lookups } from "../shared";
 import { TxSheet, type TxSheetHandle } from "../tx-sheet";
@@ -157,6 +158,8 @@ export function HistoryView({
 }
 
 function MonthGroups({ months, lk, onOpen }: { months: [string, TxDTO[]][]; lk: Lookups; onOpen: (t: TxDTO) => void }) {
+  // "Cargar más" o un movimiento restaurado: lo que no estaba entra suave (al cargar, nada).
+  const fresh = useNewIds(months.flatMap(([, list]) => list.map((t) => t.id)));
   return months.map(([m, list]) => (
     <div key={m}>
       <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-bg/92 px-4 pt-3 pb-2 text-[19px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
@@ -164,7 +167,7 @@ function MonthGroups({ months, lk, onOpen }: { months: [string, TxDTO[]][]; lk: 
       </h2>
       <ul>
         {list.map((t) => (
-          <li key={t.id} className="relative">
+          <li key={t.id} data-leave={t.id} className={cx("relative", fresh.has(t.id) && "reveal")}>
             <TxRow tx={t} lk={lk} selection={null} showAccount onClick={() => onOpen(t)} />
             <span className="pointer-events-none absolute top-1.5 right-1 font-mono text-[10.5px] text-faint">{formatShort(t.date)}</span>
           </li>

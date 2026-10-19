@@ -18,6 +18,7 @@ import {
   type TxDTO,
 } from "@/lib/finance-logic";
 import { cx } from "@/components/ui";
+import { useSlide } from "@/components/motion";
 
 // ─── Búsquedas ──────────────────────────────────────────────────────────────
 
@@ -278,6 +279,7 @@ export function TxRow({
 
 export function MonthNav({ month, basePath, current }: { month: string; basePath: string; current: string }) {
   const href = (m: string) => (m === current ? basePath : `${basePath}?mes=${m}`);
+  const slide = useSlide(month);
   return (
     <div className="flex items-center gap-0.5">
       <Link
@@ -287,7 +289,9 @@ export function MonthNav({ month, basePath, current }: { month: string; basePath
       >
         <CaretLeft size={18} />
       </Link>
-      <h2 className="display min-w-[9.5rem] text-center text-[22px] first-letter:uppercase">{formatMonth(month)}</h2>
+      <h2 key={month} className={cx("display min-w-[9.5rem] text-center text-[22px] first-letter:uppercase", slide)}>
+        {formatMonth(month)}
+      </h2>
       <Link
         href={href(shiftMonth(month, 1))}
         aria-label="Mes siguiente"

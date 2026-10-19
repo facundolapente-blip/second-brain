@@ -1,4 +1,5 @@
 import { PlanNav } from "./plan-nav";
+import "./plan-motion.css";
 
 export default function PlanLayout({ children }: LayoutProps<"/plan">) {
   return (

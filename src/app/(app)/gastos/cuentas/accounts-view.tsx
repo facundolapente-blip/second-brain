@@ -23,6 +23,7 @@ import type { CardSummary } from "@/lib/card-logic";
 import { NetWorth } from "./net-worth";
 import { ReserveCard, type ReserveData } from "./reserve-card";
 import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
+import { Tick } from "../motion";
 
 type Draft = {
   id?: string;
@@ -197,7 +198,10 @@ export function AccountsView({
                             <span className="rounded-[3px] border border-line-strong px-1.5 py-px font-mono text-[10.5px] tracking-normal">{c}</span>
                           </dt>
                           <dd className="figure text-[clamp(2rem,9vw,2.75rem)]">
-                            <Balance cents={totals[c]} currency={c} hero />
+                            {/* Un ajuste de saldo o una cuenta nueva: el total cambia con un tic. */}
+                            <Tick value={totals[c]}>
+                              <Balance cents={totals[c]} currency={c} hero />
+                            </Tick>
                           </dd>
                           <dd className="text-[13px] text-muted">
                             {n === 1 ? "1 cuenta" : `${n} cuentas`}
@@ -222,7 +226,7 @@ export function AccountsView({
               {sorted.map((a, i) => (
                 <li
                   key={a.id}
-                  className="rise flex min-w-0 items-center gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:pr-2 lg:shadow-[var(--card-shadow)]"
+                  className="rise fin-hover-lg flex min-w-0 items-center gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:pr-2 lg:shadow-[var(--card-shadow)]"
                   style={{ "--i": i } as React.CSSProperties}
                 >
                   <button

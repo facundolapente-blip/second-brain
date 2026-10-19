@@ -372,30 +372,38 @@ dialog.sheet::backdrop {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  /* Hoja del celular: sube desde el borde de abajo con la curva de las hojas nativas
+     (arranca rápido y se asienta). Va con `translate` para no pisar el `transform`
+     que pone el arrastre. En pantalla grande es un modal que aparece y crece apenas. */
   dialog.sheet[open] {
-    animation: sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation: sheet-in var(--dur-sheet) var(--ease-sheet);
   }
   @keyframes sheet-in {
-    from { transform: translateY(24px); opacity: 0; }
-    to { transform: none; opacity: 1; }
+    from { translate: 0 100%; }
   }
-  /* Salida más corta que la entrada: se va hacia abajo y el fondo se apaga. */
+  /* Salida más corta que la entrada: baja entera y el fondo se apaga. */
   dialog.sheet.closing {
-    animation: sheet-out 170ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    animation: sheet-out var(--dur-exit) var(--ease-in) forwards;
   }
   dialog.sheet.closing::backdrop {
-    animation: fade-out 170ms ease-in forwards;
+    animation: fade-out var(--dur-exit) ease-in forwards;
   }
   @keyframes sheet-out {
-    to { transform: translateY(40%); opacity: 0; }
+    to { translate: 0 100%; }
   }
   @media (min-width: 640px) {
+    dialog.sheet[open] {
+      animation: modal-in var(--dur-enter) var(--ease-out);
+    }
     dialog.sheet.closing {
-      animation-name: modal-out;
+      animation: modal-out var(--dur-exit) var(--ease-in) forwards;
     }
   }
+  @keyframes modal-in {
+    from { opacity: 0; translate: 0 10px; scale: 0.97; }
+  }
   @keyframes modal-out {
-    to { transform: translateY(8px) scale(0.98); opacity: 0; }
+    to { opacity: 0; translate: 0 6px; scale: 0.98; }
   }
   @keyframes fade-out {
     to { opacity: 0; }
@@ -427,11 +435,34 @@ dialog.sheet::backdrop {
   }
   /* Aviso de Deshacer. */
   .toast-in {
-    animation: toast-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation: toast-in 260ms var(--ease-out);
   }
   @keyframes toast-in {
-    from { transform: translateY(12px); opacity: 0; }
-    to { transform: none; opacity: 1; }
+    from { opacity: 0; translate: 0 14px; scale: 0.96; }
+  }
+  /* Un aviso nuevo cuando ya había uno a la vista: no vuelve a subir, el anterior queda
+     "debajo" un instante (se asoma hacia arriba y se apaga) y el nuevo late una vez. */
+  .toast-swap {
+    animation: toast-swap var(--dur-state) var(--ease-out);
+  }
+  @keyframes toast-swap {
+    from { scale: 0.97; }
+    40% { scale: 1.015; }
+  }
+  .toast-ghost {
+    animation: toast-ghost var(--dur-state) var(--ease-in) forwards;
+  }
+  @keyframes toast-ghost {
+    from { opacity: 0.9; }
+    to { opacity: 0; translate: 0 -10px; scale: 0.94; }
+  }
+  /* Cuánto queda para deshacer: una línea que se acorta (scaleX; se frena con el mouse encima). */
+  .toast-timer {
+    transform-origin: left;
+    animation: toast-timer var(--toast-ms, 6000ms) linear forwards;
+  }
+  @keyframes toast-timer {
+    to { transform: scaleX(0); }
   }
 }
 
@@ -447,14 +478,29 @@ dialog.sheet::backdrop {
   border-radius: 4px;
   background: var(--surface-2);
 }
+/* Si la pantalla llega enseguida, el esqueleto ni se nota: aparece recién a los 120 ms
+   (solo opacidad, también con movimiento reducido) y el brillo arranca a los 400 ms. */
+.skeleton {
+  animation: skeleton-in 200ms ease-out 120ms backwards;
+}
+@keyframes skeleton-in {
+  from { opacity: 0; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .skeleton::after {
     content: "";
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, var(--surface-3), transparent);
-    animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    /* Brillo suave y ancho (más tenue en oscuro, donde --surface-3 resalta más). */
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--surface-3) 70%, transparent) 45%,
+      color-mix(in oklab, var(--surface-3) 70%, transparent) 55%,
+      transparent 100%
+    );
+    animation: shimmer 1.8s cubic-bezier(0.45, 0, 0.55, 1) 400ms infinite;
   }
   @keyframes shimmer {
     to { transform: translateX(100%); }
@@ -534,38 +580,74 @@ dialog.sheet::backdrop {
    de llegada y salidas más cortas que las entradas. Con movimiento reducido no hay
    desplazamientos ni escalas: quedan fundidos cortos que siguen avisando. */
 :root {
+  /* Curvas: llegada (rápida al principio, se asienta), salida (arranca suave y se va),
+     deslizar entre dos lugares de la pantalla (marcas de selectores), hojas (como las
+     nativas) y resorte (vuelve a su lugar con un rebote mínimo: soltar una hoja, el "+"). */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-glide: cubic-bezier(0.3, 0.75, 0.2, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: linear(0, 0.2 6%, 0.62 16%, 0.92 26%, 1.04 36%, 1.06 44%, 1.03 56%, 1 70%, 0.995 84%, 1);
+  /* Duraciones: apretar, cambios chicos (color, menú), cambios de estado (plegar,
+     selector), entrar algo grande (modal, cajón), hojas del celular y salir (siempre
+     más corto que entrar). */
   --dur-press: 110ms;
   --dur-quick: 160ms;
   --dur-state: 220ms;
+  --dur-enter: 260ms;
+  --dur-sheet: 340ms;
+  --dur-exit: 180ms;
   /* Deja animar alto "auto" (secciones plegables con <details>). */
   interpolate-size: allow-keywords;
 }
 
+/* El fondo de una hoja se aclara mientras se la arrastra hacia abajo (lo pone Sheet). */
+dialog.sheet::backdrop {
+  opacity: var(--sheet-fade, 1);
+  transition: opacity var(--dur-state) var(--ease-out);
+}
+dialog.sheet.dragging::backdrop {
+  transition: none;
+}
+/* Soltada con un tirón: el fondo se apaga mientras la hoja termina de bajar. */
+dialog.sheet.closing-drag::backdrop {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   /* Apretar: los botones y enlaces en píldora se hunden un poco (scale, no transform:
-     así no pisa un translate que ya tengan). */
+     así no pisa un translate que ya tengan). Al soltar vuelven con un rebote mínimo.
+     Los selectores (radio/tab) no: la marca deslizante ya acusa el toque. */
   :where(button, a, [role="button"]).rounded-full {
-    transition-property: scale, background-color, color, border-color, box-shadow, opacity;
-    transition-duration: var(--dur-press), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick);
+    transition-property: scale, translate, background-color, color, border-color, box-shadow, opacity;
+    transition-duration: 300ms, var(--dur-state), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick);
+    transition-timing-function: var(--ease-spring), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out);
+  }
+  :where(button, a, [role="button"]).rounded-full:not(:disabled, [role="radio"], [role="tab"]):active {
+    scale: 0.96;
+    transition-duration: var(--dur-press);
     transition-timing-function: var(--ease-out);
   }
-  :where(button, a, [role="button"]).rounded-full:not(:disabled):active {
-    scale: 0.96;
-  }
 
-  /* Menús (tres puntitos y clic derecho): se abren desde donde se tocó. */
+  /* Menús (tres puntitos y clic derecho): se abren desde donde se tocó; si se abren
+     hacia arriba (origin-bottom-*), crecen desde abajo. */
   .menu-in {
     animation: menu-in var(--dur-quick) var(--ease-out);
   }
+  .menu-in:is(.origin-bottom-left, .origin-bottom-right, .origin-bottom) {
+    animation-name: menu-in-up;
+  }
   @keyframes menu-in {
-    from { opacity: 0; scale: 0.96; translate: 0 -4px; }
+    from { opacity: 0; scale: 0.95; translate: 0 -4px; }
+  }
+  @keyframes menu-in-up {
+    from { opacity: 0; scale: 0.95; translate: 0 4px; }
   }
 
   /* Hojas: el fondo también aparece en fundido (antes solo se apagaba al cerrar). */
   dialog.sheet[open]::backdrop {
-    animation: backdrop-in 260ms var(--ease-out);
+    animation: backdrop-in var(--dur-sheet) var(--ease-out);
   }
   @keyframes backdrop-in {
     from { opacity: 0; }
@@ -643,7 +725,11 @@ dialog.sheet::backdrop {
   dialog.sheet[open]::backdrop {
     animation: fade-only 120ms ease-out;
   }
+  .toast-swap {
+    animation: none;
+  }
   .toast-out,
+  .toast-ghost,
   .menu-out,
   .leave,
   dialog.sheet.closing,
@@ -661,8 +747,14 @@ dialog.sheet::backdrop {
 /* Cambio de tema: claro y oscuro se cruzan en un fundido (View Transitions) en vez de saltar. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 280ms;
-  animation-timing-function: var(--ease-out);
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 120ms;
+  }
 }
 
 /* Plegable: el alto se anima de 0 a su contenido (grid 0fr ↔ 1fr) y al cerrarse queda
@@ -737,4 +829,136 @@ dialog.sheet::backdrop {
 }
 [data-theme="oscuro"] .quote-card {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Utilidades de movimiento (2026-10-19) ─────────────────────────────────
+   Piezas chicas para usar en cualquier pantalla. Ninguna anima al cargar por sí
+   sola salvo .count-tick y .check-draw, que hay que poner solo después de un toque
+   (ver cada una). Con movimiento reducido: sin desplazamientos ni escalas.
+
+   .press        Hundirse al apretar, para lo que no es píldora (filas, tarjetas
+                 tocables, casillas cuadradas). Las píldoras (rounded-full) ya lo
+                 hacen solas. Usa `scale`, así no pisa un translate/transform propio.
+                 <button class="press …">
+   .lift         (ya existía) sombra corta y teñida de lo que flota. Ahora además,
+                 con mouse de verdad (@media hover), sube 1 px y la sombra se alarga
+                 al pasar por encima (en el celular no se mueve). Para tarjetas
+                 tocables: <a class="lift bg-surface border …">. Con foco de
+                 teclado adentro hace lo mismo.
+   .count-tick   Número que cambió: entra con fundido y un corrimiento de 0,3 em
+                 desde abajo (.count-tick-down: desde arriba, para cuando baja).
+                 Tiene que volver a montarse para repetirse: usar `useTick(valor)`
+                 de components/motion.ts, que da { key, className } y no anima al
+                 cargar: <span key={t.key} className={t.className}>{n}</span>
+   .check-draw   Tilde que se dibuja de izquierda a derecha (recorte, sirve con
+                 cualquier ícono, también los de Phosphor). Ponerla solo tras tocar
+                 (como .mark-pop): <Check className={justMarked ? "check-draw" : ""} />
+   .tap-target   Agranda el área tocable a 44 px sin cambiar el tamaño visible
+                 (para íconos chicos). Necesita que el elemento no tenga ::before. */
+@media (prefers-reduced-motion: no-preference) {
+  /* (Pisa las transiciones de Tailwind del elemento: ya trae las de color, fondo, borde,
+     sombra, opacidad y corrimiento. Si tiene otra propia, como de ancho, no usar .press.) */
+  .press {
+    transition-property: scale, translate, background-color, color, border-color, box-shadow, opacity;
+    transition-duration: 300ms, var(--dur-state), var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-state), var(--dur-quick);
+    transition-timing-function: var(--ease-spring), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out);
+  }
+  .press:not(:disabled, [aria-disabled="true"]):active {
+    scale: 0.98;
+    transition-duration: var(--dur-press);
+    transition-timing-function: var(--ease-out);
+  }
+
+  /* :where: en una píldora manda la transición de las píldoras (que ya incluye estas). */
+  :where(.lift) {
+    transition-property: translate, box-shadow, scale, background-color, color, border-color, opacity;
+    transition-duration: var(--dur-state), var(--dur-state), 300ms, var(--dur-quick), var(--dur-quick), var(--dur-quick), var(--dur-quick);
+    transition-timing-function: var(--ease-out), var(--ease-out), var(--ease-spring), var(--ease-out), var(--ease-out), var(--ease-out), var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .lift:hover,
+    .lift:has(:focus-visible) {
+      translate: 0 -1px;
+    }
+  }
+
+  .count-tick {
+    display: inline-block;
+    animation: count-tick var(--dur-state) var(--ease-out);
+  }
+  .count-tick-down {
+    display: inline-block;
+    animation: count-tick-down var(--dur-state) var(--ease-out);
+  }
+  @keyframes count-tick {
+    from { opacity: 0; translate: 0 0.3em; }
+  }
+  @keyframes count-tick-down {
+    from { opacity: 0; translate: 0 -0.3em; }
+  }
+
+  .check-draw {
+    animation: check-draw 260ms var(--ease-out) both;
+  }
+  @keyframes check-draw {
+    from { clip-path: inset(0 100% 0 0); opacity: 0.4; }
+    to { clip-path: inset(0 0 0 0); opacity: 1; }
+  }
+}
+/* Sombra más larga de .lift al pasar el mouse o con foco de teclado (gana a la de las tarjetas). */
+@media (hover: hover) and (pointer: fine) {
+  .lift:is(.lift, .bg-surface.border):hover,
+  .lift:is(.lift, .bg-surface.border):has(:focus-visible) {
+    box-shadow:
+      0 2px 4px rgba(var(--shadow-tint), 0.06),
+      0 18px 36px -16px rgba(var(--shadow-tint), 0.32);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="oscuro"] .lift:is(.lift, .bg-surface.border):is(:hover, :has(:focus-visible)) {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 22px 44px -20px rgba(0, 0, 0, 0.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .count-tick,
+  .count-tick-down,
+  .check-draw {
+    animation: fade-only 120ms ease-out;
+  }
+}
+.tap-target {
+  position: relative;
+}
+.tap-target::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  translate: -50% -50%;
+}
+
+/* Menú lateral: el puntito del enlace tocado late mientras carga su pantalla. */
+@media (prefers-reduced-motion: no-preference) {
+  .nav-pending {
+    animation: nav-pending 900ms ease-in-out infinite;
+  }
+  @keyframes nav-pending {
+    50% { opacity: 0.35; scale: 0.6; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-pending {
+    opacity: 0.5;
+  }
+}
+
+/* El "+" de la barra del celular: se hunde más que un botón común (es el más grande)
+   y vuelve con el resorte de las píldoras. */
+@media (prefers-reduced-motion: no-preference) {
+  button.nav-add.nav-add:active {
+    scale: 0.9;
+  }
 }

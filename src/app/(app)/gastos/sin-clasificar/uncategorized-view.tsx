@@ -1,6 +1,7 @@
 "use client";
 
 import { useSafeTransition } from "@/components/safe-action";
+import { leaveThen } from "@/components/motion";
 import { useOptimistic, useRef, useState } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { formatMonth, formatShort } from "@/lib/dates";
@@ -41,17 +42,22 @@ export function UncategorizedView({
 
   function acceptAll() {
     const pairs = withSuggestion.map((t) => ({ id: t.id, categoryId: suggestions[t.id].categoryId }));
-    startTransition(async () => {
-      removeOptimistic(pairs.map((p) => p.id));
-      await applySuggestions(pairs);
-    });
+    // Las clasificadas se van con una salida corta y después salen de la lista.
+    leaveThen(pairs.map((p) => `[data-leave="${p.id}"]`).join(","), () =>
+      startTransition(async () => {
+        removeOptimistic(pairs.map((p) => p.id));
+        await applySuggestions(pairs);
+      }),
+    );
   }
   function acceptOne(t: TxDTO) {
     const s = suggestions[t.id];
-    startTransition(async () => {
-      removeOptimistic(t.id);
-      await setTransactionCategory(t.id, s.categoryId);
-    });
+    leaveThen(`[data-leave="${t.id}"]`, () =>
+      startTransition(async () => {
+        removeOptimistic(t.id);
+        await setTransactionCategory(t.id, s.categoryId);
+      }),
+    );
   }
   const [, startTransition] = useSafeTransition();
 
@@ -59,10 +65,17 @@ export function UncategorizedView({
     if (!current) return;
     const id = current.id;
     sheet.current?.close();
-    startTransition(async () => {
-      removeOptimistic(id);
-      await setTransactionCategory(id, categoryId);
-    });
+    // Cuando la hoja bajó, la fila se va con su salida.
+    setTimeout(
+      () =>
+        leaveThen(`[data-leave="${id}"]`, () =>
+          startTransition(async () => {
+            removeOptimistic(id);
+            await setTransactionCategory(id, categoryId);
+          }),
+        ),
+      150,
+    );
   }
 
   const options = current ? categories.filter((c) => c.kind === current.kind && !c.adjustment) : [];
@@ -103,7 +116,7 @@ export function UncategorizedView({
                 // Separador de mes cuando cambia (la lista viene de la más nueva a la más vieja).
                 const newMonth = i === 0 || titled[i - 1].date.slice(0, 7) !== t.date.slice(0, 7);
                 return (
-                  <li key={t.id}>
+                  <li key={t.id} data-leave={t.id}>
                     {newMonth && (
                       <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-bg/92 px-4 pt-4 pb-2 text-[20px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
                         {formatMonth(t.date.slice(0, 7))}

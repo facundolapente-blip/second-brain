@@ -1,6 +1,6 @@
 "use client";
 
-import { useSlide, useSwap } from "@/components/motion";
+import { useSlide, useSwap, useTick } from "@/components/motion";
 import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -472,6 +472,8 @@ function ScoreRing({ value }: { value: number }) {
   const r = 70;
   const c = 2 * Math.PI * r;
   const arc = c * (300 / 360);
+  // Al cambiar de pista, la cifra se corre hacia donde fue (el arco ya se anima solo).
+  const tick = useTick(value);
   return (
     <div className="relative size-48">
       <svg viewBox="0 0 180 180" className="size-full rotate-[120deg]" aria-hidden>
@@ -498,7 +500,9 @@ function ScoreRing({ value }: { value: number }) {
         />
       </svg>
       <span className="absolute inset-0 flex items-center justify-center">
-        <span className="figure text-[68px]">{value}</span>
+        <span key={tick.key} className={cx("figure text-[68px]", tick.className)}>
+          {value}
+        </span>
         <span className="display mt-5 text-[22px] text-muted">%</span>
       </span>
     </div>
@@ -647,13 +651,15 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
             <span className={cx("font-mono tabular text-[10.5px]", it.current ? "font-semibold text-fg" : "text-muted")}>
               {it.value === null ? "" : it.value}
             </span>
-            <div className="flex w-full items-end justify-center">
+            {/* Barra de alto fijo que sube o baja corriéndose (transform, no el alto): al cambiar
+                de año o de vista, cada barra pasa a su valor nuevo sin recalcular el layout. */}
+            <div className="flex w-full justify-center overflow-hidden">
               <div
                 className={cx(
-                  "w-full max-w-6 rounded-t-[4px] transition-[height] duration-500 motion-reduce:transition-none",
+                  "h-full w-full max-w-6 rounded-t-[4px] transition-transform duration-500 ease-[var(--ease-out)] motion-reduce:transition-none",
                   it.current ? "bg-accent" : "bg-accent/55",
                 )}
-                style={{ height: `${it.value ? Math.max(4, (it.value / max) * 100) : 0}%` }}
+                style={{ transform: `translateY(${100 - (it.value ? Math.max(4, (it.value / max) * 100) : 0)}%)` }}
               />
             </div>
           </div>

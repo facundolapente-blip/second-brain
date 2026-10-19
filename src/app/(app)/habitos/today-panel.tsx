@@ -7,6 +7,7 @@ import { currentStreak, dayProgress, habitScore, hasScore, WEEKDAY_SHORT, type L
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { HabitDTO } from "@/lib/habits";
 import { cx } from "@/components/ui";
+import { useTick } from "@/components/motion";
 
 export { dayProgress };
 
@@ -27,6 +28,8 @@ export function TodayPanel({
 }) {
   const { done, total } = dayProgress(habits, logs, selected, today);
   const pct = total ? Math.round((done / total) * 100) : 0;
+  const doneTick = useTick(done);
+  const pctTick = useTick(pct);
   const isToday = selected === today;
 
   const streaks = habits
@@ -49,9 +52,13 @@ export function TodayPanel({
           <p className="hero-sub truncate font-mono text-[11px] tracking-[0.04em]">{formatLong(selected)}</p>
         </div>
         <p className="mt-4 flex items-baseline gap-2">
-          <span className="figure text-[64px]">{done}</span>
+          <span key={`n${doneTick.key}`} className={cx("figure text-[64px]", doneTick.className)}>
+            {done}
+          </span>
           <span className="figure hero-sub text-[26px]">de {total}</span>
-          <span className="ml-auto font-mono text-[13px] tabular">{pct}%</span>
+          <span key={`p${pctTick.key}`} className={cx("ml-auto font-mono text-[13px] tabular", pctTick.className)}>
+            {pct}%
+          </span>
         </p>
         <div
           role="progressbar"
@@ -61,10 +68,11 @@ export function TodayPanel({
           aria-valuenow={done}
           className="mt-4 h-2 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--hero-fg)_18%,transparent)]"
         >
-          {/* Se anima con transform (no con el ancho) para no recalcular el layout. */}
+          {/* Se anima con transform (no con el ancho) para no recalcular el layout; se corre en vez
+              de estirarse, así la punta redonda no se deforma. */}
           <span
-            className="block h-full origin-left rounded-full bg-[var(--hero-fg)] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
-            style={{ transform: `scaleX(${pct / 100})` }}
+            className="block h-full rounded-full bg-[var(--hero-fg)] transition-transform duration-500 ease-[var(--ease-out)] motion-reduce:transition-none"
+            style={{ transform: `translateX(${pct - 100}%)` }}
           />
         </div>
         <p className="hero-sub mt-3 text-[13px]">
@@ -133,6 +141,7 @@ function WeekCard({
   const shownIdx = hover ?? days.indexOf(today);
   const shown = rows[shownIdx];
   const H = 84;
+  const scoreTick = useTick(avgScore);
 
   return (
     <section className="rise rounded-2xl border border-line bg-surface px-5 pt-4 pb-3" style={{ "--i": 1 } as React.CSSProperties}>
@@ -158,15 +167,17 @@ function WeekCard({
               onPointerLeave={() => setHover((x) => (x === i ? null : x))}
               onFocus={() => setHover(i)}
               onBlur={() => setHover((x) => (x === i ? null : x))}
-              className={cx("group flex items-end justify-center rounded-t-[4px]", hover === i && "bg-surface-2/70")}
+              className={cx("group relative flex items-end justify-center overflow-hidden rounded-t-[4px]", hover === i && "bg-surface-2/70")}
             >
               {r.p ? (
+                // La barra mide siempre lo mismo y sube o baja corriéndose (transform, no el alto):
+                // al tildar un hábito, la de hoy crece sin recalcular el layout.
                 <span
                   className={cx(
-                    "block w-full max-w-5 rounded-t-[4px] transition-[height,background-color] duration-[var(--dur-state)] ease-[var(--ease-out)]",
+                    "block w-full max-w-5 rounded-t-[4px] transition-[transform,background-color] duration-[var(--dur-state)] ease-[var(--ease-out)] motion-reduce:transition-[background-color]",
                     r.d === today ? "bg-accent" : "bg-[color-mix(in_oklab,var(--accent)_38%,var(--surface))] group-hover:bg-[color-mix(in_oklab,var(--accent)_60%,var(--surface))]",
                   )}
-                  style={{ height: r.pct ? Math.max(3, (r.pct / 100) * (H - 4)) : 2 }}
+                  style={{ height: H - 4, transform: `translateY(${H - 4 - (r.pct ? Math.max(3, (r.pct / 100) * (H - 4)) : 2)}px)` }}
                 />
               ) : (
                 <span className="block h-[2px] w-full max-w-5 rounded-full bg-line-strong" />
@@ -186,7 +197,9 @@ function WeekCard({
       <div className="mt-4 flex items-baseline justify-between border-t border-line pt-3">
         <span className="text-[13.5px] text-muted">Puntaje promedio</span>
         <span className="figure text-[24px]">
-          {avgScore}
+          <span key={scoreTick.key} className={scoreTick.className}>
+            {avgScore}
+          </span>
           <span className="text-[15px] text-muted">%</span>
         </span>
       </div>

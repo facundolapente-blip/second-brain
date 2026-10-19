@@ -151,7 +151,7 @@ export function CategorySpend({
                 </div>
                 <span className="block h-1.5">
                   <span
-                    className="block h-full rounded-r-[3px] bg-[var(--fin-out)]"
+                    className="bar-anim block h-full rounded-r-[3px] bg-[var(--fin-out)]"
                     style={{ width: `${Math.max(1.5, (r.cents / max) * 100)}%` }}
                   />
                 </span>
@@ -169,7 +169,7 @@ export function CategorySpend({
               </div>
               <span className="block h-1.5">
                 <span
-                  className="block h-full rounded-r-[3px] bg-[color-mix(in_oklab,var(--fin-out)_45%,var(--surface))]"
+                  className="bar-anim block h-full rounded-r-[3px] bg-[color-mix(in_oklab,var(--fin-out)_45%,var(--surface))]"
                   style={{ width: `${Math.max(1.5, (rest / max) * 100)}%` }}
                 />
               </span>

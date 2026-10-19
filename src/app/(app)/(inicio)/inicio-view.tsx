@@ -37,6 +37,7 @@ import { setBlockDone } from "@/lib/offline/plan";
 import { writeOnDay } from "@/lib/offline/journal";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
+import { useTick } from "@/components/motion";
 import { CheckinCard } from "./checkin-card";
 import { QuickAdd } from "../gastos/quick-add";
 import { CategoryTag, PriorityTag } from "../plan/plan-ui";
@@ -337,6 +338,9 @@ function HabitsToday({ d }: { d: Dashboard }) {
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
   const celebrate = useJustCompleted(due > 0 && done >= due);
   const daySheet = useRef<DaySheetHandle>(null);
+  // Las cifras cambian con un corrimiento corto (sube desde abajo, baja desde arriba); al cargar, quietas.
+  const doneTick = useTick(done);
+  const pctTick = useTick(pct(done, due));
 
   return (
     <Card title="Hábitos de hoy" href="/habitos" color="var(--c-habitos)" className="lg:col-span-5" i={1}>
@@ -344,12 +348,20 @@ function HabitsToday({ d }: { d: Dashboard }) {
         <div className={cx("relative rounded-full", celebrate && "ring-glow")}>
           <Ring value={done} total={due} color="var(--c-habitos)" />
           <span className="figure absolute inset-0 flex items-center justify-center text-[15px]">
-            {due > 0 && done >= due ? <Check size={22} weight="bold" className="text-[var(--c-habitos)]" aria-label="Día completo" /> : `${pct(done, due)}%`}
+            {due > 0 && done >= due ? (
+              <Check size={22} weight="bold" className="text-[var(--c-habitos)]" aria-label="Día completo" />
+            ) : (
+              <span key={`p${pctTick.key}`} className={pctTick.className}>
+                {pct(done, due)}%
+              </span>
+            )}
           </span>
         </div>
         <div className="grid gap-0.5">
           <p className="figure text-[28px]">
-            {done}
+            <span key={`n${doneTick.key}`} className={doneTick.className}>
+              {done}
+            </span>
             <span className="text-muted">/{due}</span>
           </p>
           <p className="text-[13px] text-muted">
@@ -387,6 +399,7 @@ function PlanToday({ d }: { d: Dashboard }) {
   const [, start] = useSafeTransition();
   const real = blocks.filter((b) => !isFreeBlock(b));
   const doneN = real.filter((b) => b.done).length;
+  const doneTick = useTick(doneN);
 
   // La tilde aparece con un golpe, solo tras tocarla.
   const [tappedBlock, setTappedBlock] = useState<string | null>(null);
@@ -396,14 +409,18 @@ function PlanToday({ d }: { d: Dashboard }) {
         <div className="grid gap-1.5">
           <div className="flex items-baseline justify-between text-[13px] text-muted">
             <span>
-              <span className="figure text-[22px] text-fg">{doneN}</span> de {real.length} {real.length === 1 ? "bloque hecho" : "bloques hechos"}
+              <span key={`n${doneTick.key}`} className={cx("figure text-[22px] text-fg", doneTick.className)}>
+                {doneN}
+              </span>{" "}
+              de {real.length} {real.length === 1 ? "bloque hecho" : "bloques hechos"}
             </span>
             <span className="tabular">{pct(doneN, real.length)}%</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
+            {/* Avanza corriéndose (transform), no cambiando el ancho: la punta redonda no se deforma. */}
             <div
-              className="bar-anim h-full rounded-full bg-[var(--c-plan)] transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{ width: `${pct(doneN, real.length)}%` }}
+              className="h-full rounded-full bg-[var(--c-plan)] transition-transform duration-500 ease-[var(--ease-out)] motion-reduce:transition-none"
+              style={{ transform: `translateX(${pct(doneN, real.length) - 100}%)` }}
             />
           </div>
         </div>
@@ -936,7 +953,7 @@ function JournalCard({ d }: { d: Dashboard }) {
       {j.last && (
         <Link
           href={`/journal/${j.last.id}`}
-          className="group grid gap-1.5 rounded-2xl bg-surface-2 p-4 transition-colors hover:bg-surface-3"
+          className="group grid gap-1.5 rounded-2xl bg-surface-2 p-4 transition-[background-color,scale] duration-[var(--dur-quick)] hover:bg-surface-3 active:scale-[0.98] motion-reduce:active:scale-100"
         >
           <span className="kicker">
             Última entrada · {j.last.date === d.today ? "hoy" : formatShort(j.last.date)}

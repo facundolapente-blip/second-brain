@@ -156,18 +156,21 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       {/* Panel de la computadora: la entrada elegida, o el recuerdo y un resumen. */}
       {/* minmax(0,1fr) y min-w-0: un renglón que no se corta (la fecha del panel) no puede ensanchar la columna. */}
       <div className="hidden min-w-0 lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:grid-cols-[minmax(0,1fr)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]">
-        {reading ? (
-          <EntryReader key={reading.id} entry={reading} closeHref={closeHref} />
-        ) : (
-          <>
-            {home.memory && !memoryDismissed && (
-              <div className="rounded-2xl border border-line bg-surface px-6 pb-1 [&>section]:border-y-0">
-                <MemoryCard memory={home.memory} today={home.today} />
-              </div>
-            )}
-            <QuickStatsCard stats={quick} />
-          </>
-        )}
+        {/* Al abrir otra entrada (o cerrar la lectura) el panel cambia con un fundido corto; al cargar, quieto. */}
+        <SwapOnChange k={reading?.id ?? "resumen"} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+          {reading ? (
+            <EntryReader entry={reading} closeHref={closeHref} />
+          ) : (
+            <>
+              {home.memory && !memoryDismissed && (
+                <div className="rounded-2xl border border-line bg-surface px-6 pb-1 [&>section]:border-y-0">
+                  <MemoryCard memory={home.memory} today={home.today} />
+                </div>
+              )}
+              <QuickStatsCard stats={quick} />
+            </>
+          )}
+        </SwapOnChange>
       </div>
       </main>
     </>

@@ -1,6 +1,7 @@
 "use client";
 
-import { leaveThen, useChangeMotion, useNewIds } from "@/components/motion";
+import { leaveThen, useChangeMotion } from "@/components/motion";
+import { Tick, useFreshIds } from "./motion";
 import { PendingFinance } from "./pending-list";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
@@ -141,8 +142,11 @@ export function MovementsView({
   // Otro período: los datos entran desde ese lado; otras cuentas: fundido. Lo nuevo entra suave.
   const dataKey = `${period.from}|${period.to}|${scope?.join(",") ?? "todas"}`;
   const dataMotion = useChangeMotion(period.from, scope?.join(",") ?? "todas");
-  const freshTx = useNewIds(visible.map((t) => t.id));
+  // Lo recién cargado (o que cambió de día) entra en su día con un fondo que se apaga;
+  // un día que no estaba, también. Al cambiar de período o de cuentas, no: ya desliza todo.
+  const freshTx = useFreshIds(visible.map((t) => `${t.id}@${t.date}`), dataKey);
   const groups = useMemo(() => groupByDay(visible, scope, lk.currencyOf), [visible, scope, lk]);
+  const freshDay = useFreshIds(groups.map((g) => g.date), dataKey);
   // Ingresos y gastos del mes por moneda (sin transferencias), para el resumen.
   const flows = useMemo(() => {
     const inc: Record<string, number> = {};
@@ -289,7 +293,7 @@ export function MovementsView({
                     <section
                       key={g.date}
                       aria-label={relative ? `${label}, ${formatShort(g.date)}` : label}
-                      className="rise"
+                      className={cx("rise", freshDay.has(g.date) && "reveal")}
                       style={{ "--i": Math.min(gi, 8) } as React.CSSProperties}
                     >
                       {/* En el celular el día queda pegado arriba mientras se recorre su lista. */}
@@ -302,7 +306,12 @@ export function MovementsView({
                       </header>
                       <ul>
                         {g.txs.map((t) => (
-                          <li key={t.id} data-leave={t.id} className={cx(freshTx.has(t.id) && "reveal")}>
+                          <li
+                            key={t.id}
+                            data-leave={t.id}
+                            data-leave-group={t.installment?.group}
+                            className={cx(freshTx.has(`${t.id}@${t.date}`) && "reveal fin-new")}
+                          >
                             <TxRow
                               tx={t}
                               lk={lk}
@@ -339,9 +348,14 @@ function BalanceHero({ totals }: { totals: Record<string, number> }) {
   if (cur.length === 0) return <span className="figure text-[52px] lg:text-[64px]">{moneyCents(0)}</span>;
   return (
     <span className="grid gap-0.5">
-      <Balance cents={totals[cur[0]]} currency={cur[0]} hero className="figure text-[52px] lg:text-[64px]" />
+      {/* Al cargar o borrar un movimiento, el saldo cambia con un tic (no de golpe). */}
+      <Tick value={totals[cur[0]]} className="figure text-[52px] lg:text-[64px]">
+        <Balance cents={totals[cur[0]]} currency={cur[0]} hero />
+      </Tick>
       {cur.slice(1).map((c) => (
-        <Balance key={c} cents={totals[c]} currency={c} hero className="figure text-[26px] text-fg" />
+        <Tick key={c} value={totals[c]} className="figure text-[26px] text-fg">
+          <Balance cents={totals[c]} currency={c} hero />
+        </Tick>
       ))}
     </span>
   );
@@ -365,7 +379,15 @@ function FlowTile({ label, totals, kind }: { label: string; totals: Record<strin
         {label}
       </dt>
       <dd className="tabular grid font-mono text-[15px] font-medium">
-        {cur.length === 0 ? <span>{moneyCents(0)}</span> : cur.map((c) => <span key={c}>{moneyWhole(totals[c], c)}</span>)}
+        {cur.length === 0 ? (
+          <span>{moneyCents(0)}</span>
+        ) : (
+          cur.map((c) => (
+            <span key={c}>
+              <Tick value={totals[c]}>{moneyWhole(totals[c], c)}</Tick>
+            </span>
+          ))
+        )}
       </dd>
     </div>
   );

@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { CategoryAvatar, MonthNav } from "../shared";
+import { Tick } from "../motion";
 
 const STATE_TONE: Record<BudgetState, { bar: string; text: string }> = {
   ok: { bar: "var(--st-done-line)", text: "text-[var(--st-done-fg)]" },
@@ -107,7 +108,9 @@ export function BudgetsView({
                 <div>
                   <p className="hero-sub text-[12.5px]">Gastado en categorías con presupuesto</p>
                   <p className="figure mt-1 text-[34px]">
-                    {moneyCents(totalSpent)} <span className="hero-sub text-[18px]">de {moneyCents(totalBudget)}</span>
+                    {/* Otro mes o un presupuesto cambiado: la cifra cambia con un tic y la barra avanza. */}
+                    <Tick value={totalSpent}>{moneyCents(totalSpent)}</Tick>{" "}
+                    <span className="hero-sub text-[18px]">de {moneyCents(totalBudget)}</span>
                   </p>
                 </div>
                 <p className="hero-sub text-[13px]">
@@ -146,7 +149,7 @@ export function BudgetsView({
                     <button
                       type="button"
                       onClick={() => edit(c, b)}
-                      className="grid w-full gap-2.5 rounded-2xl border border-line bg-surface p-4 text-left transition-colors hover:bg-surface-2/60"
+                      className="lift grid w-full gap-2.5 rounded-2xl border border-line bg-surface p-4 text-left transition-colors hover:bg-surface-2/60"
                     >
                       {/* Si no entra todo en una fila (celular), los montos bajan: el nombre se lee entero. */}
                       <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -266,7 +269,7 @@ export function BudgetsView({
                     <Link
                       href={`/gastos/presupuestos/${p.id}`}
                       className={cx(
-                        "grid gap-3 rounded-2xl border border-line bg-surface p-4 transition-colors hover:bg-surface-2/60",
+                        "lift grid gap-3 rounded-2xl border border-line bg-surface p-4 transition-colors hover:bg-surface-2/60",
                         p.archived && "opacity-60",
                       )}
                     >
@@ -360,7 +363,7 @@ function Meter({
   return (
     <span className={cx("relative block h-2.5 rounded-full", onHero ? "bg-white/20" : "bg-surface-3")}>
       <span
-        className="bar-anim block h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="bar-anim block h-full rounded-full"
         style={{ width: `${pct}%`, background: onHero ? "white" : STATE_TONE[state].bar }}
       />
       {share !== null && (

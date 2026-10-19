@@ -17,6 +17,7 @@ import {
 import { MOODS } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
+import { useSwap, useTick } from "@/components/motion";
 import { MoodIcon } from "../journal/journal-ui";
 
 /**
@@ -56,6 +57,12 @@ export function CheckinCard({
   const [open, setOpen] = useState(() => countFilled(today) < 5);
   // Hoy ↔ Ayer: fundido de los valores (solo tras tocar).
   const [daySwap, setDaySwap] = useState(false);
+  // El ánimo elegido aparece con un golpe corto, solo tras tocarlo (al cargar, quieto).
+  const [tappedMood, setTappedMood] = useState<number | null>(null);
+  // "N de 5" → "Guardando…" → "Guardado": cada estado entra con un fundido corto, nunca de golpe.
+  const statusKey = pending ? "saving" : saved ? "saved" : "count";
+  const statusSwap = useSwap(statusKey);
+  const filledTick = useTick(filled);
   const summary = [
     MOODS.find((m) => m.value === cur.mood)?.label,
     cur.energy ? `Energía ${ENERGY_LABELS[cur.energy - 1].toLowerCase()}` : null,
@@ -129,13 +136,22 @@ export function CheckinCard({
           <CaretDown size={13} weight="bold" aria-hidden className={cx("text-muted transition-transform duration-200", !open && "-rotate-90")} />
         </button>
         <span className="tabular text-[12.5px] text-muted" aria-live="polite">
-          {pending ? "Guardando…" : saved ? (
-            <span className="inline-flex items-center gap-1">
-              <Check size={12} weight="bold" aria-hidden /> Guardado
-            </span>
-          ) : (
-            `${filled} de 5`
-          )}
+          <span key={statusKey} className={cx("inline-flex items-center gap-1", statusSwap)}>
+            {pending ? (
+              "Guardando…"
+            ) : saved ? (
+              <>
+                <Check size={12} weight="bold" aria-hidden className="check-draw" /> Guardado
+              </>
+            ) : (
+              <>
+                <span key={filledTick.key} className={filledTick.className}>
+                  {filled}
+                </span>{" "}
+                de 5
+              </>
+            )}
+          </span>
         </span>
         <PillSwitch
           label="Día"
@@ -176,14 +192,19 @@ export function CheckinCard({
                   aria-pressed={on}
                   aria-label={m.label}
                   title={m.label}
-                  onClick={() => set({ mood: on ? null : m.value })}
+                  onClick={() => {
+                    setTappedMood(on ? null : m.value);
+                    set({ mood: on ? null : m.value });
+                  }}
                   style={tone(m.color)}
                   className={cx(
                     "inline-flex h-11 items-center justify-center rounded-xl transition-[background-color,color,transform] duration-200 active:scale-95",
                     on ? "bg-tone text-tone-fg ring-2 ring-[var(--tone-solid)]" : "bg-surface-2 text-muted hover:text-fg",
                   )}
                 >
-                  <MoodIcon mood={m.value} size={22} weight={on ? "fill" : "regular"} />
+                  <span key={on ? "on" : "off"} className={cx("inline-flex", on && tappedMood === m.value && "mark-pop")}>
+                    <MoodIcon mood={m.value} size={22} weight={on ? "fill" : "regular"} />
+                  </span>
                 </button>
               );
             })}
@@ -240,6 +261,11 @@ function Scale({
   color: string;
   onChange: (v: number | null) => void;
 }) {
+  // Lo que se enciende se llena de abajo hacia arriba, una barra tras otra desde la que ya
+  // estaba (y se vacía de la más alta hacia abajo): se lee que la escala sube o baja.
+  const [last, setLast] = useState({ value, prev: value });
+  if (last.value !== value) setLast({ value, prev: last.value });
+  const prev = last.value !== value ? last.value : last.prev;
   return (
     <div className="grid gap-1">
     <div className="grid h-11 grid-cols-5 items-end gap-1.5">
@@ -254,12 +280,25 @@ function Scale({
             aria-label={`${v}: ${l}`}
             title={l}
             onClick={() => onChange(value === v ? null : v)}
-            className="flex h-11 items-end rounded-lg transition-transform active:scale-95"
+            className="flex h-11 items-end rounded-lg transition-[scale] duration-[var(--dur-press)] active:scale-95"
           >
-            <span
-              className="w-full rounded-md transition-[background-color,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{ height: `${36 + i * 16}%`, background: on ? color : "var(--surface-3)" }}
-            />
+            <span className="relative w-full overflow-hidden rounded-md bg-surface-3" style={{ height: `${36 + i * 16}%` }}>
+              <span
+                aria-hidden
+                className={cx(
+                  "absolute inset-0 origin-bottom [transform:scaleY(var(--fill))] transition-[transform,opacity] duration-300 ease-[var(--ease-out)]",
+                  "motion-reduce:[transform:none] motion-reduce:duration-[120ms]",
+                  !on && "motion-reduce:opacity-0",
+                )}
+                style={
+                  {
+                    background: color,
+                    "--fill": on ? 1 : 0,
+                    transitionDelay: `${fillDelay(v, value, prev)}ms`,
+                  } as React.CSSProperties
+                }
+              />
+            </span>
           </button>
         );
       })}
@@ -272,19 +311,30 @@ function Scale({
   );
 }
 
+/** Retraso de cada barra al cambiar la escala: en orden desde la que ya estaba (tope ~120 ms). */
+function fillDelay(v: number, value: number | null, prev: number | null) {
+  const now = value ?? 0;
+  const before = prev ?? 0;
+  if (now > before && v > before && v <= now) return Math.min(4, v - before - 1) * 35;
+  if (now < before && v > now && v <= before) return Math.min(4, before - v) * 30;
+  return 0;
+}
+
 function Sleep({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
   // Bajar de media hora lo borra (vuelve a "Cargar"): "0 h" no es un dato.
   const step = (d: number) => {
     const next = Math.min(16 * 60, (value ?? 7 * 60) + d);
     onChange(value !== null && next < 30 ? null : Math.max(30, next));
   };
+  // La cifra nueva entra desde abajo si subió y desde arriba si bajó.
+  const tick = useTick(value ?? 0);
   return (
     <div className="flex h-11 items-center gap-1 rounded-xl bg-surface-2 p-1">
       <button
         type="button"
         aria-label="Media hora menos"
         onClick={() => step(-30)}
-        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-fg"
+        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-[color,background-color,scale] duration-[var(--dur-quick)] hover:bg-surface hover:text-fg active:scale-90 motion-reduce:active:scale-100"
       >
         <Minus size={14} weight="bold" />
       </button>
@@ -293,13 +343,15 @@ function Sleep({ value, onChange }: { value: number | null; onChange: (v: number
         onClick={() => value === null && onChange(7 * 60)}
         className={cx("tabular h-full flex-1 text-center text-[15px] font-semibold", value === null && "text-muted")}
       >
-        {value === null ? "Cargar" : formatSleep(value)}
+        <span key={tick.key} className={tick.className}>
+          {value === null ? "Cargar" : formatSleep(value)}
+        </span>
       </button>
       <button
         type="button"
         aria-label="Media hora más"
         onClick={() => step(30)}
-        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-fg"
+        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-[color,background-color,scale] duration-[var(--dur-quick)] hover:bg-surface hover:text-fg active:scale-90 motion-reduce:active:scale-100"
       >
         <Plus size={14} weight="bold" />
       </button>

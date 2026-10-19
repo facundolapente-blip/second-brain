@@ -1,6 +1,6 @@
 "use client";
 
-import { useNewIds } from "@/components/motion";
+import { useNewIds, useTick } from "@/components/motion";
 import { notifyDeleted } from "@/components/undo-toast";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
@@ -8,10 +8,10 @@ import { Fragment, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
 import { saveTaskColumns, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, progressPct, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
-import { CategoryTag, categoryMap, PriorityTag } from "../plan-ui";
+import { CategoryTag, categoryMap, PriorityTag, StepBar } from "../plan-ui";
 import { tone } from "@/lib/palette";
 import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
 import { TaskKanban } from "./task-kanban";
@@ -315,7 +315,7 @@ function TaskRow({
   const done = t.status === "done";
   return (
     <li className={cx("border-b border-line", fresh && "reveal")}>
-      <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 px-1 py-3 text-left">
+      <button type="button" onClick={onOpen} className="press flex w-full items-start gap-3 px-1 py-3 text-left">
         <DateBlock deadline={t.deadline} left={left} done={done} />
         <span className="grid min-w-0 flex-1 gap-1">
           <span className={cx("text-[15.5px] leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
@@ -391,23 +391,14 @@ function DueLabel({ left, done }: { left: number | null; done: boolean }) {
 function Steps({ task }: { task: TaskDTO }) {
   const goal = task.subtasks.length;
   const n = task.subtasks.filter((s) => s.done).length;
-  const full = n >= goal;
-  // Ocupa todo el ancho de la columna (Facu: sobraba espacio); hasta 10 pasos, un segmento por paso.
+  const tick = useTick(n);
+  // Ocupa todo el ancho de la columna (Facu: sobraba espacio); hasta 10 pasos, un segmento por paso
+  // (al tildar, el segmento se llena y el número cambia con un corrimiento corto).
   return (
     <span className="flex w-full min-w-0 items-center gap-2.5" aria-label={`Avance: ${n} de ${goal} pasos`}>
-      {goal > 10 ? (
-        <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-          <span className={cx("bar-anim block h-full rounded-full", full ? "bg-[var(--st-done-line)]" : "bg-accent")} style={{ width: `${progressPct(n, goal) ?? 0}%` }} />
-        </span>
-      ) : (
-        <span className="flex min-w-0 flex-1 gap-1" aria-hidden>
-          {Array.from({ length: goal }, (_, i) => (
-            <span key={i} className={cx("h-3 min-w-0 flex-1 rounded-[3px] transition-colors", i < n ? (full ? "bg-[var(--st-done-line)]" : "bg-accent") : "bg-surface-3")} />
-          ))}
-        </span>
-      )}
+      <StepBar done={n} total={goal} />
       <span className="shrink-0 font-mono text-[12.5px] text-muted tabular" aria-hidden>
-        {n}/{goal}
+        <span key={tick.key} className={tick.className}>{n}</span>/{goal}
       </span>
     </span>
   );
@@ -464,6 +455,8 @@ function TaskTable({
   const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0);
   const cols = TASK_COLUMNS.map((c) => c.key);
   const head = (k: TaskColumnKey) => ({ label: TASK_COLUMNS.find((c) => c.key === k)!.label });
+  // La fila que se arrastra a un día queda apagada en su lugar mientras tanto.
+  const [dragging, setDragging] = useState<string | null>(null);
   return (
     // Si los anchos guardados suman más que la pantalla, la tabla se corre de costado.
     <div className="hidden max-w-full overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block lg:w-fit max-[90rem]:w-auto">
@@ -512,12 +505,15 @@ function TaskTable({
                       if (done) return;
                       e.dataTransfer.setData(TASK_DRAG, t.id);
                       e.dataTransfer.effectAllowed = "copy";
+                      setDragging(t.id);
                     }}
+                    onDragEnd={() => setDragging(null)}
                     className={cx(
                       "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2",
                       !done && "cursor-grab active:cursor-grabbing",
                       i % 2 === 1 && "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
                       fresh?.has(t.id) && "reveal",
+                      dragging === t.id && "plan-drag-source",
                     )}
                   >
                     <td className={cx(CELL, "px-3 py-1.5")}>

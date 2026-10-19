@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatMonth } from "@/lib/dates";
 import { moneyCents, moneyWhole } from "@/lib/format";
+import { Tick } from "../motion";
 
 /**
  * Patrimonio: las cuentas juntas en pesos (los dólares con la cotización de hoy)
@@ -33,7 +34,9 @@ export function NetWorth({
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <div>
           <p className="kicker">{title}</p>
-          <p className="figure mt-1 text-[34px]">{moneyWhole(now)}</p>
+          <p className="figure mt-1 text-[34px]">
+            <Tick value={now}>{moneyWhole(now)}</Tick>
+          </p>
         </div>
         <p className="pb-1 text-[13px] text-muted">
           {diff >= 0 ? "+" : "−"}

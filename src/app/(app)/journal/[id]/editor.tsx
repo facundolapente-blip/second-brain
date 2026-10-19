@@ -385,7 +385,8 @@ function SaveStatus({ status }: { status: Status }) {
       ) : busy ? (
         <span aria-hidden className="size-1.5 rounded-full motion-safe:animate-pulse bg-current" />
       ) : (
-        <Check size={13} weight="bold" aria-hidden />
+        // La tilde se dibuja al terminar de guardar (siempre llega después de escribir, nunca al abrir).
+        <Check size={13} weight="bold" aria-hidden className="check-draw" />
       )}
       {/* En pantallas angostas, "Guardando" y "Guardado" quedan solo en el ícono (el texto, para el
           lector de pantalla): la fecha necesita el lugar. Lo que hay que ver (sin guardar, en el aparato) sigue escrito. */}
@@ -400,6 +401,8 @@ function SaveStatus({ status }: { status: Status }) {
 }
 
 function MoodPicker({ value, onChange }: { value: number | null; onChange: (m: number | null) => void }) {
+  // La cara elegida aparece con un golpe corto, solo tras tocarla (al abrir la entrada, quieta).
+  const [tapped, setTapped] = useState<number | null>(null);
   return (
     <div role="radiogroup" aria-label="Ánimo del día" className="flex items-center gap-1">
       {MOODS.map((m) => {
@@ -412,14 +415,19 @@ function MoodPicker({ value, onChange }: { value: number | null; onChange: (m: n
             aria-checked={on}
             aria-label={m.label}
             title={m.label}
-            onClick={() => onChange(on ? null : m.value)}
+            onClick={() => {
+              setTapped(on ? null : m.value);
+              onChange(on ? null : m.value);
+            }}
             style={tone(m.color)}
             className={cx(
               "inline-flex size-11 items-center justify-center rounded-full border transition-[background-color,color,transform,border-color] duration-200 active:scale-90 motion-reduce:active:scale-100",
               on ? "border-[var(--tone-solid)] bg-tone text-tone-fg" : "border-transparent text-muted hover:bg-surface-2 hover:text-fg",
             )}
           >
-            <MoodIcon mood={m.value} size={on ? 28 : 26} weight={on ? "duotone" : "regular"} />
+            <span key={on ? "on" : "off"} className={cx("inline-flex", on && tapped === m.value && "mark-pop")}>
+              <MoodIcon mood={m.value} size={on ? 28 : 26} weight={on ? "duotone" : "regular"} />
+            </span>
           </button>
         );
       })}

@@ -141,6 +141,30 @@ export function ProgressBar({ pct, label }: { pct: number | null; label?: string
   );
 }
 
+/**
+ * Pasos de una tarea en segmentos (uno por paso; con más de 10, barra). Cada
+ * segmento se llena de izquierda a derecha al tildar (`.plan-seg`, solo al cambiar):
+ * `track` da alto y radio de cada segmento, `gap` la separación.
+ */
+export function StepBar({ done, total, track = "h-3 rounded-[3px]", gap = "gap-1" }: { done: number; total: number; track?: string; gap?: string }) {
+  const fill = done >= total ? "bg-[var(--st-done-line)]" : "bg-accent";
+  if (total > 10)
+    return (
+      <span className={cx("min-w-0 flex-1 overflow-hidden rounded-full bg-surface-3", track)} aria-hidden>
+        <span className={cx("bar-anim block h-full rounded-full", fill)} style={{ width: `${Math.round((Math.min(done, total) / total) * 100)}%` }} />
+      </span>
+    );
+  return (
+    <span className={cx("flex min-w-0 flex-1", gap)} aria-hidden>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={cx("min-w-0 flex-1 overflow-hidden bg-surface-3", track)}>
+          <span className={cx("plan-seg block h-full", fill)} style={i < done ? undefined : { scale: "0 1", opacity: 0 }} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function categoryMap(categories: CategoryDTO[]) {
   return new Map(categories.map((c) => [c.id, c]));
 }

@@ -71,3 +71,20 @@ export function useChangeMotion(order: string, other: string): string | undefine
   }
   return st.cls;
 }
+
+/**
+ * Para un número que cambia por un toque (contador, total, "3 de 5"): devuelve
+ * `key` (para que React lo vuelva a montar) y `className` (`count-tick` si subió,
+ * `count-tick-down` si bajó, nada al cargar).
+ * Uso: `const t = useTick(n); <span key={t.key} className={t.className}>{n}</span>`
+ */
+export function useTick(value: number | string): { key: string; className?: string } {
+  const [st, setSt] = useState<{ value: number | string; n: number; cls?: string }>({ value, n: 0 });
+  if (st.value !== value) {
+    const up = typeof value === "number" && typeof st.value === "number" ? value >= st.value : true;
+    const next = { value, n: st.n + 1, cls: up ? "count-tick" : "count-tick-down" };
+    setSt(next);
+    return { key: String(next.n), className: next.cls };
+  }
+  return { key: String(st.n), className: st.cls };
+}

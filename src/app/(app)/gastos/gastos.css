@@ -31,3 +31,90 @@
 .fin-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── Movimiento de Gastos ──────────────────────────────────────────────────
+   Mismas reglas que el resto (globals.css, "Movimiento"): nada al cargar, solo
+   transform y opacidad, salidas más cortas que las entradas y, con movimiento
+   reducido, fundidos de 120 ms. Las piezas de React están en gastos/motion.tsx. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Gráficos: al cambiar de mes, período, moneda o cuentas (`useDraw`), las barras
+     crecen desde su base, una detrás de otra; los rótulos y puntos llegan al final. */
+  .fin-draw .fin-grow-y {
+    animation: fin-grow 440ms var(--ease-out) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 18ms);
+    transform-origin: bottom;
+  }
+  .fin-draw .fin-grow-y.fin-from-top {
+    transform-origin: top;
+  }
+  .fin-draw .fin-late {
+    animation: fin-fade 240ms ease-out 300ms both;
+  }
+  @keyframes fin-grow {
+    from { scale: 1 0; }
+  }
+
+  /* Lo que sigue al puntero (tooltip, línea vertical): se desliza entre días o meses. */
+  .fin-track,
+  .fin-tip {
+    transition: translate 150ms var(--ease-out);
+  }
+
+  /* Movimiento recién cargado (o que cambió de día): entra con `reveal` y un fondo
+     de acento que se apaga, así se encuentra en su día. */
+  .fin-new {
+    position: relative;
+  }
+  .fin-new::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    pointer-events: none;
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    animation: fin-new 1600ms var(--ease-out) forwards;
+  }
+  @keyframes fin-new {
+    0%, 35% { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  /* Cuentas: en la compu cada una es una tarjeta que, con mouse, se levanta apenas y
+     la sombra crece (capa aparte que solo cambia de opacidad). En el celular son
+     filas: nada. Las demás tarjetas tocables usan .lift (globals.css). */
+  @media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+    .fin-hover-lg {
+      position: relative;
+      transition: translate var(--dur-state) var(--ease-out);
+    }
+    .fin-hover-lg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow: 0 18px 36px -16px rgba(var(--shadow-tint), 0.32);
+      opacity: 0;
+      transition: opacity var(--dur-state) var(--ease-out);
+    }
+    .fin-hover-lg:hover,
+    .fin-hover-lg:has(:focus-visible) {
+      translate: 0 -1px;
+    }
+    .fin-hover-lg:hover::after,
+    .fin-hover-lg:has(:focus-visible)::after {
+      opacity: 1;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fin-draw .fin-grow-y,
+  .fin-draw .fin-late {
+    animation: fin-fade 120ms ease-out;
+  }
+}
+
+@keyframes fin-fade {
+  from { opacity: 0; }
+}

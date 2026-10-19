@@ -386,6 +386,25 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
     const [note, setNote] = useState("");
     // Si ya se guardó al tocar un botón, cerrar no vuelve a guardar.
     const handled = useRef(false);
+    const valueRef = useRef<HTMLInputElement>(null);
+
+    /** Cambio desde los botones: la cifra se corre apenas hacia donde fue (sube desde abajo, baja desde arriba). */
+    function change(next: number) {
+      const dir = Math.sign(next - value);
+      setValue(next);
+      const el = valueRef.current;
+      if (!dir || !el || typeof el.animate !== "function") return;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.animate(
+        reduce
+          ? [{ opacity: 0.4 }, { opacity: 1 }]
+          : [
+              { opacity: 0.35, transform: `translateY(${dir * 0.22}em)` },
+              { opacity: 1, transform: "none" },
+            ],
+        { duration: reduce ? 120 : 220, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+      );
+    }
 
     useImperativeHandle(ref, () => ({
       show(habit, date) {
@@ -434,14 +453,15 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                 <div className="flex items-center justify-center gap-5">
                   <button
                     type="button"
-                    onClick={() => setValue((v) => Math.max(0, v - 1))}
-                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg transition-colors hover:bg-surface-2 active:scale-95"
+                    onClick={() => change(Math.max(0, value - 1))}
+                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-surface-2 active:scale-90 motion-reduce:active:scale-100"
                     aria-label="Restar uno"
                   >
                     <Minus size={20} weight="bold" />
                   </button>
                   <div className="min-w-24 text-center">
                     <input
+                      ref={valueRef}
                       type="number"
                       inputMode="numeric"
                       value={value}
@@ -453,11 +473,18 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                     <p className="kicker mt-1">
                       de {habit.target} {habit.unit ?? ""}
                     </p>
+                    {/* Cuánto falta para la meta: avanza al sumar (se vuelve a montar al abrir otro día, así no arranca moviéndose). */}
+                    <div key={`${habit.id}|${target.date}`} aria-hidden className="mx-auto mt-2.5 h-1 w-20 overflow-hidden rounded-full bg-surface-3">
+                      <div
+                        className="h-full rounded-full bg-[var(--st-done-line)] transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none"
+                        style={{ transform: `translateX(${Math.min(100, habit.target > 0 ? (value / habit.target) * 100 : 0) - 100}%)` }}
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setValue((v) => v + 1)}
-                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg transition-colors hover:bg-surface-2 active:scale-95"
+                    onClick={() => change(value + 1)}
+                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-surface-2 active:scale-90 motion-reduce:active:scale-100"
                     aria-label="Sumar uno"
                   >
                     <Plus size={20} weight="bold" />
@@ -466,15 +493,15 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                 {/* Atajos: solo cambian el número (se guarda con Guardar o al cerrar la hoja). */}
                 <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Atajos de cantidad">
                   {stepOf(habit.target) > 1 && (
-                    <Button variant="outline" size="sm" onClick={() => setValue((v) => v + stepOf(habit.target))}>
+                    <Button variant="outline" size="sm" onClick={() => change(value + stepOf(habit.target))}>
                       +{stepOf(habit.target)}
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" disabled={value >= habit.target} onClick={() => setValue(habit.target)}>
+                  <Button variant="outline" size="sm" disabled={value >= habit.target} onClick={() => change(habit.target)}>
                     <Check size={14} weight="bold" aria-hidden />
                     Completar
                   </Button>
-                  <Button variant="outline" size="sm" disabled={value === 0} onClick={() => setValue(0)}>
+                  <Button variant="outline" size="sm" disabled={value === 0} onClick={() => change(0)}>
                     Poner en 0
                   </Button>
                 </div>

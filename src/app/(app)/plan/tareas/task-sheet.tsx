@@ -1,6 +1,6 @@
 "use client";
 
-import { useNewIds } from "@/components/motion";
+import { leaveThen, useNewIds, useTick } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useSaveOnDismiss } from "@/components/save-on-dismiss";
@@ -226,6 +226,7 @@ function Subtasks({ task }: { task: TaskDTO }) {
   const [text, setText] = useState("");
   const [, start] = useSafeTransition();
   const done = items.filter((s) => s.done).length;
+  const doneTick = useTick(done);
   // Un paso recién agregado tiene un id provisional hasta que el servidor da el
   // suyo. Si se tilda o se saca antes, el cambio espera ese id y se manda después.
   const tmpSeq = useRef(0);
@@ -265,12 +266,21 @@ function Subtasks({ task }: { task: TaskDTO }) {
   return (
     <div className="grid gap-2">
       <span className="kicker">
-        Pasos {items.length > 0 && <span className="tracking-normal normal-case">· {done} de {items.length}</span>}
+        Pasos{" "}
+        {items.length > 0 && (
+          <span className="tracking-normal normal-case">
+            ·{" "}
+            <span key={doneTick.key} className={doneTick.className}>
+              {done}
+            </span>{" "}
+            de {items.length}
+          </span>
+        )}
       </span>
       {items.length > 0 && (
         <ul className="grid divide-y divide-line rounded-xl border border-line">
           {items.map((s) => (
-            <li key={s.k ?? s.id} className={cx("flex items-center gap-2 px-2", fresh.has(s.k ?? s.id) && "reveal")}>
+            <li key={s.k ?? s.id} data-paso={s.k ?? s.id} className={cx("flex items-center gap-2 px-2", fresh.has(s.k ?? s.id) && "reveal")}>
               <button
                 type="button"
                 aria-pressed={s.done}
@@ -295,8 +305,10 @@ function Subtasks({ task }: { task: TaskDTO }) {
                 type="button"
                 aria-label={`Sacar ${s.title}`}
                 onClick={() => {
-                  setItems((x) => x.filter((y) => y.id !== s.id));
+                  // Se va con una salida corta y recién después se saca de la lista (un segundo toque mientras sale no cuenta).
+                  if (document.querySelector(`[data-paso="${s.k ?? s.id}"]`)?.classList.contains("leave")) return;
                   sync(s, { deleted: true });
+                  leaveThen(`[data-paso="${s.k ?? s.id}"]`, () => setItems((x) => x.filter((y) => y.id !== s.id)));
                 }}
                 className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg"
               >

@@ -62,14 +62,14 @@ export function PillSwitch<T extends string>({
       <span
         aria-hidden
         className={cx(
-          "pointer-events-none absolute inset-y-1 left-1 rounded-full transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)] motion-reduce:transition-none",
+          "pointer-events-none absolute inset-y-1 left-1 rounded-full transition-transform duration-[var(--dur-state)] ease-[var(--ease-glide)] motion-reduce:transition-none",
           thumb,
         )}
         style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
       />
       {options.map((o) => {
         const active = current === o.value;
-        const cls = cx("relative z-[1] inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-colors duration-[var(--dur-quick)]", item, active ? on : off);
+        const cls = cx("relative z-[1] inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-colors duration-[var(--dur-state)]", item, active ? on : off);
         return hrefOf ? (
           <Link key={o.value} href={hrefOf(o.value)} role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => setPicked(o.value)} className={cls} scroll={false}>
             {o.label}

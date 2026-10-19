@@ -7,6 +7,7 @@ import { tone } from "@/lib/palette";
 import { JournalHeader, MoodBadge, Stat } from "../journal-ui";
 import { JournalTabs, WriteTodayButton } from "../journal-nav";
 import { MonthColumns, MonthHeatmap, WeekdayBars } from "./stats-charts";
+import { SlideOnChange } from "@/components/motion-wrap";
 
 export const metadata = { title: "Estadísticas · Journal" };
 
@@ -124,7 +125,10 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             >
               <CaretLeft size={18} />
             </Link>
-            <h2 className="display text-[28px] first-letter:uppercase">{formatMonth(month)}</h2>
+            {/* Al cambiar de mes, el nombre y las cifras entran desde ese lado (las flechas quedan quietas: no pierden el foco). */}
+            <SlideOnChange k={month} className="min-w-0">
+              <h2 className="display text-[28px] first-letter:uppercase">{formatMonth(month)}</h2>
+            </SlideOnChange>
             {month < current ? (
               <Link
                 href={monthLink(shiftMonth(month, 1))}
@@ -139,6 +143,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             )}
           </div>
 
+          <SlideOnChange k={month} className="grid content-start gap-5">
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4 lg:grid-cols-2">
             <Stat label="Entradas" value={<span className="tabular">{s.monthEntries}</span>} />
             <Stat
@@ -193,6 +198,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               </ul>
             </div>
           )}
+          </SlideOnChange>
 
           </div>
 

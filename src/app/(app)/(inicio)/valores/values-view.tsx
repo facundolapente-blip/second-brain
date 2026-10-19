@@ -7,6 +7,7 @@ import { cx, inputClass } from "@/components/ui";
 import { notifyError } from "@/components/undo-toast";
 import { saveValues } from "@/lib/offline/values";
 import { parseValueNotes } from "@/lib/values";
+import { useSwap } from "@/components/motion";
 
 type Status = "saved" | "dirty" | "saving" | "error";
 
@@ -114,10 +115,14 @@ function SaveState({ status }: { status: Status }) {
     saving: { icon: <CloudArrowUp size={14} />, text: "Guardando" },
     error: { icon: <WarningCircle size={14} weight="fill" />, text: "No se guardó" },
   }[status];
+  // Cada estado entra con un fundido corto (nunca al cargar); la tilde se dibuja al terminar de guardar.
+  const swap = useSwap(status);
   return (
     <span role="status" className={cx("inline-flex shrink-0 items-center gap-1.5 font-mono text-[12px]", status === "error" ? "text-danger" : "text-muted")}>
-      {map.icon}
-      {map.text}
+      <span key={status} className={cx("inline-flex items-center gap-1.5", swap)}>
+        <span className={cx("inline-flex", swap && status === "saved" && "check-draw")}>{map.icon}</span>
+        {map.text}
+      </span>
     </span>
   );
 }

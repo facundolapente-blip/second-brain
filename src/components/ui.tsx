@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { notifyDeleted } from "./undo-toast";
+import { useTick } from "./motion";
 
 export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
@@ -130,7 +131,7 @@ export function Segmented<T extends string>({
       {/* La marca de lo elegido se desliza a la opción nueva (las columnas son iguales). */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-y-[3px] left-[3px] rounded-[3px] bg-raised shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)] transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)] motion-reduce:transition-none"
+        className="pointer-events-none absolute inset-y-[3px] left-[3px] rounded-[3px] bg-raised shadow-[0_1px_2px_rgba(var(--shadow-tint),0.12)] transition-transform duration-[var(--dur-state)] ease-[var(--ease-glide)] motion-reduce:transition-none"
         style={{ width: `calc((100% - 6px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
       />
       {options.map((o) => (
@@ -143,7 +144,7 @@ export function Segmented<T extends string>({
           tabIndex={o.value === options[index]?.value ? 0 : -1}
           onClick={() => onChange(o.value)}
           className={cx(
-            "relative h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors",
+            "relative h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors duration-[var(--dur-state)]",
             value === o.value ? "text-fg" : "text-muted hover:text-fg",
           )}
         >
@@ -156,6 +157,9 @@ export function Segmented<T extends string>({
 }
 
 export type SheetHandle = { open: () => void; close: () => void };
+
+/** Lo que dura la salida de una hoja (igual que `--dur-exit` en globals.css). */
+const EXIT_MS = 180;
 
 /**
  * Hoja inferior en el celular, modal centrado en pantalla grande. Usa <dialog>
@@ -186,6 +190,7 @@ export const Sheet = forwardRef<
     d.classList.remove("closing");
     d.style.transform = "";
     d.style.transition = "";
+    d.style.removeProperty("--sheet-fade");
   }
   function open() {
     const d = dlg.current;
@@ -202,7 +207,7 @@ export const Sheet = forwardRef<
     closing.current = setTimeout(() => {
       d.close();
       reset(d);
-    }, 170);
+    }, EXIT_MS);
   }
   /** Cierre pedido por la persona: primero `onDismiss` (si la hoja sigue abierta). */
   function dismiss() {
@@ -223,34 +228,47 @@ export const Sheet = forwardRef<
     onPointerDown: (e: React.PointerEvent) => {
       if (e.pointerType === "mouse" || (e.target as HTMLElement).closest("button")) return;
       drag.current = { y: e.clientY, t: e.timeStamp, dy: 0 };
+      dlg.current?.classList.add("dragging");
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
     onPointerMove: (e: React.PointerEvent) => {
       const g = drag.current;
       const d = dlg.current;
       if (!g || !d) return;
-      g.dy = Math.max(0, e.clientY - g.y);
+      const raw = e.clientY - g.y;
+      // Hacia abajo sigue al dedo; hacia arriba se resiste (cede poco y cada vez menos).
+      g.dy = Math.max(0, raw);
+      const shown = raw >= 0 ? raw : -Math.min(14, Math.sqrt(-raw) * 1.6);
       d.style.transition = "none";
-      d.style.transform = `translateY(${g.dy}px)`;
+      d.style.transform = `translateY(${shown}px)`;
+      // El fondo se aclara a medida que la hoja baja.
+      d.style.setProperty("--sheet-fade", String(Math.max(0.15, 1 - g.dy / Math.max(1, d.offsetHeight))));
     },
     onPointerUp: (e: React.PointerEvent) => {
       const g = drag.current;
       const d = dlg.current;
       drag.current = null;
       if (!g || !d) return;
+      d.classList.remove("dragging");
       const fast = g.dy / Math.max(1, e.timeStamp - g.t) > 0.6;
       if (g.dy > 90 || (fast && g.dy > 24)) {
         onDismiss?.();
-        d.style.transition = "transform 170ms cubic-bezier(0.4, 0, 1, 1)";
+        // Sigue bajando a la velocidad que traía (un tirón rápido se va más rápido).
+        d.style.transition = `transform ${fast ? 150 : EXIT_MS}ms var(--ease-in)`;
         d.style.transform = "translateY(100%)";
+        d.classList.add("closing-drag");
         clearTimeout(closing.current);
         closing.current = setTimeout(() => {
           d.close();
+          d.classList.remove("closing-drag");
           reset(d);
-        }, 170);
+        }, fast ? 150 : EXIT_MS);
       } else {
-        d.style.transition = "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)";
+        // Vuelve a su lugar con un rebote mínimo (con menos movimiento, sin rebote).
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        d.style.transition = reduce ? "transform 120ms ease-out" : "transform 420ms var(--ease-spring)";
         d.style.transform = "";
+        d.style.removeProperty("--sheet-fade");
       }
     },
   };
@@ -342,6 +360,8 @@ export function ConfirmButton({
   disabled?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
+  // El texto cambia con un corrimiento corto (no de golpe): "Borrar" ↔ "Tocá de nuevo…".
+  const tick = useTick(armed ? 1 : 0);
   useEffect(() => {
     if (!armed) return;
     const t = setTimeout(() => setArmed(false), 5000);
@@ -362,7 +382,9 @@ export function ConfirmButton({
         } else setArmed(true);
       }}
     >
-      {armed ? confirmLabel : children}
+      <span key={tick.key} className={cx("inline-flex items-center gap-2", tick.className)}>
+        {armed ? confirmLabel : children}
+      </span>
     </Button>
   );
 }

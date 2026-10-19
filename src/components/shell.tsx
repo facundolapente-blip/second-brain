@@ -3,9 +3,9 @@
 import { PillSwitch } from "./pill-switch";
 import { notifyInfo, UndoToast } from "./undo-toast";
 import { ContextMenuHost } from "./context-menu";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Bell, CalendarCheck, ChartLineUp, Compass, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
 import { signOut } from "@/lib/auth-client";
 import { THEME_COLOR, THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
@@ -13,6 +13,7 @@ import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
 import { flushQueue, pendingCount } from "@/lib/offline-queue";
 import { flushActions, pendingActions, subscribePending } from "@/lib/offline/registry";
 import { cx } from "./ui";
+import { useTick } from "./motion";
 
 type Module = { href: string; label: string; icon: Icon; color: string };
 
@@ -51,29 +52,99 @@ export function MenuButton() {
   );
 }
 
+/**
+ * Mientras carga la pantalla del enlace tocado, su puntito late (sin mover nada:
+ * siempre ocupa su lugar). Si la pantalla llega enseguida, ni se ve.
+ */
+function NavHint({ color }: { color?: string }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden
+      className={cx("ml-auto size-2 shrink-0 rounded-full", pending && "nav-pending", !color && !pending && "opacity-0")}
+      style={{ background: color ?? "currentColor" }}
+    />
+  );
+}
+
+/** Abrir en otra pestaña (Ctrl/Cmd/Shift o botón del medio) no cambia la marca. */
+function plainClick(e: React.MouseEvent) {
+  return !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
+}
+
 function Nav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  // La marca pasa al enlace tocado enseguida, sin esperar a que llegue la pantalla.
+  const [clicked, setClicked] = useState<string | null>(null);
+  const [from, setFrom] = useState(pathname);
+  if (from !== pathname) {
+    setFrom(pathname);
+    setClicked(null);
+  }
+  const isActive = (href: string, exact?: boolean) =>
+    clicked ? clicked === href : exact ? pathname === href : pathname.startsWith(href);
+
+  // La marca de lo elegido es una sola pieza que se desliza al enlace nuevo. Hasta medir
+  // (al cargar), cada enlace pinta su propio fondo: así nunca se ve sin marca.
+  const nav = useRef<HTMLElement>(null);
+  const [mark, setMark] = useState<{ y: number; h: number; moved: boolean } | null>(null);
+  const activeHref = MODULES.find((m) => isActive(m.href, m.href === "/"))?.href ?? TOOLS.find((t) => isActive(t.href))?.href ?? null;
+  useLayoutEffect(() => {
+    const box = nav.current;
+    if (!box) return;
+    const measure = (moved: boolean) => {
+      const el = activeHref ? box.querySelector<HTMLElement>(`a[data-href="${activeHref}"]`) : null;
+      if (!el || el.getClientRects().length === 0) return setMark(null);
+      const y = el.offsetTop;
+      const h = el.offsetHeight;
+      setMark((m) => (m && m.y === y && m.h === h ? m : { y, h, moved: moved && m !== null }));
+    };
+    measure(true);
+    // Si cambia el alto de algo (llega la letra, se agranda la pantalla), se acomoda sin deslizarse.
+    const ro = new ResizeObserver(() => measure(false));
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [activeHref]);
+  const markReady = mark !== null;
+
+  const linkCls = (active: boolean) =>
+    cx(
+      "press relative z-[1] flex items-center gap-3 rounded-xl px-3 transition-colors duration-200",
+      active ? "font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
+      active && !markReady && "bg-side-on-bg",
+    );
   return (
-    <nav aria-label="Módulos">
+    <nav ref={nav} aria-label="Módulos" className="relative">
+      {mark && (
+        <span
+          aria-hidden
+          className={cx(
+            "pointer-events-none absolute inset-x-0 top-0 rounded-xl bg-side-on-bg",
+            mark.moved && "transition-[translate,height] duration-[var(--dur-state)] ease-[var(--ease-glide)] motion-reduce:transition-none",
+          )}
+          style={{ translate: `0 ${mark.y}px`, height: mark.h }}
+        />
+      )}
       <ul className="grid gap-1">
         {MODULES.map((m, i) => {
-          const active = m.href === "/" ? pathname === "/" : pathname.startsWith(m.href);
+          const active = isActive(m.href, m.href === "/");
           const Ico = m.icon;
           return (
             <li key={m.href}>
               <Link
                 href={m.href}
-                onClick={onNavigate}
+                data-href={m.href}
+                onClick={(e) => {
+                  if (plainClick(e)) setClicked(m.href);
+                  onNavigate?.();
+                }}
                 aria-current={active ? "page" : undefined}
-                className={cx(
-                  "flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors duration-200",
-                  active ? "bg-side-on-bg font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
-                )}
+                className={cx("h-11 text-[15px]", linkCls(active))}
               >
                 <span className="font-mono text-[11px] tabular opacity-60">{String(i).padStart(2, "0")}</span>
                 <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
                 {m.label}
-                <span aria-hidden className="ml-auto size-2 rounded-full" style={{ background: m.color }} />
+                <NavHint color={m.color} />
               </Link>
             </li>
           );
@@ -82,21 +153,23 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
       <p className="mt-6 mb-1.5 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
       <ul className="grid gap-1">
         {TOOLS.map((t) => {
-          const active = pathname.startsWith(t.href);
+          const active = isActive(t.href);
           const Ico = t.icon;
           return (
             <li key={t.href}>
               <Link
                 href={t.href}
-                onClick={onNavigate}
+                data-href={t.href}
+                onClick={(e) => {
+                  if (plainClick(e)) setClicked(t.href);
+                  onNavigate?.();
+                }}
                 aria-current={active ? "page" : undefined}
-                className={cx(
-                  "flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors duration-200",
-                  active ? "bg-side-on-bg font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
-                )}
+                className={cx("h-10 text-[14px]", linkCls(active))}
               >
                 <Ico size={17} weight={active ? "fill" : "regular"} aria-hidden />
                 {t.label}
+                <NavHint />
               </Link>
             </li>
           );
@@ -146,6 +219,7 @@ function applyTheme(t: Theme) {
 function SignOutButton() {
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const tick = useTick(busy ? 2 : armed ? 1 : 0);
   useEffect(() => {
     if (!armed) return;
     const t = setTimeout(() => setArmed(false), 4000);
@@ -197,12 +271,14 @@ function SignOutButton() {
       onClick={() => (armed ? out() : setArmed(true))}
       aria-live="polite"
       className={cx(
-        "flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-[13.5px] transition-colors",
+        "press flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-[13.5px]",
         armed ? "bg-[var(--st-fail-bg)] font-medium text-[var(--st-fail-fg)]" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
       )}
     >
       <SignOut size={17} aria-hidden />
-      {busy ? "Saliendo…" : armed ? "Tocá de nuevo para salir" : "Cerrar sesión"}
+      <span key={tick.key} className={tick.className}>
+        {busy ? "Saliendo…" : armed ? "Tocá de nuevo para salir" : "Cerrar sesión"}
+      </span>
     </button>
   );
 }
@@ -304,9 +380,92 @@ function useOffline() {
   return { offline, pending, syncing };
 }
 
+/**
+ * Cajón del celular: se cierra deslizándolo hacia la izquierda. Sigue al dedo (el
+ * fondo se aclara a la par) y al soltar se cierra si pasó un tercio o fue un tirón;
+ * si no, vuelve. Solo con el dedo y si el gesto es más horizontal que vertical
+ * (deslizar para arriba o abajo y tocar un enlace siguen igual).
+ */
+function useSwipeToClose(close: () => void) {
+  const g = useRef<{ x: number; y: number; t: number; dx: number; on: boolean; id: number } | null>(null);
+  // El panel es el que recibe el gesto; el fondo, el hermano de antes.
+  const parts = (e: React.PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    return { el, bg: el.previousElementSibling as HTMLElement | null };
+  };
+  const clear = (...els: (HTMLElement | null)[]) => {
+    for (const x of els) {
+      if (!x) continue;
+      x.style.translate = "";
+      x.style.opacity = "";
+      x.style.transition = "";
+    }
+  };
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      g.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, on: false, id: e.pointerId };
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const s = g.current;
+      if (!s) return;
+      const { el, bg } = parts(e);
+      const dx = e.clientX - s.x;
+      const dy = e.clientY - s.y;
+      if (!s.on) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) {
+          if (Math.abs(dy) > 10) g.current = null;
+          return;
+        }
+        s.on = true;
+        try {
+          el.setPointerCapture(s.id);
+        } catch {
+          // El puntero ya no está (se levantó el dedo): sigue sin captura.
+        }
+      }
+      // Hacia la izquierda sigue al dedo; hacia la derecha se resiste.
+      s.dx = dx < 0 ? dx : Math.min(12, Math.sqrt(dx) * 1.5);
+      el.style.transition = "none";
+      el.style.translate = `${s.dx}px 0`;
+      if (bg) {
+        bg.style.transition = "none";
+        bg.style.opacity = String(Math.max(0, 1 + Math.min(0, s.dx) / el.offsetWidth));
+      }
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      const s = g.current;
+      g.current = null;
+      if (!s?.on) return;
+      const { el, bg } = parts(e);
+      const fast = -s.dx / Math.max(1, e.timeStamp - s.t) > 0.5;
+      if (-s.dx > el.offsetWidth / 3 || (fast && s.dx < -24)) {
+        // Al sacar el estilo en línea, la transición de cierre sigue desde donde quedó.
+        clear(el, bg);
+        close();
+      } else {
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el.style.transition = reduce ? "translate 120ms ease-out" : "translate 420ms var(--ease-spring)";
+        el.style.translate = "";
+        if (bg) {
+          bg.style.transition = "opacity 220ms ease-out";
+          bg.style.opacity = "";
+        }
+        setTimeout(() => clear(el, bg), 440);
+      }
+    },
+    onPointerCancel: (e: React.PointerEvent) => {
+      g.current = null;
+      const { el, bg } = parts(e);
+      clear(el, bg);
+    },
+  };
+}
+
 export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
   const [drawer, setDrawer] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
+  const swipe = useSwipeToClose(() => setDrawer(false));
   // Cajón abierto: Escape lo cierra, el foco entra al menú y al cerrar vuelve a
   // donde estaba (el botón "Abrir menú").
   useEffect(() => {
@@ -371,7 +530,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
             onClick={() => setDrawer(false)}
             className={cx(
               "absolute inset-0 bg-[rgba(20,18,14,0.45)] transition-opacity",
-              drawer ? "duration-[280ms] ease-[var(--ease-out)]" : "duration-200 ease-[var(--ease-in)]",
+              drawer ? "duration-[var(--dur-sheet)] ease-[var(--ease-out)]" : "duration-[var(--dur-exit)] ease-[var(--ease-in)]",
               drawer ? "opacity-100" : "opacity-0",
             )}
           />
@@ -380,10 +539,12 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
             role="dialog"
             aria-modal="true"
             aria-label="Menú"
+            {...swipe}
             className={cx(
-              // Entra en 280 ms y se va en 200 (más rápido); con menos movimiento, solo un fundido en su lugar.
-              "absolute inset-y-0 left-0 flex w-[17.5rem] flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
-              drawer ? "duration-[280ms] ease-[var(--ease-out)]" : "duration-200 ease-[var(--ease-in)] motion-reduce:opacity-0",
+              // Entra con la curva de las hojas y se va más rápido; se cierra también deslizándolo
+              // hacia la izquierda. Con menos movimiento, solo un fundido en su lugar.
+              "absolute inset-y-0 left-0 flex w-[17.5rem] touch-pan-y flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[16px_0_48px_-24px_rgba(0,0,0,0.45)] transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
+              drawer ? "duration-[var(--dur-sheet)] ease-[var(--ease-sheet)]" : "duration-[var(--dur-exit)] ease-[var(--ease-in)] motion-reduce:opacity-0",
               drawer ? "translate-x-0" : "-translate-x-full",
             )}
           >

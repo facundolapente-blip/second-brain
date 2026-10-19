@@ -29,7 +29,7 @@ export function NavAddButton({ label }: { label: string }) {
         type="button"
         onClick={() => window.dispatchEvent(new Event(EVENT))}
         aria-label={label}
-        className="lift -mt-5 inline-flex size-[58px] items-center justify-center rounded-full bg-ink text-on-ink ring-[5px] ring-bg transition-transform duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 motion-reduce:transition-none"
+        className="nav-add lift -mt-5 inline-flex size-[58px] items-center justify-center rounded-full bg-ink text-on-ink ring-[5px] ring-bg"
       >
         <Plus size={26} />
       </button>

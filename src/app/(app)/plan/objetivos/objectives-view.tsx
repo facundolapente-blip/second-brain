@@ -43,6 +43,7 @@ import {
   type Quarter,
 } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
+import { useSlide, useTick } from "@/components/motion";
 import { PillSwitch } from "@/components/pill-switch";
 import { notifyInfo } from "@/components/undo-toast";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
@@ -226,6 +227,7 @@ export function ObjectivesView({
             key={`${review.year}-${review.quarter}`}
             year={review.year}
             quarter={review.quarter}
+            opened={forcedReview !== null}
             groups={groups}
             today={today}
             onOpen={openKr}
@@ -386,6 +388,8 @@ function YearMap({
   onPlan: (objectiveId: string, quarter: Quarter) => void;
 }) {
   const [mobileQ, setMobileQ] = useState<Quarter>(nowQ ?? "Q1");
+  // Otro trimestre en el celular: entra desde ese lado (Q1 → Q2 desde la derecha).
+  const qSlide = useSlide(mobileQ);
   const currentYear = Number(today.slice(0, 4));
   // Se planifica en el trimestre en curso y los que vienen (o todo un año futuro).
   const plannable = (q: Quarter) => year > currentYear || (year === currentYear && nowQ !== null && QUARTERS.indexOf(q) >= QUARTERS.indexOf(nowQ));
@@ -488,7 +492,7 @@ function YearMap({
           className="w-full"
           options={QUARTERS.map((q) => ({ value: q, label: q === nowQ ? `${q} · ahora` : q }))}
         />
-        <ul className="grid gap-2.5">
+        <ul key={mobileQ} className={cx("grid gap-2.5", qSlide)}>
           {groups.map((g) => (
             <li key={g.id || "loose"} className="grid gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3.5">
               <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
@@ -520,6 +524,7 @@ function GoalStepper({ o }: { o: Group }) {
     setValue(o.progress ?? 0);
   }
   const goal = o.goal ?? 0;
+  const tick = useTick(value);
   const bump = (d: 1 | -1) => {
     const next = Math.max(0, Math.min(goal, value + d));
     if (next === value) return;
@@ -531,8 +536,10 @@ function GoalStepper({ o }: { o: Group }) {
       <button type="button" onClick={() => bump(-1)} aria-label={`Restar uno a ${cleanTitle(o.title)}`} className="inline-flex size-11 items-center justify-center rounded-full text-muted hover:text-fg">
         <Minus size={14} />
       </button>
-      <span className="min-w-6 text-center font-mono text-[13px] tabular" aria-live="polite">
-        {fmtNum(value)}
+      <span className="min-w-6 overflow-hidden text-center font-mono text-[13px] tabular" aria-live="polite">
+        <span key={tick.key} className={tick.className}>
+          {fmtNum(value)}
+        </span>
       </span>
       <button type="button" onClick={() => bump(1)} aria-label={`Sumar uno a ${cleanTitle(o.title)}`} className="inline-flex size-11 items-center justify-center rounded-full text-muted hover:text-fg">
         <Plus size={14} />
@@ -592,7 +599,7 @@ function RoleCard({
   const note = late ? `deadline vencido (${shortDate(o.deadline!, today)})` : o.status === "todo" ? "sin empezar" : null;
 
   return (
-    <article className="relative grid h-full content-start gap-3 rounded-2xl border border-line bg-surface px-5 pt-4 pb-4 transition-shadow hover:shadow-[var(--card-shadow)]">
+    <article className="lift plan-hover relative grid h-full content-start gap-3 rounded-2xl border border-line bg-surface px-5 pt-4 pb-4">
       <div className="grid gap-1">
         <span className="kicker">{o.loose ? "Sueltos" : (o.role ?? o.area ?? "Objetivo")}</span>
         <h3 className="text-[17px] leading-snug font-semibold">
@@ -756,11 +763,14 @@ function QuarterReview({
   quarter,
   groups,
   today,
+  opened,
   onOpen,
   onClose,
 }: {
   year: number;
   quarter: Quarter;
+  /** Abierta con "Revisar el Qn": entra desplegándose (la que aparece sola al cargar, no). */
+  opened: boolean;
   groups: Group[];
   today: string;
   onOpen: (k: KeyResultDTO) => void;
@@ -768,7 +778,13 @@ function QuarterReview({
 }) {
   const router = useRouter();
   const [pending, start] = useSafeTransition();
-  const [carried, setCarried] = useState(false);
+  const [carried, setCarried] = useState<string | null>(null);
+  // Al cerrarla se pliega (alto y opacidad) y recién después sale de la página.
+  const [closing, setClosing] = useState(false);
+  function close() {
+    setClosing(true);
+    setTimeout(onClose, 220);
+  }
   const rows = groups
     .map((g) => ({ g, krs: g.keyResults.filter((k) => krQuarters(k).includes(quarter)) }))
     .filter((r) => r.krs.length);
@@ -781,10 +797,12 @@ function QuarterReview({
   const questions = quarterReviewQuestions(unfinished.length, next.quarter);
 
   return (
-    <section aria-label={`Revisión del ${quarter} ${year}`} className="reveal relative mt-4 grid gap-5 rounded-2xl border border-line bg-surface px-5 pt-5 pb-5 lg:px-7">
+    <div className="fold" data-closed={closing || undefined}>
+    <div className="plan-fold-shadow">
+    <section aria-label={`Revisión del ${quarter} ${year}`} className={cx(opened && "reveal", "relative mt-4 grid gap-5 rounded-2xl border border-line bg-surface px-5 pt-5 pb-5 lg:px-7")}>
       <button
         type="button"
-        onClick={onClose}
+        onClick={close}
         aria-label="Cerrar la revisión"
         className="absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
       >
@@ -848,7 +866,7 @@ function QuarterReview({
                               <span className="flex w-36 shrink-0 items-center gap-2 max-sm:w-24">
                                 <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
                                   <span
-                                    className={cx("block h-full rounded-full", k.status === "done" ? "bg-[var(--st-done-line)]" : "bg-accent")}
+                                    className={cx("bar-anim block h-full rounded-full", k.status === "done" ? "bg-[var(--st-done-line)]" : "bg-accent")}
                                     style={{ width: `${p}%` }}
                                   />
                                 </span>
@@ -875,6 +893,13 @@ function QuarterReview({
               <Button variant="accent" size="sm" disabled={pending} onClick={() => start(() => writeQuarterReview(year, quarter, unfinished.length))}>
                 Escribir la revisión
               </Button>
+              {/* Lo llevado queda confirmado ahí mismo (la tilde se dibuja), además del aviso de abajo. */}
+              {carried && (
+                <span role="status" className="reveal inline-flex h-9 items-center gap-1.5 px-1 text-[13.5px] font-medium text-[var(--st-done-fg)]">
+                  <Check size={15} weight="bold" aria-hidden className="check-draw" />
+                  {carried}
+                </span>
+              )}
               {unfinished.length > 0 && !carried && (
                 <Button
                   variant="outline"
@@ -884,9 +909,10 @@ function QuarterReview({
                     start(async () => {
                       const r = await carryOverKrs({ krIds: unfinished.map((k) => k.id), year: next.year, quarter: next.quarter });
                       if (!r.ok) return;
-                      setCarried(true);
                       const n = "count" in r && typeof r.count === "number" ? r.count : unfinished.length;
-                      notifyInfo(n ? `${n} llevados al ${next.quarter}${next.year !== year ? ` ${next.year}` : ""}` : `Ya estaban en el ${next.quarter}`);
+                      const msg = n ? `${n} llevados al ${next.quarter}${next.year !== year ? ` ${next.year}` : ""}` : `Ya estaban en el ${next.quarter}`;
+                      setCarried(msg);
+                      notifyInfo(msg);
                       if (next.year !== year) router.refresh();
                     })
                   }
@@ -899,6 +925,8 @@ function QuarterReview({
         </div>
       )}
     </section>
+    </div>
+    </div>
   );
 }
 

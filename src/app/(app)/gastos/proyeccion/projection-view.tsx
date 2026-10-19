@@ -253,7 +253,8 @@ function MonthChart({ p }: { p: Projection }) {
         <path d={path(p.avgLine)} fill="none" stroke="var(--faint)" strokeWidth="1.5" strokeDasharray="2 4" vectorEffect="non-scaling-stroke" />
         <path d={path(p.projectedLine)} fill="none" stroke="var(--fin-out)" strokeWidth="2" strokeDasharray="6 5" vectorEffect="non-scaling-stroke" />
         <path d={path(p.actual)} fill="none" stroke="var(--fin-out)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        <line x1={x(focus)} x2={x(focus)} y1="0" y2={H} stroke="var(--border-strong)" vectorEffect="non-scaling-stroke" />
+        {/* Se corre con translate (unidades del gráfico): se desliza de un día a otro en vez de saltar. */}
+        <line x1={0} x2={0} y1="0" y2={H} stroke="var(--border-strong)" vectorEffect="non-scaling-stroke" className="fin-track" style={{ translate: `${x(focus).toFixed(1)}px 0` }} />
       </svg>
       <details className="text-sm">
         <summary className="kicker inline-flex min-h-11 cursor-pointer items-center select-none hover:text-fg">Ver como tabla</summary>
