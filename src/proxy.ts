@@ -18,6 +18,8 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/cron/")) return NextResponse.next();
   // El webhook de WhatsApp tampoco: la ruta valida la firma de Meta y el número de Facu.
   if (pathname === "/api/whatsapp") return NextResponse.next();
+  // Política de privacidad pública: Meta la pide para publicar la app del bot.
+  if (pathname === "/privacidad") return NextResponse.next();
   if (mailSinLogin()) return NextResponse.next();
 
   // Sin cookie ni se consulta la base; con cookie, se comprueba que la sesión exista y no haya vencido.
