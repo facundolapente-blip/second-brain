@@ -1,5 +1,6 @@
 "use client";
 
+import { useGastosNew } from "../new-action";
 import { quiet, safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Handshake, Plus } from "@phosphor-icons/react";
@@ -11,7 +12,6 @@ import { CURRENCIES, moneyCents } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
-import { Fab } from "../shared";
 
 type Dir = DebtDTO["direction"];
 
@@ -35,6 +35,8 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
   const people = new Map<string, DebtDTO[]>();
   for (const d of open) people.set(d.person, [...(people.get(d.person) ?? []), d]);
 
+  // El "+" de la barra de abajo crea acá.
+  useGastosNew(() => edit(null));
   function edit(d: DebtDTO | null) {
     setEditing(d);
     setKey((k) => k + 1);
@@ -151,8 +153,6 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
           </div>
         )}
       </main>
-
-      <Fab onClick={() => edit(null)} label="Nueva deuda" />
 
       <Sheet ref={sheet} title={editing ? "Editar deuda" : "Nueva deuda"}>
         <DebtForm key={key} debt={editing} onDone={() => sheet.current?.close()} />

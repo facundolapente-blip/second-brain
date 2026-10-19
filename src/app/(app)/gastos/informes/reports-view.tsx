@@ -25,6 +25,7 @@ import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
 import { CategoryAvatar, useLookups } from "../shared";
 import { PeriodNav } from "../period-nav";
+import { NavDim, usePeriodSwipe } from "../period-step";
 import { normTitle } from "@/lib/smart-logic";
 
 const ALL = "ALL";
@@ -137,6 +138,8 @@ export function ReportsView({
   todayRates: Record<string, number>;
 }) {
   const { selection, scope, setSelection } = useSelection(accounts);
+  // Deslizar de costado cambia de mes o de año, como las flechas (no sobre los gráficos).
+  const swipe = usePeriodSwipe();
   const lk = useLookups(accounts, categories);
 
   const currencies = useMemo(() => {
@@ -267,7 +270,7 @@ export function ReportsView({
     <>
       <PageHeader title="Informes" wide tabs={<GastosTabs />} />
 
-      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-2 pb-8 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-6">
+      <main {...swipe} className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-2 pb-8 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-6">
         {/* Filtros: una sola fila arriba de todo lo que afectan. */}
         <div className="lg:col-span-12">
           <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
@@ -280,7 +283,7 @@ export function ReportsView({
         </div>
         <section className="grid gap-3 lg:col-span-12 lg:grid-cols-[1fr_minmax(0,340px)] lg:items-center" aria-label="Filtros">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} basePath="/gastos/informes" modes={["month", "year"]} />
+            <PeriodNav period={period} today={today} basePath="/gastos/informes" modes={["month", "year"]} />
             {currencies.length > 1 && (
               <div className="w-full sm:w-[22rem]">
                 <Segmented
@@ -295,6 +298,7 @@ export function ReportsView({
           <AccountSwitcher accounts={accounts} selection={selection} onChange={setSelection} />
         </section>
 
+        <NavDim className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
         {empty ? (
           <div className="grid justify-items-start gap-2 border-y border-line py-10 lg:col-span-12">
             <span className="inline-flex text-accent-fg">
@@ -431,6 +435,7 @@ export function ReportsView({
             </section>
           </>
         )}
+        </NavDim>
       </main>
     </>
   );
@@ -591,6 +596,7 @@ function PaceChart({
           key={drawKey}
           ref={box}
           role="img"
+          data-no-swipe
           tabIndex={0}
           aria-label={`Gasto acumulado: ${formatMonth(month)} ${moneyWhole(curSeries[curEnd], currency)} al día ${curEnd}; ${formatMonth(prevMonth)} ${moneyWhole(prevSeries[prevEnd], currency)} en total.`}
           onPointerMove={(e) => pick(e.clientX)}
@@ -652,8 +658,9 @@ function PaceChart({
                 style={{ translate: h > span / 2 ? "calc(-100% - 10px) 0" : "10px 0" }}
               >
                 <span className="text-muted">Día {h}</span>
-                <TooltipRow color="var(--fin-out)" label={monthName(month)} value={h <= curEnd ? moneyWhole(curSeries[h], currency) : "Sin datos"} />
-                <TooltipRow color="var(--faint)" label={monthName(prevMonth)} value={h <= prevEnd ? moneyWhole(prevSeries[h], currency) : "Sin datos"} />
+                {/* Un día que todavía no llegó (o que el mes anterior no tuvo) no tiene fila. */}
+                {h <= curEnd && <TooltipRow color="var(--fin-out)" label={monthName(month)} value={moneyWhole(curSeries[h], currency)} />}
+                {h <= prevEnd && <TooltipRow color="var(--faint)" label={monthName(prevMonth)} value={moneyWhole(prevSeries[h], currency)} />}
               </div>
             </PointerTrack>
           )}
@@ -1007,7 +1014,7 @@ function MonthlyColumns({
           ))}
         </div>
 
-        <div className="relative" style={{ height: H }}>
+        <div className="relative" data-no-swipe style={{ height: H }}>
           {ticks.map((t) => (
             <span
               key={t}
@@ -1247,7 +1254,7 @@ function NetColumns({
           ))}
         </div>
 
-        <div className="relative" style={{ height: H }}>
+        <div className="relative" data-no-swipe style={{ height: H }}>
           {ticks.map((t) => (
             <span
               key={t}

@@ -8,17 +8,26 @@ import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHan
 import { CalendarPlus, Check, Link as LinkIcon, PencilSimple, Plus, X, CopySimple } from "@phosphor-icons/react";
 import { addSubtask, deleteSubtask, deleteTask, saveTask, toggleSubtask, duplicateTask } from "@/lib/offline/plan";
 import { linkLabel, normalizeLink, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskLink, type TaskStatus } from "@/lib/plan-logic";
-import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, IconButton, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { PriorityPicker } from "../plan-ui";
+import { CategoryChoice, PriorityPicker } from "../plan-ui";
 
 export type TaskSheetHandle = { open: (task?: TaskDTO, preset?: { status?: TaskStatus }) => void };
+
+/**
+ * Lo que hacen las tareas con la hoja, al instante: guardar cierra la hoja y la
+ * tarea ya se ve cambiada (o nueva); si el servidor falla, vuelve sola y avisa.
+ */
+export type TaskSheetActions = {
+  save: (fd: FormData, task?: TaskDTO) => void;
+  duplicate: (task: TaskDTO) => void;
+  remove: (task: TaskDTO) => void;
+};
 
 /** Hoja para crear o editar una tarea. "Agendar" la lleva a la semana como bloque. */
 export const TaskSheet = forwardRef<
   TaskSheetHandle,
-  { categories: CategoryDTO[]; onSchedule: (task: TaskDTO) => void }
->(function TaskSheet({ categories, onSchedule }, ref) {
+  { categories: CategoryDTO[]; onSchedule: (task: TaskDTO) => void; actions?: TaskSheetActions }
+>(function TaskSheet({ categories, onSchedule, actions }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [task, setTask] = useState<TaskDTO | undefined>();
   const [presetStatus, setPresetStatus] = useState<TaskStatus | undefined>();
@@ -43,6 +52,7 @@ export const TaskSheet = forwardRef<
           dismiss.current = fn;
         }}
         categories={categories}
+        actions={actions}
         onDone={() => sheet.current?.close()}
         onSchedule={(t) => {
           sheet.current?.close();
@@ -60,7 +70,9 @@ function TaskForm({
   onSchedule,
   registerDismiss,
   initialStatus,
+  actions,
 }: {
+  actions?: TaskSheetActions;
   task?: TaskDTO;
   /** Estado con el que arranca una tarea nueva (el "+" de una columna del tablero). */
   initialStatus?: TaskStatus;
@@ -80,14 +92,26 @@ function TaskForm({
   useEffect(() => {
     if (state?.ok) notify();
   }, [state]);
+  // Editar en la compu: el foco va al nombre (en el celular no, así no salta el teclado).
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (task && window.matchMedia("(min-width: 1024px) and (pointer: fine)").matches) nameRef.current?.focus();
+  }, [task]);
+  /** Con las tareas a mano: se cierra enseguida y el cambio ya se ve (sin "Guardando..."). */
+  function instant(e: React.FormEvent<HTMLFormElement>) {
+    if (!actions) return;
+    e.preventDefault();
+    actions.save(new FormData(e.currentTarget), task);
+    onDone();
+  }
 
   return (
-    <form ref={form} action={action} className="grid gap-5">
+    <form ref={form} action={actions ? undefined : action} onSubmit={actions ? instant : undefined} className="grid gap-5">
       {task && <input type="hidden" name="id" value={task.id} />}
       <input type="hidden" name="categoryId" value={categoryId} />
 
       <Field label="Nombre">
-        <Input name="title" defaultValue={task?.title} required maxLength={160} autoFocus={!task} placeholder="Obligatorio, Post Arcano..." />
+        <Input ref={nameRef} name="title" defaultValue={task?.title} required maxLength={160} autoFocus={!task} placeholder="Obligatorio, Post Arcano..." />
       </Field>
 
       <div className="grid gap-1.5">
@@ -105,36 +129,22 @@ function TaskForm({
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => {
             const on = categoryId === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setCategoryId(on ? "" : c.id)}
-                style={tone(c.color)}
-                aria-pressed={on}
-                className={cx(
-                  "h-9 rounded-[4px] border px-3 text-[13px] transition-colors",
-                  on ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
-                )}
-              >
-                {c.name}
-              </button>
-            );
+            return <CategoryChoice key={c.id} category={c} on={on} onClick={() => setCategoryId(on ? "" : c.id)} />;
           })}
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] items-end gap-4">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-4">
         <div className="grid gap-1.5">
           <span className="kicker">Prioridad</span>
           <PriorityPicker value={priority} onChange={setPriority} name="priority" />
         </div>
         <Field label="Deadline">
-          <Input type="date" name="deadline" defaultValue={task?.deadline ?? ""} />
+          <Input type="date" name="deadline" defaultValue={task?.deadline ?? ""} className="min-w-0" />
         </Field>
       </div>
 
-      <div className="grid grid-cols-[1fr_6rem] gap-3">
+      <div className="grid grid-cols-[1fr_6rem] items-start gap-3">
         <Field label="Se repite" hint="Al terminarla aparece la siguiente.">
           <select name="repeat" defaultValue={task?.repeat ?? ""} className={inputClass}>
             <option value="">No</option>
@@ -173,45 +183,56 @@ function TaskForm({
         </p>
       )}
 
-      <div className="grid gap-2">
-        <Button type="submit" variant="accent" disabled={pending}>
-          {pending ? "Guardando..." : task ? "Guardar cambios" : "Crear tarea"}
-        </Button>
-        {task && task.status !== "done" && (
-          <Button type="button" variant="outline" onClick={() => onSchedule(task)}>
-            <CalendarPlus size={17} /> Agendar en la semana
-          </Button>
-        )}
-        {task && (
+      {task && (
+        <div className="grid gap-2">
+          {task.status !== "done" && (
+            <Button type="button" variant="outline" onClick={() => onSchedule(task)}>
+              <CalendarPlus size={17} /> Agendar en la semana
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
             disabled={deleting}
-            onClick={() =>
+            onClick={() => {
+              if (actions) {
+                actions.duplicate(task);
+                onDone();
+                return notifyInfo("Tarea duplicada");
+              }
               startDelete(async () => {
                 await duplicateTask(task.id);
                 onDone();
                 notifyInfo("Tarea duplicada");
-              })
-            }
+              });
+            }}
           >
             <CopySimple size={17} /> Duplicar
           </Button>
-        )}
-        {task && (
           <ConfirmButton
             undo="Tarea borrada"
             disabled={deleting}
-            onConfirm={() =>
+            onConfirm={() => {
+              if (actions) {
+                actions.remove(task);
+                return onDone();
+              }
               startDelete(async () => {
                 await deleteTask(task.id);
                 onDone();
-              })
-            }
+              });
+            }}
           >
             Borrar tarea
           </ConfirmButton>
-        )}
+        </div>
+      )}
+
+      {/* Guardar queda pegado abajo de la hoja (el formulario es largo). */}
+      <div className="plan-sticky-save">
+        <Button type="submit" variant="accent" disabled={pending && !actions} className="w-full">
+          {pending && !actions ? "Guardando..." : task ? "Guardar cambios" : "Crear tarea"}
+        </Button>
       </div>
     </form>
   );
@@ -373,7 +394,7 @@ function LinksField({ initial }: { initial: TaskLink[] }) {
   const freshLinks = useNewIds(links.map((l) => l.url));
   return (
     <div className="grid gap-2">
-      <span className="text-sm font-medium">Links (opcional)</span>
+      <span className="kicker">Links (opcional)</span>
       <input type="hidden" name="links" value={JSON.stringify(all)} />
       {links.length > 0 && (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">

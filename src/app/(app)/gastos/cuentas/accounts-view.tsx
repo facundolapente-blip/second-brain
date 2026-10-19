@@ -1,5 +1,6 @@
 "use client";
 
+import { useGastosNew } from "../new-action";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
@@ -22,7 +23,7 @@ import { CardPanel } from "./card-panel";
 import type { CardSummary } from "@/lib/card-logic";
 import { NetWorth } from "./net-worth";
 import { ReserveCard, type ReserveData } from "./reserve-card";
-import { AccountAvatar, Balance, EmptyBlock, Fab } from "../shared";
+import { AccountAvatar, Balance, EmptyBlock } from "../shared";
 import { Tick } from "../motion";
 
 type Draft = {
@@ -95,6 +96,8 @@ export function AccountsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNew]);
 
+  // El "+" de la barra de abajo crea acá.
+  useGastosNew(() => open(blank()));
   function open(d: Draft) {
     setDraft(d);
     setDeleteError(null);
@@ -293,8 +296,6 @@ export function AccountsView({
           </>
         )}
       </main>
-
-      <Fab onClick={() => open(blank())} label="Nueva cuenta" />
 
       <Sheet ref={sheet} title={draft.id ? "Editar cuenta" : "Nueva cuenta"}>
         <form key={formKey} action={action} className="grid grid-cols-[minmax(0,1fr)] gap-5">

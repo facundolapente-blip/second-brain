@@ -1,11 +1,12 @@
 "use client";
 
 import { leaveThen, useSwap } from "@/components/motion";
-import { notifyInfo } from "@/components/undo-toast";
-import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { notifyError, notifyInfo } from "@/components/undo-toast";
+import { useSafeTransition } from "@/components/safe-action";
+import { haptic } from "@/components/haptics";
 import Link from "next/link";
-import { forwardRef, useActionState, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { ArrowsDownUp, Check, Camera, X, CopySimple } from "@phosphor-icons/react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { ArrowsDownUp, Check, Camera, X, CopySimple, NotePencil } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
 import { currencySymbol, money } from "@/lib/format";
 import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory, duplicateTransaction } from "@/lib/offline/finance";
@@ -13,6 +14,7 @@ import { splitInstallments } from "@/lib/card-logic";
 import { moneyCents } from "@/lib/format";
 import {
   centsToInput,
+  cleanAmountInput,
   isAmountExpr,
   parseAmount,
   type AccountDTO,
@@ -54,6 +56,13 @@ export type TxSheetHandle = {
   fromTemplate: (t: TemplateDTO) => void;
 };
 
+/**
+ * Lo que la lista muestra mientras el servidor guarda (la hoja ya se cerró): el
+ * movimiento nuevo o editado (`save`) o lo que se borra (`remove`). La lista lo
+ * aplica con `useOptimistic`; si el servidor falla, vuelve solo a como estaba.
+ */
+export type TxOptimistic = { type: "save"; tx: TxDTO } | { type: "remove"; id?: string; group?: string };
+
 const KIND_OPTIONS: { value: TxKind; label: string }[] = [
   { value: "expense", label: "Gasto" },
   { value: "income", label: "Ingreso" },
@@ -66,17 +75,69 @@ const SAVE_LABEL: Record<TxKind, string> = {
   transfer: "Guardar transferencia",
 };
 
+// ─── Borrador ───────────────────────────────────────────────────────────────
+// Cerrar la hoja (arrastrar, X, Escape, tocar afuera) sin guardar no pierde lo
+// escrito: queda en este aparato 10 minutos y vuelve al tocar "+". Nunca se
+// guarda solo como movimiento (es plata).
+
+const DRAFT_KEY = "sb_gastos_borrador";
+const DRAFT_MS = 10 * 60_000;
+
+function readDraft(): Draft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as { at?: number; d?: Draft };
+    if (!s?.d || typeof s.at !== "number" || Date.now() - s.at > DRAFT_MS) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return s.d;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(d: Draft) {
+  if (d.id || (!d.amount.trim() && !d.title.trim() && !d.note.trim())) return;
+  try {
+    // Sin fotos (no entran en localStorage) ni lo que dependía de la hoja abierta.
+    const rest: Draft = { ...d };
+    delete rest.photos;
+    delete rest.byHand;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), d: rest }));
+  } catch {
+    // Sin almacenamiento (modo privado): no hay borrador.
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // nada
+  }
+}
+
+let optimisticSeq = 0;
+
 export const TxSheet = forwardRef<
   TxSheetHandle,
-  { accounts: AccountDTO[]; categories: CategoryDTO[]; templates: TemplateDTO[]; selection: Selection }
->(function TxSheet({ accounts, categories, templates, selection }, ref) {
+  {
+    accounts: AccountDTO[];
+    categories: CategoryDTO[];
+    templates: TemplateDTO[];
+    selection: Selection;
+    /** Para que la lista muestre el cambio al instante (con `useOptimistic`). */
+    onOptimistic?: (change: TxOptimistic) => void;
+  }
+>(function TxSheet({ accounts, categories, templates, selection, onOptimistic }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const projects = useProjects();
-  // Los archivados no se ofrecen, salvo el que ya tiene el movimiento.
-  const activeProjects = projects.filter((p) => !p.archived || p.id === d.projectId);
   const [formKey, setFormKey] = useState(0);
-  const [state, action, pending] = useActionState(safeForm(saveTransaction), null);
+  const [error, setError] = useState<string | null>(null);
+  const [fromDraft, setFromDraft] = useState(false);
   const [, startTransition] = useSafeTransition();
 
   const active = accounts.filter((a) => !a.archived);
@@ -99,6 +160,13 @@ export const TxSheet = forwardRef<
     };
   };
   const [d, setD] = useState<Draft>(blank);
+  // Los archivados no se ofrecen, salvo el que ya tiene el movimiento.
+  const activeProjects = projects.filter((p) => !p.archived || p.id === d.projectId);
+  // Lo último escrito, para guardarlo como borrador al cerrar la hoja.
+  const latest = useRef(d);
+  useEffect(() => {
+    latest.current = d;
+  });
   const kindSwap = useSwap(d.kind);
   // Comprobantes elegidos antes de guardar un movimiento nuevo: se suben al guardarlo.
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
@@ -107,32 +175,64 @@ export const TxSheet = forwardRef<
   const [suggested, setSuggested] = useState<string | null>(null);
   const [byHand, setByHand] = useState(false);
   const suggestTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Foco al monto al abrir: se reintenta (la hoja tarda en abrir apenas carga la
+  // página), pero nunca después de que la persona tocó o escribió en la hoja.
+  const focusTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const acted = useRef(false);
+  useEffect(() => () => focusTimers.current.forEach(clearTimeout), []);
 
-  function open(next: Draft) {
+  function open(next: Draft, opts?: { draft?: boolean }) {
     setD({ ...next, byHand: !!next.categoryId });
     setPendingPhotos([]);
     setByHand(!!next.categoryId);
     setSuggested(null);
+    setError(null);
+    setFromDraft(!!opts?.draft);
     setFormKey((k) => k + 1);
     sheet.current?.open();
+    focusTimers.current.forEach(clearTimeout);
+    focusTimers.current = [];
+    acted.current = false;
     // En el celular el teclado numérico sale directo al abrir.
     // Si viene precargado (plantilla), queda seleccionado para pisarlo al tipear.
-    // Se reintenta un par de veces: abierta apenas carga la página (atajo "Cargar
-    // gasto"), la hoja todavía no terminó de abrir al primer intento.
     if (!next.id) {
       for (const ms of [60, 250, 600]) {
-        setTimeout(() => {
-          const el = amountRef.current;
-          if (!el || document.activeElement === el) return;
-          el.focus();
-          el.select();
-        }, ms);
+        focusTimers.current.push(
+          setTimeout(() => {
+            const el = amountRef.current;
+            if (!el || acted.current || document.activeElement === el) return;
+            // Solo si el foco no está en otro campo de la hoja (body, afuera, o el
+            // botón que el navegador enfoca solo al abrir el diálogo).
+            const a = document.activeElement;
+            const dlg = el.closest("dialog");
+            const inSheet = !!a && a !== document.body && !!dlg?.contains(a);
+            if (inSheet && a.matches("input, textarea, select, [contenteditable=true]")) return;
+            el.focus();
+            el.select();
+          }, ms),
+        );
       }
     }
   }
 
   useImperativeHandle(ref, () => ({
-    create: (preset) => open({ ...blank(), ...preset }),
+    create: (preset) => {
+      // Sin nada precargado, vuelve lo que quedó escrito la última vez (si es reciente).
+      const draft = preset ? null : readDraft();
+      if (draft) {
+        const base = blank();
+        const ok = (id: string) => active.some((a) => a.id === id);
+        open(
+          {
+            ...base,
+            ...draft,
+            accountId: ok(draft.accountId) ? draft.accountId : base.accountId,
+            toAccountId: ok(draft.toAccountId) ? draft.toAccountId : base.toAccountId,
+          },
+          { draft: true },
+        );
+      } else open({ ...blank(), ...preset });
+    },
     edit: (tx) =>
       open({
         id: tx.id,
@@ -152,24 +252,6 @@ export const TxSheet = forwardRef<
     fromTemplate: (t) => open(applyTemplate(blank(), t)),
   }));
 
-  // Las fotos pendientes se leen al guardar, sin que elegir una dispare el efecto.
-  const pendingRef = useRef<File[]>([]);
-  useEffect(() => {
-    pendingRef.current = pendingPhotos;
-  }, [pendingPhotos]);
-
-  useEffect(() => {
-    if (!state?.ok) return;
-    sheet.current?.close();
-    // Los comprobantes de un movimiento nuevo se suben ahora que tiene id.
-    const files = pendingRef.current;
-    if (state.id && files.length) {
-      pendingRef.current = [];
-      const owner = { transactionId: state.id };
-      void Promise.all(files.map((f) => sendPhoto(f, owner).catch(() => null)));
-    }
-  }, [state]);
-
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
 
   function onTitle(title: string) {
@@ -185,6 +267,7 @@ export const TxSheet = forwardRef<
     }, 350);
   }
   function pickCategory(categoryId: string | null) {
+    haptic("tap");
     setByHand(true);
     set({ categoryId, byHand: true });
   }
@@ -208,6 +291,80 @@ export const TxSheet = forwardRef<
     return `1 ${currencySymbol(loCur)} = ${money(hi / lo, hiCur)}`;
   })();
 
+  /** Lo mismo que revisa el servidor, para no cerrar la hoja con algo que va a rechazar. */
+  function validate(): string | null {
+    if (parseAmount(d.amount) === null) return "Escribí un monto mayor a cero.";
+    if (!from) return "Elegí una cuenta.";
+    if (d.kind === "transfer") {
+      if (!to) return "Elegí la cuenta de destino.";
+      if (to.id === from.id) return "La cuenta de origen y la de destino son la misma.";
+      if (crossCurrency && parseAmount(d.toAmount) === null) return `Escribí cuánto llega a "${to.name}" (en ${to.currency}).`;
+    }
+    return null;
+  }
+
+  /** El movimiento como lo va a ver la lista mientras sube. */
+  function optimisticTx(n: number): TxDTO {
+    const amount = parseAmount(d.amount)!;
+    const count = !d.id && d.kind === "expense" && from?.type === "card" ? Number(d.installments ?? "1") : 1;
+    const parts = count >= 2 ? splitInstallments(amount, count) : null;
+    const transfer = d.kind === "transfer";
+    return {
+      id: d.id ?? `optimista-${n}`,
+      kind: d.kind,
+      date: d.date,
+      title: d.title.trim() || null,
+      amountCents: parts ? parts[0] : amount,
+      accountId: d.accountId,
+      categoryId: transfer ? null : d.categoryId,
+      toAccountId: transfer ? d.toAccountId : null,
+      toAmountCents: transfer ? (crossCurrency ? parseAmount(d.toAmount) : amount) : null,
+      note: d.note.trim() || null,
+      projectId: transfer ? null : d.projectId,
+      photos: d.photos ?? [],
+      installment: parts ? { group: `optimista-${n}`, no: 1, count } : (d.installment ?? null),
+    };
+  }
+
+  /**
+   * Guardar sin esperar al servidor: la hoja se cierra al toque y la lista muestra
+   * el movimiento (subiendo). Crear va con `once`, así un reintento no lo duplica.
+   * Si el servidor lo rechaza, la fila se va, avisa y lo escrito queda de borrador.
+   */
+  function submit(form: HTMLFormElement) {
+    const problem = validate();
+    if (problem) {
+      setError(problem);
+      haptic("error");
+      return;
+    }
+    const fd = new FormData(form);
+    const snapshot = d;
+    const files = pendingPhotos;
+    const change: TxOptimistic = { type: "save", tx: optimisticTx(++optimisticSeq) };
+    clearDraft();
+    haptic("success");
+    focusTimers.current.forEach(clearTimeout);
+    sheet.current?.close();
+    startTransition(
+      async () => {
+        onOptimistic?.(change);
+        const r = await saveTransaction(null, fd);
+        if (!r.ok) {
+          writeDraft(snapshot);
+          notifyError(`No se guardó: ${r.error} Quedó como borrador en el +.`);
+          return;
+        }
+        // Los comprobantes de un movimiento nuevo se suben ahora que tiene id.
+        if ("id" in r && r.id && files.length) {
+          const owner = { transactionId: r.id };
+          void Promise.all(files.map((f) => sendPhoto(f, owner).catch(() => null)));
+        }
+      },
+      { onError: () => writeDraft(snapshot) },
+    );
+  }
+
   if (active.length === 0) {
     return (
       <Sheet ref={sheet} title="Nuevo movimiento">
@@ -223,13 +380,23 @@ export const TxSheet = forwardRef<
     );
   }
 
+  const symbol = currencySymbol(from?.currency ?? "UYU");
+
   return (
-    <Sheet ref={sheet} title={d.id ? "Editar movimiento" : "Nuevo movimiento"}>
+    <Sheet ref={sheet} title={d.id ? "Editar movimiento" : "Nuevo movimiento"} onDismiss={() => writeDraft(latest.current)}>
       <form
         key={formKey}
-        action={action}
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(e.currentTarget);
+        }}
         aria-keyshortcuts="Control+Enter"
+        onPointerDown={() => {
+          acted.current = true;
+        }}
         onKeyDown={(e) => {
+          acted.current = true;
           // Ctrl/Cmd + Enter guarda desde cualquier campo (también desde la nota).
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
@@ -244,13 +411,39 @@ export const TxSheet = forwardRef<
         <input type="hidden" name="categoryId" value={d.kind === "transfer" ? "" : (d.categoryId ?? "")} />
         <input type="hidden" name="projectId" value={d.kind === "transfer" ? "" : (d.projectId ?? "")} />
 
+        {fromDraft && (
+          <div className="reveal -mb-1 flex flex-wrap items-center gap-2 text-[13px]">
+            <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-soft pr-1 pl-3 text-accent-fg">
+              <NotePencil size={14} aria-hidden />
+              Borrador
+              <button
+                type="button"
+                onClick={() => {
+                  clearDraft();
+                  setFromDraft(false);
+                  setD(blank());
+                  setError(null);
+                  setTimeout(() => amountRef.current?.focus(), 0);
+                }}
+                className="tap-target inline-flex h-6 items-center rounded-full px-2 font-medium hover:bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]"
+              >
+                · Descartar
+              </button>
+            </span>
+            <span className="text-muted">Lo que habías escrito</span>
+          </div>
+        )}
+
         {!d.id && templates.length > 0 && (
           <div className="-mx-5 flex gap-2 overflow-x-auto px-5 fin-scroll">
             {templates.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setD((prev) => applyTemplate(prev, t))}
+                onClick={() => {
+                  haptic("tap");
+                  setD((prev) => applyTemplate(prev, t));
+                }}
                 className="h-9 shrink-0 rounded-full border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 {t.name}
@@ -266,21 +459,24 @@ export const TxSheet = forwardRef<
           options={KIND_OPTIONS}
         />
 
-        <label className="grid gap-1.5">
-          <span className="kicker">
+        {/* El monto es lo protagonista: cifra grande y centrada, sin caja, con la moneda de la cuenta. */}
+        <div className="fin-amount-box grid justify-items-center gap-1 pt-1">
+          <label htmlFor="tx-amount" className="kicker">
             {d.kind === "transfer" && crossCurrency ? `Sale de ${from?.name}` : "Monto"}
-          </span>
-          <span className="flex h-16 items-center gap-2.5 rounded-[6px] border border-line-strong bg-surface px-3.5 transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
-            <span className="text-xl font-medium text-muted">{currencySymbol(from?.currency ?? "UYU")}</span>
+          </label>
+          <div className="flex max-w-full min-w-0 items-baseline justify-center gap-1.5 px-2">
+            <span aria-hidden className="figure shrink-0 text-[26px] text-muted">
+              {symbol}
+            </span>
             <input
+              id="tx-amount"
               ref={amountRef}
               name="amount"
               inputMode="decimal"
               enterKeyHint="done"
               autoComplete="off"
-              style={{ outline: "none" }}
               value={d.amount}
-              onChange={(e) => set({ amount: e.target.value })}
+              onChange={(e) => set({ amount: cleanAmountInput(e.target.value) })}
               // "500+20" escrito a mano: al salir del campo queda el resultado.
               onBlur={() => {
                 if (!isAmountExpr(d.amount)) return;
@@ -288,23 +484,25 @@ export const TxSheet = forwardRef<
                 if (c !== null) set({ amount: centsToInput(c) });
               }}
               placeholder="0"
-              required
-              aria-describedby={state && !state.ok ? "tx-error" : undefined}
-              className="figure h-full w-0 min-w-0 flex-1 bg-transparent text-[38px] outline-none placeholder:text-faint"
+              aria-invalid={error?.includes("monto") || undefined}
+              aria-describedby={error ? "tx-error" : undefined}
+              style={{ width: `${Math.max(1, d.amount.length) + 0.3}ch` }}
+              className="fin-amount figure h-[66px] max-w-[calc(100vw-7.5rem)] min-w-[2ch] bg-transparent text-center text-[54px] leading-none outline-none! placeholder:text-faint sm:max-w-[26rem]"
             />
-            {d.kind !== "transfer" && (
-              <span
-                aria-hidden
-                className={cx(
-                  "shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium transition-colors duration-[var(--dur-quick)]",
-                  d.kind === "income" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-muted",
-                )}
-              >
-                {d.kind === "income" ? "+ ingreso" : "− gasto"}
-              </span>
-            )}
-          </span>
-        </label>
+          </div>
+          <span aria-hidden className="fin-amount-line h-[2px] w-44 rounded-full" />
+          {d.kind !== "transfer" && (
+            <span
+              aria-hidden
+              className={cx(
+                "mt-1.5 rounded-full px-2 py-0.5 text-[12px] font-medium transition-colors duration-[var(--dur-quick)]",
+                d.kind === "income" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-muted",
+              )}
+            >
+              {d.kind === "income" ? "+ ingreso" : "− gasto"}
+            </span>
+          )}
+        </div>
         <AmountMath
           amount={d.amount}
           currency={from?.currency ?? "UYU"}
@@ -361,9 +559,8 @@ export const TxSheet = forwardRef<
                     autoComplete="off"
                     style={{ outline: "none" }}
                     value={d.toAmount}
-                    onChange={(e) => set({ toAmount: e.target.value })}
+                    onChange={(e) => set({ toAmount: cleanAmountInput(e.target.value) })}
                     placeholder="0"
-                    required
                     className="figure h-full w-0 min-w-0 flex-1 bg-transparent text-[24px] outline-none placeholder:text-faint"
                   />
                 </span>
@@ -594,7 +791,14 @@ export const TxSheet = forwardRef<
               const id = d.id!;
               sheet.current?.close();
               // La fila se va con una salida corta cuando la hoja ya bajó (la lista la saca al responder el servidor).
-              afterSheet(() => leaveThen(`[data-leave="${id}"]`, () => startTransition(() => deleteTransaction(id))));
+              afterSheet(() =>
+                leaveThen(`[data-leave="${id}"]`, () =>
+                  startTransition(() => {
+                    onOptimistic?.({ type: "remove", id });
+                    return deleteTransaction(id);
+                  }),
+                ),
+              );
             }}
           >
             Eliminar movimiento
@@ -607,7 +811,14 @@ export const TxSheet = forwardRef<
             onConfirm={() => {
               const group = d.installment!.group;
               sheet.current?.close();
-              afterSheet(() => leaveThen(`[data-leave-group="${group}"]`, () => startTransition(() => deleteInstallments(group))));
+              afterSheet(() =>
+                leaveThen(`[data-leave-group="${group}"]`, () =>
+                  startTransition(() => {
+                    onOptimistic?.({ type: "remove", group });
+                    return deleteInstallments(group);
+                  }),
+                ),
+              );
             }}
           >
             Eliminar las {d.installment.count} cuotas
@@ -616,19 +827,20 @@ export const TxSheet = forwardRef<
 
         {/* Guardar queda siempre a mano, pegado abajo de la hoja, aunque la lista de categorías sea larga. */}
         <div className="sticky bottom-[calc(max(1.25rem,env(safe-area-inset-bottom))*-1)] z-10 -mx-5 -mb-5 grid gap-2 border-t border-line bg-surface/95 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md">
-          {state && !state.ok && (
-            <p id="tx-error" role="alert" className="reveal text-sm text-danger">
-              {state.error}
+          {error && (
+            <p id="tx-error" role="alert" key={error} className="reveal text-sm text-danger">
+              {error}
             </p>
           )}
-          <Button type="submit" variant="accent" disabled={pending} className="h-12 text-[15px]">
-            {pending ? "Guardando…" : d.id ? "Guardar cambios" : SAVE_LABEL[d.kind]}
+          <Button type="submit" variant="accent" className="h-12 text-[15px]">
+            {d.id ? "Guardar cambios" : SAVE_LABEL[d.kind]}
           </Button>
         </div>
       </form>
     </Sheet>
   );
 });
+
 
 function applyTemplate(base: Draft, t: TemplateDTO): Draft {
   return {
@@ -667,7 +879,10 @@ function AccountPicker({
               type="button"
               role="radio"
               aria-checked={on}
-              onClick={() => onChange(a.id)}
+              onClick={() => {
+                haptic("tap");
+                onChange(a.id);
+              }}
               className={cx(
                 "flex h-11 shrink-0 items-center gap-2 rounded-[6px] border pr-3 pl-1.5 text-sm transition-colors",
                 on ? "border-fg bg-surface-2 font-medium" : "border-line-strong hover:bg-surface-2",
@@ -733,7 +948,7 @@ const MATH_OPS = [
 ] as const;
 
 /**
- * Corregir el monto sin borrarlo: cuatro signos chicos debajo (+ − × ÷). Al tocar
+ * Corregir el monto sin borrarlo: una fila de cuatro teclas debajo (+ − × ÷). Al tocar
  * uno aparece un campo para el otro número con la cuenta a la vista ("500 + 20 =
  * $ 520"). Lo que se escribe ya va al monto como cuenta ("500+20"): Guardar
  * guarda el resultado (sin botón de aplicar, pedido de Facu). Enter deja el
@@ -768,7 +983,7 @@ function AmountMath({ amount, currency, onChange }: { amount: string; currency: 
   }
   return (
     <div
-      className="-mt-3 grid min-w-0 gap-2"
+      className="-mt-1 grid min-w-0 gap-2"
       onKeyDown={(e) => {
         // Con el cartel abierto, Escape lo cierra a él (no a toda la hoja).
         if (e.key === "Escape" && op) {
@@ -778,7 +993,7 @@ function AmountMath({ amount, currency, onChange }: { amount: string; currency: 
         }
       }}
     >
-      <div className="flex gap-1.5" role="group" aria-label="Corregir el monto con una cuenta">
+      <div className="grid grid-cols-4 gap-2" role="group" aria-label="Corregir el monto con una cuenta">
         {MATH_OPS.map((o) => {
           const s = "sign" in o ? o.sign : o.op;
           const on = op?.op === o.op;
@@ -790,10 +1005,14 @@ function AmountMath({ amount, currency, onChange }: { amount: string; currency: 
               aria-pressed={on}
               title={o.label}
               disabled={base === null}
-              onClick={() => (on ? cancel() : open(o))}
+              onClick={() => {
+                haptic("tap");
+                if (on) cancel();
+                else open(o);
+              }}
               className={cx(
-                "inline-flex size-9 items-center justify-center rounded-full border font-mono text-[17px] leading-none transition-colors disabled:opacity-35",
-                on ? "border-ink bg-ink text-on-ink" : "border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
+                "press inline-flex h-11 items-center justify-center rounded-xl font-mono text-[20px] leading-none transition-colors disabled:opacity-35",
+                on ? "bg-ink text-on-ink" : "bg-surface-2 text-fg hover:bg-surface-3",
               )}
             >
               {s}

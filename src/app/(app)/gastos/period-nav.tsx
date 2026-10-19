@@ -7,6 +7,21 @@ import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { formatMonth, shiftMonth } from "@/lib/dates";
 import { periodHref, periodLabel, type Period } from "@/lib/finance-logic";
 import { Button, cx, Input, Segmented } from "@/components/ui";
+import { useSlide } from "@/components/motion";
+import { usePeriodStep, useStepEvents } from "./period-step";
+
+/** Mes o año corrido `delta` lugares (el período libre no tiene flechas). */
+function shifted(p: Period, delta: number): Period | null {
+  if (p.kind === "month") {
+    const month = shiftMonth(p.month, delta);
+    return { kind: "month", month, from: `${month}-01`, to: `${month}-31` };
+  }
+  if (p.kind === "year") {
+    const year = String(Number(p.year) + delta);
+    return { kind: "year", year, from: `${year}-01-01`, to: `${year}-12-31` };
+  }
+  return null;
+}
 
 const arrow =
   "inline-flex size-11 items-center justify-center rounded-[4px] text-muted transition-colors hover:bg-surface-2 hover:text-fg";
@@ -33,6 +48,42 @@ export function PeriodNav({
   const [mode, setMode] = useState<Period["kind"]>(period.kind);
   const [from, setFrom] = useState(period.from);
   const [to, setTo] = useState(period.to);
+  // Llegó otro período por la URL (atrás del navegador, otro enlace): el modo y las fechas lo siguen.
+  const [seen, setSeen] = useState(`${period.from}_${period.to}`);
+  if (seen !== `${period.from}_${period.to}`) {
+    setSeen(`${period.from}_${period.to}`);
+    setMode(period.kind);
+    setFrom(period.from);
+    setTo(period.to);
+  }
+  // El renglón de flechas o fechas entra suave solo si se cambió de modo con un toque (al cargar, quieto).
+  const [modeTouched, setModeTouched] = useState(false);
+  const href = (p: Period) => periodHref(p, today, basePath);
+  const prev = shifted(period, -1);
+  const next = shifted(period, 1);
+  // Lo que se ve cambia al toque; los datos llegan después (y se precargan los vecinos).
+  const step = usePeriodStep(period, [prev ? href(prev) : "", next ? href(next) : ""]);
+  const shown = step.shown;
+  const move = (delta: 1 | -1) => {
+    const n = shifted(shown, delta);
+    if (n) step.go(n, href(n));
+  };
+  useStepEvents((d) => {
+    if (mode === shown.kind && shown.kind !== "range") move(d);
+  });
+  const slide = useSlide(shown.from);
+  /** Flecha: enlace de verdad (sirve sin JavaScript y con clic del medio), pero con un clic común no espera. */
+  const arrowProps = (delta: 1 | -1) => {
+    const n = shifted(shown, delta);
+    return {
+      href: n ? href(n) : basePath,
+      onClick: (e: React.MouseEvent) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        e.preventDefault();
+        move(delta);
+      },
+    };
+  };
   const thisMonth = today.slice(0, 7);
   const thisYear = today.slice(0, 4);
   // Mes y año de referencia al cambiar de modo: el final de lo que se está viendo (sin pasar de hoy).
@@ -46,6 +97,7 @@ export function PeriodNav({
           value={mode}
           onChange={(m) => {
             setMode(m);
+            setModeTouched(true);
             if (m === "month") go({ kind: "month", month: ref.slice(0, 7) });
             if (m === "year") go({ kind: "year", year: ref.slice(0, 4) });
           }}
@@ -59,34 +111,60 @@ export function PeriodNav({
         />
       </div>
 
-      {mode === "month" && period.kind === "month" && (
-        <div className="reveal -ml-3 flex items-center gap-0.5">
-          <Link href={periodHref({ kind: "month", month: shiftMonth(period.month, -1) }, today, basePath)} aria-label="Mes anterior" className={arrow}>
+      {mode === "month" && shown.kind === "month" && (
+        <div className={cx("-ml-3 flex items-center gap-0.5", modeTouched && "reveal")}>
+          <Link {...arrowProps(-1)} aria-label="Mes anterior" className={arrow}>
             <CaretLeft size={18} />
           </Link>
-          <h2 className="display min-w-[9.5rem] text-center text-[22px] first-letter:uppercase">{formatMonth(period.month)}</h2>
-          <Link href={periodHref({ kind: "month", month: shiftMonth(period.month, 1) }, today, basePath)} aria-label="Mes siguiente" className={arrow}>
+          <h2 className="min-w-[9.5rem] overflow-hidden text-center" aria-live="polite">
+            <span key={shown.month} className={cx("display inline-block text-[22px] first-letter:uppercase", slide)}>
+              {formatMonth(shown.month)}
+            </span>
+          </h2>
+          <Link {...arrowProps(1)} aria-label="Mes siguiente" className={arrow}>
             <CaretRight size={18} />
           </Link>
-          {period.month !== thisMonth && (
-            <Link href={basePath} className={todayBtn}>
+          {shown.month !== thisMonth && (
+            <Link
+              href={basePath}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                const n = shifted({ kind: "month", month: thisMonth, from: "", to: "" }, 0)!;
+                step.go(n, basePath);
+              }}
+              className={todayBtn}
+            >
               Hoy
             </Link>
           )}
         </div>
       )}
 
-      {mode === "year" && period.kind === "year" && (
-        <div className="reveal -ml-3 flex items-center gap-0.5">
-          <Link href={periodHref({ kind: "year", year: String(Number(period.year) - 1) }, today, basePath)} aria-label="Año anterior" className={arrow}>
+      {mode === "year" && shown.kind === "year" && (
+        <div className={cx("-ml-3 flex items-center gap-0.5", modeTouched && "reveal")}>
+          <Link {...arrowProps(-1)} aria-label="Año anterior" className={arrow}>
             <CaretLeft size={18} />
           </Link>
-          <h2 className="display min-w-[6rem] text-center text-[22px]">{period.year}</h2>
-          <Link href={periodHref({ kind: "year", year: String(Number(period.year) + 1) }, today, basePath)} aria-label="Año siguiente" className={arrow}>
+          <h2 className="min-w-[6rem] overflow-hidden text-center" aria-live="polite">
+            <span key={shown.year} className={cx("display inline-block text-[22px]", slide)}>
+              {shown.year}
+            </span>
+          </h2>
+          <Link {...arrowProps(1)} aria-label="Año siguiente" className={arrow}>
             <CaretRight size={18} />
           </Link>
-          {period.year !== thisYear && (
-            <Link href={periodHref({ kind: "year", year: thisYear }, today, basePath)} className={todayBtn}>
+          {shown.year !== thisYear && (
+            <Link
+              href={href({ kind: "year", year: thisYear, from: "", to: "" })}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                const n = shifted({ kind: "year", year: thisYear, from: "", to: "" }, 0)!;
+                step.go(n, href(n));
+              }}
+              className={todayBtn}
+            >
               Este año
             </Link>
           )}
@@ -95,7 +173,7 @@ export function PeriodNav({
 
       {mode === "range" && (
         <form
-          className="reveal grid gap-2"
+          className={cx("grid gap-2", modeTouched && "reveal")}
           onSubmit={(e) => {
             e.preventDefault();
             if (from && to) go({ kind: "range", from, to });

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowCounterClockwise, WarningCircle } from "@phosphor-icons/react";
 import { cx } from "./ui";
 import { undoLastDelete } from "@/lib/trash-actions";
+import { haptic } from "./haptics";
 
 /**
  * Aviso de abajo después de borrar: "Movimiento borrado · Deshacer". Lo borrado
@@ -142,12 +143,15 @@ export function UndoToast() {
             disabled={pending}
             onClick={() =>
               start(async () => {
+                haptic("tap");
                 try {
                   const r = await undoLastDelete();
+                  haptic(r.ok ? "success" : "error");
                   setMsg((m) => m && { ...m, swap: true, done: r.ok ? "Listo, volvió a su lugar" : r.error });
                   router.refresh();
                 } catch {
                   // Sin señal o sesión vencida: que no mande la pantalla a "No se pudo cargar".
+                  haptic("error");
                   setMsg((m) => m && { ...m, swap: true, done: "No se pudo deshacer (sin conexión). Está en Historial y papelera.", error: true });
                 }
               })

@@ -10,8 +10,8 @@ export default async function GastosLayout({ children }: LayoutProps<"/gastos">)
   return (
     <SelectionProvider initial={selection}>
       <ProjectsProvider projects={projects}>
-      {/* Abajo deja lugar para la barra inferior y el botón flotante. */}
-      <div data-module="gastos" className="min-h-dvh pb-[calc(156px+env(safe-area-inset-bottom))] lg:pb-12">
+      {/* Abajo deja lugar para la barra inferior (con el "+" al medio). */}
+      <div data-module="gastos" className="min-h-dvh pb-[calc(96px+env(safe-area-inset-bottom))] lg:pb-12">
         {children}
         <GastosNav />
       </div>

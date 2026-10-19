@@ -1,96 +1,9 @@
-import { PhotoStrip } from "@/components/photos";
 import Link from "next/link";
-import { ArrowSquareOut, Fire, PencilSimple, X } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, Fire } from "@phosphor-icons/react/dist/ssr";
 import { addDays, formatLong, startOfWeek } from "@/lib/dates";
-import { moodInfo, wordCount } from "@/lib/journal-logic";
-import type { EntryDTO, QuickStatsDTO } from "@/lib/journal";
-import { MoodBadge } from "./journal-ui";
+import type { QuickStatsDTO } from "@/lib/journal";
 
 const nf = new Intl.NumberFormat("es-UY");
-
-/**
- * Panel de lectura de la computadora: la entrada elegida en la lista, entera,
- * con medida de lectura cómoda. Para escribir se abre el editor.
- */
-export function EntryReader({ entry, closeHref }: { entry: EntryDTO; closeHref: string }) {
-  const words = wordCount(entry.body) + wordCount(entry.title ?? "");
-  const paragraphs = entry.body
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  const mood = moodInfo(entry.mood);
-
-  return (
-    <article
-      aria-label="Entrada elegida"
-      className="min-w-0 rounded-2xl border border-line bg-surface"
-    >
-      <div className="flex min-w-0 items-center gap-2 border-b border-line py-2.5 pr-2.5 pl-7">
-        <p className="kicker min-w-0 flex-1 truncate">
-          {entry.title ? formatLong(entry.date) : entry.date.slice(0, 4)}
-          <span aria-hidden> · </span>
-          {words === 1 ? "1 palabra" : `${nf.format(words)} palabras`}
-        </p>
-        <Link
-          href={`/journal/${entry.id}`}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
-        >
-          <PencilSimple size={15} aria-hidden /> Editar
-        </Link>
-        <Link
-          href={closeHref}
-          scroll={false}
-          aria-label="Cerrar lectura"
-          title="Cerrar lectura"
-          className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
-        >
-          <X size={17} aria-hidden />
-        </Link>
-      </div>
-
-      <div className="px-7 pt-7 pb-9 xl:px-10">
-        <div className="mx-auto grid max-w-[64ch] gap-5">
-          <div className="flex items-start gap-4">
-            {/* La mayoría de las entradas no tiene título: entonces la fecha hace de título. */}
-            <h2 className="display min-w-0 flex-1 text-[34px] leading-[1.08] text-pretty first-letter:uppercase">
-              {entry.title || formatLong(entry.date)}
-            </h2>
-            {mood && <MoodBadge mood={entry.mood} size={40} />}
-          </div>
-
-          {paragraphs.length === 0 ? (
-            <p className="text-[16px] text-muted">Esta entrada no tiene texto.</p>
-          ) : (
-            <div className="prose-serif grid gap-4 text-[17.5px] leading-[1.75] text-fg/90">
-              {paragraphs.map((p, i) => (
-                <p key={i} className="whitespace-pre-line">
-                  {p}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <PhotoStrip photos={entry.photos} />
-
-          {entry.tags.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5 pt-2" aria-label="Etiquetas">
-              {entry.tags.map((t) => (
-                <li key={t}>
-                  <Link
-                    href={`/journal?etiqueta=${encodeURIComponent(t)}`}
-                    className="inline-flex h-8 items-center rounded-full bg-accent-soft px-3 text-[12.5px] font-medium text-accent-fg transition-opacity hover:opacity-80"
-                  >
-                    #{t}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
 
 /**
  * Cuando no hay entrada elegida: cifras rápidas y las últimas cinco semanas,

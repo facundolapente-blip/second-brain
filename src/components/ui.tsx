@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { notifyDeleted } from "./undo-toast";
+import { haptic } from "./haptics";
 import { useTick } from "./motion";
 
 export function cx(...c: (string | false | null | undefined)[]) {
@@ -124,6 +125,7 @@ export function Segmented<T extends string>({
       onKeyDown={(e) => {
         const to = radioKeyTarget(e, index, options.length);
         if (to === null) return;
+        haptic("select");
         onChange(options[to].value);
         e.currentTarget.querySelectorAll<HTMLElement>("[role=radio]")[to]?.focus();
       }}
@@ -142,7 +144,10 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           // Como un grupo de radios nativo: Tab entra solo a lo elegido y las flechas cambian.
           tabIndex={o.value === options[index]?.value ? 0 : -1}
-          onClick={() => onChange(o.value)}
+          onClick={() => {
+            if (o.value !== value) haptic("select");
+            onChange(o.value);
+          }}
           className={cx(
             "relative h-9 rounded-[3px] px-2 text-[13px] font-medium transition-colors duration-[var(--dur-state)]",
             value === o.value ? "text-fg" : "text-muted hover:text-fg",
@@ -181,7 +186,7 @@ export const Sheet = forwardRef<
 >(function Sheet({ title, children, onClose, defaultOpen, wide, onDismiss }, ref) {
   const dlg = useRef<HTMLDialogElement>(null);
   const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
+  const drag = useRef<{ y: number; t: number; dy: number; past: boolean } | null>(null);
   // Dónde empezó el clic: seleccionar texto arrastrando y soltar afuera también
   // da un "click" en el fondo, y eso cerraba la hoja.
   const downOnBackdrop = useRef(false);
@@ -223,55 +228,135 @@ export const Sheet = forwardRef<
   }, [defaultOpen]);
   useEffect(() => () => clearTimeout(closing.current), []);
 
+  /** Cuánto hay que bajarla (o un tirón) para que se cierre al soltar. */
+  const DISMISS_PX = 90;
+  function dragStart(y: number, t: number) {
+    drag.current = { y, t, dy: 0, past: false };
+    dlg.current?.classList.add("dragging");
+  }
+  function dragMove(y: number) {
+    const g = drag.current;
+    const d = dlg.current;
+    if (!g || !d) return;
+    const raw = y - g.y;
+    // Hacia abajo sigue al dedo; hacia arriba se resiste (cede poco y cada vez menos).
+    g.dy = Math.max(0, raw);
+    const shown = raw >= 0 ? raw : -Math.min(14, Math.sqrt(-raw) * 1.6);
+    d.style.transition = "none";
+    d.style.transform = `translateY(${shown}px)`;
+    // El fondo se aclara a medida que la hoja baja.
+    d.style.setProperty("--sheet-fade", String(Math.max(0.15, 1 - g.dy / Math.max(1, d.offsetHeight))));
+    const past = g.dy > DISMISS_PX;
+    if (past && !g.past) haptic("threshold");
+    g.past = past;
+  }
+  function dragEnd(t: number) {
+    const g = drag.current;
+    const d = dlg.current;
+    drag.current = null;
+    if (!g || !d) return;
+    d.classList.remove("dragging");
+    const fast = g.dy / Math.max(1, t - g.t) > 0.6;
+    if (g.dy > DISMISS_PX || (fast && g.dy > 24)) {
+      haptic("tap");
+      onDismiss?.();
+      // Sigue bajando a la velocidad que traía (un tirón rápido se va más rápido).
+      d.style.transition = `transform ${fast ? 150 : EXIT_MS}ms var(--ease-in)`;
+      d.style.transform = "translateY(100%)";
+      d.classList.add("closing-drag");
+      clearTimeout(closing.current);
+      closing.current = setTimeout(() => {
+        d.close();
+        d.classList.remove("closing-drag");
+        reset(d);
+      }, fast ? 150 : EXIT_MS);
+    } else {
+      // Vuelve a su lugar con un rebote mínimo (con menos movimiento, sin rebote).
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      d.style.transition = reduce ? "transform 120ms ease-out" : "transform 420ms var(--ease-spring)";
+      d.style.transform = "";
+      d.style.removeProperty("--sheet-fade");
+    }
+  }
+
   // Arrastrar hacia abajo desde la agarradera o el título (solo hoja de celular).
   const dragProps = {
     onPointerDown: (e: React.PointerEvent) => {
       if (e.pointerType === "mouse" || (e.target as HTMLElement).closest("button")) return;
-      drag.current = { y: e.clientY, t: e.timeStamp, dy: 0 };
-      dlg.current?.classList.add("dragging");
+      dragStart(e.clientY, e.timeStamp);
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    onPointerMove: (e: React.PointerEvent) => {
-      const g = drag.current;
-      const d = dlg.current;
-      if (!g || !d) return;
-      const raw = e.clientY - g.y;
-      // Hacia abajo sigue al dedo; hacia arriba se resiste (cede poco y cada vez menos).
-      g.dy = Math.max(0, raw);
-      const shown = raw >= 0 ? raw : -Math.min(14, Math.sqrt(-raw) * 1.6);
-      d.style.transition = "none";
-      d.style.transform = `translateY(${shown}px)`;
-      // El fondo se aclara a medida que la hoja baja.
-      d.style.setProperty("--sheet-fade", String(Math.max(0.15, 1 - g.dy / Math.max(1, d.offsetHeight))));
-    },
-    onPointerUp: (e: React.PointerEvent) => {
-      const g = drag.current;
-      const d = dlg.current;
-      drag.current = null;
-      if (!g || !d) return;
-      d.classList.remove("dragging");
-      const fast = g.dy / Math.max(1, e.timeStamp - g.t) > 0.6;
-      if (g.dy > 90 || (fast && g.dy > 24)) {
-        onDismiss?.();
-        // Sigue bajando a la velocidad que traía (un tirón rápido se va más rápido).
-        d.style.transition = `transform ${fast ? 150 : EXIT_MS}ms var(--ease-in)`;
-        d.style.transform = "translateY(100%)";
-        d.classList.add("closing-drag");
-        clearTimeout(closing.current);
-        closing.current = setTimeout(() => {
-          d.close();
-          d.classList.remove("closing-drag");
-          reset(d);
-        }, fast ? 150 : EXIT_MS);
-      } else {
-        // Vuelve a su lugar con un rebote mínimo (con menos movimiento, sin rebote).
-        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        d.style.transition = reduce ? "transform 120ms ease-out" : "transform 420ms var(--ease-spring)";
-        d.style.transform = "";
-        d.style.removeProperty("--sheet-fade");
-      }
-    },
+    onPointerMove: (e: React.PointerEvent) => dragMove(e.clientY),
+    onPointerUp: (e: React.PointerEvent) => dragEnd(e.timeStamp),
   };
+
+  // Desde el contenido también, como en iOS: si está arriba de todo, tirar hacia abajo
+  // baja la hoja en vez de no hacer nada (si tiene para subir, primero se desplaza).
+  // Con listeners nativos: React los registra pasivos y no dejaría frenar el rebote.
+  const body = useRef<HTMLDivElement>(null);
+  // Los listeners se ponen una vez: llaman siempre a la versión actual (con el onDismiss de ahora).
+  const dragFns = useRef({ dragStart, dragMove, dragEnd });
+  useEffect(() => {
+    dragFns.current = { dragStart, dragMove, dragEnd };
+  });
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    let s: { x: number; y: number; t: number; on: boolean; dead: boolean } | null = null;
+    const sheetMode = () => window.matchMedia("(max-width: 639px)").matches;
+    const ownScroll = (target: EventTarget | null) => {
+      for (let p = target instanceof Element ? target : null; p && p !== el; p = p.parentElement) {
+        if (p.closest("[data-no-swipe], input[type=range], [role=slider]")) return true;
+        if (p instanceof HTMLElement && p.scrollHeight > p.clientHeight + 1 && p.scrollTop > 0) {
+          const oy = getComputedStyle(p).overflowY;
+          if (oy === "auto" || oy === "scroll") return true;
+        }
+      }
+      return false;
+    };
+    const start = (e: TouchEvent) => {
+      s = null;
+      if (e.touches.length !== 1 || !sheetMode() || el.scrollTop > 0 || ownScroll(e.target)) return;
+      const t = e.touches[0];
+      s = { x: t.clientX, y: t.clientY, t: e.timeStamp, on: false, dead: false };
+    };
+    const move = (e: TouchEvent) => {
+      if (!s || s.dead) return;
+      const t = e.touches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (!s.on) {
+        if (el.scrollTop > 0 || dy < -4 || Math.abs(dx) > Math.abs(dy)) {
+          if (dy < -4 || Math.abs(dx) > 8) s.dead = true;
+          return;
+        }
+        // Desde el primer movimiento: si el navegador ya arrancó su gesto, después no se puede frenar.
+        if (e.cancelable && dy > 0) e.preventDefault();
+        if (dy < 8) return;
+        s.on = true;
+        // Si había texto enfocado, el teclado se va (si no, la hoja baja con el teclado arriba).
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        dragFns.current.dragStart(t.clientY, e.timeStamp);
+      }
+      if (e.cancelable) e.preventDefault();
+      dragFns.current.dragMove(t.clientY);
+    };
+    const end = (e: TouchEvent) => {
+      const on = s?.on;
+      s = null;
+      if (on) dragFns.current.dragEnd(e.timeStamp);
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end, { passive: true });
+    el.addEventListener("touchcancel", end, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, []);
 
   return (
     <dialog
@@ -301,7 +386,7 @@ export const Sheet = forwardRef<
         </IconButton>
       </div>
       </div>
-      <div className="max-h-[calc(92dvh-60px)] overflow-y-auto px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div ref={body} className="max-h-[calc(92dvh-60px)] overflow-y-auto overscroll-contain px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {children}
       </div>
     </dialog>
@@ -377,9 +462,13 @@ export function ConfirmButton({
       onClick={() => {
         if (armed) {
           setArmed(false);
+          haptic("success");
           onConfirm();
           if (undo) notifyDeleted(undo);
-        } else setArmed(true);
+        } else {
+          haptic("threshold");
+          setArmed(true);
+        }
       }}
     >
       <span key={tick.key} className={cx("inline-flex items-center gap-2", tick.className)}>

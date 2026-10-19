@@ -1,16 +1,12 @@
 "use client";
 
-import { leaveThen, useChangeMotion } from "@/components/motion";
+import { useChangeMotion } from "@/components/motion";
 import { Tick, useFreshIds } from "./motion";
-import { PendingFinance } from "./pending-list";
-import { useSafeTransition } from "@/components/safe-action";
-import { notifyDeleted } from "@/components/undo-toast";
-import { showContextMenu } from "@/components/context-menu";
-import { deleteTransaction, duplicateTransaction, renameTransaction } from "@/lib/offline/finance";
+import { PendingFinance, useQueuedTxs } from "./pending-list";
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, Tag, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, SquaresFour, Tag } from "@phosphor-icons/react";
 import { Menu } from "@/components/menu";
 import { formatShort } from "@/lib/dates";
 import { moneyCents, moneyWhole } from "@/lib/format";
@@ -35,10 +31,46 @@ import { GastosTabs } from "./gastos-nav";
 import { AccountChips, selectionLabel } from "./account-switcher";
 import { useSelection } from "./selection";
 import { QuickAdd } from "./quick-add";
-import { Balance, EmptyBlock, Fab, TotalsInline, TxRow, useLookups } from "./shared";
+import { Balance, EmptyBlock, TotalsInline, TxRow, useLookups } from "./shared";
 import { PeriodNav } from "./period-nav";
-import { TxSheet, type TxSheetHandle } from "./tx-sheet";
+import { TxSheet, type TxOptimistic, type TxSheetHandle } from "./tx-sheet";
+import { TxGestures, useTxActions } from "./tx-actions";
+import { useGastosNew } from "./new-action";
+import { NavDim, usePeriodSwipe } from "./period-step";
 import { CategorySpend, SideBalances } from "./month-side";
+
+/** Cambios que la lista muestra mientras el servidor guarda (la hoja ya se cerró). */
+type Shown = { list: TxDTO[]; up: Record<string, true> };
+function applyChange(st: Shown, c: TxOptimistic): Shown {
+  if (c.type === "remove") {
+    return { ...st, list: st.list.filter((t) => (c.id ? t.id !== c.id : t.installment?.group !== c.group)) };
+  }
+  const t = c.tx;
+  const i = st.list.findIndex((x) => x.id === t.id);
+  // Editado en el mismo día: queda en su lugar. Nuevo (o cambió de día): arriba de su día.
+  const list = i >= 0 && st.list[i].date === t.date ? st.list.map((x) => (x.id === t.id ? t : x)) : [t, ...st.list.filter((x) => x.id !== t.id)];
+  return { list, up: { ...st.up, [t.id]: true } };
+}
+
+const sig = (t: TxDTO) => `${t.kind}|${t.date}|${t.amountCents}|${t.accountId}|${t.title ?? ""}`;
+const isLocal = (id: string) => id.startsWith("optimista-") || id.startsWith("cola-");
+
+/**
+ * Filas de verdad que llegaron del servidor en lugar de una optimista (mismo día,
+ * monto, cuenta y título): no vuelven a entrar (ya estaban a la vista), solo se
+ * iluminan apenas para decir "guardado".
+ */
+function useReplaced(rows: TxDTO[]): Set<string> {
+  const key = rows.map((r) => r.id).join("|");
+  const [st, setSt] = useState(() => ({ key, local: new Set(rows.filter((r) => isLocal(r.id)).map(sig)), replaced: new Set<string>() }));
+  if (st.key !== key) {
+    const before = new Set(st.key.split("|"));
+    const replaced = new Set(rows.filter((r) => !isLocal(r.id) && !before.has(r.id) && st.local.has(sig(r))).map((r) => r.id));
+    setSt({ key, local: new Set(rows.filter((r) => isLocal(r.id)).map(sig)), replaced });
+    return replaced;
+  }
+  return st.replaced;
+}
 
 /** Atajo de teclado "N" para cargar un movimiento, salvo que se esté escribiendo o haya una hoja abierta. */
 function useNewShortcut(onNew: () => void) {
@@ -82,6 +114,17 @@ export function MovementsView({
   const form = useRef<TxSheetHandle>(null);
   const hasAccounts = accounts.some((a) => !a.archived);
   useNewShortcut(() => hasAccounts && form.current?.create());
+  // El "+" de la barra de abajo del celular.
+  useGastosNew(() => (hasAccounts ? form.current?.create() : router.push("/gastos/cuentas?nueva=1")));
+  // Deslizar de costado cambia de mes (o de año), como las flechas.
+  const swipe = usePeriodSwipe();
+
+  // Lo guardado aparece al instante (subiendo) y lo borrado se va; si el servidor falla, vuelve solo.
+  const base = useMemo<Shown>(() => ({ list: txs, up: {} }), [txs]);
+  const [shown, applyOptimistic] = useOptimistic(base, applyChange);
+  // Lo cargado sin señal también se ve en su día ("sin subir").
+  const queued = useQueuedTxs();
+  const actions = useTxActions({ edit: (t) => form.current?.edit(t), onOptimistic: applyOptimistic });
 
   // ?nuevo=1 (atajo del ícono de la app o "Compartir"): abre la hoja directo; ?titulo= la precarga.
   useEffect(() => {
@@ -108,37 +151,12 @@ export function MovementsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasAccounts]);
 
-  // Clic derecho en un movimiento: cambiar el título, duplicar, editar o borrar.
-  const [, startMenu] = useSafeTransition();
-  function txMenu(e: React.MouseEvent, t: TxDTO) {
-    const name = t.title || (t.kind === "transfer" ? "Transferencia" : "Sin título");
-    showContextMenu(
-      e,
-      [
-        {
-          label: "Cambiar título",
-          icon: <PencilSimple size={15} />,
-          rename: { value: t.title ?? "", onSave: (title) => startMenu(() => renameTransaction(t.id, title)) },
-        },
-        { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => startMenu(() => duplicateTransaction(t.id)) },
-        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => form.current?.edit(t) },
-        {
-          label: t.installment ? "Borrar esta cuota" : "Borrar",
-          icon: <Trash size={15} />,
-          danger: true,
-          onSelect: () => {
-            // Se va con una salida corta (la lista lo saca cuando responde el servidor).
-            leaveThen(`[data-leave="${t.id}"]`, () => startMenu(() => deleteTransaction(t.id)));
-            notifyDeleted("Movimiento borrado");
-          },
-        },
-      ],
-      name,
-    );
-  }
-
   // "Todas" son las personales: lo de las cuentas de trabajo se ve solo si se eligen.
-  const visible = useMemo(() => txs.filter((t) => touchesSelection(t, scope)), [txs, scope]);
+  const visible = useMemo(
+    () => [...queued.filter((q) => periodIncludes(period, q.date)), ...shown.list].filter((t) => touchesSelection(t, scope)),
+    [queued, shown.list, scope, period],
+  );
+  const replaced = useReplaced(visible);
   // Otro período: los datos entran desde ese lado; otras cuentas: fundido. Lo nuevo entra suave.
   const dataKey = `${period.from}|${period.to}|${scope?.join(",") ?? "todas"}`;
   const dataMotion = useChangeMotion(period.from, scope?.join(",") ?? "todas");
@@ -198,7 +216,7 @@ export function MovementsView({
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
+      <main {...swipe} className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         {!hasAccounts ? (
           <EmptyBlock title="Empezá por tus cuentas" icon={<Bank size={22} aria-hidden />}>
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
@@ -219,7 +237,8 @@ export function MovementsView({
               <PendingFinance />
               <QuickAdd accounts={accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency }))} />
               <div className="grid gap-3">
-                <PeriodNav key={`${period.from}_${period.to}`} period={period} today={today} />
+                <PeriodNav period={period} today={today} />
+                <NavDim>
                 <div key={dataKey} className={cx("grid gap-1", dataMotion)}>
                   <span className="kicker">Saldo actual · {selectionLabel(accounts, selection)}</span>
                   <BalanceHero totals={balance} />
@@ -230,10 +249,11 @@ export function MovementsView({
                     </p>
                   )}
                 </div>
-                <dl className="grid grid-cols-2 divide-x divide-line border-y border-line lg:max-w-xl">
+                <dl className="mt-3 grid grid-cols-2 divide-x divide-line border-y border-line lg:max-w-xl">
                   <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
                   <FlowTile label="Gastos" totals={flows.exp} kind="out" />
                 </dl>
+                </NavDim>
               </div>
             </section>
 
@@ -265,6 +285,7 @@ export function MovementsView({
                       { label: "Recurrentes", icon: <ArrowsClockwise size={16} aria-hidden />, onSelect: () => router.push("/gastos/recurrentes") },
                       { label: "Plantillas", icon: <Copy size={16} aria-hidden />, onSelect: () => router.push("/gastos/plantillas") },
                       { label: "Deudas", icon: <Handshake size={16} aria-hidden />, onSelect: () => router.push("/gastos/deudas") },
+                      { label: "Categorías", icon: <SquaresFour size={16} aria-hidden />, onSelect: () => router.push("/gastos/categorias") },
                     ]}
                   />
                 </div>
@@ -276,7 +297,7 @@ export function MovementsView({
             </aside>
 
             {groups.length === 0 ? (
-              <div className="grid justify-items-center gap-2 border-t border-line py-16 text-center lg:col-start-1 lg:row-start-2">
+              <NavDim className="grid justify-items-center gap-2 border-t border-line py-16 text-center lg:col-start-1 lg:row-start-2">
                 <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
                   <Receipt size={20} aria-hidden />
                 </span>
@@ -284,9 +305,10 @@ export function MovementsView({
                 <p className="max-w-[34ch] text-sm text-muted">
                   {selection ? "En las cuentas elegidas. Probá con todas o con otras fechas." : "Cargá el primero con el botón de más."}
                 </p>
-              </div>
+              </NavDim>
             ) : (
-              <div key={dataKey} className={cx("grid gap-6 pt-2 lg:col-start-1 lg:row-start-2", dataMotion)}>
+              <NavDim className="lg:col-start-1 lg:row-start-2">
+              <div key={dataKey} className={cx("grid gap-6 pt-2", dataMotion)}>
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -305,35 +327,55 @@ export function MovementsView({
                         <TotalsInline totals={g.net} className="font-mono text-[12.5px] font-medium" />
                       </header>
                       <ul>
-                        {g.txs.map((t) => (
-                          <li
-                            key={t.id}
-                            data-leave={t.id}
-                            data-leave-group={t.installment?.group}
-                            className={cx(freshTx.has(`${t.id}@${t.date}`) && "reveal fin-new")}
-                          >
-                            <TxRow
-                              tx={t}
-                              lk={lk}
-                              selection={scope}
-                              showAccount={showAccount}
-                              onClick={() => form.current?.edit(t)}
-                              onMenu={(e) => txMenu(e, t)}
-                            />
-                          </li>
-                        ))}
+                        {g.txs.map((t) => {
+                          const local = isLocal(t.id);
+                          const status = t.id.startsWith("cola-") ? "sin-subir" : shown.up[t.id] ? "subiendo" : undefined;
+                          return (
+                            <li
+                              key={t.id}
+                              data-leave={t.id}
+                              data-leave-group={t.installment?.group}
+                              className={cx(
+                                replaced.has(t.id)
+                                  ? "fin-new"
+                                  : freshTx.has(`${t.id}@${t.date}`) && (local ? "reveal" : "reveal fin-new"),
+                              )}
+                            >
+                              <TxGestures tx={t} actions={actions} disabled={local}>
+                                {(gp) => (
+                                  <TxRow
+                                    tx={t}
+                                    lk={lk}
+                                    selection={scope}
+                                    showAccount={showAccount}
+                                    status={status}
+                                    onClick={local ? undefined : () => form.current?.edit(t)}
+                                    gestures={local ? undefined : gp}
+                                  />
+                                )}
+                              </TxGestures>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </section>
                   );
                 })}
               </div>
+              </NavDim>
             )}
           </div>
         )}
       </main>
 
-      {hasAccounts && <Fab onClick={() => form.current?.create()} />}
-      <TxSheet ref={form} accounts={accounts} categories={categories} templates={templates} selection={selection} />
+      <TxSheet
+        ref={form}
+        accounts={accounts}
+        categories={categories}
+        templates={templates}
+        selection={selection}
+        onOptimistic={applyOptimistic}
+      />
     </>
   );
 }

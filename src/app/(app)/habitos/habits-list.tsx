@@ -58,6 +58,19 @@ export function HabitsList({
   const [category, setCategory] = useState<string | null>(null);
   const form = useRef<HabitFormHandle>(null);
   const daySheet = useRef<DaySheetHandle>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  /** Abre o cierra la búsqueda; al cerrarla se borra lo escrito (si no, el filtro quedaba escondido). */
+  function toggleSearch(open = !searching) {
+    if (!open) {
+      setSearching(false);
+      setQuery("");
+      return;
+    }
+    setSearching(true);
+    // El foco, dos cuadros después: cerrado, el campo está oculto (visibility) y no lo
+    // toma hasta que arranca el plegado.
+    requestAnimationFrame(() => requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true })));
+  }
   useOnNew(() => {
     if (!archived) form.current?.create();
   });
@@ -76,8 +89,8 @@ export function HabitsList({
         tabs={<HabitsTabs />}
         actions={
           <>
-            <IconButton label="Buscar" onClick={() => setSearching((s) => !s)}>
-              <MagnifyingGlass size={21} />
+            <IconButton label={searching ? "Cerrar la búsqueda" : "Buscar"} onClick={() => toggleSearch()} className={cx(searching && "text-accent")}>
+              <MagnifyingGlass size={21} weight={searching ? "bold" : "regular"} />
             </IconButton>
             <Menu
               trigger={(toggle) => (
@@ -128,29 +141,51 @@ export function HabitsList({
       />
 
       <main className="mx-auto grid max-w-3xl px-4 pt-3 lg:max-w-6xl lg:px-10 lg:pt-6">
-        {(searching || activeCategory) && (
-          <div className="reveal flex flex-wrap items-center gap-2 pb-3">
-            {searching && (
+        {/* La búsqueda se abre con el alto animado (antes aparecía de golpe y empujaba la lista). */}
+        <div className="fold" data-closed={!searching || undefined}>
+          <div>
+            <div className="relative pb-3">
+              <MagnifyingGlass size={17} aria-hidden className="pointer-events-none absolute top-3.5 left-3 text-faint" />
               <input
-                autoFocus
+                ref={searchRef}
+                type="search"
+                enterKeyHint="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && toggleSearch(false)}
                 placeholder="Buscar hábito"
                 aria-label="Buscar hábito"
-                className="h-11 min-w-0 flex-1 rounded-[4px] border border-line-strong bg-surface px-3 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-[var(--focus)]"
+                className="h-11 w-full min-w-0 rounded-[4px] border border-line-strong bg-surface pr-11 pl-9 text-[15px] outline-none placeholder:text-faint focus:ring-2 focus:ring-[var(--focus)] [&::-webkit-search-cancel-button]:appearance-none"
               />
-            )}
-            {activeCategory && (
               <button
                 type="button"
-                onClick={() => setCategory(null)}
-                style={tone(activeCategory.color)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[4px] bg-tone px-2.5 text-[13px] font-medium text-tone-fg"
+                onClick={() => {
+                  setQuery("");
+                  searchRef.current?.focus();
+                }}
+                aria-label="Limpiar la búsqueda"
+                tabIndex={query ? 0 : -1}
+                className={cx(
+                  "absolute top-0 right-0 inline-flex size-11 items-center justify-center rounded-[4px] text-muted transition-opacity duration-150 hover:text-fg",
+                  !query && "pointer-events-none opacity-0",
+                )}
               >
-                {activeCategory.name}
-                <X size={13} weight="bold" />
+                <X size={16} weight="bold" />
               </button>
-            )}
+            </div>
+          </div>
+        </div>
+        {activeCategory && (
+          <div className="reveal flex flex-wrap items-center gap-2 pb-3">
+            <button
+              type="button"
+              onClick={() => setCategory(null)}
+              style={tone(activeCategory.color)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[4px] bg-tone px-2.5 text-[13px] font-medium text-tone-fg"
+            >
+              {activeCategory.name}
+              <X size={13} weight="bold" />
+            </button>
           </div>
         )}
 

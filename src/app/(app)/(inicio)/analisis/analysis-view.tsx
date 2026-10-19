@@ -2,6 +2,7 @@
 
 import { useSwap } from "@/components/motion";
 import { PillSwitch } from "@/components/pill-switch";
+import { usePeriodNav } from "../period-nav";
 import { useState } from "react";
 import { Lightbulb } from "@phosphor-icons/react";
 import type { Corr, Insight } from "@/lib/insights";
@@ -41,12 +42,15 @@ export function AnalysisView({
 }) {
   // Otro rango: el contenido cambia con un fundido (no al cargar).
   const rangeSwap = useSwap(String(range));
+  // El rango elegido y el rótulo cambian al toque; si los datos tardan, el contenido se atenúa.
+  const nav = usePeriodNav(String(range));
+  const shown = Number(nav.shown);
   const rangeSwitch = (
     <PillSwitch
       label="Período"
-      value={String(range)}
+      value={nav.shown}
       options={ranges.map((r) => ({ value: String(r), label: r === 365 ? "1 año" : `${r}d` }))}
-      hrefOf={(r) => `/analisis?dias=${r}`}
+      onChange={(r) => r !== nav.shown && nav.go(r, `/analisis?dias=${r}`)}
       item="h-8 px-3 text-[12.5px]"
     />
   );
@@ -54,13 +58,13 @@ export function AnalysisView({
     <>
       <PageHeader
         title="Análisis"
-        kicker={range === 365 ? "Último año, hasta ayer" : `Últimos ${range} días, hasta ayer`}
+        kicker={shown === 365 ? "Último año, hasta ayer" : `Últimos ${shown} días, hasta ayer`}
         wide
         // En el celular el selector va debajo: al lado del título se cortaban el rótulo y el título.
         actions={<div className="hidden sm:block">{rangeSwitch}</div>}
       />
       <div className="mx-auto flex max-w-6xl px-4 pb-2 sm:hidden">{rangeSwitch}</div>
-      <main key={range} className={cx("mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4", rangeSwap)}>
+      <main key={range} {...nav.bodyProps} className={cx("mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4", rangeSwap)}>
         <Card title="Lo que se ve en tus datos" className="xl:col-span-12">
           {insights.length === 0 ? (
             <p className="text-[14px] leading-relaxed text-muted">

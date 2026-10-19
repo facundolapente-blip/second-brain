@@ -1,0 +1,9 @@
+/* Contenido de un período que se está cargando (usePeriodNav en period-nav.tsx):
+   si a los 150 ms no llegaron los datos, baja a 0,55 en 120 ms; vuelve enseguida. */
+[data-period-body] {
+  transition: opacity 120ms var(--ease-out);
+}
+[data-period-body][data-period-loading] {
+  opacity: 0.55;
+  transition-delay: 150ms;
+}

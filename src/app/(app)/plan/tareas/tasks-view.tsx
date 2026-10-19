@@ -1,19 +1,24 @@
 "use client";
 
-import { useNewIds, useTick } from "@/components/motion";
-import { notifyDeleted } from "@/components/undo-toast";
+import { leaveThen, useNewIds, useTick } from "@/components/motion";
+import { notifyDeleted, notifyError, notifyInfo } from "@/components/undo-toast";
+import { haptic } from "@/components/haptics";
+import { SwipeRow } from "@/components/swipe-row";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
-import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash } from "@phosphor-icons/react";
-import { saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask } from "@/lib/offline/plan";
-import { formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks } from "@/lib/plan-logic";
+import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots } from "@phosphor-icons/react";
+import { saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
+import { addDays, formatShort } from "@/lib/dates";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, taskFromForm } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, StepBar } from "../plan-ui";
 import { tone } from "@/lib/palette";
-import { TaskSheet, type TaskSheetHandle } from "./task-sheet";
+import { TaskSheet, type TaskSheetActions, type TaskSheetHandle } from "./task-sheet";
+import { DatePicker } from "./date-picker";
+import { usePlanWeek } from "../plan-context";
+import { ghostCard, liftImage, ringWhileMenu } from "../drag-motion";
 import { TaskKanban } from "./task-kanban";
 import { PillSwitch } from "@/components/pill-switch";
 
@@ -55,47 +60,24 @@ function groupsOf(visible: TaskDTO[], matching: TaskDTO[]) {
  * Muestra las primeras 6 y el resto con "Ver todas".
  */
 /** Cambiar el deadline desde la fila (lo da `TasksBoard`, que lo muestra enseguida). */
-const DeadlineContext = createContext<(t: TaskDTO, deadline: string | null) => void>(() => {});
+const DeadlineContext = createContext<{ change: (t: TaskDTO, deadline: string | null) => void; today: string }>({ change: () => {}, today: "" });
 
 /**
- * Tocar la fecha abre el selector de fecha del aparato y guarda al elegir (en la
- * compu con `showPicker`; en el celular el campo invisible queda encima y el toque
- * lo abre directo). "Borrar" en el selector deja la tarea sin fecha.
+ * Tocar la fecha abre el selector propio (atajos + calendario chico; cartel en la
+ * compu, hoja chica en el celular) y guarda al elegir, al instante.
  */
-function DeadlinePicker({ task, children, className }: { task: TaskDTO; children: React.ReactNode; className?: string }) {
-  const change = useContext(DeadlineContext);
-  const input = useRef<HTMLInputElement>(null);
+export function DeadlinePicker({ task, children, className }: { task: TaskDTO; children: React.ReactNode; className?: string }) {
+  const { change, today } = useContext(DeadlineContext);
   return (
-    <span className={cx("relative inline-flex shrink-0", className)}>
-      <button
-        type="button"
-        draggable={false}
-        onClick={() => {
-          const el = input.current;
-          if (!el) return;
-          try {
-            el.showPicker();
-          } catch {
-            el.focus();
-            el.click();
-          }
-        }}
-        aria-label={task.deadline ? `Cambiar el deadline de ${task.title} (${formatShort(task.deadline)})` : `Ponerle deadline a ${task.title}`}
-        title="Cambiar la fecha"
-        className="press rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-      >
-        {children}
-      </button>
-      <input
-        ref={input}
-        type="date"
-        tabIndex={-1}
-        aria-hidden
-        value={task.deadline ?? ""}
-        onChange={(e) => change(task, e.target.value || null)}
-        className="pointer-events-none absolute inset-0 h-full w-full cursor-pointer opacity-0 pointer-coarse:pointer-events-auto"
-      />
-    </span>
+    <DatePicker
+      value={task.deadline}
+      today={today}
+      onChange={(d) => change(task, d)}
+      label={task.deadline ? `Deadline de ${task.title} (${formatShort(task.deadline)})` : `Ponerle deadline a ${task.title}`}
+      className={className}
+    >
+      {children}
+    </DatePicker>
   );
 }
 
@@ -166,27 +148,93 @@ export function TasksBoard({
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
   const manual = manualOrder;
-  // El deadline cambiado desde la fila se ve enseguida (si falla, vuelve solo).
-  const [optimisticTasks, setOptimisticDeadline] = useOptimistic(tasks, (list: TaskDTO[], m: { id: string; deadline: string | null }) =>
-    list.map((t) => (t.id === m.id ? { ...t, deadline: m.deadline } : t)),
+  // Todo lo que se cambia desde acá se ve enseguida (si falla, vuelve solo): el deadline,
+  // lo guardado en la hoja, una tarea nueva (con el id que le pone el aparato, el mismo
+  // que va a tener guardada), una borrada, terminar deslizando.
+  const [optimisticTasks, applyTask] = useOptimistic(tasks, (list: TaskDTO[], m: (Partial<TaskDTO> & { id: string }) | { add: TaskDTO; after?: string } | { remove: string }) =>
+    "add" in m
+      ? list.some((t) => t.id === m.add.id)
+        ? list.map((t) => (t.id === m.add.id ? m.add : t))
+        : m.after && list.some((t) => t.id === m.after)
+          ? list.flatMap((t) => (t.id === m.after ? [t, m.add] : [t]))
+          : [m.add, ...list]
+      : "remove" in m
+        ? list.filter((t) => t.id !== m.remove)
+        : list.map((t) => (t.id === m.id ? { ...t, ...m } : t)),
   );
   const [, startDeadline] = useSafeTransition();
+  const [justCreated, setJustCreated] = useState<string | null>(null);
   const changeDeadline = (t: TaskDTO, deadline: string | null) => {
     if (deadline === t.deadline) return;
     startDeadline(async () => {
-      setOptimisticDeadline({ id: t.id, deadline });
+      applyTask({ id: t.id, deadline });
       await setTaskDeadline(t.id, deadline);
     });
   };
+  const sheetActions: TaskSheetActions = {
+    save(fd, task) {
+      const id = task?.id ?? newClientId();
+      if (!task) {
+        fd.set("clientId", id);
+        setJustCreated(id);
+      }
+      const next = taskFromForm(fd, task ?? null, id);
+      startDeadline(async () => {
+        if (next) applyTask(task ? next : { add: next });
+        const r = await saveTask(null, fd);
+        if (r && !r.ok) notifyError(`No se guardó: ${r.error}`);
+      });
+    },
+    duplicate(task) {
+      const copyId = newClientId();
+      startDeadline(async () => {
+        // La copia queda debajo de la original, con los pasos sin tildar y sin agendar.
+        const subtasks = task.subtasks.map((x, i) => ({ ...x, id: `tmp-${copyId}-${i}`, done: false }));
+        applyTask({
+          add: { ...task, id: copyId, subtasks, progress: subtasks.length ? 0 : task.progress, scheduled: false, blockCount: 0, status: task.status === "done" ? "todo" : task.status, doneAt: null },
+          after: task.id,
+        });
+        await duplicateTask(task.id, copyId);
+      });
+    },
+    remove(task) {
+      leaveThen(`[data-task="${task.id}"]`, () =>
+        startDeadline(async () => {
+          applyTask({ remove: task.id });
+          await deleteTask(task.id);
+        }),
+      );
+    },
+  };
+  /** Deslizar en el celular: Hecho (pasa a Terminado) o +1 semana (corre el deadline 7 días). */
+  function swipeDone(t: TaskDTO) {
+    haptic("success");
+    leaveThen(`[data-task="${t.id}"]`, () =>
+      startDeadline(async () => {
+        applyTask({ id: t.id, status: "done", doneAt: new Date().toISOString() });
+        await setTaskStatus(t.id, "done");
+      }),
+    );
+    notifyInfo(`"${t.title}" terminada`);
+  }
+  function swipeWeek(t: TaskDTO) {
+    const d = addDays(t.deadline ?? today, 7);
+    changeDeadline(t, d);
+    notifyInfo(`"${t.title}" vence el ${formatShort(d)}`);
+  }
   const ordered = optimisticTasks;
   const matching = arrange(applyTaskView(ordered, view, manual), view);
-  const visible = all ? matching : matching.slice(0, LIMIT);
+  // Una tarea recién creada que quedaría escondida después de las primeras 6: se muestran todas (si no, parecía que no se creó).
+  const showAll = all || (!!justCreated && matching.slice(LIMIT).some((t) => t.id === justCreated));
+  const visible = showAll ? matching : matching.slice(0, LIMIT);
   const groups = groupsOf(visible, matching);
   const fresh = useNewIds(visible.map((t) => t.id));
   const hidden = matching.length - visible.length;
   // Clic derecho en una tarea (tabla de la compu).
   const [, startMenu] = useSafeTransition();
   function taskMenu(e: React.MouseEvent, t: TaskDTO) {
+    // La fila queda marcada mientras el menú está abierto.
+    ringWhileMenu(e.currentTarget as HTMLElement);
     showContextMenu(
       e,
       [
@@ -195,7 +243,7 @@ export function TasksBoard({
           icon: <PencilSimple size={15} />,
           rename: { value: t.title, onSave: (title) => startMenu(() => renameTask(t.id, title)) },
         },
-        { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => startMenu(() => duplicateTask(t.id)) },
+        { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => sheetActions.duplicate(t) },
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => sheet.current?.open(t) },
         ...(t.status !== "done" ? [{ label: "Agendar en la semana", icon: <CalendarPlus size={15} />, onSelect: () => schedule(t) }] : []),
         {
@@ -203,7 +251,7 @@ export function TasksBoard({
           icon: <Trash size={15} />,
           danger: true,
           onSelect: () => {
-            startMenu(() => deleteTask(t.id));
+            sheetActions.remove(t);
             notifyDeleted("Tarea borrada");
           },
         },
@@ -211,8 +259,10 @@ export function TasksBoard({
       t.title,
     );
   }
+  // "Agendar en la semana": la hoja de bloque de la semana (así el bloque se ve al instante ahí).
+  const week = usePlanWeek();
   const schedule = (t: TaskDTO) =>
-    blockSheet.current?.open({
+    (week ? week.openBlock : (d: Parameters<BlockSheetHandle["open"]>[0]) => blockSheet.current?.open(d))({
       date: today,
       title: t.title,
       categoryId: t.categoryId,
@@ -221,7 +271,7 @@ export function TasksBoard({
     });
 
   return (
-    <DeadlineContext value={changeDeadline}>
+    <DeadlineContext value={{ change: changeDeadline, today }}>
     <section id="tareas" aria-label="Tareas" className="scroll-mt-24 pt-3 lg:pt-5">
       <div className="flex items-center gap-2">
         {/* En el celular el título pliega la lista (queda una línea con el resumen). */}
@@ -234,7 +284,7 @@ export function TasksBoard({
         >
           <h2 className="display text-[22px] lg:text-[26px]">Tareas</h2>
           {/* Las vencidas primero: si no entra todo en el celular, lo que se corta es lo menos importante. */}
-          <span className="truncate font-mono text-[12px] text-muted tabular">
+          <span className="min-w-0 truncate font-mono text-[12px] text-muted tabular">
             {overdue > 0 && <span className="text-danger">{overdue === 1 ? "1 vencida" : `${overdue} vencidas`} · </span>}
             {open.length} abiertas
           </span>
@@ -245,8 +295,9 @@ export function TasksBoard({
             className={cx("shrink-0 text-muted transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)] lg:hidden", folded && "-rotate-90")}
           />
         </button>
-        <Button variant="outline" size="sm" className="ml-auto" onClick={() => sheet.current?.open()}>
-          <Plus size={15} weight="bold" /> Nueva tarea
+        {/* En el celular solo el +: así entra el resumen completo ("5 vencidas · 19 abiertas"). */}
+        <Button variant="outline" size="sm" className="ml-auto shrink-0 max-sm:size-10 max-sm:px-0" aria-label="Nueva tarea" onClick={() => sheet.current?.open()}>
+          <Plus size={15} weight="bold" /> <span className="max-sm:hidden">Nueva tarea</span>
         </Button>
       </div>
       {/* En el celular se pliega con el alto animado (en la compu siempre se ve). */}
@@ -269,6 +320,7 @@ export function TasksBoard({
               onClick={() => {
                 setView(v.id);
                 setAll(false);
+                setJustCreated(null);
               }}
               className={cx(
                 "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors",
@@ -300,6 +352,7 @@ export function TasksBoard({
           today={today}
           onOpen={(t) => sheet.current?.open(t)}
           onNew={(status) => sheet.current?.open(undefined, { status })}
+          onDeadline={changeDeadline}
         />
       ) : visible.length === 0 ? (
         <div className="grid justify-items-start gap-3 border-y border-line py-6">
@@ -325,6 +378,8 @@ export function TasksBoard({
                     category={t.categoryId ? cats.get(t.categoryId) : null}
                     today={today}
                     onOpen={() => sheet.current?.open(t)}
+                    onDone={() => swipeDone(t)}
+                    onWeek={() => swipeWeek(t)}
                   />
                 ))}
               </Fragment>
@@ -332,25 +387,24 @@ export function TasksBoard({
           </ul>
         </>
       )}
-      {!board && (hidden > 0 || (all && matching.length > LIMIT)) && (
+      {!board && (hidden > 0 || (showAll && matching.length > LIMIT)) && (
         <button
           type="button"
-          onClick={() => setAll((a) => !a)}
+          onClick={() => {
+            setJustCreated(null);
+            setAll(!showAll);
+          }}
           className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-[13.5px] font-medium text-accent-fg hover:bg-surface-2"
         >
-          {all ? "Ver menos" : `Ver todas (${hidden} más)`}
+          {showAll ? "Ver menos" : `Ver todas (${hidden} más)`}
         </button>
       )}
       </div>
       </div>
       </div>
 
-      <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} />
-      <BlockSheet
-        ref={blockSheet}
-        categories={categories}
-        tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))}
-      />
+      <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} actions={sheetActions} />
+      {!week && <BlockSheet ref={blockSheet} categories={categories} tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))} />}
     </section>
     </DeadlineContext>
   );
@@ -361,20 +415,31 @@ function TaskRow({
   category,
   today,
   onOpen,
+  onDone,
+  onWeek,
   fresh,
 }: {
   task: TaskDTO;
   category?: CategoryDTO | null;
   today: string;
   onOpen: () => void;
+  /** Deslizar a la derecha: Terminado. */
+  onDone: () => void;
+  /** Deslizar a la izquierda: el deadline una semana después. */
+  onWeek: () => void;
   /** Recién aparecida ("Ver todas", nueva): entra con un fundido. */
   fresh?: boolean;
 }) {
   const left = daysLeft(t.deadline, today);
   const done = t.status === "done";
   return (
-    <li className={cx("border-b border-line", fresh && "reveal")}>
-      <div className="flex items-start gap-3 px-1 py-3">
+    <li data-task={t.id} className={cx("border-b border-line", fresh && "reveal")}>
+      <SwipeRow
+        left={done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: onDone }}
+        right={done ? undefined : { label: "+1 semana", icon: <CalendarDots size={20} weight="bold" />, tone: "accent", onAction: onWeek }}
+      >
+      <div className="bg-bg">
+      <div className="tap-tint flex items-start gap-3 px-1 py-3">
         <DeadlinePicker task={t}>
           <DateBlock deadline={t.deadline} left={left} done={done} />
         </DeadlinePicker>
@@ -395,6 +460,8 @@ function TaskRow({
           <Steps task={t} />
         </div>
       )}
+      </div>
+      </SwipeRow>
     </li>
   );
 }
@@ -561,6 +628,7 @@ function TaskTable({
                 return (
                   <tr
                     key={t.id}
+                    data-task={t.id}
                     onContextMenu={(e) => onMenu(e, t)}
                     // Toda la fila se arrastra a un día de la semana (Lista o Por horas) y ahí se crea el bloque.
                     draggable={!done}
@@ -568,11 +636,14 @@ function TaskTable({
                       if (done) return;
                       e.dataTransfer.setData(TASK_DRAG, t.id);
                       e.dataTransfer.effectAllowed = "copy";
+                      // Lo que sigue al mouse: una tarjeta chica con el nombre (la fila suelta se ve rota).
+                      const cat = t.categoryId ? cats.get(t.categoryId)?.name : undefined;
+                      liftImage(e, e.currentTarget, ghostCard(t.title, cat ? `${cat} · soltala en un día` : "Soltala en un día"));
                       setDragging(t.id);
                     }}
                     onDragEnd={() => setDragging(null)}
                     className={cx(
-                      "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2",
+                      "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2 active:bg-surface-2",
                       !done && "cursor-grab active:cursor-grabbing",
                       i % 2 === 1 && "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
                       fresh?.has(t.id) && "reveal",

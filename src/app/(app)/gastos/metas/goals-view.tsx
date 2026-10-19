@@ -1,5 +1,6 @@
 "use client";
 
+import { useGastosNew } from "../new-action";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus, Target } from "@phosphor-icons/react";
@@ -13,7 +14,6 @@ import { FinanceIcon } from "@/lib/finance-icons";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
-import { Fab } from "../shared";
 
 /** Cuánto hay que juntar por mes para llegar a la fecha. */
 function perMonth(g: GoalDTO, today: string) {
@@ -31,6 +31,8 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
   const active = goals.filter((g) => !g.archived);
   const archived = goals.filter((g) => g.archived);
 
+  // El "+" de la barra de abajo crea acá.
+  useGastosNew(() => edit(null));
   function edit(g: GoalDTO | null) {
     setEditing(g);
     setKey((k) => k + 1);
@@ -136,8 +138,6 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
           </p>
         )}
       </main>
-
-      <Fab onClick={() => edit(null)} label="Nueva meta" />
 
       <Sheet ref={sheet} title={editing ? "Editar meta" : "Nueva meta"}>
         <GoalForm key={key} goal={editing} accounts={accounts} onDone={() => sheet.current?.close()} />

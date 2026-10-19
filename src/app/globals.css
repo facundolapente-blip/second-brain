@@ -426,12 +426,13 @@ dialog.sheet::backdrop {
     35% { transform: scale(1.08); }
     100% { box-shadow: 0 0 0 18px color-mix(in oklab, var(--c-habitos) 0%, transparent); transform: none; }
   }
-  /* Cambio de pantalla (template.tsx de cada módulo): fundido corto, sin movimiento. */
+  /* Cambio de pantalla (PageFade en el template.tsx de cada módulo, solo al cambiar de
+     módulo o pestaña): fundido corto desde 0,6, sin blanquear la pantalla ni moverla. */
   .page-fade {
     animation: page-fade 150ms ease-out;
   }
   @keyframes page-fade {
-    from { opacity: 0; }
+    from { opacity: 0.6; }
   }
   /* Aviso de Deshacer. */
   .toast-in {
@@ -801,13 +802,18 @@ dialog.sheet.closing-drag::backdrop {
 /* Al llegar el contenido después del esqueleto de carga, entra con el mismo fundido corto
    (sin esto, el esqueleto se reemplazaba de golpe). `:where` deja que las clases de cada
    pantalla (swap, plan-slide…) ganen cuando corresponde. */
+/* Solo cuando se vio el esqueleto (PageFade marca data-arrived): al cargar la app o al
+   cambiar de semana sin esqueleto no hay fundido. */
 @media (prefers-reduced-motion: no-preference) {
-  :where(#contenido main) {
-    animation: page-fade 150ms ease-out;
+  :where([data-arrived] main:not([aria-busy])) {
+    animation: arrive 150ms ease-out;
+  }
+  @keyframes arrive {
+    from { opacity: 0.4; }
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(#contenido main) {
+  :where([data-arrived] main:not([aria-busy])) {
     animation: fade-in 120ms ease-out;
   }
 }
@@ -961,4 +967,105 @@ dialog.sheet.closing-drag::backdrop {
   button.nav-add.nav-add:active {
     scale: 0.9;
   }
+}
+
+/* ── Gestos y respuesta al toque (auditoría 2026-10-19) ──────────────────────
+   .tap-tint     Fila o pestaña tocable: se tiñe apenas (tinta al 5 %) en el
+                 instante del toque (:active), en 80 ms, y se suelta en 160 ms.
+                 Para filas de lista, pestañas de barras y enlaces del menú. No
+                 cambia tamaño ni lugar (sirve también en filas que no se mueven).
+                 --tap-inset achica el tinte (p. ej. [--tap-inset:3px_2px]).
+                 El tinte es un ::after encima (no pisa el fondo propio); pone
+                 position: relative en la capa components (una utilidad
+                 absolute/sticky le gana). No usar en elementos que ya usen ::after.
+   SwipeRow      (components/swipe-row.tsx) fondo de color detrás de la fila:
+                 .swipe-back[data-tone=done|danger|accent|neutral], el ícono crece
+                 al pasar el umbral (data-past). */
+@layer components {
+  .tap-tint {
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tap-tint::after {
+    content: "";
+    position: absolute;
+    inset: var(--tap-inset, 0);
+    border-radius: inherit;
+    background: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms var(--ease-out);
+  }
+  .tap-tint:active:not(:disabled, [aria-disabled="true"])::after {
+    opacity: 0.05;
+    transition-duration: 80ms;
+  }
+  :root[data-theme="oscuro"] .tap-tint:active:not(:disabled, [aria-disabled="true"])::after {
+    opacity: 0.07;
+  }
+}
+
+.swipe-back {
+  pointer-events: none;
+}
+.swipe-back[data-tone="done"] { background: var(--st-done-line); color: #fff; }
+.swipe-back[data-tone="danger"] { background: var(--danger); color: #fff; }
+.swipe-back[data-tone="accent"] { background: var(--accent); color: var(--on-accent); }
+.swipe-back[data-tone="neutral"] { background: var(--muted); color: var(--surface); }
+:root[data-theme="oscuro"] .swipe-back:is([data-tone="done"], [data-tone="danger"]) { color: var(--bg); }
+.swipe-icon {
+  transition: scale 220ms var(--ease-spring);
+}
+.swipe-back[data-past="true"] .swipe-icon {
+  scale: 1.25;
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-icon { transition: none; }
+  .swipe-back[data-past="true"] .swipe-icon { scale: 1; }
+}
+
+/* Tirar para actualizar (PullToRefresh en el Shell). Sin el tirón propio del navegador
+   (Chrome en Android recargaba la página entera): el de la app sube la cola y refresca. */
+@media (hover: none) and (pointer: coarse) and (max-width: 1023px) {
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+.pull-indicator {
+  will-change: transform, opacity;
+}
+.pull-indicator[data-past="true"] {
+  color: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pull-spin {
+    animation: pull-spin 700ms linear infinite;
+  }
+  @keyframes pull-spin {
+    to { transform: rotate(360deg); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pull-spin {
+    animation: pull-pulse 900ms ease-in-out infinite;
+  }
+  @keyframes pull-pulse {
+    50% { opacity: 0.4; }
+  }
+}
+
+/* Hoja abierta en el celular: la página de atrás no se desplaza. */
+@media (max-width: 639px) {
+  html:has(dialog.sheet[open]) {
+    overflow: hidden;
+  }
+}
+/* Oscuro: el velo casi no oscurecía y la hoja no se despegaba del fondo. */
+:root[data-theme="oscuro"] dialog.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.56);
+}
+:root[data-theme="oscuro"] dialog.sheet {
+  background: color-mix(in oklab, var(--surface) 94%, white);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 -12px 40px -16px rgba(0, 0, 0, 0.7);
 }

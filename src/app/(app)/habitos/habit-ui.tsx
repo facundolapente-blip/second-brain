@@ -2,7 +2,7 @@
 
 import { useSlide } from "@/components/motion";
 import { useSafeTransition } from "@/components/safe-action";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dropPending, enqueue, flushQueue, isNetworkError, pendingOps, subscribeQueue } from "@/lib/offline-queue";
 import { isSessionExpired, isStaleDeploy, reloadForNewVersion } from "@/lib/offline/queue";
@@ -14,18 +14,22 @@ import {
   frequencyLabel,
   isDone,
   nextStatus,
-  unpackAll,
+  unitLabel,
+  unpackLogs,
   type DayLog,
   type DayState,
   type LogMap,
   type LogStatus,
   type PackedLogMap,
+  type PackedLogs,
 } from "@/lib/habit-logic";
 import { addDays, formatLong, monthBounds, shiftMonth, weekday } from "@/lib/dates";
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { mergeOrder } from "@/components/sortable";
+import { HOLD_CLASS, useHoldRepeat } from "./hold-repeat";
+import { useSwipe } from "@/components/swipe";
 
 // ─── Estado optimista de las marcas ─────────────────────────────────────────
 
@@ -72,6 +76,30 @@ function queuedMarks(): Mark[] {
     .map((o) => ({ habitId: o.habitId, date: o.date, status: o.status, value: o.value, note: o.note }));
 }
 
+/**
+ * Abre las marcas compactas conservando el mismo objeto por hábito mientras sus
+ * marcas no cambien (también entre versiones del servidor). Así, al tildar uno o al
+ * volver la página revalidada, los cálculos guardados por hábito (puntaje, racha:
+ * ver `today-panel.tsx`) y las filas memorizadas solo se rehacen para ese hábito.
+ */
+const unpacked = new Map<string, { sig: string; logs: LogMap }>();
+function packedSig(p: PackedLogs | null | undefined): string {
+  return p ? `${p.from}|${p.s}|${p.v ? JSON.stringify(p.v) : ""}|${p.n ? JSON.stringify(p.n) : ""}` : "";
+}
+function unpackStable(packed: PackedLogMap): Record<string, LogMap> {
+  const out: Record<string, LogMap> = {};
+  for (const [id, p] of Object.entries(packed)) {
+    const sig = packedSig(p);
+    let hit = unpacked.get(id);
+    if (!hit || hit.sig !== sig) {
+      hit = { sig, logs: unpackLogs(p) };
+      unpacked.set(id, hit);
+    }
+    out[id] = hit.logs;
+  }
+  return out;
+}
+
 export function useHabitLogs(packed: PackedLogMap) {
   const router = useRouter();
   // Marcas hechas sin señal que todavía no llegaron al servidor (ver offline-queue),
@@ -104,11 +132,12 @@ export function useHabitLogs(packed: PackedLogMap) {
   }, [router, packed]);
   const sent = queue.sentFor === packed ? queue.sent : EMPTY;
   // Llegan compactas (ver packLogs); se abren una vez por cada versión del servidor.
-  const initial = useMemo(() => [...sent, ...queue.ops].reduce(withMark, unpackAll(packed)), [packed, sent, queue.ops]);
+  const initial = useMemo(() => [...sent, ...queue.ops].reduce(withMark, unpackStable(packed)), [packed, sent, queue.ops]);
   const [logs, apply] = useOptimistic(initial, withMark);
   const [, startTransition] = useSafeTransition();
 
-  const mark: MarkFn = (habitId, date, status, value = 1, note) => {
+  // Estable entre renders: las filas memorizadas (day-rows) no se vuelven a dibujar por esto.
+  const mark: MarkFn = useCallback((habitId, date, status, value = 1, note) => {
     // Una marca nueva reemplaza a las que seguían en la cola para ese día (si no, al
     // subir después pisarían a esta); se queda con la nota que traían.
     const keptNote = dropPending(habitId, date);
@@ -136,7 +165,7 @@ export function useHabitLogs(packed: PackedLogMap) {
         router.refresh();
       }
     });
-  };
+  }, [apply, router, startTransition]);
 
   return { logs, mark };
 }
@@ -329,6 +358,8 @@ export function CalendarMonth({
   for (let d = from; d <= to; d = addDays(d, 1)) cells.push({ date: d, inMonth: true });
   while (cells.length % 7 !== 0) cells.push({ date: addDays(cells[cells.length - 1].date, 1), inMonth: false });
   const monthSlide = useSlide(month);
+  // Deslizar de costado sobre el calendario cambia de mes (entra con el mismo deslizamiento que las flechas).
+  const swipe = useSwipe({ onLeft: () => setMonth(shiftMonth(month, 1)), onRight: () => setMonth(shiftMonth(month, -1)) });
 
   return (
     <div className="grid gap-4">
@@ -338,6 +369,7 @@ export function CalendarMonth({
         onPrev={() => setMonth(shiftMonth(month, -1))}
         onNext={() => setMonth(shiftMonth(month, 1))}
       />
+      <div {...swipe} className="touch-pan-y">
       <div key={month} className={cx("grid grid-cols-7 justify-items-center gap-y-2", monthSlide)}>
         {WEEK_HEAD.map((w, i) => (
           <span key={w} className={cx("kicker pb-1", i >= 5 && "text-accent-fg!")}>
@@ -364,6 +396,7 @@ export function CalendarMonth({
             </span>
           ),
         )}
+      </div>
       </div>
     </div>
   );
@@ -405,6 +438,10 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
         { duration: reduce ? 120 : 220, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
       );
     }
+
+    // Mantener apretado − o + repite cada 120 ms desde los 400 ms (se guarda al cerrar o con Guardar).
+    const less = useHoldRepeat(() => change(Math.max(0, value - 1)));
+    const more = useHoldRepeat(() => change(value + 1));
 
     useImperativeHandle(ref, () => ({
       show(habit, date) {
@@ -453,8 +490,8 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                 <div className="flex items-center justify-center gap-5">
                   <button
                     type="button"
-                    onClick={() => change(Math.max(0, value - 1))}
-                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-surface-2 active:scale-90 motion-reduce:active:scale-100"
+                    {...less}
+                    className={cx(HOLD_CLASS, "inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-surface-2 active:scale-90 motion-reduce:active:scale-100")}
                     aria-label="Restar uno"
                   >
                     <Minus size={20} weight="bold" />
@@ -471,7 +508,7 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                       aria-label="Cantidad"
                     />
                     <p className="kicker mt-1">
-                      de {habit.target} {habit.unit ?? ""}
+                      de {habit.target} {unitLabel(habit.target, habit.unit)}
                     </p>
                     {/* Cuánto falta para la meta: avanza al sumar (se vuelve a montar al abrir otro día, así no arranca moviéndose). */}
                     <div key={`${habit.id}|${target.date}`} aria-hidden className="mx-auto mt-2.5 h-1 w-20 overflow-hidden rounded-full bg-surface-3">
@@ -483,8 +520,8 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
                   </div>
                   <button
                     type="button"
-                    onClick={() => change(value + 1)}
-                    className="inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-surface-2 active:scale-90 motion-reduce:active:scale-100"
+                    {...more}
+                    className={cx(HOLD_CLASS, "inline-flex size-12 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-surface-2 active:scale-90 motion-reduce:active:scale-100")}
                     aria-label="Sumar uno"
                   >
                     <Plus size={20} weight="bold" />

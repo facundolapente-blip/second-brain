@@ -17,7 +17,9 @@ import {
 import { MOODS } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
-import { useSwap, useTick } from "@/components/motion";
+import { useTick } from "@/components/motion";
+import { haptic } from "@/components/haptics";
+import { HOLD_CLASS, useHoldRepeat } from "../habitos/hold-repeat";
 import { MoodIcon } from "../journal/journal-ui";
 
 /**
@@ -59,9 +61,10 @@ export function CheckinCard({
   const [daySwap, setDaySwap] = useState(false);
   // El ánimo elegido aparece con un golpe corto, solo tras tocarlo (al cargar, quieto).
   const [tappedMood, setTappedMood] = useState<number | null>(null);
-  // "N de 5" → "Guardando…" → "Guardado": cada estado entra con un fundido corto, nunca de golpe.
+  // "N de 5" → "Guardando…" → "Guardado": los tres ocupan el mismo lugar (el ancho del
+  // más largo) y se cruzan con un fundido, así nada se corre (antes el selector Hoy/Ayer
+  // bajaba de renglón y la tarjeta saltaba ~45 px).
   const statusKey = pending ? "saving" : saved ? "saved" : "count";
-  const statusSwap = useSwap(statusKey);
   const filledTick = useTick(filled);
   const summary = [
     MOODS.find((m) => m.value === cur.mood)?.label,
@@ -123,39 +126,37 @@ export function CheckinCard({
       style={{ "--i": 1 } as React.CSSProperties}
       className="rise grid gap-4 rounded-[20px] border border-line bg-surface p-4 lg:col-span-12 lg:p-5"
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-controls="checkin-cuerpo"
-          className="-my-2 -ml-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
-        >
-          <span aria-hidden className="size-2 rounded-full bg-[var(--mod-inicio)]" />
-          <h2 className="text-[15px] font-semibold tracking-tight">¿Cómo estás?</h2>
-          <CaretDown size={13} weight="bold" aria-hidden className={cx("text-muted transition-transform duration-200", !open && "-rotate-90")} />
-        </button>
-        <span className="tabular text-[12.5px] text-muted" aria-live="polite">
-          <span key={statusKey} className={cx("inline-flex items-center gap-1", statusSwap)}>
-            {pending ? (
-              "Guardando…"
-            ) : saved ? (
-              <>
-                <Check size={12} weight="bold" aria-hidden className="check-draw" /> Guardado
-              </>
-            ) : (
-              <>
-                <span key={filledTick.key} className={filledTick.className}>
-                  {filled}
-                </span>{" "}
-                de 5
-              </>
-            )}
+      <header className="flex items-center gap-3">
+        {/* En el celular el estado va debajo del título (al lado no entraba con el selector);
+            desde sm, en la misma línea. Siempre en el mismo lugar. */}
+        <div className="flex min-w-0 flex-col sm:flex-row sm:items-center sm:gap-3">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls="checkin-cuerpo"
+            className="-my-2 -ml-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
+          >
+            <span aria-hidden className="size-2 rounded-full bg-[var(--mod-inicio)]" />
+            <h2 className="text-[15px] font-semibold tracking-tight">¿Cómo estás?</h2>
+            <CaretDown size={13} weight="bold" aria-hidden className={cx("text-muted transition-transform duration-200", !open && "-rotate-90")} />
+          </button>
+          <span className="tabular -mt-1 grid pl-5 text-[12.5px] leading-[18px] text-muted sm:mt-0 sm:pl-0" aria-live="polite">
+            <StatusLine on={statusKey === "count"}>
+              <span key={filledTick.key} className={filledTick.className}>
+                {filled}
+              </span>{" "}
+              de 5
+            </StatusLine>
+            <StatusLine on={statusKey === "saving"}>Guardando…</StatusLine>
+            <StatusLine on={statusKey === "saved"}>
+              <Check size={12} weight="bold" aria-hidden className={statusKey === "saved" ? "check-draw" : undefined} /> Guardado
+            </StatusLine>
           </span>
-        </span>
+        </div>
         <PillSwitch
           label="Día"
-          className="ml-auto"
+          className="ml-auto shrink-0"
           value={day}
           options={[
             { value: "today", label: "Hoy" },
@@ -193,6 +194,7 @@ export function CheckinCard({
                   aria-label={m.label}
                   title={m.label}
                   onClick={() => {
+                    haptic("select");
                     setTappedMood(on ? null : m.value);
                     set({ mood: on ? null : m.value });
                   }}
@@ -229,6 +231,21 @@ export function CheckinCard({
       </div>
       </div>
     </section>
+  );
+}
+
+/** Un estado del renglón de guardado: todos en la misma celda, visible solo el actual. */
+function StatusLine({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden={!on}
+      className={cx(
+        "col-start-1 row-start-1 inline-flex items-center gap-1 whitespace-nowrap transition-opacity duration-[160ms] ease-out",
+        !on && "opacity-0",
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -279,7 +296,10 @@ function Scale({
             aria-pressed={value === v}
             aria-label={`${v}: ${l}`}
             title={l}
-            onClick={() => onChange(value === v ? null : v)}
+            onClick={() => {
+              haptic("select");
+              onChange(value === v ? null : v);
+            }}
             className="flex h-11 items-end rounded-lg transition-[scale] duration-[var(--dur-press)] active:scale-95"
           >
             <span className="relative w-full overflow-hidden rounded-md bg-surface-3" style={{ height: `${36 + i * 16}%` }}>
@@ -328,13 +348,17 @@ function Sleep({ value, onChange }: { value: number | null; onChange: (v: number
   };
   // La cifra nueva entra desde abajo si subió y desde arriba si bajó.
   const tick = useTick(value ?? 0);
+  // Mantener apretado + o − repite cada 120 ms (desde los 400 ms); se guarda una vez al
+  // final, porque los toques seguidos se juntan en un solo guardado.
+  const less = useHoldRepeat(() => step(-30));
+  const more = useHoldRepeat(() => step(30));
   return (
     <div className="flex h-11 items-center gap-1 rounded-xl bg-surface-2 p-1">
       <button
         type="button"
         aria-label="Media hora menos"
-        onClick={() => step(-30)}
-        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-[color,background-color,scale] duration-[var(--dur-quick)] hover:bg-surface hover:text-fg active:scale-90 motion-reduce:active:scale-100"
+        {...less}
+        className={cx(HOLD_CLASS, "inline-flex size-9 items-center justify-center rounded-lg text-muted transition-[color,background-color,scale] duration-[var(--dur-quick)] hover:bg-surface hover:text-fg active:scale-90 motion-reduce:active:scale-100")}
       >
         <Minus size={14} weight="bold" />
       </button>
@@ -350,8 +374,8 @@ function Sleep({ value, onChange }: { value: number | null; onChange: (v: number
       <button
         type="button"
         aria-label="Media hora más"
-        onClick={() => step(30)}
-        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-[color,background-color,scale] duration-[var(--dur-quick)] hover:bg-surface hover:text-fg active:scale-90 motion-reduce:active:scale-100"
+        {...more}
+        className={cx(HOLD_CLASS, "inline-flex size-9 items-center justify-center rounded-lg text-muted transition-[color,background-color,scale] duration-[var(--dur-quick)] hover:bg-surface hover:text-fg active:scale-90 motion-reduce:active:scale-100")}
       >
         <Plus size={14} weight="bold" />
       </button>

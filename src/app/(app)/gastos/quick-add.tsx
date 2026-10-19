@@ -7,6 +7,7 @@ import { quickAdd, quickAddContext, suggestCategory } from "@/lib/offline/financ
 import { parseQuick, type QuickAccount } from "@/lib/smart-logic";
 import { moneyCents } from "@/lib/format";
 import { cx } from "@/components/ui";
+import { haptic } from "@/components/haptics";
 
 type Context = NonNullable<Awaited<ReturnType<typeof quickAddContext>>>;
 
@@ -79,20 +80,37 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
     start(async () => {
       const r = await quickAdd(text, Object.keys(picked).length ? picked : undefined);
       if (r.ok) {
+        haptic("success");
         setDone(("summary" in r && r.summary) || "Listo");
         setError(null);
         setText("");
         setPickedAccount(undefined);
         setPickedCategory(undefined);
         input.current?.focus();
-      } else setError(r.error);
+      } else {
+        haptic("error");
+        setError(r.error);
+      }
     });
   }
 
-  const showHelp = focused || text.trim() || done || error;
+  // "Listo" se apaga solo; la ayuda y la vista previa flotan debajo del campo (no corren la pantalla).
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(null), 2600);
+    return () => clearTimeout(t);
+  }, [done]);
+  const showPanel = focused || !!done || !!error;
 
   return (
-    <div className={cx("grid grid-cols-1 gap-1.5", className)}>
+    <div
+      className={cx("relative grid grid-cols-1", className)}
+      // El foco puede ir a los selectores de la vista previa sin que se cierre.
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+      }}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -110,11 +128,7 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
             setError(null);
             loadContext();
           }}
-          onFocus={() => {
-            setFocused(true);
-            loadContext();
-          }}
-          onBlur={() => setFocused(false)}
+          onFocus={loadContext}
           aria-label="Carga rápida"
           placeholder="Carga rápida: 350 almuerzo itau"
           enterKeyHint="send"
@@ -129,9 +143,11 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
           {pending ? "…" : "Cargar"}
         </button>
       </form>
+      {showPanel && (
+      <div className="reveal absolute inset-x-0 top-full z-20 mt-1.5 rounded-2xl border border-line bg-raised px-2 py-2 shadow-[var(--card-shadow)]">
       {p && !done && !error ? (
         // Vista previa: lo que se va a cargar, con cuenta y categoría para cambiar.
-        <div className="reveal flex flex-wrap items-center gap-1.5 px-2 text-[12.5px]" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]" aria-live="polite">
           <span className={cx("px-1 font-medium tabular", p.kind === "income" && "fin-income")}>
             {p.kind === "income" ? "Ingreso" : "Gasto"} {moneyCents(p.amountCents, currency ?? "UYU")}
           </span>
@@ -140,7 +156,10 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
             <select
               aria-label="Cuenta"
               value={accountId ?? ""}
-              onChange={(e) => setPickedAccount(e.target.value || undefined)}
+              onChange={(e) => {
+                haptic("tap");
+                setPickedAccount(e.target.value || undefined);
+              }}
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               {!accountId && <option value="">Última cuenta usada</option>}
@@ -155,7 +174,10 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
             <select
               aria-label="Categoría"
               value={categoryId ?? ""}
-              onChange={(e) => setPickedCategory(e.target.value)}
+              onChange={(e) => {
+                haptic("tap");
+                setPickedCategory(e.target.value);
+              }}
               disabled={!ctx}
               className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"
             >
@@ -170,8 +192,8 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
           {p.daysAgo > 0 && <span className="px-1 text-muted">{p.daysAgo === 1 ? "ayer" : "anteayer"}</span>}
         </div>
       ) : (
-        /* La ayuda aparece solo mientras se usa (o con el resultado), así no ocupa lugar siempre. */
-        <p className={cx("px-4 text-[12.5px] text-muted", showHelp ? "reveal" : "sr-only")} aria-live="polite">
+        /* La ayuda aparece solo mientras se usa (o con el resultado). */
+        <p className="px-2 py-1 text-[12.5px] text-muted" aria-live="polite">
           {error ? (
             <span className="text-danger">{error}</span>
           ) : done ? (
@@ -184,6 +206,8 @@ export function QuickAdd({ accounts, className }: { accounts: QuickAccount[]; cl
             "Monto, qué fue y la cuenta. “+” adelante es ingreso; “ayer” cambia el día."
           )}
         </p>
+      )}
+      </div>
       )}
     </div>
   );

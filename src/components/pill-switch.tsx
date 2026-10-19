@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cx, radioKeyTarget } from "./ui";
+import { haptic } from "./haptics";
 
 /**
  * Selector en píldora (dos a cuatro opciones del mismo ancho) con una marca que
@@ -51,6 +52,7 @@ export function PillSwitch<T extends string>({
     const to = radioKeyTarget(e, index, options.length);
     if (to === null) return;
     const v = options[to].value;
+    haptic("select");
     if (hrefOf) {
       setPicked(v);
       router.push(hrefOf(v), { scroll: false });
@@ -71,11 +73,17 @@ export function PillSwitch<T extends string>({
         const active = current === o.value;
         const cls = cx("relative z-[1] inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-colors duration-[var(--dur-state)]", item, active ? on : off);
         return hrefOf ? (
-          <Link key={o.value} href={hrefOf(o.value)} role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => setPicked(o.value)} className={cls} scroll={false}>
+          <Link key={o.value} href={hrefOf(o.value)} role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => {
+              if (o.value !== current) haptic("select");
+              setPicked(o.value);
+            }} className={cls} scroll={false}>
             {o.label}
           </Link>
         ) : (
-          <button key={o.value} type="button" role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => onChange?.(o.value)} className={cls}>
+          <button key={o.value} type="button" role="radio" aria-checked={active} tabIndex={o.value === options[index]?.value ? 0 : -1} onClick={() => {
+              if (o.value !== current) haptic("select");
+              onChange?.(o.value);
+            }} className={cls}>
             {o.label}
           </button>
         );

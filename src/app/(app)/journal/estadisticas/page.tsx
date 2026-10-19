@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CaretLeft, CaretRight, Fire, Trophy } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, Fire, Trophy } from "@phosphor-icons/react/dist/ssr";
 import { getStats } from "@/lib/journal";
 import { formatLong, formatMonth, shiftMonth, todayISO } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
@@ -8,6 +8,8 @@ import { JournalHeader, MoodBadge, Stat } from "../journal-ui";
 import { JournalTabs, WriteTodayButton } from "../journal-nav";
 import { MonthColumns, MonthHeatmap, WeekdayBars } from "./stats-charts";
 import { SlideOnChange } from "@/components/motion-wrap";
+import { JournalMonthNav } from "../month-nav";
+import { NavDim } from "../../gastos/period-step";
 
 export const metadata = { title: "Estadísticas · Journal" };
 
@@ -23,7 +25,6 @@ function daysInMonth(m: string) {
   return new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
 
-const monthLink = (m: string) => `/journal/estadisticas?mes=${m}`;
 
 /** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
 const CARD =
@@ -116,33 +117,10 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
 
         <section className={`grid gap-5 border-t border-line pt-8 lg:col-span-12 lg:row-start-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-x-10 ${CARD}`}>
           <div className="grid content-start gap-5">
-          <div className="flex items-center justify-between">
-            <Link
-              href={monthLink(shiftMonth(month, -1))}
-              scroll={false}
-              aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg transition-colors hover:bg-surface-2"
-            >
-              <CaretLeft size={18} />
-            </Link>
-            {/* Al cambiar de mes, el nombre y las cifras entran desde ese lado (las flechas quedan quietas: no pierden el foco). */}
-            <SlideOnChange k={month} className="min-w-0">
-              <h2 className="display text-[28px] first-letter:uppercase">{formatMonth(month)}</h2>
-            </SlideOnChange>
-            {month < current ? (
-              <Link
-                href={monthLink(shiftMonth(month, 1))}
-                scroll={false}
-                aria-label="Mes siguiente"
-                className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg transition-colors hover:bg-surface-2"
-              >
-                <CaretRight size={18} />
-              </Link>
-            ) : (
-              <span className="size-11" />
-            )}
-          </div>
+          {/* El nombre cambia al toque (las flechas quedan quietas: no pierden el foco); las cifras llegan después. */}
+          <JournalMonthNav month={month} base="/journal/estadisticas?mes=" max={current} titleClassName="text-[28px]" />
 
+          <NavDim>
           <SlideOnChange k={month} className="grid content-start gap-5">
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4 lg:grid-cols-2">
             <Stat label="Entradas" value={<span className="tabular">{s.monthEntries}</span>} />
@@ -199,6 +177,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             </div>
           )}
           </SlideOnChange>
+          </NavDim>
 
           </div>
 

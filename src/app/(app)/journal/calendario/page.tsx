@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { SlideOnChange, SwapOnChange } from "@/components/motion-wrap";
 import Form from "next/form";
-import { CaretDown, CaretLeft, CaretRight, MagnifyingGlass, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
+import { CaretDown, MagnifyingGlass, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getMonthEntries, getRangeEntries } from "@/lib/journal";
-import { addDays, diffDays, formatLong, formatMonth, formatShort, isISODate, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
+import { addDays, diffDays, formatLong, formatShort, isISODate, monthBounds, todayISO, weekday } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { EntryCard, JournalHeader, WriteDayButton } from "../journal-ui";
 import { JournalTabs, WriteTodayButton } from "../journal-nav";
+import { JournalMonthNav } from "../month-nav";
+import { NavDim, PeriodSwipeMain } from "../../gastos/period-step";
 
 export const metadata = { title: "Calendario · Journal" };
 
@@ -60,39 +62,24 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
     <>
       <JournalHeader title="Calendario" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
-      <main className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:max-w-6xl lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
+      <PeriodSwipeMain className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:max-w-6xl lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
         <section className="grid content-start gap-4 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]">
-          <div className="flex items-center justify-between">
-            <Link
-              href={href(shiftMonth(month, -1))}
-              scroll={false}
-              aria-label="Mes anterior"
-              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg transition-colors hover:bg-surface-2"
-            >
-              <CaretLeft size={18} />
-            </Link>
-            <div className="grid justify-items-center gap-0.5 text-center leading-tight">
-              <h2 className="display text-[26px] first-letter:uppercase">{formatMonth(month)}</h2>
+          {/* El mes cambia al toque (o deslizando); los días y las cifras llegan después. */}
+          <JournalMonthNav
+            month={month}
+            base="/journal/calendario?mes="
+            suffix={keep}
+            todayMonth={today.slice(0, 7)}
+            todayHref={href(today.slice(0, 7), today)}
+          >
+            <NavDim>
               <span className="kicker tabular mt-1">
                 {byDay.size === 0
                   ? "Sin entradas"
                   : `${byDay.size === 1 ? "1 día escrito" : `${byDay.size} días escritos`}, ${nf.format(monthWords)} palabras`}
               </span>
-              {month !== today.slice(0, 7) && (
-                <Link href={href(today.slice(0, 7), today)} scroll={false} className="mt-0.5 text-[13px] font-medium text-accent-fg hover:underline">
-                  Volver a hoy
-                </Link>
-              )}
-            </div>
-            <Link
-              href={href(shiftMonth(month, 1))}
-              scroll={false}
-              aria-label="Mes siguiente"
-              className="inline-flex size-11 items-center justify-center rounded-[4px] text-fg transition-colors hover:bg-surface-2"
-            >
-              <CaretRight size={18} />
-            </Link>
-          </div>
+            </NavDim>
+          </JournalMonthNav>
 
           {/* Ir directo a un mes o elegir un período (Form de Next: navega sin recargar la página entera). */}
           <details className="group rounded-xl border border-line px-3 py-2" open={!!range}>
@@ -132,7 +119,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
             </div>
           </details>
 
-          <SlideOnChange k={month}><div className="grid grid-cols-7 justify-items-center gap-x-0.5 gap-y-1 lg:gap-y-2">
+          <NavDim><SlideOnChange k={month}><div className="grid grid-cols-7 justify-items-center gap-x-0.5 gap-y-1 lg:gap-y-2">
             {WEEK_HEAD.map((w) => (
               <span key={w} aria-hidden className="kicker pb-1">
                 {w}
@@ -173,7 +160,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                 </Link>
               );
             })}
-          </div></SlideOnChange>
+          </div></SlideOnChange></NavDim>
 
           <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[12.5px] text-muted" aria-label="Referencias de color">
             <li className="inline-flex items-center gap-1.5">
@@ -264,7 +251,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
           )}
           </SwapOnChange>
         </section>
-      </main>
+      </PeriodSwipeMain>
     </>
   );
 }

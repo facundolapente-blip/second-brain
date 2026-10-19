@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useSyncExternalStore } from "react";
+import { Check } from "@phosphor-icons/react";
 import { tone } from "@/lib/palette";
-import type { CategoryDTO } from "@/lib/plan-logic";
+import { minutesNow, type CategoryDTO } from "@/lib/plan-logic";
 import { cx } from "@/components/ui";
 
 /**
@@ -30,6 +32,33 @@ export function CategoryTag({ category, className }: { category?: CategoryDTO | 
     <Chip toneKey={category.color} className={className}>
       {category.name}
     </Chip>
+  );
+}
+
+/**
+ * Elegir categoría en una hoja: la misma etiqueta llena de la tabla (no con
+ * borde), y la elegida con aro y tilde. Tocar la elegida la saca.
+ */
+export function CategoryChoice({ category: c, on, onClick }: { category: CategoryDTO; on: boolean; onClick: () => void }) {
+  // La tilde se dibuja solo después de tocar (al abrir la hoja ya está).
+  const [tapped, setTapped] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setTapped(true);
+        onClick();
+      }}
+      style={tone(c.color)}
+      aria-pressed={on}
+      className={cx(
+        "chip-solid press inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium whitespace-nowrap transition-shadow duration-[var(--dur-quick)]",
+        on ? "ring-2 ring-fg ring-offset-2 ring-offset-[var(--surface)]" : "hover:ring-1 hover:ring-fg/30",
+      )}
+    >
+      {on && <Check size={13} weight="bold" aria-hidden className={cx("-ml-0.5", tapped && "check-draw")} />}
+      {c.name}
+    </button>
   );
 }
 
@@ -167,4 +196,31 @@ export function StepBar({ done, total, track = "h-3 rounded-[3px]", gap = "gap-1
 
 export function categoryMap(categories: CategoryDTO[]) {
   return new Map(categories.map((c) => [c.id, c]));
+}
+
+/**
+ * Minuto del día ahora (Montevideo), al día cada minuto: la línea de "ahora" de
+ * Por horas y el bloque que está pasando. En el servidor (y al hidratar) -1: así
+ * no hay diferencia entre lo dibujado allá y acá; aparece en el primer cuadro.
+ */
+const nowStore = {
+  subscribe(cb: () => void) {
+    let t: ReturnType<typeof setTimeout>;
+    const loop = () => {
+      cb();
+      t = setTimeout(loop, 60_000 - (Date.now() % 60_000) + 50);
+    };
+    t = setTimeout(loop, 60_000 - (Date.now() % 60_000) + 50);
+    const vis = () => document.visibilityState === "visible" && cb();
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("visibilitychange", vis);
+    };
+  },
+  get: () => minutesNow(),
+  server: () => -1,
+};
+export function useNow(): number {
+  return useSyncExternalStore(nowStore.subscribe, nowStore.get, nowStore.server);
 }

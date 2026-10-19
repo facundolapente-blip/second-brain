@@ -29,7 +29,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
       today={today}
       blocks={blocks}
       categories={categories}
-      tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))}
+      tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, categoryId: t.categoryId, priority: t.priority }))}
       todoFolded={jar.get(HOURS_TODO_FOLD_COOKIE)?.value === "1"}
       initialView={jar.get(PLAN_VIEW_COOKIE)?.value === "horas" ? "horas" : "lista"}
       top={<TasksBoard key="tareas" tasks={tasks} categories={categories} today={todayISO()} manualOrder={!!manual} folded={jar.get(TASKS_FOLD_COOKIE)?.value === "1"} columns={parseTaskColumns(columns?.value)} layout={jar.get(TASKS_LAYOUT_COOKIE)?.value === "tablero" ? "tablero" : "tabla"} />}

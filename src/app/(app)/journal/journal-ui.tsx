@@ -12,6 +12,7 @@ import { moodInfo } from "@/lib/journal-logic";
 import { writeOnDay } from "@/lib/offline/journal";
 import { tone } from "@/lib/palette";
 import type { EntryCardDTO } from "@/lib/journal";
+import { previewEntry } from "./reader-slot";
 
 // ─── Ánimo ──────────────────────────────────────────────────────────────────
 
@@ -141,11 +142,17 @@ export function EntryCard({
         if (!window.matchMedia("(min-width: 1024px)").matches) return;
         e.preventDefault();
         setPicking(true);
+        // El panel la muestra ya con lo de la tarjeta; el resto llega con la navegación.
+        previewEntry(entry);
         router.replace(selectHref, { scroll: false });
+      }}
+      // En la compu, al pasar el mouse ya se pide la entrada (llega antes al panel).
+      onMouseEnter={() => {
+        if (selectHref && !selected) router.prefetch(selectHref);
       }}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
       className={cx(
-        "rise group -mx-2 grid grid-cols-[3rem_minmax(0,1fr)] gap-x-4 rounded-[6px] border-b border-line px-2 py-5 transition-[background-color,border-color,box-shadow] duration-200 ease-[var(--ease-out)] last:border-b-0 hover:bg-surface-2/70 active:bg-surface-2 lg:-mx-3 lg:grid-cols-[3.5rem_minmax(0,1fr)] lg:gap-x-5 lg:rounded-xl lg:px-4 lg:py-5",
+        "rise tap-tint group -mx-2 grid grid-cols-[3rem_minmax(0,1fr)] gap-x-4 rounded-[6px] border-b border-line px-2 py-5 transition-[background-color,border-color,box-shadow] duration-200 ease-[var(--ease-out)] last:border-b-0 hover:bg-surface-2/70 lg:-mx-3 lg:grid-cols-[3.5rem_minmax(0,1fr)] lg:gap-x-5 lg:rounded-xl lg:px-4 lg:py-5",
         (selected || picking) && "lg:border-transparent lg:bg-surface lg:shadow-[var(--card-shadow),0_0_0_1px_var(--card-ring)] lg:hover:bg-surface",
       )}
     >

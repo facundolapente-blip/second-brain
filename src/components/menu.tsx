@@ -127,7 +127,7 @@ export function Menu({ trigger, items, align = "right" }: { trigger: (toggle: ()
                 it.onSelect();
               }}
               className={cx(
-                "flex min-h-11 w-full items-center gap-2.5 px-3.5 text-left text-[14px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none",
+                "tap-tint flex min-h-11 w-full items-center gap-2.5 px-3.5 text-left text-[14px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none",
                 it.danger ? "text-danger" : "text-fg",
               )}
             >

@@ -8,7 +8,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch } from "./plan-logic";
+import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -46,6 +46,15 @@ async function blockId(raw: unknown): Promise<string> {
   const r = await prisma.actionReceipt.findUnique({ where: { id: m[1] }, select: { result: true } });
   const real = (r?.result as { id?: unknown } | null)?.id;
   return typeof real === "string" ? real : s;
+}
+
+/**
+ * Id que mandó el aparato para algo nuevo (`newClientId`): así lo que se vio al
+ * instante y lo guardado son lo mismo. Si no tiene la forma o ya existe, el de siempre.
+ */
+async function freshId(raw: unknown, exists: (id: string) => Promise<unknown>): Promise<string | undefined> {
+  if (!isClientId(raw)) return undefined;
+  return (await exists(raw)) ? undefined : raw;
 }
 
 /** Lugar de los bloques sin hora vecinos que se renumeraron al soltar uno (`placeAt`). */
@@ -125,7 +134,8 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     refrescar();
     return { ok: true, id };
   }
-  const created = await prisma.planBlock.create({ data: { ...data, sortKey: startTime ? null : await newSortKey(data.date) } });
+  const newId = await freshId(fd.get("clientId"), (x) => prisma.planBlock.findUnique({ where: { id: x }, select: { id: true } }));
+  const created = await prisma.planBlock.create({ data: { ...data, ...(newId ? { id: newId } : {}), sortKey: startTime ? null : await newSortKey(data.date) } });
   await logActivity("created", "block", created.id, `${title} (${date})`);
   if (data.taskId) await prisma.planTask.update({ where: { id: data.taskId }, data: { scheduled: true } });
   refrescar();
@@ -145,7 +155,7 @@ const cleanTitle = (t: unknown) => String(t ?? "").trim().replace(/\s+/g, " ").s
  * categoría y prioridad de la tarea) y la marca como agendada. Con hora, el
  * bloque dura una hora; sin hora queda para el día, en el lugar donde se soltó.
  */
-export async function scheduleTask(taskId: string, date: string, startTime: string | null, sortKey?: number, others?: SortKeyPatch[]): Promise<ActionResult | undefined> {
+export async function scheduleTask(taskId: string, date: string, startTime: string | null, sortKey?: number, others?: SortKeyPatch[], clientId?: string): Promise<ActionResult | undefined> {
   await exigirSesion();
   if (!isISODate(date)) return;
   const t = await prisma.planTask.findUnique({ where: { id: String(taskId) } });
@@ -153,8 +163,10 @@ export async function scheduleTask(taskId: string, date: string, startTime: stri
   const start = startTime && isTime(startTime) ? startTime : null;
   const mins = start ? Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5)) + 60 : 0;
   const end = start ? `${String(Math.min(23, Math.floor(mins / 60))).padStart(2, "0")}:${String(mins >= 24 * 60 ? 59 : mins % 60).padStart(2, "0")}` : null;
+  const newId = await freshId(clientId, (x) => prisma.planBlock.findUnique({ where: { id: x }, select: { id: true } }));
   const block = await prisma.planBlock.create({
     data: {
+      ...(newId ? { id: newId } : {}),
       title: t.title,
       categoryId: t.categoryId,
       priority: t.priority,
@@ -182,12 +194,14 @@ export async function renameBlock(id: string, title: string) {
 }
 
 /** Duplicar desde el menú de clic derecho: la copia queda el mismo día, justo después y sin tildar. */
-export async function duplicateBlock(id: string): Promise<ActionResult | undefined> {
+export async function duplicateBlock(id: string, clientId?: string): Promise<ActionResult | undefined> {
   await exigirSesion();
   const b = await prisma.planBlock.findUnique({ where: { id: await blockId(id) } });
   if (!b) return;
+  const newId = await freshId(clientId, (x) => prisma.planBlock.findUnique({ where: { id: x }, select: { id: true } }));
   const copy = await prisma.planBlock.create({
     data: {
+      ...(newId ? { id: newId } : {}),
       title: b.title,
       categoryId: b.categoryId,
       date: b.date,
@@ -339,9 +353,11 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
     .slice(0, 50);
   // Las nuevas van arriba de todo (si no, con el orden a mano quedarían escondidas al final).
   const first = await prisma.planTask.aggregate({ _min: { order: true } });
+  const newId = await freshId(fd.get("clientId"), (x) => prisma.planTask.findUnique({ where: { id: x }, select: { id: true } }));
   const created = await prisma.planTask.create({
     data: {
       ...data,
+      ...(newId ? { id: newId } : {}),
       order: (first._min.order ?? 0) - 1,
       completedAt: status === "done" ? new Date() : null,
       subtasks: { create: steps.map((title, order) => ({ title: title.slice(0, 200), order })) },
@@ -448,13 +464,15 @@ export async function renameTask(id: string, title: string) {
 }
 
 /** Duplicar una tarea: misma configuración, pasos sin tildar, justo debajo de la original. */
-export async function duplicateTask(id: string) {
+export async function duplicateTask(id: string, clientId?: string) {
   await exigirSesion();
   const t = await prisma.planTask.findUnique({ where: { id: String(id) }, include: { subtasks: { orderBy: { order: "asc" } } } });
   if (!t) return;
   await prisma.planTask.updateMany({ where: { order: { gt: t.order } }, data: { order: { increment: 1 } } });
+  const newId = await freshId(clientId, (x) => prisma.planTask.findUnique({ where: { id: x }, select: { id: true } }));
   const copy = await prisma.planTask.create({
     data: {
+      ...(newId ? { id: newId } : {}),
       title: t.title,
       categoryId: t.categoryId,
       status: t.status === "done" ? "todo" : t.status,

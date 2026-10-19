@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PeriodArrow, usePeriodNav } from "../period-nav";
 import {
   CaretLeft,
   CaretRight,
@@ -8,7 +9,7 @@ import {
   FilePdf,
 } from "@phosphor-icons/react";
 import type { MonthlySummary } from "@/lib/monthly";
-import { formatMonth, formatShort, shiftMonth, weekday } from "@/lib/dates";
+import { formatMonth, formatShort, shiftMonth, todayISO, weekday } from "@/lib/dates";
 import { formatSleep, formatWeight } from "@/lib/checkin-logic";
 import { moodInfo } from "@/lib/journal-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
@@ -47,9 +48,6 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
   const key = s.period.key;
   const word = isYear ? "año" : "mes";
   const prevKey = isYear ? String(Number(key) - 1) : shiftMonth(key, -1);
-  const nextKey = isYear ? String(Number(key) + 1) : shiftMonth(key, 1);
-  const href = (k: string) =>
-    isYear ? `/resumen?anio=${k}` : `/resumen?mes=${k}`;
   // Para los links a Gastos y al Journal: el último mes del período.
   const lastMonth = s.to.slice(0, 7);
   const totalDays = s.days.length;
@@ -59,45 +57,41 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
   const maxCat = Math.max(1, ...s.topCategories.map((c) => c.cents));
   const offset = (weekday(s.from) + 6) % 7;
   const net = now.incomeCents - now.spentCents;
+  // Flechas y "Mes/Año": el rótulo cambia al toque; varios toques se suman (usePeriodNav).
+  const nav = usePeriodNav(key);
+  const shownYear = /^\d{4}$/.test(nav.shown);
+  const shownCurrent = nav.shown === todayISO().slice(0, shownYear ? 4 : 7);
+  const shift = (k: string, d: number) => (/^\d{4}$/.test(k) ? String(Number(k) + d) : shiftMonth(k, d));
+  const hrefOf = (k: string) => (/^\d{4}$/.test(k) ? `/resumen?anio=${k}` : `/resumen?mes=${k}`);
+  const goTo = (k: string) => nav.go(k, hrefOf(k));
+  const shownWord = shownYear ? "año" : "mes";
+  const toggleKey = shownYear ? (nav.shown === key ? lastMonth : `${nav.shown}-12` > todayISO().slice(0, 7) ? todayISO().slice(0, 7) : `${nav.shown}-12`) : nav.shown.slice(0, 4);
 
   return (
     <>
       <PageHeader
-        title={isYear ? "Tu año" : "Resumen del mes"}
-        kicker={isYear ? key : cap(formatMonth(key))}
+        title={shownYear ? "Tu año" : "Resumen del mes"}
+        kicker={shownYear ? nav.shown : cap(formatMonth(nav.shown))}
         wide
         actions={
           <>
-            <Link
-              href={
-                isYear
-                  ? `/resumen?mes=${lastMonth}`
-                  : `/resumen?anio=${key.slice(0, 4)}`
-              }
-              aria-label={isYear ? "Ver el mes" : "Ver el año"}
+            <PeriodArrow
+              href={hrefOf(toggleKey)}
+              onGo={() => goTo(toggleKey)}
+              label={shownYear ? "Ver el mes" : "Ver el año"}
               className="mr-1 inline-flex h-9 shrink-0 items-center rounded-full border border-line-strong px-3 text-[13px] whitespace-nowrap text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:px-3.5"
             >
               {/* En el celular, corto: si no, el botón se partía en renglones y el título se cortaba. */}
-              <span className="sm:hidden">{isYear ? "Mes" : "Año"}</span>
-              <span className="hidden sm:inline">{isYear ? "Ver el mes" : "Ver el año"}</span>
-            </Link>
-            <Link
-              href={href(prevKey)}
-              aria-label={`${cap(word)} anterior`}
-              title={`${cap(word)} anterior`}
-              className={navClass}
-            >
+              <span className="sm:hidden">{shownYear ? "Mes" : "Año"}</span>
+              <span className="hidden sm:inline">{shownYear ? "Ver el mes" : "Ver el año"}</span>
+            </PeriodArrow>
+            <PeriodArrow href={hrefOf(shift(nav.shown, -1))} onGo={() => goTo(shift(nav.shown, -1))} label={`${cap(shownWord)} anterior`} className={navClass}>
               <CaretLeft size={18} weight="bold" />
-            </Link>
-            {!s.isCurrent && (
-              <Link
-                href={href(nextKey)}
-                aria-label={`${cap(word)} siguiente`}
-                title={`${cap(word)} siguiente`}
-                className={navClass}
-              >
+            </PeriodArrow>
+            {!shownCurrent && (
+              <PeriodArrow href={hrefOf(shift(nav.shown, 1))} onGo={() => goTo(shift(nav.shown, 1))} label={`${cap(shownWord)} siguiente`} className={navClass}>
                 <CaretRight size={18} weight="bold" />
-              </Link>
+              </PeriodArrow>
             )}
             <button
               type="button"
@@ -112,7 +106,7 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
           </>
         }
       />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4 print:grid-cols-2 print:gap-3 print:p-0">
+      <main {...nav.bodyProps} className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4 print:grid-cols-2 print:gap-3 print:p-0">
         <section
           aria-label="El mes en números"
           className="hero rise rounded-[22px] p-5 lg:col-span-12 lg:p-7 print:col-span-2 print:break-inside-avoid"

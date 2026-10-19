@@ -8,7 +8,7 @@ import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../h
 import { dayProgress } from "@/lib/habit-logic";
 import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
-import { useId, useOptimistic, useRef, useState } from "react";
+import { useEffect, useId, useOptimistic, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -27,7 +27,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import type { Dashboard } from "@/lib/dashboard";
-import { addDays, formatLong, formatMonth, formatShort, shiftMonth, weekday } from "@/lib/dates";
+import { addDays, formatLong, formatMonth, formatShort as formatShortRaw, shiftMonth, weekday } from "@/lib/dates";
 import { greeting } from "@/lib/journal-logic";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
@@ -36,6 +36,8 @@ import { daysLeftLabel, isFreeBlock, timeRange } from "@/lib/plan-logic";
 import { setBlockDone } from "@/lib/offline/plan";
 import { writeOnDay } from "@/lib/offline/journal";
 import { PageHeader } from "@/components/page-header";
+import { MenuButton } from "@/components/shell";
+import "./inicio.css";
 import { cx, ToneSquare } from "@/components/ui";
 import { useTick } from "@/components/motion";
 import { CheckinCard } from "./checkin-card";
@@ -59,6 +61,14 @@ function deltaLabel(delta: number, rest: string) {
   return `${p > 0 ? "+" : "−"}${Math.abs(p)}% vs. ${rest}`;
 }
 
+/** "9 oct" guardado por día: la constancia lo pide para ~250 días en cada dibujo (al volver la página revalidada). */
+const shortCache = new Map<string, string>();
+function formatShort(iso: string) {
+  let v = shortCache.get(iso);
+  if (v === undefined) shortCache.set(iso, (v = formatShortRaw(iso)));
+  return v;
+}
+
 function pct(a: number, b: number) {
   return b === 0 ? 0 : Math.round((a / b) * 100);
 }
@@ -70,19 +80,20 @@ export function InicioView({ d, notes, reserve }: { d: Dashboard; notes: ValueNo
   const prevName = formatMonth(shiftMonth(d.gastos.month, -1)).split(" ")[0];
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
 
+  const title = `${greeting(d.hour)}, Facu`;
+  const headerActions = (
+    <div className="flex gap-1.5">
+      <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={weekday(d.today) === 0 || weekday(d.today) === 1} />
+      <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
-        title={`${greeting(d.hour)}, Facu`}
-        kicker={formatLong(d.today)}
-        wide
-        actions={
-          <div className="flex gap-1.5">
-            <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={weekday(d.today) === 0 || weekday(d.today) === 1} />
-            <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
-          </div>
-        }
-      />
+      <CompactBar title={title}>{headerActions}</CompactBar>
+      <div className="inicio-head">
+        <PageHeader title={title} kicker={formatLong(d.today)} wide actions={headerActions} />
+      </div>
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         {d.backup && (
           <Link
@@ -160,6 +171,46 @@ export function InicioView({ d, notes, reserve }: { d: Dashboard; notes: ValueNo
         <Constancia d={d} />
       </main>
     </>
+  );
+}
+
+/**
+ * Barra de un renglón que aparece arriba a los 40 px de bajar (el encabezado grande
+ * se va con la página). Alto 0 en el flujo: aparecer no corre nada.
+ */
+function CompactBar({ title, children }: { title: string; children: React.ReactNode }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      setOn(window.scrollY > 40);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+  return (
+    <div className="sticky top-0 z-30 h-0">
+      <div
+        className="inicio-compact absolute inset-x-0 top-0 border-b border-line bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md"
+        data-on={on || undefined}
+        aria-hidden={!on}
+        inert={!on}
+      >
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 lg:px-10">
+          <MenuButton />
+          <p className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em]">{title}</p>
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -336,23 +387,30 @@ function HabitsToday({ d }: { d: Dashboard }) {
   const sticky = useStickyDay(d.today, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today)).map((h) => h.id));
   const visible = sorted.filter((h) => sticky.has(h.id));
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
-  const celebrate = useJustCompleted(due > 0 && done >= due);
+  const complete = due > 0 && done >= due;
+  const celebrate = useJustCompleted(complete, d.today);
+  // El anillo está arriba de la tarjeta: si al completar el día quedó fuera de la
+  // pantalla, se llena (con su brillo) recién cuando vuelve a verse.
+  const ringRef = useRef<HTMLDivElement>(null);
+  const ringSeen = useSeenWhile(ringRef, celebrate);
+  const ringDone = celebrate && !ringSeen ? Math.max(0, done - 1) : done;
+  const ringComplete = due > 0 && ringDone >= due;
   const daySheet = useRef<DaySheetHandle>(null);
   // Las cifras cambian con un corrimiento corto (sube desde abajo, baja desde arriba); al cargar, quietas.
   const doneTick = useTick(done);
-  const pctTick = useTick(pct(done, due));
+  const pctTick = useTick(pct(ringDone, due));
 
   return (
     <Card title="Hábitos de hoy" href="/habitos" color="var(--c-habitos)" className="lg:col-span-5" i={1}>
       <div className="flex items-center gap-4">
-        <div className={cx("relative rounded-full", celebrate && "ring-glow")}>
-          <Ring value={done} total={due} color="var(--c-habitos)" />
+        <div ref={ringRef} className={cx("relative rounded-full", celebrate && ringSeen && "ring-done-glow")}>
+          <Ring value={ringDone} total={due} color="var(--c-habitos)" />
           <span className="figure absolute inset-0 flex items-center justify-center text-[15px]">
-            {due > 0 && done >= due ? (
+            {ringComplete ? (
               <Check size={22} weight="bold" className="text-[var(--c-habitos)]" aria-label="Día completo" />
             ) : (
               <span key={`p${pctTick.key}`} className={pctTick.className}>
-                {pct(done, due)}%
+                {pct(ringDone, due)}%
               </span>
             )}
           </span>
@@ -378,14 +436,56 @@ function HabitsToday({ d }: { d: Dashboard }) {
           mark={mark}
           onOpen={(h) => daySheet.current?.show(h, d.today)}
           onReorder={reorder}
+          celebrate={celebrate}
           rowClassName="bg-surface py-1.5 lg:py-2.5"
         />
       ) : (
         <p className="text-[14px] text-muted">No hay hábitos para hoy.</p>
       )}
+      {/* Al pie, donde se tildó el último: "Día completo · N de N". Se abre con el alto
+          animado (no empuja de golpe) y el chip entra con fundido y escala; al abrir la
+          página ya completa, quieto. */}
+      <div className="fold -mt-4" data-closed={!complete || undefined} aria-live="polite">
+        <div>
+          {complete && (
+            <p
+              className={cx(
+                "mt-4 flex w-fit items-center gap-2 rounded-full bg-[var(--st-done-bg)] py-1.5 pr-3.5 pl-1.5 text-[13.5px] font-medium text-[var(--st-done-fg)]",
+                celebrate && "day-chip-in",
+              )}
+            >
+              <span className="inline-flex size-6 items-center justify-center rounded-full bg-[var(--st-done-line)] text-white">
+                <Check size={14} weight="bold" aria-hidden />
+              </span>
+              Día completo · {due} de {due}
+            </p>
+          )}
+        </div>
+      </div>
       <DaySheet ref={daySheet} logs={logs} mark={mark} />
     </Card>
   );
+}
+
+/**
+ * Si `active`, avisa la primera vez que el elemento se ve en la pantalla (debajo
+ * del encabezado fijo). Vuelve a false cuando `active` deja de serlo.
+ */
+function useSeenWhile(ref: React.RefObject<HTMLElement | null>, active: boolean) {
+  const [seen, setSeen] = useState(false);
+  if (!active && seen) setSeen(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!active || seen || !el) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setSeen(true), {
+      threshold: 0.6,
+      rootMargin: "-72px 0px 0px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, active, seen]);
+  return seen;
 }
 
 // ─── Plan de hoy ────────────────────────────────────────────────────────────
@@ -444,7 +544,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                     });
                   }}
                   className={cx(
-                    "relative flex min-h-11 w-full items-center gap-3 rounded-xl py-1 pr-2 text-left transition-colors hover:bg-surface-2 disabled:hover:bg-transparent",
+                    "tap-tint relative flex min-h-11 w-full items-center gap-3 rounded-xl py-1 pr-2 text-left transition-colors duration-[80ms] hover:bg-surface-2 disabled:hover:bg-transparent",
                   )}
                 >
                   <span className="tabular w-14 shrink-0 text-right font-mono text-[11.5px] text-fg/75">
@@ -693,7 +793,7 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
                 <Link
                   href={`/gastos?nuevo=1&pagar=${c.accountId}&monto=${c.leftCents}`}
                   className={cx(
-                    "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
+                    "tap-tint flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
                     late ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
                   )}
                 >
@@ -716,7 +816,7 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
               <Link
                 href="/gastos/presupuestos"
                 className={cx(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
+                  "tap-tint flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
                   a.state === "over" ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
                 )}
               >

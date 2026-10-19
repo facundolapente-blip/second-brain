@@ -32,6 +32,19 @@
   display: none;
 }
 
+/* Monto de la hoja de carga: cifra grande sin caja; la raya de abajo toma el acento
+   mientras se escribe (solo color: nada se mueve). */
+.fin-amount {
+  caret-color: var(--accent);
+}
+.fin-amount-line {
+  background: var(--border-strong);
+  transition: background-color var(--dur-quick) var(--ease-out);
+}
+.fin-amount-box:focus-within .fin-amount-line {
+  background: var(--accent);
+}
+
 /* ─── Movimiento de Gastos ──────────────────────────────────────────────────
    Mismas reglas que el resto (globals.css, "Movimiento"): nada al cargar, solo
    transform y opacidad, salidas más cortas que las entradas y, con movimiento

@@ -1,5 +1,6 @@
 "use client";
 
+import { useGastosNew } from "../new-action";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "@phosphor-icons/react";
@@ -10,7 +11,7 @@ import type { CategoryDTO } from "@/lib/finance-logic";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
-import { CategoryAvatar, Fab } from "../shared";
+import { CategoryAvatar } from "../shared";
 
 type Kind = "expense" | "income";
 type Draft = { id?: string; name: string; kind: Kind; icon: string; color: string; txCount: number };
@@ -32,6 +33,8 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
     sheet.current?.open();
   }
   const create = (kind: Kind = "expense") => open({ name: "", kind, icon: "Tag", color: "blue", txCount: 0 });
+  // El "+" de la barra de abajo crea acá.
+  useGastosNew(() => create());
 
   const sections: { kind: Kind; title: string }[] = [
     { kind: "expense", title: "Gastos" },
@@ -92,8 +95,6 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
           );
         })}
       </main>
-
-      <Fab onClick={() => create()} label="Nueva categoría" />
 
       <Sheet ref={sheet} title={draft.id ? "Editar categoría" : "Nueva categoría"}>
         <form key={formKey} action={action} className="grid grid-cols-[minmax(0,1fr)] gap-5">

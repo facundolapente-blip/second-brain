@@ -3,7 +3,8 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { leaveThen } from "@/components/motion";
 import { useOptimistic, useRef, useState } from "react";
-import { CheckCircle } from "@phosphor-icons/react";
+import { CheckCircle, Tag } from "@phosphor-icons/react";
+import { swipeApply, TxGestures, useTxActions } from "../tx-actions";
 import { formatMonth, formatShort } from "@/lib/dates";
 import { applySuggestions, setTransactionCategory } from "@/lib/offline/finance";
 import { dayLabel, type AccountDTO, type CategoryDTO, type TxDTO } from "@/lib/finance-logic";
@@ -60,6 +61,12 @@ export function UncategorizedView({
     );
   }
   const [, startTransition] = useSafeTransition();
+  // Deslizar a la izquierda borra; a la derecha aplica la sugerencia. Mantener apretado: menú.
+  const actions = useTxActions({ onOptimistic: (c) => c.type === "remove" && c.id && removeOptimistic(c.id) });
+  function classify(t: TxDTO) {
+    setCurrent(t);
+    sheet.current?.open();
+  }
 
   function assign(categoryId: string) {
     if (!current) return;
@@ -122,13 +129,24 @@ export function UncategorizedView({
                         {formatMonth(t.date.slice(0, 7))}
                       </h2>
                     )}
+                    <TxGestures
+                      tx={t}
+                      actions={actions}
+                      right={
+                        suggestions[t.id] && lk.category(suggestions[t.id].categoryId)
+                          ? swipeApply(lk.category(suggestions[t.id].categoryId)!.name, () => acceptOne(t))
+                          : null
+                      }
+                      onMenu={(e) =>
+                        actions.menu(e, t, [{ label: "Clasificar", icon: <Tag size={15} />, onSelect: () => classify(t) }])
+                      }
+                    >
+                    {(g) => (
                     <button
                       type="button"
-                      onClick={() => {
-                        setCurrent(t);
-                        sheet.current?.open();
-                      }}
-                      className="flex min-h-16 w-full items-center gap-3.5 border-b border-line px-1 py-2.5 text-left transition-colors hover:bg-surface-2/70"
+                      onClick={() => classify(t)}
+                      {...g}
+                      className="tap-tint flex min-h-16 w-full items-center gap-3.5 border-b border-line px-1 py-2.5 text-left transition-colors duration-[80ms] select-none [-webkit-touch-callout:none] hover:bg-surface-2/70"
                     >
                       <CategoryAvatar />
                       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -146,6 +164,8 @@ export function UncategorizedView({
                         className="font-mono text-[14px] font-medium"
                       />
                     </button>
+                    )}
+                    </TxGestures>
                     {suggestions[t.id] && lk.category(suggestions[t.id].categoryId) && (
                       <div className="-mt-1 flex items-center gap-2 border-b border-line px-1 pb-2.5 pl-[3.6rem]">
                         <span className="text-[12.5px] text-muted">¿Es</span>

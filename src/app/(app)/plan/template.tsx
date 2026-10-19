@@ -1,4 +1,6 @@
-/** Se vuelve a montar al cambiar de pantalla: un fundido corto, solo de opacidad (sin desplazar nada). */
+import { PageFade } from "@/components/page-fade";
+
+/** Se vuelve a montar en cada navegación; `PageFade` hace el fundido solo al cambiar de pantalla. */
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <div className="page-fade">{children}</div>;
+  return <PageFade>{children}</PageFade>;
 }

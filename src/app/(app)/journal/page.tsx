@@ -8,7 +8,8 @@ import { isMood, MEMORY_COOKIE, moodInfo, normalizeTag } from "@/lib/journal-log
 import { EntryCard, JournalHeader } from "./journal-ui";
 import { JournalTabs, WriteTodayButton } from "./journal-nav";
 import { EmptyJournal, HomeActions, MemoryCard } from "./home-parts";
-import { EntryReader, QuickStatsCard } from "./reader-panel";
+import { QuickStatsCard } from "./reader-panel";
+import { ReaderSlot } from "./reader-slot";
 
 export const metadata = { title: "Journal" };
 
@@ -157,10 +158,8 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       {/* minmax(0,1fr) y min-w-0: un renglón que no se corta (la fecha del panel) no puede ensanchar la columna. */}
       <div className="hidden min-w-0 lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:grid-cols-[minmax(0,1fr)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]">
         {/* Al abrir otra entrada (o cerrar la lectura) el panel cambia con un fundido corto; al cargar, quieto. */}
-        <SwapOnChange k={reading?.id ?? "resumen"} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-          {reading ? (
-            <EntryReader entry={reading} closeHref={closeHref} />
-          ) : (
+        {/* Una entrada elegida se dibuja al toque con lo de la tarjeta y se completa al llegar. */}
+        <ReaderSlot reading={reading} closeHref={closeHref}>
             <>
               {home.memory && !memoryDismissed && (
                 <div className="rounded-2xl border border-line bg-surface px-6 pb-1 [&>section]:border-y-0">
@@ -169,8 +168,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               )}
               <QuickStatsCard stats={quick} />
             </>
-          )}
-        </SwapOnChange>
+        </ReaderSlot>
       </div>
       </main>
     </>

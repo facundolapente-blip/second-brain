@@ -5,7 +5,7 @@ import { useOnNew } from "@/components/nav-add";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowsClockwise, CalendarPlus, Check, Lightning, Minus, PencilSimple, Plus, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, CalendarPlus, CaretDown, Check, Lightning, Minus, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import {
   bumpObjective,
   carryOverKrs,
@@ -157,6 +157,7 @@ export function ObjectivesView({
 
   return (
     <>
+      <div className="plan-head contents" data-w="96">
       <PageHeader
         title="Objetivos"
         wide
@@ -172,6 +173,7 @@ export function ObjectivesView({
           </>
         }
       />
+      </div>
       <main className="mx-auto max-w-3xl px-4 pb-8 lg:max-w-[96rem] lg:px-10">
         {/* Un año por pestaña, como las hojas de Notion. */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-3 pb-1">
@@ -781,6 +783,8 @@ function QuarterReview({
   const [carried, setCarried] = useState<string | null>(null);
   // Al cerrarla se pliega (alto y opacidad) y recién después sale de la página.
   const [closing, setClosing] = useState(false);
+  // En el celular arranca plegada en una línea (ocupaba toda la primera pantalla); abierta a pedido sí se ve.
+  const [unfolded, setUnfolded] = useState(opened);
   function close() {
     setClosing(true);
     setTimeout(onClose, 220);
@@ -799,7 +803,23 @@ function QuarterReview({
   return (
     <div className="fold" data-closed={closing || undefined}>
     <div className="plan-fold-shadow">
-    <section aria-label={`Revisión del ${quarter} ${year}`} className={cx(opened && "reveal", "relative mt-4 grid gap-5 rounded-2xl border border-line bg-surface px-5 pt-5 pb-5 lg:px-7")}>
+    {/* Celular: una línea que la abre. */}
+    <button
+      type="button"
+      onClick={() => setUnfolded((u) => !u)}
+      aria-expanded={unfolded}
+      aria-controls="revision-trimestre"
+      className={cx("tap-tint mt-4 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-line bg-surface px-4 text-left lg:hidden", opened && "reveal")}
+    >
+      <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">
+        Revisión del {quarter}
+        {all.length > 0 && <span className="font-normal text-muted"> · {unfinished.length === 0 ? "todo terminado" : `${unfinished.length} sin terminar`}</span>}
+      </span>
+      <CaretDown size={15} weight="bold" aria-hidden className={cx("shrink-0 text-muted transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)]", !unfolded && "-rotate-90")} />
+    </button>
+    <div id="revision-trimestre" className="fold fold-mobile" data-closed={!unfolded || undefined}>
+    <div className="plan-fold-shadow">
+    <section aria-label={`Revisión del ${quarter} ${year}`} className={cx(opened && "reveal", "relative mt-4 grid gap-5 rounded-2xl border border-line bg-surface px-5 pt-5 pb-5 max-lg:mt-2 lg:px-7")}>
       <button
         type="button"
         onClick={close}
@@ -927,6 +947,8 @@ function QuarterReview({
     </section>
     </div>
     </div>
+    </div>
+    </div>
   );
 }
 
@@ -1016,15 +1038,15 @@ function ObjectiveForm({
           options={(["todo", "doing", "done", "closed"] as KrStatus[]).map((s) => ({ value: s, label: KR_STATUS[s].label }))}
         />
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Meta propia" hint="Opcional">
-          <Input name="goal" inputMode="decimal" defaultValue={objective?.goal ?? ""} placeholder="4" />
+      <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3">
+        <Field label="Meta propia" hint="Opcional" className="min-w-0">
+          <Input name="goal" inputMode="decimal" defaultValue={objective?.goal ?? ""} placeholder="4" className="min-w-0" />
         </Field>
-        <Field label="Llevo">
-          <Input name="progress" inputMode="decimal" defaultValue={objective?.progress ?? ""} />
+        <Field label="Llevo" className="min-w-0">
+          <Input name="progress" inputMode="decimal" defaultValue={objective?.progress ?? ""} className="min-w-0" />
         </Field>
-        <Field label="Deadline">
-          <Input type="date" name="deadline" defaultValue={objective?.deadline ?? ""} />
+        <Field label="Deadline" className="col-span-2 min-w-0 sm:col-span-1">
+          <Input type="date" name="deadline" defaultValue={objective?.deadline ?? ""} className="min-w-0" />
         </Field>
       </div>
       <p className="-mt-2 text-[12.5px] text-muted">Con meta propia el avance es lo que llevás sobre la meta; sin meta, el promedio de sus resultados clave.</p>
@@ -1321,15 +1343,16 @@ function KrForm({
         </select>
       </Field>
 
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Progreso">
-          <Input name="progress" inputMode="decimal" defaultValue={kr?.progress ?? ""} />
+      {/* En el celular la fecha va en su propio renglón (en tres columnas se cortaba). */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Field label="Progreso" className="min-w-0">
+          <Input name="progress" inputMode="decimal" defaultValue={kr?.progress ?? ""} className="min-w-0" />
         </Field>
-        <Field label="Meta">
-          <Input name="goal" inputMode="decimal" defaultValue={kr?.goal ?? ""} />
+        <Field label="Meta" className="min-w-0">
+          <Input name="goal" inputMode="decimal" defaultValue={kr?.goal ?? ""} className="min-w-0" />
         </Field>
-        <Field label="Deadline">
-          <Input type="date" name="deadline" defaultValue={kr?.deadline ?? ""} />
+        <Field label="Deadline" className="col-span-2 min-w-0 sm:col-span-1">
+          <Input type="date" name="deadline" defaultValue={kr?.deadline ?? ""} className="min-w-0" />
         </Field>
       </div>
 

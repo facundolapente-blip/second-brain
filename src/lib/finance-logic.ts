@@ -163,6 +163,15 @@ export function parseAmount(raw: string): number | null {
   return Number.isFinite(cents) && cents > 0 && cents < 1e14 ? cents : null;
 }
 
+/**
+ * Lo que se escribe en un campo de monto: solo lo que `parseAmount` puede leer
+ * (dígitos, separadores, espacios, $ y los signos de cuenta). Una letra que llega
+ * por error (el foco saltó mientras se escribía otro campo) no entra.
+ */
+export function cleanAmountInput(raw: string): string {
+  return raw.replace(/[^\d.,\s$+\-−–xX×*/÷:]/g, "");
+}
+
 /** Signos de cuenta que se pueden escribir (× x X → *, ÷ : → /, − → -), sin espacios ni $. */
 function normalizeExpr(raw: string): string {
   return raw

@@ -1,0 +1,23 @@
+/* Inicio: encabezado que se compacta al bajar (InicioView). El encabezado grande
+   (PageHeader) deja de ser fijo y se va con la página; a los 40 px aparece arriba
+   una barra de un renglón (título de 17 px) con un fundido de 160 ms. La barra no
+   ocupa lugar (alto 0), así que nada se corre. */
+.inicio-head > header {
+  position: relative;
+}
+.inicio-compact {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 160ms var(--ease-out),
+    visibility 160ms allow-discrete;
+}
+.inicio-compact[data-on] {
+  opacity: 1;
+  visibility: visible;
+}
+@media print {
+  .inicio-compact {
+    display: none;
+  }
+}

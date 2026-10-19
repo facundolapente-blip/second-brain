@@ -1,0 +1,94 @@
+/* Hábitos: el círculo de cada fila (Hoy e Inicio) y el cierre del día.
+   Se importa desde day-rows.tsx. Solo se anima transform/scale y opacidad. */
+
+/* Colores del círculo. "Hecho" lleno con tilde blanco: en oscuro el verde del tema
+   es claro y el blanco no llegaba a 3:1, así que el relleno se oscurece un poco. */
+.habit-check {
+  --hc-done: var(--st-done-line);
+  --hc-done-press: color-mix(in oklab, var(--st-done-line) 82%, black);
+  --hc-on-done: #fff;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    scale 300ms var(--ease-spring),
+    background-color 200ms var(--ease-out),
+    border-color 200ms var(--ease-out),
+    color 200ms var(--ease-out);
+}
+:root[data-theme="oscuro"] .habit-check {
+  --hc-done: color-mix(in oklab, var(--st-done-line) 72%, black);
+  --hc-done-press: color-mix(in oklab, var(--st-done-line) 60%, black);
+}
+
+/* Apretado: se pone en pointerdown sin pasar por React (data-pressed), en 80 ms. */
+.habit-check[data-pressed]:not(:disabled) {
+  scale: 0.92;
+  border-color: color-mix(in oklab, currentColor 55%, var(--line-strong));
+  transition-duration: 80ms, 80ms, 80ms, 80ms;
+  transition-timing-function: var(--ease-out);
+}
+.habit-check[data-state="done"][data-pressed]:not(:disabled) {
+  border-color: var(--hc-done-press);
+}
+
+/* Aro que se expande desde el círculo del último hábito al completar el día. */
+.habit-burst {
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 9999px;
+  border: 2.5px solid var(--st-done-line);
+  pointer-events: none;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .habit-burst {
+    animation: habit-burst 450ms var(--ease-out);
+  }
+  @keyframes habit-burst {
+    from { opacity: 1; scale: 1; }
+    to { opacity: 0; scale: 1.6; }
+  }
+  /* Chip "Día completo" de Inicio: fundido y escala de 0,96 a 1. */
+  .day-chip-in {
+    animation: day-chip-in 260ms var(--ease-out);
+  }
+  @keyframes day-chip-in {
+    from { opacity: 0; scale: 0.96; }
+  }
+  /* Aro de Inicio cuando vuelve a verse con el día completo. */
+  .ring-done-glow {
+    animation: ring-done-glow 900ms var(--ease-out);
+  }
+  @keyframes ring-done-glow {
+    0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--c-habitos) 55%, transparent); scale: 0.9; }
+    35% { scale: 1.06; }
+    100% { box-shadow: 0 0 0 18px color-mix(in oklab, var(--c-habitos) 0%, transparent); scale: 1; }
+  }
+}
+
+/* Movimiento reducido: sin escalas; el cambio se ve como un fundido de color de 200 ms. */
+@media (prefers-reduced-motion: reduce) {
+  .habit-check,
+  .habit-check[data-pressed] {
+    scale: none;
+    transition: background-color 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out;
+  }
+  .habit-burst {
+    inset: 0;
+    border: 0;
+    background: var(--st-done-line);
+    animation: habit-burst-fade 200ms ease-out;
+  }
+  @keyframes habit-burst-fade {
+    from { opacity: 0.35; }
+    to { opacity: 0; }
+  }
+  .day-chip-in,
+  .ring-done-glow {
+    animation: habit-fade-in 200ms ease-out;
+  }
+  @keyframes habit-fade-in {
+    from { opacity: 0; }
+  }
+}

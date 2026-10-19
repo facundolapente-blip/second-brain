@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { addDays, formatLong, startOfWeek, weekday } from "@/lib/dates";
 import { currentStreak, dayProgress, habitScore, hasScore, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
@@ -12,10 +12,32 @@ import { useTick } from "@/components/motion";
 export { dayProgress };
 
 /**
+ * Racha, puntaje y si tiene puntaje, guardados por objeto de marcas: `useHabitLogs`
+ * conserva el mismo objeto mientras las marcas de ese hábito no cambian, así que al
+ * tildar uno solo se recalcula ese (antes, ~140 ms por toque recalculando todos).
+ */
+const statCache = new WeakMap<LogMap, Map<string, { streak: number; score: number | null }>>();
+function habitStats(h: HabitDTO, logs: LogMap, today: string) {
+  let byKey = statCache.get(logs);
+  if (!byKey) statCache.set(logs, (byKey = new Map()));
+  const key = `${today}|${h.id}|${h.frequency}|${h.weekdays}|${h.timesPerWeek}|${h.weekStart}|${h.target}|${h.startDate}|${h.archivedOn ?? ""}`;
+  let hit = byKey.get(key);
+  if (!hit) {
+    hit = { streak: currentStreak(h, logs, today), score: hasScore(h, logs, today) ? habitScore(h, logs, today) : null };
+    byKey.set(key, hit);
+  }
+  return hit;
+}
+
+const NO_LOGS: LogMap = {};
+
+/**
  * Panel lateral de Hoy en la computadora: el avance del día en el bloque
  * destacado, la semana día por día, el puntaje promedio y las rachas más largas.
+ * Memorizado: Hoy le pasa las marcas con `useDeferredValue`, así el toque en un
+ * círculo se dibuja primero y el panel se pone al día enseguida, sin trabar el toque.
  */
-export function TodayPanel({
+export const TodayPanel = memo(function TodayPanel({
   habits,
   logs,
   selected,
@@ -32,14 +54,15 @@ export function TodayPanel({
   const pctTick = useTick(pct);
   const isToday = selected === today;
 
-  const streaks = habits
-    .map((h) => ({ h, n: currentStreak(h, logs[h.id] ?? {}, today) }))
+  const stats = habits.map((h) => ({ h, ...habitStats(h, logs[h.id] ?? NO_LOGS, today) }));
+  const streaks = stats
+    .map(({ h, streak }) => ({ h, n: streak }))
     .filter((s) => s.n > 0)
     .sort((a, b) => b.n - a.n || a.h.name.localeCompare(b.h.name, "es"))
     .slice(0, 5);
 
   // Solo los que ya tienen días (o semanas) que cuenten: uno creado hoy no baja el promedio.
-  const scores = habits.filter((h) => hasScore(h, logs[h.id] ?? {}, today)).map((h) => habitScore(h, logs[h.id] ?? {}, today));
+  const scores = stats.flatMap((s) => (s.score === null ? [] : [s.score]));
   const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
 
   return (
@@ -111,7 +134,7 @@ export function TodayPanel({
       </section>
     </aside>
   );
-}
+});
 
 /**
  * La semana en curso: una columna por día con la proporción de hábitos hechos.

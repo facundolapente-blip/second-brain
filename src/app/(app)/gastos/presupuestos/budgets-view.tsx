@@ -24,6 +24,8 @@ import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetH
 import { GastosTabs } from "../gastos-nav";
 import { CategoryAvatar, MonthNav } from "../shared";
 import { Tick } from "../motion";
+import { useGastosNew } from "../new-action";
+import { NavDim, usePeriodSwipe } from "../period-step";
 
 const STATE_TONE: Record<BudgetState, { bar: string; text: string }> = {
   ok: { bar: "var(--st-done-line)", text: "text-[var(--st-done-fg)]" },
@@ -64,6 +66,14 @@ export function BudgetsView({
   // Presupuestos pasa todo a pesos (Movimientos no): se avisa cuando hay dólares.
   const hasForeign = budgets.some((b) => b.foreign.length > 0) || unbudgeted.some((u) => u.foreign.length > 0);
 
+  // Deslizar de costado cambia de mes, como las flechas.
+  const swipe = usePeriodSwipe();
+  // El "+" de la barra de abajo: un presupuesto puntual nuevo.
+  useGastosNew(() => {
+    setProjectKey((k) => k + 1);
+    projectSheet.current?.open();
+  });
+
   function edit(category: CategoryDTO, budget?: CategoryBudgetDTO) {
     setEditing({ category, budget });
     editSheet.current?.open();
@@ -88,8 +98,7 @@ export function BudgetsView({
           </Button>
         }
       />
-      {/* Abajo deja lugar para el + flotante del celular: si no, tapaba el "Poner" de la última fila. */}
-      <main className="mx-auto grid max-w-3xl grid-cols-1 gap-6 px-4 pt-2 pb-28 lg:max-w-6xl lg:grid-cols-12 lg:gap-8 lg:px-10 lg:pt-6 lg:pb-10">
+      <main {...swipe} className="mx-auto grid max-w-3xl grid-cols-1 gap-6 px-4 pt-2 pb-6 lg:max-w-6xl lg:grid-cols-12 lg:gap-8 lg:px-10 lg:pt-6 lg:pb-10">
         {/* Mensual por categoría */}
         <section aria-label="Presupuesto mensual por categoría" className="grid min-w-0 content-start gap-4 lg:col-span-7">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -102,6 +111,7 @@ export function BudgetsView({
             )}
           </div>
 
+          <NavDim className="grid min-w-0 content-start gap-4">
           {budgets.length > 0 && (
             <div className="hero grid gap-3 rounded-[20px] p-5">
               <div className="flex flex-wrap items-end justify-between gap-2">
@@ -228,6 +238,7 @@ export function BudgetsView({
               )}
             </div>
           )}
+          </NavDim>
         </section>
 
         {/* Puntuales */}
@@ -314,18 +325,6 @@ export function BudgetsView({
           )}
         </section>
       </main>
-
-      <button
-        type="button"
-        onClick={() => {
-          setProjectKey((k) => k + 1);
-          projectSheet.current?.open();
-        }}
-        aria-label="Nuevo presupuesto puntual"
-        className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform active:scale-95 lg:hidden"
-      >
-        <Plus size={24} />
-      </button>
 
       <Sheet ref={editSheet} title={editing ? `Presupuesto de ${editing.category.name}` : "Presupuesto"}>
         {editing && (

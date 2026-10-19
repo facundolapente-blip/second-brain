@@ -1,5 +1,6 @@
 "use client";
 
+import { useGastosNew } from "../new-action";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { FixedSuggestions } from "./fixed-suggestions";
 import type { FixedSuggestion } from "@/lib/smart-logic";
@@ -13,7 +14,7 @@ import { FREQUENCIES, frequencyLabel, occurrencesBetween, type ScheduleDTO, type
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
-import { CategoryAvatar, EmptyBlock, Fab, useLookups } from "../shared";
+import { CategoryAvatar, EmptyBlock, useLookups } from "../shared";
 
 type Kind = ScheduleDTO["kind"];
 const KIND_OPTIONS: { value: Kind; label: string }[] = [
@@ -42,6 +43,8 @@ export function SchedulesView({
   const [formKey, setFormKey] = useState(0);
   const [, start] = useSafeTransition();
 
+  // El "+" de la barra de abajo crea acá.
+  useGastosNew(() => open(null));
   function open(s: ScheduleDTO | null) {
     setEditing(s);
     setFormKey((k) => k + 1);
@@ -138,8 +141,6 @@ export function SchedulesView({
           </>
         )}
       </main>
-
-      <Fab onClick={() => open(null)} label="Nuevo recurrente" />
 
       <Sheet ref={sheet} title={editing ? "Editar recurrente" : "Nuevo recurrente"}>
         <ScheduleForm

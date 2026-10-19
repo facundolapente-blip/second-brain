@@ -1,0 +1,23 @@
+/*
+ * Propio del Journal. Mismas reglas que globals.css ("Movimiento"): nada al cargar,
+ * solo opacidad y transform; con movimiento reducido, fundidos.
+ */
+
+/* "Guardado" del editor: se apaga solo a los 1,5 s (el lugar queda, la fecha no se mueve). */
+.jr-save-fade {
+  animation: jr-save-fade 400ms ease-out 1.5s forwards;
+}
+@keyframes jr-save-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * Mientras se escribe, la franja amarilla de "sin conexión" del Shell no aparece: al
+ * desplegarse empujaba el texto unos 60 px. El editor ya lo dice en su estado
+ * ("Guardado en el aparato"). La franja es el primer hijo de #contenido (shell.tsx).
+ */
+#contenido:has([data-journal-editor]) > .fold:first-child {
+  display: none;
+}

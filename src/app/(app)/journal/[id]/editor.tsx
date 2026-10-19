@@ -249,7 +249,8 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
         )}
       </header>
 
-      <main className="mx-auto grid max-w-[42rem] gap-7 px-5 pt-5 pb-16 lg:px-8 lg:pt-10">
+      {/* data-journal-editor: la franja de "sin conexión" no se muestra acá (journal.css): empujaba el texto. */}
+      <main data-journal-editor className="mx-auto grid max-w-[42rem] gap-7 px-5 pt-5 pb-16 lg:px-8 lg:pt-10">
         <MoodPicker
           value={mood}
           onChange={(m) => {
@@ -367,34 +368,46 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   );
 }
 
-/** Estado del autoguardado: discreto mientras todo va bien, claro si falla. */
+/**
+ * Estado del autoguardado: una palabra chica, también en el celular. "Guardando" →
+ * "Guardado" con la tilde que se dibuja, y a los 1,5 s se apaga (fundido; el lugar
+ * queda, así la fecha no se reacomoda). Sin señal: "Guardado en el aparato" (queda
+ * a la vista: es lo que hay que saber). Si falla, "Sin guardar" en rojo.
+ */
 function SaveStatus({ status }: { status: Status }) {
   const busy = status === "saving" || status === "pending";
-  // Sin nada que contar no ocupa lugar (si no, le cortaba la fecha en el celular).
+  // Antes de escribir nada no ocupa lugar (si no, le cortaba la fecha en el celular).
   if (status === "idle") return <span aria-live="polite" className="ml-auto" />;
   return (
     <span
       aria-live="polite"
       className={cx(
         "ml-auto inline-flex shrink-0 items-center gap-1.5 px-2 font-mono text-[11px] tracking-[0.04em] uppercase",
-        status === "error" ? "text-danger" : "text-muted",
+        status === "error" ? "text-danger" : status === "local" ? "text-[var(--st-skip-fg)]" : "text-muted",
       )}
     >
-      {status === "error" ? (
-        <WarningCircle size={14} weight="bold" aria-hidden />
-      ) : busy ? (
-        <span aria-hidden className="size-1.5 rounded-full motion-safe:animate-pulse bg-current" />
-      ) : (
-        // La tilde se dibuja al terminar de guardar (siempre llega después de escribir, nunca al abrir).
-        <Check size={13} weight="bold" aria-hidden className="check-draw" />
-      )}
-      {/* En pantallas angostas, "Guardando" y "Guardado" quedan solo en el ícono (el texto, para el
-          lector de pantalla): la fecha necesita el lugar. Lo que hay que ver (sin guardar, en el aparato) sigue escrito. */}
-      <span
-        key={busy ? "busy" : status}
-        className={cx("reveal inline-flex items-center gap-1.5", (busy || status === "saved") && "max-[419px]:sr-only")}
-      >
-        {busy ? "Guardando" : status === "error" ? "Sin guardar" : status === "local" ? "Guardado en el aparato" : "Guardado"}
+      <span key={busy ? "busy" : status} className={cx("inline-flex items-center gap-1.5", status === "saved" && "jr-save-fade")}>
+        {status === "error" ? (
+          <WarningCircle size={14} weight="bold" aria-hidden />
+        ) : busy ? (
+          <span aria-hidden className="size-1.5 rounded-full bg-current motion-safe:animate-pulse" />
+        ) : (
+          // La tilde se dibuja al terminar de guardar (siempre llega después de escribir, nunca al abrir).
+          <Check size={13} weight="bold" aria-hidden className="check-draw" />
+        )}
+        {busy ? (
+          "Guardando"
+        ) : status === "error" ? (
+          "Sin guardar"
+        ) : status === "local" ? (
+          // En pantallas angostas, más corto: la fecha necesita el lugar.
+          <>
+            <span className="max-[419px]:sr-only">Guardado en el aparato</span>
+            <span aria-hidden className="min-[420px]:hidden">En el aparato</span>
+          </>
+        ) : (
+          "Guardado"
+        )}
       </span>
     </span>
   );

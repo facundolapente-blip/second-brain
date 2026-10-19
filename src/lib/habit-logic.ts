@@ -60,6 +60,22 @@ export function frequencyLabel(h: Pick<HabitRule, "frequency" | "weekdays" | "ti
   return "Todos los días";
 }
 
+/**
+ * La unidad de un hábito de cantidad según el número: la unidad se guarda como
+ * la escribió Facu (en plural, "Frutas", "vasos"); con 1 va en singular ("1 Fruta",
+ * "1 vaso", "1 flexión"). Las que no terminan en s ("ml", "km") quedan igual.
+ */
+export function unitLabel(n: number, unit: string | null | undefined): string {
+  const u = (unit ?? "").trim();
+  if (n !== 1 || u.length < 3) return u;
+  if (/iones$/i.test(u)) return u.replace(/iones$/i, (m) => (m === m.toUpperCase() ? "IÓN" : "ión"));
+  if (/ces$/i.test(u)) return u.replace(/ces$/i, (m) => (m === m.toUpperCase() ? "Z" : "z"));
+  // "flores", "papeles", "litros"…: las de consonante + es pierden el "es"; el resto, la s.
+  if (/[aeiouáéíóú][rlndj]es$/i.test(u)) return u.slice(0, -2);
+  if (/[^s]s$/i.test(u)) return u.slice(0, -1);
+  return u;
+}
+
 /** ¿Se puede marcar ese día? En "X veces por semana" cualquier día vale. */
 export function isScheduled(h: HabitRule, iso: string): boolean {
   if (iso < h.startDate || (h.trackEnd !== undefined && iso > h.trackEnd)) return false;

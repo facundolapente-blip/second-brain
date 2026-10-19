@@ -3,6 +3,8 @@
 import { PillSwitch } from "./pill-switch";
 import { notifyInfo, UndoToast } from "./undo-toast";
 import { ContextMenuHost } from "./context-menu";
+import { PullToRefresh } from "./pull-refresh";
+import { plainClick } from "./tab-nav";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -67,11 +69,6 @@ function NavHint({ color }: { color?: string }) {
   );
 }
 
-/** Abrir en otra pestaña (Ctrl/Cmd/Shift o botón del medio) no cambia la marca. */
-function plainClick(e: React.MouseEvent) {
-  return !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
-}
-
 function Nav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   // La marca pasa al enlace tocado enseguida, sin esperar a que llegue la pantalla.
@@ -109,7 +106,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
 
   const linkCls = (active: boolean) =>
     cx(
-      "press relative z-[1] flex items-center gap-3 rounded-xl px-3 transition-colors duration-200",
+      "press tap-tint relative z-[1] flex items-center gap-3 rounded-xl px-3 transition-colors duration-200",
       active ? "font-semibold text-side-on" : "text-side-fg hover:bg-side-on-bg hover:text-side-on",
       active && !markReady && "bg-side-on-bg",
     );
@@ -440,6 +437,24 @@ function useSwipeToClose(close: () => void) {
       const { el, bg } = parts(e);
       const fast = -s.dx / Math.max(1, e.timeStamp - s.t) > 0.5;
       if (-s.dx > el.offsetWidth / 3 || (fast && s.dx < -24)) {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          // Con menos movimiento no vuelve hacia adentro: queda donde lo soltó el dedo y se funde.
+          el.style.transition = "opacity 120ms ease-out";
+          el.style.opacity = "0";
+          if (bg) {
+            bg.style.transition = "opacity 120ms ease-out";
+            bg.style.opacity = "0";
+          }
+          close();
+          setTimeout(() => {
+            el.style.transition = "none";
+            clear(bg);
+            el.style.translate = "";
+            el.style.opacity = "";
+            requestAnimationFrame(() => (el.style.transition = ""));
+          }, 160);
+          return;
+        }
         // Al sacar el estilo en línea, la transición de cierre sigue desde donde quedó.
         clear(el, bg);
         close();
@@ -499,6 +514,12 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
   }, [drawer]);
   useRefreshOnReturn();
   const { offline, pending, syncing } = useOffline();
+  // Safari de iPhone no aplica :active (el tinte de .tap-tint) si nadie escucha touchstart.
+  useEffect(() => {
+    const noop = () => {};
+    document.addEventListener("touchstart", noop, { passive: true });
+    return () => document.removeEventListener("touchstart", noop);
+  }, []);
 
   return (
     <DrawerCtx.Provider value={() => setDrawer(true)}>
@@ -510,6 +531,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
       </a>
       <UndoToast />
       <ContextMenuHost />
+      <PullToRefresh />
       <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
         <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex print:hidden">
           <Brand />
@@ -543,11 +565,20 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
             className={cx(
               // Entra con la curva de las hojas y se va más rápido; se cierra también deslizándolo
               // hacia la izquierda. Con menos movimiento, solo un fundido en su lugar.
-              "absolute inset-y-0 left-0 flex w-[17.5rem] touch-pan-y flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[16px_0_48px_-24px_rgba(0,0,0,0.45)] transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
+              "absolute inset-y-0 left-0 flex w-[17.5rem] touch-pan-y flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
               drawer ? "duration-[var(--dur-sheet)] ease-[var(--ease-sheet)]" : "duration-[var(--dur-exit)] ease-[var(--ease-in)] motion-reduce:opacity-0",
               drawer ? "translate-x-0" : "-translate-x-full",
             )}
           >
+            {/* La sombra existe solo con el cajón abierto (cerrado asomaba en el borde
+                izquierdo de todas las pantallas): entra y se va en fundido con el cajón. */}
+            <span
+              aria-hidden
+              className={cx(
+                "pointer-events-none absolute inset-0 shadow-[16px_0_48px_-24px_rgba(0,0,0,0.45)] transition-opacity",
+                drawer ? "opacity-100 duration-[var(--dur-sheet)] ease-[var(--ease-out)]" : "opacity-0 duration-[var(--dur-exit)] ease-[var(--ease-in)]",
+              )}
+            />
             <Brand />
             <Nav onNavigate={() => setDrawer(false)} />
             <div className="mt-auto grid gap-3">

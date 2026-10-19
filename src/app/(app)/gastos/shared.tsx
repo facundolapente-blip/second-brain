@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, CaretLeft, CaretRight, Plus, Camera } from "@phosphor-icons/react";
+import { ArrowRight, CaretLeft, CaretRight, Camera, CloudArrowUp } from "@phosphor-icons/react";
 import { formatMonth, shiftMonth } from "@/lib/dates";
 import { moneyCents, moneySigned } from "@/lib/format";
 import { tone } from "@/lib/palette";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/finance-logic";
 import { cx } from "@/components/ui";
 import { useSlide } from "@/components/motion";
+import { usePeriodStep, useStepEvents } from "./period-step";
 
 // ─── Búsquedas ──────────────────────────────────────────────────────────────
 
@@ -207,6 +208,8 @@ export function TxRow({
   showAccount,
   onClick,
   onMenu,
+  status,
+  gestures,
 }: {
   tx: TxDTO;
   lk: Lookups;
@@ -215,6 +218,10 @@ export function TxRow({
   onClick?: () => void;
   /** Clic derecho (duplicar, cambiar título...). */
   onMenu?: (e: React.MouseEvent) => void;
+  /** Guardado en la pantalla pero todavía no en el servidor: "subiendo" (con señal) o "sin-subir" (en el aparato). */
+  status?: "subiendo" | "sin-subir";
+  /** Props táctiles de `TxGestures` (mantener apretado, menú). */
+  gestures?: Partial<React.ComponentProps<"button">>;
 }) {
   const isTransfer = tx.kind === "transfer";
   const category = lk.category(tx.categoryId);
@@ -250,7 +257,12 @@ export function TxRow({
       type="button"
       onClick={onClick}
       onContextMenu={onMenu}
-      className="flex min-h-[64px] w-full items-center gap-3.5 border-b border-line px-1 py-3 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2"
+      {...gestures}
+      aria-busy={status === "subiendo" || undefined}
+      className={cx(
+        "tap-tint flex min-h-[64px] w-full items-center gap-3.5 border-b border-line px-1 py-3 text-left transition-[background-color,opacity] duration-[80ms] select-none [-webkit-touch-callout:none] hover:bg-surface-2/70",
+        status && "opacity-70",
+      )}
     >
       <CategoryAvatar category={category} transfer={isTransfer} />
       <span className="grid min-w-0 flex-1 gap-0.5">
@@ -258,7 +270,16 @@ export function TxRow({
           <span className={cx("truncate text-[15px]", title ? "font-medium" : "text-muted")}>{title || "Sin título"}</span>
           {tx.photos.length > 0 && <Camera size={14} className="shrink-0 text-muted" aria-label="Con comprobante" />}
         </span>
-        <span className="truncate text-[13px] text-muted">{subtitle}</span>
+        <span className="truncate text-[13px] text-muted">
+          {status ? (
+            <span className="inline-flex items-center gap-1">
+              <CloudArrowUp size={13} weight="bold" aria-hidden className={status === "subiendo" ? "motion-safe:animate-pulse" : undefined} />
+              {status === "subiendo" ? "Subiendo…" : "En el aparato, sin subir"}
+            </span>
+          ) : (
+            subtitle
+          )}
+        </span>
       </span>
       <span className="grid shrink-0 justify-items-end gap-0.5 font-mono text-[14px] font-medium">
         {internal ? (
@@ -279,50 +300,50 @@ export function TxRow({
 
 export function MonthNav({ month, basePath, current }: { month: string; basePath: string; current: string }) {
   const href = (m: string) => (m === current ? basePath : `${basePath}?mes=${m}`);
-  const slide = useSlide(month);
+  // El mes cambia al toque (los datos llegan después); tres toques son tres meses.
+  const step = usePeriodStep(month, [href(shiftMonth(month, -1)), href(shiftMonth(month, 1))]);
+  const shown = step.shown;
+  const slide = useSlide(shown);
+  const move = (m: string) => step.go(m, href(m));
+  useStepEvents((d) => move(shiftMonth(shown, d)));
+  const click = (m: string) => (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    move(m);
+  };
   return (
     <div className="flex items-center gap-0.5">
       <Link
-        href={href(shiftMonth(month, -1))}
+        href={href(shiftMonth(shown, -1))}
+        onClick={click(shiftMonth(shown, -1))}
         aria-label="Mes anterior"
         className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
       >
         <CaretLeft size={18} />
       </Link>
-      <h2 key={month} className={cx("display min-w-[9.5rem] text-center text-[22px] first-letter:uppercase", slide)}>
-        {formatMonth(month)}
+      <h2 className="min-w-[9.5rem] overflow-hidden text-center" aria-live="polite">
+        <span key={shown} className={cx("display inline-block text-[22px] first-letter:uppercase", slide)}>
+          {formatMonth(shown)}
+        </span>
       </h2>
       <Link
-        href={href(shiftMonth(month, 1))}
+        href={href(shiftMonth(shown, 1))}
+        onClick={click(shiftMonth(shown, 1))}
         aria-label="Mes siguiente"
         className="inline-flex size-11 items-center justify-center rounded-[4px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
       >
         <CaretRight size={18} />
       </Link>
-      {month !== current && (
+      {shown !== current && (
         <Link
           href={basePath}
+          onClick={click(current)}
           className="ml-1 inline-flex h-9 items-center rounded-[4px] border border-line-strong px-3 text-[13px] font-medium transition-colors hover:bg-surface-2"
         >
           Hoy
         </Link>
       )}
     </div>
-  );
-}
-
-// ─── Botón flotante ─────────────────────────────────────────────────────────
-
-export function Fab({ onClick, label = "Nuevo movimiento" }: { onClick: () => void; label?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="lift fixed right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 inline-flex size-14 items-center justify-center rounded-full bg-ink text-on-ink transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-95 lg:hidden"
-    >
-      <Plus size={24} />
-    </button>
   );
 }
 

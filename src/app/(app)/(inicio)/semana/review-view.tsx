@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { PeriodArrow, usePeriodNav } from "../period-nav";
 import { CaretLeft, CaretRight, CheckCircle, NotePencil } from "@phosphor-icons/react";
 import type { WeeklyReview } from "@/lib/review";
-import { addDays, formatShort, weekday } from "@/lib/dates";
+import { addDays, formatShort, startOfWeek, todayISO, weekday } from "@/lib/dates";
 import { formatSleep, formatWeight } from "@/lib/checkin-logic";
 import { moodInfo } from "@/lib/journal-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
@@ -17,6 +18,9 @@ import { MoodIcon } from "../../journal/journal-ui";
 import { Card, Delta, Kpi, Mini } from "../summary-ui";
 
 const WD = ["D", "L", "M", "M", "J", "V", "S"];
+
+const ARROW =
+  "relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg active:bg-ink/5";
 
 function rangeLabel(monday: string, sunday: string) {
   const a = formatShort(monday);
@@ -32,27 +36,34 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
   const weak = habitsSorted.filter((h) => h.reinforce);
   const maxSpent = Math.max(1, ...r.days.map((d) => d.spentCents));
   const hasFeel = r.days.some((d) => d.mood !== null || d.energy !== null || d.sleepMin !== null);
+  // Las flechas cambian el rótulo al toque y suman toques seguidos (ver usePeriodNav).
+  const nav = usePeriodNav(r.monday);
+  const thisMonday = r.isCurrent ? r.monday : startOfWeek(todayISO(), 1);
+  const goWeek = (delta: number) => {
+    const next = addDays(nav.shown, delta * 7);
+    nav.go(next, `/semana?semana=${next}`);
+  };
 
   return (
     <>
       <PageHeader
         title="Revisión semanal"
-        kicker={`Semana del ${rangeLabel(r.monday, r.sunday)}`}
+        kicker={`Semana del ${rangeLabel(nav.shown, addDays(nav.shown, 6))}`}
         wide
         actions={
           <>
-            <Link href={`/semana?semana=${addDays(r.monday, -7)}`} aria-label="Semana anterior" title="Semana anterior" className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg">
+            <PeriodArrow href={`/semana?semana=${addDays(nav.shown, -7)}`} onGo={() => goWeek(-1)} label="Semana anterior" className={ARROW}>
               <CaretLeft size={18} weight="bold" />
-            </Link>
-            {!r.isCurrent && (
-              <Link href={`/semana?semana=${addDays(r.monday, 7)}`} aria-label="Semana siguiente" title="Semana siguiente" className="relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 before:content-[''] hover:bg-surface-2 hover:text-fg">
+            </PeriodArrow>
+            {nav.shown < thisMonday && (
+              <PeriodArrow href={`/semana?semana=${addDays(nav.shown, 7)}`} onGo={() => goWeek(1)} label="Semana siguiente" className={ARROW}>
                 <CaretRight size={18} weight="bold" />
-              </Link>
+              </PeriodArrow>
             )}
           </>
         }
       />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+      <main {...nav.bodyProps} className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         <section aria-label="Resumen de la semana" className="hero rise rounded-[22px] p-5 xl:col-span-12 lg:p-7">
           <p className="hero-sub text-[13px]">{r.isCurrent ? "Semana en curso, hasta hoy · comparada con la anterior hasta el mismo día" : "Comparado con la semana anterior"}</p>
           <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">

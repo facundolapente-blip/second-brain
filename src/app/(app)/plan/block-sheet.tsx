@@ -7,19 +7,30 @@ import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHan
 import { deleteBlock, passToNextWeek, saveBlock, duplicateBlock } from "@/lib/offline/plan";
 import { ArrowArcRight, CopySimple } from "@phosphor-icons/react";
 import { shiftEnd, type BlockDTO, type CategoryDTO, type TaskDTO } from "@/lib/plan-logic";
-import { tone } from "@/lib/palette";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
-import { PriorityPicker } from "./plan-ui";
+import { CategoryChoice, PriorityPicker } from "./plan-ui";
 import { TimeInput } from "@/components/time-input";
 
 export type BlockDraft = Partial<BlockDTO> & { date: string };
 export type BlockSheetHandle = { open: (draft: BlockDraft) => void };
 
+/**
+ * Lo que hace la semana con la hoja, al instante (lo optimista vive en la semana):
+ * guardar cierra la hoja enseguida y el bloque ya se ve cambiado o nuevo; si el
+ * servidor falla, vuelve solo y avisa abajo.
+ */
+export type BlockSheetActions = {
+  save: (fd: FormData, draft: BlockDraft) => void;
+  duplicate: (id: string) => void;
+  passWeek: (id: string) => void;
+  remove: (id: string) => void;
+};
+
 /** Hoja para crear o editar un bloque de la semana. */
 export const BlockSheet = forwardRef<
   BlockSheetHandle,
-  { categories: CategoryDTO[]; tasks: Pick<TaskDTO, "id" | "title" | "status">[] }
->(function BlockSheet({ categories, tasks }, ref) {
+  { categories: CategoryDTO[]; tasks: Pick<TaskDTO, "id" | "title" | "status">[]; actions?: BlockSheetActions }
+>(function BlockSheet({ categories, tasks, actions }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<BlockDraft>({ date: "" });
   const [key, setKey] = useState(0);
@@ -44,6 +55,7 @@ export const BlockSheet = forwardRef<
         initial={draft}
         categories={categories}
         tasks={tasks}
+        actions={actions}
         onDone={() => sheet.current?.close()}
       />
     </Sheet>
@@ -56,12 +68,14 @@ function BlockForm({
   tasks,
   onDone,
   registerDismiss,
+  actions,
 }: {
   initial: BlockDraft;
   categories: CategoryDTO[];
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
   onDone: () => void;
   registerDismiss: (fn: () => void) => void;
+  actions?: BlockSheetActions;
 }) {
   const [state, action, pending] = useActionState(safeForm(saveBlock), null);
   const { form, onDismiss } = useSaveOnDismiss(state);
@@ -78,16 +92,29 @@ function BlockForm({
   useEffect(() => {
     if (state?.ok) notify();
   }, [state]);
+  // Editar en la compu: el foco va al nombre (en el celular no, así no salta el teclado).
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (initial.id && window.matchMedia("(min-width: 1024px) and (pointer: fine)").matches) nameRef.current?.focus();
+  }, [initial.id]);
+  /** Con la semana a mano: se cierra enseguida y el cambio ya se ve (sin "Guardando..."). */
+  function instant(e: React.FormEvent<HTMLFormElement>) {
+    if (!actions) return;
+    e.preventDefault();
+    actions.save(new FormData(e.currentTarget), initial);
+    onDone();
+  }
 
   const openTasks = tasks.filter((t) => t.status !== "done" || t.id === initial.taskId);
 
   return (
-    <form ref={form} action={action} className="grid gap-5">
+    <form ref={form} action={actions ? undefined : action} onSubmit={actions ? instant : undefined} className="grid gap-5">
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="categoryId" value={categoryId} />
 
       <Field label="Nombre">
         <Input
+          ref={nameRef}
           name="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -130,19 +157,7 @@ function BlockForm({
           {categories.map((c) => {
             const on = categoryId === c.id;
             return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setCategoryId(on ? "" : c.id)}
-                style={tone(c.color)}
-                aria-pressed={on}
-                className={cx(
-                  "h-9 rounded-[4px] border px-3 text-[13px] transition-colors",
-                  on ? "border-tone-solid bg-tone font-medium text-tone-fg" : "border-line text-muted hover:bg-surface-2",
-                )}
-              >
-                {c.name}
-              </button>
+              <CategoryChoice key={c.id} category={c} on={on} onClick={() => setCategoryId(on ? "" : c.id)} />
             );
           })}
         </div>
@@ -183,8 +198,8 @@ function BlockForm({
       )}
 
       <div className="grid gap-2">
-        <Button type="submit" variant="accent" disabled={pending}>
-          {pending ? "Guardando..." : initial.id ? "Guardar cambios" : "Crear bloque"}
+        <Button type="submit" variant="accent" disabled={pending && !actions}>
+          {pending && !actions ? "Guardando..." : initial.id ? "Guardar cambios" : "Crear bloque"}
         </Button>
         {initial.id && (
           <Button
@@ -192,12 +207,16 @@ function BlockForm({
             variant="outline"
             disabled={deleting}
             className="h-11"
-            onClick={() =>
+            onClick={() => {
+              if (actions) {
+                actions.passWeek(initial.id!);
+                return onDone();
+              }
               startDelete(async () => {
                 await passToNextWeek(initial.id!);
                 onDone();
-              })
-            }
+              });
+            }}
           >
             <ArrowArcRight size={16} /> Pasar a la semana que viene
           </Button>
@@ -208,13 +227,18 @@ function BlockForm({
             variant="outline"
             disabled={deleting}
             className="h-11"
-            onClick={() =>
+            onClick={() => {
+              if (actions) {
+                actions.duplicate(initial.id!);
+                onDone();
+                return notifyInfo("Bloque duplicado");
+              }
               startDelete(async () => {
                 await duplicateBlock(initial.id!);
                 onDone();
                 notifyInfo("Bloque duplicado");
-              })
-            }
+              });
+            }}
           >
             <CopySimple size={16} /> Duplicar
           </Button>
@@ -223,12 +247,16 @@ function BlockForm({
           <ConfirmButton
             undo="Bloque borrado"
             disabled={deleting}
-            onConfirm={() =>
+            onConfirm={() => {
+              if (actions) {
+                actions.remove(initial.id!);
+                return onDone();
+              }
               startDelete(async () => {
                 await deleteBlock(initial.id!);
                 onDone();
-              })
-            }
+              });
+            }}
           >
             Borrar bloque
           </ConfirmButton>

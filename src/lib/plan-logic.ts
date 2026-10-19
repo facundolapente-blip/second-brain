@@ -2,7 +2,7 @@
  * Reglas del Plan semanal, sin base ni React (servidor y cliente).
  * Calcadas del "Plan Semanal" de Notion de Facu.
  */
-import { addDays, diffDays, startOfWeek } from "./dates";
+import { addDays, diffDays, isISODate, startOfWeek, TZ } from "./dates";
 
 export type TaskStatus = "backlog" | "todo" | "doing" | "done";
 export type KrStatus = "todo" | "doing" | "done" | "closed";
@@ -557,4 +557,159 @@ export function applyTaskView(tasks: TaskDTO[], view: TaskView, manualOrder = fa
       // De la terminada más reciente a la más vieja.
       return tasks.filter((t) => t.status === "done").sort((a, b) => (b.doneAt ?? "").localeCompare(a.doneAt ?? ""));
   }
+}
+
+// ─── Experiencia de uso (auditoría 2026-10-19) ──────────────────────────────
+
+/**
+ * Id que pone el aparato a un bloque o una tarea nueva (con forma de cuid): lo
+ * provisorio que se ve al instante y lo que guarda el servidor tienen el mismo id,
+ * así la tarjeta no se vuelve a montar (ni a animar) cuando llega la respuesta.
+ */
+export function newClientId(): string {
+  const a = new Uint8Array(24);
+  crypto.getRandomValues(a);
+  return "c" + Array.from(a, (b) => "0123456789abcdefghijklmnopqrstuvwxyz"[b % 36]).join("");
+}
+export function isClientId(s: unknown): s is string {
+  return typeof s === "string" && /^c[a-z0-9]{24}$/.test(s);
+}
+
+/** Lo mínimo de un formulario que hace falta para leerlo (FormData lo cumple). */
+export type FormLike = { get(name: string): FormDataEntryValue | null };
+const field = (fd: FormLike, k: string, max = 200) => String(fd.get(k) ?? "").trim().slice(0, max);
+
+/**
+ * El bloque como va a quedar al guardar la hoja, para mostrarlo al instante
+ * (mismas reglas que `saveBlock`): horas escritas a mano normalizadas, el fin solo
+ * si es después del inicio, un bloque nuevo sin hora arriba de su día y uno que
+ * pasa a una semana posterior llega sin tildar. null si no se puede guardar.
+ */
+export function blockFromForm(fd: FormLike, base: BlockDTO | null, dayBlocks: BlockDTO[], id: string): BlockDTO | null {
+  const title = field(fd, "title", 120);
+  const date = field(fd, "date", 10);
+  if (!title || !isISODate(date)) return null;
+  const start = normalizeTime(field(fd, "startTime", 8));
+  if (start === null) return null;
+  const end = normalizeTime(field(fd, "endTime", 8)) ?? "";
+  const startTime = start || null;
+  const endTime = startTime && isTime(end) && end > startTime ? end : null;
+  const done = base ? (base.date !== date && startOfWeek(date) > startOfWeek(base.date) ? false : base.done) : false;
+  return {
+    id,
+    title,
+    date,
+    startTime,
+    endTime,
+    categoryId: field(fd, "categoryId", 40) || null,
+    priority: Math.max(0, Math.min(4, Math.round(Number(field(fd, "priority", 2)) || 0))),
+    place: field(fd, "place", 120) || null,
+    notes: field(fd, "notes", 2000) || null,
+    taskId: field(fd, "taskId", 40) || null,
+    done,
+    sortKey: base ? base.sortKey : startTime ? null : topSortKey(dayBlocks.filter((b) => b.date === date)),
+  };
+}
+
+/**
+ * La tarea como va a quedar al guardar la hoja (mismas reglas que `saveTask`),
+ * para verla cambiada al instante. Una nueva trae sus pasos escritos (uno por renglón).
+ */
+export function taskFromForm(fd: FormLike, base: TaskDTO | null, id: string, now = new Date()): TaskDTO | null {
+  const title = field(fd, "title", 160);
+  if (!title) return null;
+  const st = field(fd, "status") as TaskStatus;
+  const status: TaskStatus = (["backlog", "todo", "doing", "done"] as TaskStatus[]).includes(st) ? st : "todo";
+  const deadline = field(fd, "deadline", 10);
+  const repeat = field(fd, "repeat");
+  const every = Math.round(Number(field(fd, "repeatEvery", 4)));
+  let links: TaskLink[] = base?.links ?? [];
+  try {
+    links = parseTaskLinks(JSON.parse(String(fd.get("links") ?? "[]")));
+  } catch {
+    // Se queda con los que tenía.
+  }
+  const prio = field(fd, "priority", 2);
+  const subtasks = base
+    ? base.subtasks
+    : field(fd, "subtasks", 4000)
+        .split(/\r?\n/)
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .slice(0, 50)
+        .map((t, i) => ({ id: `tmp-${id}-${i}`, title: t.slice(0, 200), done: false }));
+  return {
+    id,
+    title,
+    status,
+    categoryId: field(fd, "categoryId", 40) || null,
+    priority: prio === "" ? 1 : Math.max(0, Math.min(4, Math.round(Number(prio)) || 0)),
+    deadline: isISODate(deadline) ? deadline : null,
+    scheduled: fd.get("scheduled") === "on",
+    notes: field(fd, "notes", 4000) || null,
+    links,
+    repeat: repeat === "daily" || repeat === "weekly" || repeat === "monthly" ? repeat : null,
+    repeatEvery: Number.isFinite(every) ? Math.max(1, Math.min(60, every)) : 1,
+    subtasks,
+    progress: subtasks.length ? subtasks.filter((s) => s.done).length : (base?.progress ?? null),
+    goal: subtasks.length ? subtasks.length : (base?.goal ?? null),
+    blockCount: base?.blockCount ?? 0,
+    order: base?.order ?? -1e9,
+    doneAt: status === "done" ? (base?.status === "done" ? base.doneAt : now.toISOString()) : null,
+  };
+}
+
+const clockFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** Minuto del día ahora en Montevideo (0 a 1439). */
+export function minutesNow(d = new Date()): number {
+  const [h, m] = clockFmt.format(d).split(":").map(Number);
+  return (h % 24) * 60 + m;
+}
+
+/** ¿El bloque está pasando ahora? Hoy, con hora, entre su inicio y su fin (sin fin, una hora). */
+export function isBlockNow(b: Pick<BlockDTO, "date" | "startTime" | "endTime">, today: string, now: number): boolean {
+  if (b.date !== today || !b.startTime) return false;
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const start = m(b.startTime);
+  const end = b.endTime && m(b.endTime) > start ? m(b.endTime) : start + 60;
+  return now >= start && now < end;
+}
+
+/**
+ * A qué hora abrir la grilla de Por horas: una hora antes de ahora, o el primer
+ * bloque de esos días si empieza antes (en horas enteras, nunca antes de `from`).
+ */
+export function hoursScrollTarget(now: number, firstBlockMin: number | null, from: number): number {
+  const target = Math.min(Math.floor(now / 60) - 1, firstBlockMin === null ? Infinity : Math.floor(firstBlockMin / 60));
+  return Math.max(from, target);
+}
+
+/**
+ * Atajos del selector de deadline: Hoy, Mañana, Próximo lunes y +1 semana (desde el
+ * deadline que tenga; si no tiene o ya venció, desde hoy: correr una vencida y que siga vencida no sirve).
+ */
+export function deadlineShortcuts(today: string, current: string | null): { label: string; date: string }[] {
+  return [
+    { label: "Hoy", date: today },
+    { label: "Mañana", date: addDays(today, 1) },
+    { label: "Próximo lunes", date: addDays(startOfWeek(today), 7) },
+    { label: "+1 semana", date: addDays(current && current > today ? current : today, 7) },
+  ];
+}
+
+/**
+ * Las semanas (de lunes a domingo) que muestran un mes en un calendario chico:
+ * siempre semanas completas, con los días del mes de al lado.
+ */
+export function monthGrid(month: string): string[][] {
+  const first = `${month}-01`;
+  const start = startOfWeek(first);
+  const weeks: string[][] = [];
+  for (let d = start; d.slice(0, 7) <= month || weeks.length === 0; ) {
+    const week = Array.from({ length: 7 }, (_, i) => addDays(d, i));
+    weeks.push(week);
+    d = addDays(d, 7);
+    if (d.slice(0, 7) > month) break;
+  }
+  return weeks;
 }

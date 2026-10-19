@@ -1,3 +1,4 @@
+import "./journal.css";
 import { Suspense } from "react";
 import { JournalNav, JournalTrail } from "./journal-nav";
 
