@@ -1,19 +1,27 @@
 /**
  * Lectura de los mensajes del bot de WhatsApp (puro: sin base, se puede probar suelto).
- * Comandos: "tarea <título> [fecha]", "bloque <título> [día] [hora]", "nota <texto>",
+ * Comandos: "gg <gasto>" (como la carga rápida; "+" adelante = ingreso), "tt|tarea <título> [fecha]", "bloque <título> [día] [hora]", "nota <texto>",
+ * "jj|diario [ayer] <texto>",
  * "hoy", "ayuda" / "/start". Lo demás se prueba como carga rápida de Gastos.
  */
 import { addDays, isISODate, weekday } from "../dates";
 import { isTime, normalizeTime } from "../plan-logic";
 
-export type BotCommand = "tarea" | "bloque" | "nota" | "hoy" | "ayuda" | null;
+export type BotCommand = "gasto" | "tarea" | "bloque" | "nota" | "diario" | "hoy" | "ayuda" | null;
 
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const COMMANDS: Record<string, Exclude<BotCommand, null>> = {
+  // Atajos de Facu: GG gasto (o ingreso con "+"), TT tarea, JJ journal.
+  gg: "gasto",
+  gasto: "gasto",
+  tt: "tarea",
   tarea: "tarea",
   bloque: "bloque",
   nota: "nota",
+  diario: "diario",
+  journal: "diario",
+  jj: "diario",
   hoy: "hoy",
   ayuda: "ayuda",
   help: "ayuda",
@@ -50,7 +58,7 @@ export function dayAtEnd(words: string[], today: string): { date: string; used: 
     else if (w === "manana") date = addDays(today, 1);
     else if (w === "ayer") date = addDays(today, -1);
     else if (Object.hasOwn(WEEKDAYS, w)) date = addDays(today, (WEEKDAYS[w] - weekday(today) + 7) % 7);
-    else if (/^d{4}-d{2}-d{2}$/.test(w) && isISODate(w)) date = w;
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(w) && isISODate(w)) date = w;
     else {
       const m = w.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2}|\d{4}))?$/);
       if (m) {
@@ -164,4 +172,16 @@ export function parseBlock(
   const endTime = startTime && time?.end && time.end > startTime ? time.end : null;
   if (time?.end && !endTime) return { error: `La hora de fin (${time.end}) tiene que ser después de la de inicio (${startTime}).` };
   return { title, date: date ?? today, startTime, endTime };
+}
+
+/**
+ * "jj <texto>": va a la entrada de hoy. Con "ayer:" o "ayer," adelante va a la de ayer.
+ * Los saltos de línea se respetan.
+ */
+export function parseJournal(rest: string, today: string): { date: string; text: string } | { error: string } {
+  const m = rest.match(/^(ayer|hoy)\s*[:,]\s*/i);
+  const date = m && fold(m[1]) === "ayer" ? addDays(today, -1) : today;
+  const text = (m ? rest.slice(m[0].length) : rest).trim();
+  if (!text) return { error: "Falta el texto. Por ejemplo: JJ hoy fue un buen día" };
+  return { date, text };
 }

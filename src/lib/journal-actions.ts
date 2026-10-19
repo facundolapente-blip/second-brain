@@ -8,6 +8,7 @@ import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { QUARTER_REVIEW_TAG, REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
+import { appendToJournal } from "./journal-append";
 
 function refrescar() {
   revalidatePath("/journal", "layout");
@@ -164,29 +165,8 @@ async function moveCheckinMood(id: string, from: string, to: string, prevMood: n
  */
 export async function shareToJournal(text: string): Promise<{ id: string }> {
   await exigirSesion();
-  const day = todayISO();
-  const clean = String(text ?? "").trim().slice(0, 5000);
-  const existing = await prisma.journalEntry.findFirst({
-    where: { date: toDbDate(day), NOT: { tags: { hasSome: [REVIEW_TAG, QUARTER_REVIEW_TAG] } } },
-    orderBy: { createdAt: "asc" },
-  });
-  if (existing) {
-    if (clean) {
-      const body = existing.body.trim() ? `${existing.body.trimEnd()}
-
-${clean}` : clean;
-      await prisma.journalEntry.update({ where: { id: existing.id }, data: { body: body.slice(0, BODY_MAX) } });
-    }
-    refrescar();
-    return { id: existing.id };
-  }
-  const checkin = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(day) }, select: { mood: true } });
-  const created = await prisma.journalEntry.create({
-    data: { date: toDbDate(day), body: clean, mood: isMood(checkin?.mood) ? checkin.mood : null },
-  });
-  await logActivity("created", "journal", created.id, `Entrada del ${day} (compartido)`);
-  refrescar();
-  return { id: created.id };
+  const { id } = await appendToJournal(todayISO(), text, "compartido");
+  return { id };
 }
 
 /** Al salir del editor sin haber escrito nada, la entrada no queda guardada. */

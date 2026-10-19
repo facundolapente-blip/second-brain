@@ -8,7 +8,8 @@ import { logActivity } from "../trash";
 import { createQuickTransaction } from "../quick-add";
 import { getDashboard } from "../dashboard";
 import { appendValueNote, VALUES_KEY } from "../values";
-import { parseBlock, parseCommand, parseTask } from "./parse";
+import { parseBlock, parseCommand, parseJournal, parseTask } from "./parse";
+import { appendToJournal } from "../journal-append";
 
 /**
  * Lo que hace el bot de WhatsApp con cada mensaje (ya validada la firma y el número en
@@ -18,15 +19,19 @@ import { parseBlock, parseCommand, parseTask } from "./parse";
 export const HELP = [
   "Mandame cosas y entran a Second Brain:",
   "",
-  "Gastos e ingresos (como la carga rápida):",
-  "350 almuerzo itau",
-  "+2450 disco santander ayer",
-  "usd 20 nafta",
-  "20x3 almuerzo",
+  "GG gasto (como la carga rápida; con + adelante es un ingreso):",
+  "GG 350 almuerzo itau",
+  "GG +2450 sueldo santander",
+  "GG usd 20 nafta",
+  "GG 20x3 café ayer",
   "",
-  "Tarea del Plan (fecha opcional, queda como deadline):",
-  "tarea llamar al banco viernes",
-  "tarea pagar el alquiler 25/10",
+  "TT tarea del Plan (fecha opcional, queda como deadline):",
+  "TT llamar al banco viernes",
+  "TT pagar el alquiler 25/10",
+  "",
+  "JJ journal (se suma a la entrada de hoy; con ayer: a la de ayer):",
+  "JJ hoy entrené y me sentí bien",
+  "JJ ayer: cena con amigos",
   "",
   "Bloque de la semana (día y hora opcionales):",
   "bloque gym mañana 18",
@@ -36,23 +41,31 @@ export const HELP = [
   "nota primero lo importante",
   "",
   "hoy: resumen del día",
+  "(Sin GG también entiende un gasto si empieza con el monto.)",
 ].join("\n");
 
 const SHORT_HELP =
-  "No te entendí. Probá con:\n350 almuerzo itau\ntarea llamar al banco viernes\nbloque gym mañana 18\nnota primero lo importante\nhoy\n\nayuda: todos los ejemplos";
+  "No te entendí. Probá con:\nGG 350 almuerzo itau\nGG +2450 sueldo\nTT llamar al banco viernes\nJJ hoy fue un buen día\nbloque gym mañana 18\nnota primero lo importante\nhoy\n\nayuda: todos los ejemplos";
 
 const MAX_TEXT = 1000;
+/** El journal acepta textos largos (WhatsApp manda hasta 4096 caracteres). */
+const MAX_JOURNAL = 4096;
 
 export async function handleBotMessage(raw: string): Promise<string> {
   const text = raw.trim();
   if (!text) return SHORT_HELP;
-  if (text.length > MAX_TEXT) return `Es muy largo (máximo ${MAX_TEXT} caracteres).`;
   const { cmd, rest } = parseCommand(text);
+  if (text.length > (cmd === "diario" ? MAX_JOURNAL : MAX_TEXT)) return `Es muy largo (máximo ${cmd === "diario" ? MAX_JOURNAL : MAX_TEXT} caracteres).`;
   const today = todayISO();
 
   switch (cmd) {
     case "ayuda":
       return HELP;
+    case "gasto": {
+      if (!rest) return "Falta el gasto. Por ejemplo: GG 350 almuerzo (o GG +2450 sueldo para un ingreso)";
+      const r = await createQuickTransaction(rest, undefined, "WhatsApp");
+      return r.ok ? r.summary : `${r.error} Por ejemplo: GG 350 almuerzo`;
+    }
     case "hoy":
       return await summary();
     case "tarea": {
@@ -67,6 +80,13 @@ export async function handleBotMessage(raw: string): Promise<string> {
     }
     case "nota":
       return await addNote(rest);
+    case "diario": {
+      const p = parseJournal(rest, today);
+      if ("error" in p) return p.error;
+      const r = await appendToJournal(p.date, p.text, "WhatsApp");
+      const when = p.date === today ? "de hoy" : "de ayer";
+      return `${r.created ? "Empecé la entrada" : "Sumado a la entrada"} ${when} del journal (${r.words} ${r.words === 1 ? "palabra" : "palabras"} en total).`;
+    }
     default: {
       const r = await createQuickTransaction(text, undefined, "WhatsApp");
       if (r.ok) return r.summary;
