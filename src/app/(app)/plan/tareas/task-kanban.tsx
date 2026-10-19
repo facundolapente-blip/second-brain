@@ -31,25 +31,6 @@ function useFinePointer() {
   );
 }
 
-/**
- * El consejo de cómo se usa el tablero en el celular sale solo la primera vez
- * (se recuerda en el aparato). Se decide una vez por visita: no desaparece mientras se lee.
- */
-const TIP_KEY = "sb_plan_tablero_consejo";
-let tipDecision: boolean | null = null;
-function showTip(): boolean {
-  if (tipDecision === null) {
-    try {
-      tipDecision = !localStorage.getItem(TIP_KEY);
-      localStorage.setItem(TIP_KEY, "1");
-    } catch {
-      tipDecision = false;
-    }
-  }
-  return tipDecision;
-}
-const noop = () => () => {};
-
 /** Columnas del tablero, en el orden de Notion: de lo que espera a lo terminado. */
 const COLUMNS: TaskStatus[] = ["backlog", "todo", "doing", "done"];
 /** Dentro de cada columna: primero lo que vence antes (terminadas: la más reciente arriba). */
@@ -101,7 +82,6 @@ export function TaskKanban({
   const flown = useLandedKeys(fresh, (k) => k.split(":")[1]);
   const landed = new Set([...fresh].filter((k) => !flown.has(k)));
   const sensors = useSensors(useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }));
-  const tip = useSyncExternalStore(noop, showTip, () => false);
   // Celular: en qué columna se está (puntos y nombre en vez de un texto fijo).
   const scroller = useRef<HTMLDivElement>(null);
   const [col, setCol] = useState(0);
@@ -205,7 +185,6 @@ export function TaskKanban({
           {TASK_STATUS[COLUMNS[col]].label} · {col + 1} de {COLUMNS.length}
         </span>
       </div>
-      {tip && <p className="pt-1 text-center text-[12px] text-muted lg:hidden">Deslizá para ver las otras columnas · mantené apretada una tarjeta para moverla</p>}
       <DragOverlay dropAnimation={null}>
         {dragging && <Card task={dragging.task} category={dragging.task.categoryId ? cats.get(dragging.task.categoryId) : null} today={today} overlay />}
       </DragOverlay>
