@@ -5,6 +5,8 @@ import { useActionState, useRef, useState } from "react";
 import { CheckCircle, DownloadSimple, FileArrowUp, Medal, Notebook, Wallet, WarningCircle, type Icon } from "@phosphor-icons/react";
 import { importBackup, type ImportResult } from "@/lib/data-actions";
 import { HealthImport } from "./health-import";
+import { WatchCard } from "./watch-card";
+import type { WatchStatus } from "@/lib/watch";
 import { formatShort } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
 import { cx } from "@/components/ui";
@@ -27,11 +29,15 @@ const nf = new Intl.NumberFormat("es-UY");
 /** "1 entrada", "1.234 entradas". */
 const count = (n: number, one: string, many: string) => `${nf.format(n)} ${n === 1 ? one : many}`;
 
-export function DataView({ stats, backups }: { stats: Stats; backups: React.ReactNode }) {
+export function DataView({ stats, backups, watch }: { stats: Stats; backups: React.ReactNode; watch: WatchStatus }) {
   return (
     <>
       <PageHeader title="Datos" kicker="Backups y exportación" wide />
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+        <section className="grid gap-3 lg:col-span-12">
+          <WatchCard status={watch} />
+        </section>
+
         <section className="rise grid gap-3 lg:col-span-12">
           <h2 className="text-[15px] font-semibold">Importar un backup</h2>
           <p className="max-w-[70ch] text-[13.5px] leading-relaxed text-muted">

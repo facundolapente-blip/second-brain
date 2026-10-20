@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fromDbDate } from "@/lib/dates";
 import { backupsEnabled, getBackupStatus, listBackups, type BackupInfo } from "@/lib/backup";
 import { DataView } from "./data-view";
+import { getWatchStatus } from "@/lib/watch";
 import { Backups } from "./backups";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function DatosPage() {
   } catch {
     // si el almacén no responde, la pantalla igual se ve
   }
-  const status = await getBackupStatus();
+  const [status, watch] = await Promise.all([getBackupStatus(), getWatchStatus()]);
   return (
     <div data-module="inicio" className="min-h-dvh">
       <DataView
@@ -46,6 +47,7 @@ export default async function DatosPage() {
           stepDays,
           lastSteps: d(lastSteps),
         }}
+        watch={watch}
         backups={<Backups enabled={enabled} backups={backups} status={status} />}
       />
     </div>

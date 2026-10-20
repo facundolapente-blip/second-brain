@@ -14,6 +14,8 @@ import { prisma } from "./prisma";
  */
 
 const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit", "ActionReceipt", "PushSubscription"]);
+/** Ajustes que son claves de otros servicios: no van en los respaldos (se vuelven a pegar). */
+const SECRET_SETTINGS = new Set<string>(["reloj_intervals"]);
 const PREFIX = "respaldos/";
 /** Se guardan los últimos 30 y, de antes, el último de cada mes durante un año. */
 const KEEP_DAILY = 30;
@@ -29,7 +31,8 @@ export async function buildBackup(): Promise<Buffer> {
   for (const name of Object.values(Prisma.ModelName)) {
     if (SKIP.has(name)) continue;
     const delegate = (prisma as unknown as Record<string, Delegate>)[name[0].toLowerCase() + name.slice(1)];
-    tablas[name] = await delegate.findMany();
+    const rows = await delegate.findMany();
+    tablas[name] = name === "AppSetting" ? rows.filter((r) => !SECRET_SETTINGS.has((r as { key: string }).key)) : rows;
   }
   const data = { app: "second-brain", version: 2, exportado: new Date().toISOString(), tablas };
   return gzipSync(JSON.stringify(data));

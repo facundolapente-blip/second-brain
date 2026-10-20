@@ -1,5 +1,6 @@
 import { pushConfigured } from "@/lib/push";
 import { runReminders } from "@/lib/reminders";
+import { syncWatch } from "@/lib/watch";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,10 +20,12 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const dryRun = params.get("simular") === "1";
   const hora = Number(params.get("hora") ?? NaN);
+  // De paso, cada hora: pasos, sueño y peso del reloj de los últimos 3 días (si está conectado).
+  const watch = dryRun ? null : await syncWatch({ days: 3 }).catch(() => null);
   if (!dryRun && !pushConfigured()) return Response.json({ ok: false, error: "Faltan las claves VAPID" }, { status: 500 });
   try {
     const run = await runReminders({ dryRun, hour: Number.isInteger(hora) && hora >= 0 && hora <= 23 ? hora : undefined });
-    return Response.json({ ok: true, ...run });
+    return Response.json({ ok: true, ...run, reloj: watch });
   } catch (e) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
