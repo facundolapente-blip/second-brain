@@ -43,7 +43,7 @@ export type ReviewUndo = {
   at: string;
   count: number;
   /** Cómo estaba cada movimiento cambiado. */
-  rows: { id: string; before: Record<string, string | null> }[];
+  rows: { id: string; before: Record<string, string | null>; after?: Record<string, string | null> }[];
   /** Ingresos de los cambios de moneda que se unieron (están en la papelera). */
   trashed: string[];
   /** Categorías a las que se les cambió la marca de trabajo. */

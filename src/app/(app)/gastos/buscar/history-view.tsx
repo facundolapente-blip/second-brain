@@ -28,7 +28,7 @@ function hrefOf(p: Partial<Params>): string {
   return sp.size ? `/gastos/buscar?${sp}` : "/gastos/buscar";
 }
 
-function applyChange(list: TxDTO[], c: TxOptimistic): TxDTO[] {
+export function applyChange(list: TxDTO[], c: TxOptimistic): TxDTO[] {
   if (c.type === "remove") return list.filter((t) => (c.id ? t.id !== c.id : t.installment?.group !== c.group));
   // Lo duplicado o creado aparece al subir (puede no cumplir los filtros); lo editado, al instante.
   return list.some((t) => t.id === c.tx.id) ? list.map((t) => (t.id === c.tx.id ? c.tx : t)) : list;
@@ -397,7 +397,7 @@ function RangeForm({
   );
 }
 
-function MonthGroups({
+export function MonthGroups({
   months,
   lk,
   onOpen,

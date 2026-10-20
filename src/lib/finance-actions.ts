@@ -214,6 +214,25 @@ export async function setTransactionCategory(id: string, categoryId: string | nu
   refrescar();
 }
 
+/**
+ * Pasa varios movimientos a otra categoría (desde la pantalla de una categoría). Solo
+ * cambia la categoría: los saldos no se tocan. Los que no corresponden (transferencias,
+ * o un gasto a una categoría de ingreso) quedan como estaban; un ingreso puede ir a una
+ * categoría de gasto (reintegro), como en la hoja.
+ */
+export async function moveToCategory(ids: string[], categoryId: string | null): Promise<{ ok: true; moved: number } | { ok: false; error: string }> {
+  await exigirSesion();
+  if (!Array.isArray(ids) || !ids.length || ids.length > 2000) return { ok: false, error: "Elegí algún movimiento." };
+  const cat = categoryId ? await prisma.category.findUnique({ where: { id: categoryId } }) : null;
+  if (categoryId && (!cat || cat.isAdjustment)) return { ok: false, error: "Esa categoría ya no existe." };
+  const txs = await prisma.transaction.findMany({ where: { id: { in: ids.map(String) }, kind: { in: ["expense", "income"] } }, select: { id: true, kind: true } });
+  const fits = txs.filter((t) => !cat || cat.kind === t.kind || (t.kind === "income" && cat.kind === "expense"));
+  if (fits.length) await prisma.transaction.updateMany({ where: { id: { in: fits.map((t) => t.id) } }, data: { categoryId } });
+  await logActivity("updated", "transaction", null, `${fits.length} ${fits.length === 1 ? "movimiento pasó" : "movimientos pasaron"} a ${cat?.name ?? "Sin clasificar"}`);
+  refrescar();
+  return { ok: true, moved: fits.length };
+}
+
 // ─── Cuentas ────────────────────────────────────────────────────────────────
 
 /** Saldo inicial: admite negativo (una tarjeta que arranca debiendo). */

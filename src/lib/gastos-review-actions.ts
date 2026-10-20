@@ -5,6 +5,7 @@ import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { normTitle } from "./smart-logic";
+import { toCents } from "./finance-logic";
 import { logActivity, trashAndDelete } from "./trash";
 import { restoreItem } from "./trash-actions";
 import { parseUndo, reviewSelect, toReviewTx, type ReviewUndo } from "./gastos-review";
@@ -22,6 +23,49 @@ export type ReviewResult = { ok: true; changed: number } | { ok: false; error: s
 
 function refrescar() {
   revalidatePath("/", "layout");
+}
+
+// ─── Candado de saldos ──────────────────────────────────────────────────────
+// Facu: está terminantemente prohibido que cambien los saldos (el de hoy es el correcto).
+// Aplicar y deshacer miran el saldo de cada cuenta antes y después; si uno solo cambia
+// un centavo, se vuelve todo atrás y no se aplica nada.
+
+/** Saldo de cada cuenta en centavos (saldo inicial + todos sus movimientos). */
+async function accountBalances(): Promise<Map<string, number>> {
+  const [accounts, txs] = await Promise.all([
+    prisma.account.findMany({ select: { id: true, initialBalance: true } }),
+    prisma.transaction.findMany({ select: { kind: true, amount: true, toAmount: true, accountId: true, toAccountId: true } }),
+  ]);
+  const out = new Map(accounts.map((a) => [a.id, toCents(a.initialBalance)]));
+  const add = (id: string, cents: number) => out.set(id, (out.get(id) ?? 0) + cents);
+  for (const t of txs) {
+    const amt = toCents(t.amount);
+    if (t.kind === "income") add(t.accountId, amt);
+    else if (t.kind === "expense") add(t.accountId, -amt);
+    else {
+      add(t.accountId, -amt);
+      if (t.toAccountId) add(t.toAccountId, t.toAmount ? toCents(t.toAmount) : amt);
+    }
+  }
+  return out;
+}
+
+/** Cuentas cuyo saldo cambió (vacío = todo igual). */
+function changedBalances(before: Map<string, number>, after: Map<string, number>): string[] {
+  const ids = new Set([...before.keys(), ...after.keys()]);
+  return [...ids].filter((id) => (before.get(id) ?? 0) !== (after.get(id) ?? 0));
+}
+
+/** Vuelve los movimientos como estaban: los ingresos de la papelera y cada fila con su foto de antes. */
+async function revertData(undo: ReviewUndo) {
+  for (const id of undo.trashed) {
+    const item = await prisma.trashItem.findFirst({ where: { kind: "transaction", entityId: id }, orderBy: { deletedAt: "desc" } });
+    if (item) await restoreItem(item.id);
+  }
+  for (const r of undo.rows) {
+    await prisma.transaction.update({ where: { id: r.id }, data: r.before }).catch(() => {});
+  }
+  for (const f of undo.flags) await prisma.category.update({ where: { id: f.id }, data: { isBusiness: f.isBusiness } }).catch(() => {});
 }
 
 /** Crea (o marca) las categorías de la revisión y devuelve sus ids. */
@@ -67,6 +111,7 @@ export async function applyGastosReview(input: {
   const items = (input.items ?? []).slice(0, 2000);
   if (!pairs.length && !items.length) return { ok: false, error: "No hay nada para aplicar." };
 
+  const balancesBefore = await accountBalances();
   const cats = await ensureReviewCategories();
   const undo: ReviewUndo = { at: new Date().toISOString(), count: 0, rows: [], trashed: [], flags: [], reviewed: [] };
   const reviewedRow = await prisma.appSetting.findUnique({ where: { key: REVIEWED_KEY } });
@@ -129,6 +174,8 @@ export async function applyGastosReview(input: {
         projectId: o.projectId,
         title: o.title,
       },
+      // Cómo queda: si después se edita, deshacer cambiaría el saldo y se frena.
+      after: { kind: "transfer", accountId: o.accountId, toAccountId: i.accountId, amount: o.amount.toString(), toAmount: i.amount.toString() },
     });
     await prisma.transaction.update({
       where: { id: o.id },
@@ -143,6 +190,20 @@ export async function applyGastosReview(input: {
     });
     if (await trashAndDelete("transaction", i.id)) undo.trashed.push(i.id);
     undo.count++;
+  }
+
+  // Candado: ningún saldo puede cambiar. Si cambió, todo vuelve atrás y no se aplica nada.
+  const moved = changedBalances(balancesBefore, await accountBalances());
+  if (moved.length) {
+    await revertData(undo);
+    const still = changedBalances(balancesBefore, await accountBalances());
+    console.error("Revisión de movimientos frenada: cambiaba el saldo de", moved, still.length ? `(y no se pudo volver: ${still})` : "");
+    return {
+      ok: false,
+      error: still.length
+        ? "Se frenó porque un saldo cambiaba y no se pudo volver atrás del todo: avisá antes de seguir."
+        : "No se aplicó nada: uno de los cambios movía un saldo. Los saldos quedaron como estaban.",
+    };
   }
 
   await prisma.appSetting.upsert({
@@ -168,15 +229,25 @@ export async function undoGastosReview(): Promise<ReviewResult> {
   const row = await prisma.appSetting.findUnique({ where: { key: REVIEW_UNDO_KEY } });
   const undo = parseUndo(row?.value);
   if (!undo) return { ok: false, error: "No hay ninguna revisión para deshacer." };
-  // Primero vuelven los ingresos de la papelera, después cada movimiento como estaba.
-  for (const id of undo.trashed) {
-    const item = await prisma.trashItem.findFirst({ where: { kind: "transaction", entityId: id }, orderBy: { deletedAt: "desc" } });
-    if (item) await restoreItem(item.id);
-  }
+  // Si después se editó una de las transferencias que se armaron o se sacó de la papelera
+  // un ingreso, deshacer movería un saldo: no se hace.
   for (const r of undo.rows) {
-    await prisma.transaction.update({ where: { id: r.id }, data: r.before }).catch(() => {});
+    if (!r.after) continue;
+    const t = await prisma.transaction.findUnique({ where: { id: r.id }, select: { kind: true, accountId: true, toAccountId: true, amount: true, toAmount: true } });
+    const now = t && { kind: t.kind, accountId: t.accountId, toAccountId: t.toAccountId, amount: t.amount.toString(), toAmount: t.toAmount?.toString() ?? null };
+    if (!now || JSON.stringify(now) !== JSON.stringify(r.after)) {
+      return { ok: false, error: "No se puede deshacer: cambiaste uno de esos movimientos después y los saldos se moverían." };
+    }
   }
-  for (const f of undo.flags) await prisma.category.update({ where: { id: f.id }, data: { isBusiness: f.isBusiness } }).catch(() => {});
+  for (const id of undo.trashed) {
+    if (!(await prisma.trashItem.findFirst({ where: { kind: "transaction", entityId: id }, select: { id: true } }))) {
+      return { ok: false, error: "No se puede deshacer: uno de los movimientos ya no está en la papelera y los saldos se moverían." };
+    }
+  }
+  const balancesBefore = await accountBalances();
+  await revertData(undo);
+  const moved = changedBalances(balancesBefore, await accountBalances());
+  if (moved.length) console.error("Deshacer la revisión movió el saldo de", moved);
   const reviewedRow = await prisma.appSetting.findUnique({ where: { key: REVIEWED_KEY } });
   const reviewed = parseReviewed(reviewedRow?.value);
   for (const id of undo.reviewed) reviewed.delete(id);
