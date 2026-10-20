@@ -263,7 +263,7 @@ export function HabitBadge({ habit, text, compact }: { habit: HabitDTO; text?: s
       className={cx(
         "inline-flex items-center gap-1 rounded-[3px] bg-tone px-1.5 leading-none font-medium text-tone-fg",
         // En la lista de Hoy del celular, más chica para que entren más hábitos.
-        compact ? "py-[2px] text-[11px] lg:py-[3px] lg:text-[12px]" : "py-[3px] text-[12px]",
+        compact ? "py-[3px] text-[12px]" : "py-[3px] text-[12px]",
       )}
     >
       {text ?? frequencyLabel(habit)}

@@ -141,10 +141,10 @@ const HabitRow = memo(function HabitRow({
         disabled={isFuture}
         className="tap-tint -my-1 -ml-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 pl-1.5 text-left transition-colors duration-[80ms] hover:bg-ink/[0.03] disabled:hover:bg-transparent lg:gap-4"
       >
-        <HabitAvatar icon={h.icon} color={h.color} className="size-8 lg:size-[42px]" />
+        <HabitAvatar icon={h.icon} color={h.color} className="size-9 lg:size-[42px]" />
         <span className="grid min-w-0 gap-0.5 lg:gap-1">
           <span className="flex items-baseline gap-2">
-            <span className="truncate text-[15px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
+            <span className="truncate text-[16px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
             {isCount && (
               <span className="tabular shrink-0 text-sm text-muted">
                 {value}
@@ -169,7 +169,7 @@ export function WeekCount({ habit, logs, day, today, className }: { habit: Habit
   if (!wp) return null;
   const thisWeek = periodStart(habit, day) === periodStart(habit, today);
   return (
-    <span className={cx("tabular min-w-0 truncate font-mono text-[11px] leading-none text-muted lg:text-[12px]", className)}>
+    <span className={cx("tabular min-w-0 truncate font-mono text-[11.5px] leading-none text-muted lg:text-[12px]", className)}>
       {wp.done}/{wp.need} {thisWeek ? "esta semana" : "esa semana"}
     </span>
   );

@@ -151,7 +151,7 @@ export function TodayView({
               </div>
             )}
             <div {...swipe} className="touch-pan-y">
-              <div key={selected} ref={keepRef} style={keepStyle} className={cx("px-4 lg:px-6", daySlide)}>
+              <div key={selected} ref={keepRef} style={keepStyle} className={cx("px-3.5 lg:px-6", daySlide)}>
                 {habits.length === 0 ? (
                   <EmptyState onCreate={() => form.current?.create()} />
                 ) : visible.length === 0 ? (
