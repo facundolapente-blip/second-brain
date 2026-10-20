@@ -214,6 +214,9 @@ export function AccountChips({
         // Con "Trabajo" activo sus cuentas no se ven elegidas una por una (el botón
         // las representa), salvo en "Varias", donde sí se ve qué está tildado.
         const on = selection !== null && selection.includes(a.id) && (!onWork || multi);
+        // Con "Personales" o "Trabajo", las cuentas de ese grupo quedan marcadas (más suave
+        // que una cuenta elegida sola: el botón del grupo es el que manda).
+        const member = !multi && !on && ((selection === null && !a.business) || (onWork && a.business));
         // Antes de la primera cuenta de trabajo, el botón que las junta.
         const workChip = a.business && !list[i - 1]?.business && work.length > 1;
         return (
@@ -236,8 +239,16 @@ export function AccountChips({
             key={a.id}
             type="button"
             aria-pressed={on}
+            title={member ? (a.business ? "Incluida en Trabajo" : "Incluida en Personales") : undefined}
             onClick={() => pick(a.id)}
-            className={cx(chip, on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong text-fg hover:bg-surface-2")}
+            className={cx(
+              chip,
+              on
+                ? "border-ink bg-ink font-medium text-on-ink"
+                : member
+                  ? "border-ink/70 bg-[color-mix(in_oklab,var(--ink)_12%,var(--surface))] font-medium text-fg"
+                  : "border-line-strong text-fg hover:bg-surface-2",
+            )}
           >
             {multi ? (
               <span
