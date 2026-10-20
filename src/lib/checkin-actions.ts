@@ -20,7 +20,7 @@ export async function saveCheckin(date: string, patch: unknown) {
     update: data,
   });
   // Si quedó sin ningún dato (se borró todo), la fila sobra: si no, contaría como check-in.
-  if ([row.mood, row.energy, row.stress, row.sleepMin, row.weightG, row.steps, row.stressScore, row.note].every((v) => v === null)) {
+  if ([row.mood, row.energy, row.stress, row.sleepMin, row.weightG, row.steps, row.stressScore, row.hrMin, row.hrMax, row.note].every((v) => v === null)) {
     await prisma.dailyCheckin.delete({ where: { id: row.id } });
   }
   // El ánimo es uno solo por día: pasa a las entradas del journal de ese día que

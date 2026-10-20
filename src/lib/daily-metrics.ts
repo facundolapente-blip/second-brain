@@ -34,6 +34,8 @@ export type DayMetrics = {
   steps: number | null;
   /** Estrés promedio que midió el reloj (1 a 99); aparte del estrés del check-in. */
   stressWatch: number | null;
+  /** Pulso mínimo del día (reloj), en latidos por minuto. */
+  hrMin: number | null;
   wrote: boolean;
   words: number;
   /** En pesos uruguayos (los dólares, con la cotización del día). */
@@ -135,6 +137,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       weightG: null,
       steps: null,
       stressWatch: null,
+      hrMin: null,
       wrote: false,
       words: 0,
       spentCents: 0,
@@ -166,6 +169,7 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     m.weightG = c.weightG;
     m.steps = c.steps;
     m.stressWatch = c.stressScore;
+    m.hrMin = c.hrMin;
   }
   for (const e of entries) {
     const m = byDate.get(fromDbDate(e.date));

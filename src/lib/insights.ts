@@ -200,6 +200,7 @@ export const METRICS = [
   { id: "sleep", label: "Sueño", short: "Sueño", get: (d: DayMetrics) => d.sleepMin },
   { id: "steps", label: "Pasos", short: "Pasos", get: (d: DayMetrics) => d.steps },
   { id: "stressWatch", label: "Estrés (reloj)", short: "Est. reloj", get: (d: DayMetrics) => d.stressWatch },
+  { id: "hrMin", label: "Pulso mínimo", short: "Pulso mín.", get: (d: DayMetrics) => d.hrMin },
   { id: "spent", label: "Gasto", short: "Gasto", get: (d: DayMetrics) => d.spentCents },
   { id: "words", label: "Palabras", short: "Palab.", get: (d: DayMetrics) => d.words },
   { id: "plan", label: "Plan %", short: "Plan %", get: (d: DayMetrics) => (d.blocksTotal ? d.blocksDone / d.blocksTotal : null) },
