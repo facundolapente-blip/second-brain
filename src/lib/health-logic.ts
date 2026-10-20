@@ -216,3 +216,41 @@ export function niceCeil(v: number): number {
   for (const s of [1, 2, 4, 5, 10]) if (s * mag >= v) return s * mag;
   return 10 * mag;
 }
+
+/** Metas de referencia de la pantalla Salud. */
+export const STEPS_GOAL = 8000;
+export const SLEEP_GOAL_MIN = 7 * 60;
+
+export type HealthHighlights = {
+  /** Días con 8.000 pasos o más, de los días con pasos (sin hoy, que no terminó). */
+  stepsGoal: { hit: number; of: number };
+  /** Noches de 7 h o más, de las noches con dato. */
+  sleepGoal: { hit: number; of: number };
+  bestSteps: { date: string; value: number } | null;
+  longestSleep: { date: string; value: number } | null;
+  calmest: { date: string; value: number } | null;
+  farthest: { date: string; value: number } | null;
+};
+
+/** Lo destacado de un período: cuántos días llegaron a la meta y los récords (sin el día de hoy en lo que se acumula). */
+export function healthHighlights(days: HealthDay[], today: string): HealthHighlights {
+  const pick = (key: HealthKey, better: (a: number, b: number) => boolean) => {
+    let best: { date: string; value: number } | null = null;
+    for (const d of days) {
+      const v = d[key];
+      if (v === null || (d.date >= today && PARTIAL_TODAY.has(key))) continue;
+      if (!best || better(v, best.value)) best = { date: d.date, value: v };
+    }
+    return best;
+  };
+  const steps = valuesOf(days, "steps", today);
+  const sleep = valuesOf(days, "sleepMin", today);
+  return {
+    stepsGoal: { hit: steps.filter((v) => v >= STEPS_GOAL).length, of: steps.length },
+    sleepGoal: { hit: sleep.filter((v) => v >= SLEEP_GOAL_MIN).length, of: sleep.length },
+    bestSteps: pick("steps", (a, b) => a > b),
+    longestSleep: pick("sleepMin", (a, b) => a > b),
+    calmest: pick("stress", (a, b) => a < b),
+    farthest: pick("distanceM", (a, b) => a > b),
+  };
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   averageOf,
+  healthHighlights,
   changeOf,
   emptyHealthDay,
   hasAnyData,
@@ -104,5 +105,29 @@ describe("cambios y formato", () => {
     expect(niceCeil(13500)).toBe(20000);
     expect(niceCeil(3800)).toBe(4000);
     expect(niceCeil(480)).toBe(500);
+  });
+});
+
+describe("healthHighlights", () => {
+  const day = (date: string, v: Partial<HealthDay>): HealthDay => ({ ...emptyHealthDay(date), ...v });
+  const days = [
+    day("2026-09-01", { steps: 9000, sleepMin: 480, stress: 20, distanceM: 6000 }),
+    day("2026-09-02", { steps: 4000, sleepMin: 360, stress: 15, distanceM: 2500 }),
+    day("2026-09-03", { steps: 12000, sleepMin: 500, stress: 30, distanceM: 9000 }),
+    day("2026-09-04", { steps: 20000, stress: 10 }),
+  ];
+  it("cuenta los días que llegaron a la meta y encuentra los récords", () => {
+    const h = healthHighlights(days, "2026-09-30");
+    expect(h.stepsGoal).toEqual({ hit: 3, of: 4 });
+    expect(h.sleepGoal).toEqual({ hit: 2, of: 3 });
+    expect(h.bestSteps).toEqual({ date: "2026-09-04", value: 20000 });
+    expect(h.longestSleep).toEqual({ date: "2026-09-03", value: 500 });
+    expect(h.calmest).toEqual({ date: "2026-09-04", value: 10 });
+    expect(h.farthest).toEqual({ date: "2026-09-03", value: 9000 });
+  });
+  it("hoy no cuenta en lo que se acumula durante el día", () => {
+    const h = healthHighlights(days, "2026-09-04");
+    expect(h.stepsGoal).toEqual({ hit: 2, of: 3 });
+    expect(h.bestSteps?.date).toBe("2026-09-03");
   });
 });
