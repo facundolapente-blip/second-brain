@@ -8,7 +8,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId } from "./plan-logic";
+import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, parseTaskColumnOrder, TASK_COLUMN_ORDER_KEY, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -412,6 +412,13 @@ export async function saveTaskColumns(widths: TaskColumnWidths) {
   await exigirSesion();
   const value = JSON.stringify(parseTaskColumns(JSON.stringify(widths ?? {})));
   await prisma.appSetting.upsert({ where: { key: "tareas_columnas" }, create: { key: "tareas_columnas", value }, update: { value } });
+}
+
+/** Orden de las columnas de la tabla de tareas (arrastrando los encabezados). */
+export async function saveTaskColumnOrder(order: string[]) {
+  await exigirSesion();
+  const value = JSON.stringify(parseTaskColumnOrder(Array.isArray(order) ? order : []));
+  await prisma.appSetting.upsert({ where: { key: TASK_COLUMN_ORDER_KEY }, create: { key: TASK_COLUMN_ORDER_KEY, value }, update: { value } });
 }
 
 function jsonOrEmpty(raw: string): unknown {

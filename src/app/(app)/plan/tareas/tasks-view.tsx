@@ -8,9 +8,9 @@ import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
 import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots } from "@phosphor-icons/react";
-import { saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
+import { saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
 import { addDays, formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, taskFromForm } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, taskFromForm } from "@/lib/plan-logic";
 import { Button, cx } from "@/components/ui";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, StepBar } from "../plan-ui";
@@ -82,7 +82,7 @@ export function DeadlinePicker({ task, children, className }: { task: TaskDTO; c
 }
 
 /** Vista y "Ver todas" del tablero: viven mientras la app está abierta (cambiar de semana no los pierde). */
-const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths } = { view: "deadline", all: false };
+const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths; order?: TaskColumnKey[] } = { view: "deadline", all: false };
 
 export function TasksBoard({
   tasks,
@@ -91,6 +91,7 @@ export function TasksBoard({
   manualOrder = false,
   folded: foldedInitial = false,
   columns = {},
+  columnOrder,
   layout: initialLayout = "tabla",
 }: {
   tasks: TaskDTO[];
@@ -102,6 +103,8 @@ export function TasksBoard({
   folded?: boolean;
   /** Anchos de columna guardados (tabla de la compu). */
   columns?: TaskColumnWidths;
+  /** Orden de las columnas guardado (se cambia arrastrando los encabezados). */
+  columnOrder?: TaskColumnKey[];
   /** Tabla (la de siempre) o Tablero (columnas por estado); se recuerda con una cookie. */
   layout?: "tabla" | "tablero";
 }) {
@@ -125,6 +128,12 @@ export function TasksBoard({
     setWidths(next);
     if (save) quiet(saveTaskColumns(next));
   }
+  // Orden de las columnas: arrastrando un encabezado (se guarda al soltar).
+  const [order, setOrder] = useState<TaskColumnKey[]>(() => savedBoard.order ?? columnOrder ?? TASK_COLUMNS.map((c) => c.key));
+  function reorder(next: TaskColumnKey[]) {
+    setOrder(next);
+    quiet(saveTaskColumnOrder(next));
+  }
   // Cambiar de vista: fundido corto (solo después de tocar, no al cargar).
   const [swapped, setSwapped] = useState(false);
   const setView = (v: TaskView) => {
@@ -143,7 +152,8 @@ export function TasksBoard({
     savedBoard.view = view;
     savedBoard.all = all;
     savedBoard.widths = widths;
-  }, [view, all, widths]);
+    savedBoard.order = order;
+  }, [view, all, widths, order]);
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
@@ -362,7 +372,7 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} widths={widths} onResize={resize} />
+          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} widths={widths} onResize={resize} order={order} onReorder={reorder} />
           {/* Celular: la misma agrupación, con la fecha a la izquierda. */}
           <ul className="grid border-t border-line lg:hidden">
             {groups.map((g) => (
@@ -567,8 +577,13 @@ function TaskTable({
   fresh,
   widths,
   onResize: resize,
+  order,
+  onReorder,
 }: {
   groups: ReturnType<typeof groupsOf>;
+  /** Orden de las columnas; se cambia arrastrando un encabezado. */
+  order: TaskColumnKey[];
+  onReorder: (order: TaskColumnKey[]) => void;
   /** Anchos guardados (los mismos en todas las vistas); se cambian arrastrando el borde del encabezado. */
   widths: TaskColumnWidths;
   onResize: (k: TaskColumnKey, w: number | null, save: boolean) => void;
@@ -583,7 +598,38 @@ function TaskTable({
   // Cada columna tiene su ancho y la tabla mide la suma: arrastrar un borde cambia solo esa
   // columna y el borde sigue al mouse (lo de la derecha se corre, como en Notion). Ninguna se estira sola.
   const total = TASK_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0);
-  const cols = TASK_COLUMNS.map((c) => c.key);
+  const cols = order;
+  // Columna que se arrastra y dónde caería (antes o después de cuál), para la línea de color.
+  const [colDrag, setColDrag] = useState<TaskColumnKey | null>(null);
+  const [colTarget, setColTarget] = useState<{ key: TaskColumnKey; after: boolean } | null>(null);
+  const dropAt = colDrag && colTarget ? moveTaskColumn(cols, colDrag, colTarget.key, colTarget.after) : null;
+  // Sin cambio real (soltar en su mismo lugar), no se marca nada.
+  const willMove = !!dropAt && dropAt.join() !== cols.join();
+  function endColDrag() {
+    setColDrag(null);
+    setColTarget(null);
+  }
+  // Soltar en el encabezado o en cualquier celda de una columna: cae antes o después según la mitad.
+  const colDrop = (k: TaskColumnKey) => ({
+    onDragOver: (e: React.DragEvent<HTMLElement>) => {
+      if (!colDrag || !e.dataTransfer.types.includes(TASK_COLUMN_DRAG)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const box = e.currentTarget.getBoundingClientRect();
+      const after = e.clientX > box.left + box.width / 2;
+      if (colTarget?.key !== k || colTarget.after !== after) setColTarget({ key: k, after });
+    },
+    onDrop: (e: React.DragEvent<HTMLElement>) => {
+      if (!colDrag || !e.dataTransfer.types.includes(TASK_COLUMN_DRAG)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (willMove && dropAt) onReorder(dropAt);
+      endColDrag();
+    },
+  });
+  // Línea de color a todo el alto en el borde donde caería la columna.
+  const dropLine = (k: TaskColumnKey) =>
+    willMove && colTarget?.key === k ? (colTarget.after ? "shadow-[inset_-3px_0_0_var(--accent)]" : "shadow-[inset_3px_0_0_var(--accent)]") : null;
   const head = (k: TaskColumnKey) => ({ label: TASK_COLUMNS.find((c) => c.key === k)!.label });
   // La fila que se arrastra a un día queda apagada en su lugar mientras tanto.
   const [dragging, setDragging] = useState<string | null>(null);
@@ -599,14 +645,35 @@ function TaskTable({
         </colgroup>
         <thead>
           <tr className="border-b border-line-strong bg-surface-2 text-[11px] tracking-[0.06em] text-muted uppercase">
-            {cols.map((k) => (
+            {cols.map((k, i) => (
               <th
                 key={k}
+                // Arrastrar el encabezado cambia el orden de las columnas (como en Notion).
+                draggable
+                tabIndex={0}
+                title="Arrastrá para cambiar el orden (o Alt + flechas)"
+                aria-label={`${head(k).label}. Arrastrá o usá Alt y las flechas para moverla`}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(TASK_COLUMN_DRAG, k);
+                  e.dataTransfer.effectAllowed = "move";
+                  liftImage(e, e.currentTarget, ghostCard(head(k).label, "Soltala donde va"));
+                  setColDrag(k);
+                }}
+                {...colDrop(k)}
+                onDragEnd={endColDrag}
+                onKeyDown={(e) => {
+                  if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+                  e.preventDefault();
+                  const to = cols[i + (e.key === "ArrowRight" ? 1 : -1)];
+                  if (to) onReorder(moveTaskColumn(cols, k, to, e.key === "ArrowRight"));
+                }}
                 className={cx(
                   CELL,
-                  "relative py-2.5 font-medium",
+                  "relative cursor-grab py-2.5 font-medium transition-[opacity,background-color] duration-[var(--dur-quick)] outline-none select-none hover:bg-surface-3 focus-visible:bg-surface-3 active:cursor-grabbing",
                   k === "scheduled" ? "px-2 text-center" : "px-3",
                   COMPACT_HIDDEN.has(k) && WIDE_ONLY,
+                  colDrag === k && "opacity-40",
+                  dropLine(k),
                 )}
               >
                 <span className="block truncate">{head(k).label}</span>
@@ -650,59 +717,68 @@ function TaskTable({
                       dragging === t.id && "plan-drag-source",
                     )}
                   >
-                    <td className={cx(CELL, "px-3 py-1.5")}>
-                      <DeadlinePicker task={t}>
-                        <DateBlock deadline={t.deadline} left={left} done={done} />
-                      </DeadlinePicker>
-                    </td>
-                    <td className={cx(CELL, "py-1 pr-3 pl-1.5")}>
-                      <div className="flex items-center">
-                        {!done && (
-                          // Pista de que la fila se arrastra a un día de la semana.
-                          <span
-                            aria-hidden
-                            title="Arrastrala a un día de la semana para agendarla"
-                            className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
-                          >
-                            <CalendarPlus size={16} aria-hidden />
-                          </span>
-                        )}
-                        <button type="button" onClick={() => onOpen(t)} className={cx("grid min-h-11 w-full min-w-0 content-center gap-0.5 rounded-lg px-2 text-left", done && "pl-10")}>
-                          <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
-                          <TaskMeta t={t} done={done} hideScheduled />
-                          {/* Tabla compacta: categoría y prioridad debajo del nombre. */}
-                          {(t.categoryId || t.priority > 0) && (
-                            <span className="mt-1 flex flex-wrap items-center gap-1.5 min-[90rem]:hidden">
-                              <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
-                              <PriorityTag n={t.priority} />
+                    {cols.map((k) => {
+                      const cell: Record<TaskColumnKey, [string, React.ReactNode]> = {
+                        date: [
+                          "px-3 py-1.5",
+                          <DeadlinePicker key="d" task={t}>
+                            <DateBlock deadline={t.deadline} left={left} done={done} />
+                          </DeadlinePicker>,
+                        ],
+                        title: [
+                          "py-1 pr-3 pl-1.5",
+                          <div key="t" className="flex items-center">
+                            {!done && (
+                              // Pista de que la fila se arrastra a un día de la semana.
+                              <span
+                                aria-hidden
+                                title="Arrastrala a un día de la semana para agendarla"
+                                className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
+                              >
+                                <CalendarPlus size={16} aria-hidden />
+                              </span>
+                            )}
+                            <button type="button" onClick={() => onOpen(t)} className={cx("grid min-h-11 w-full min-w-0 content-center gap-0.5 rounded-lg px-2 text-left", done && "pl-10")}>
+                              <span className={cx("leading-snug font-medium", done && "text-muted line-through decoration-faint")}>{t.title}</span>
+                              <TaskMeta t={t} done={done} hideScheduled />
+                              {/* Tabla compacta: categoría y prioridad debajo del nombre. */}
+                              {(t.categoryId || t.priority > 0) && (
+                                <span className="mt-1 flex flex-wrap items-center gap-1.5 min-[90rem]:hidden">
+                                  <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
+                                  <PriorityTag n={t.priority} />
+                                </span>
+                              )}
+                            </button>
+                          </div>,
+                        ],
+                        category: [cx("px-3", WIDE_ONLY), <CategoryTag key="c" category={t.categoryId ? cats.get(t.categoryId) : null} />],
+                        priority: [cx("px-3", WIDE_ONLY), <PriorityTag key="p" n={t.priority} />],
+                        deadline: [
+                          "px-3",
+                          <DeadlinePicker key="v" task={t} className="-mx-1.5">
+                            <span className="inline-flex min-h-9 items-center rounded-md px-1.5 hover:bg-surface-2">
+                              {done || left === null ? <span className="text-faint" aria-label="Sin deadline">–</span> : <DueLabel left={left} done={done} />}
                             </span>
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                    <td className={cx(CELL, "px-3", WIDE_ONLY)}>
-                      <CategoryTag category={t.categoryId ? cats.get(t.categoryId) : null} />
-                    </td>
-                    <td className={cx(CELL, "px-3", WIDE_ONLY)}>
-                      <PriorityTag n={t.priority} />
-                    </td>
-                    <td className={cx(CELL, "px-3")}>
-                      <DeadlinePicker task={t} className="-mx-1.5">
-                        <span className="inline-flex min-h-9 items-center rounded-md px-1.5 hover:bg-surface-2">
-                          {done || left === null ? <span className="text-faint" aria-label="Sin deadline">–</span> : <DueLabel left={left} done={done} />}
-                        </span>
-                      </DeadlinePicker>
-                    </td>
-                    <td className={cx(CELL, "px-3")}>
-                      {t.subtasks.length > 0 ? (
-                        <Steps task={t} />
-                      ) : (
-                        <span className="text-faint" aria-label="Sin progreso">–</span>
-                      )}
-                    </td>
-                    <td className={cx(CELL, "px-2 text-center")}>
-                      <ScheduledBox task={t} />
-                    </td>
+                          </DeadlinePicker>,
+                        ],
+                        progress: [
+                          "px-3",
+                          t.subtasks.length > 0 ? (
+                            <Steps key="s" task={t} />
+                          ) : (
+                            <span key="s" className="text-faint" aria-label="Sin progreso">
+                              –
+                            </span>
+                          ),
+                        ],
+                        scheduled: ["px-2 text-center", <ScheduledBox key="a" task={t} />],
+                      };
+                      return (
+                        <td key={k} {...colDrop(k)} className={cx(CELL, cell[k][0], colDrag === k && "opacity-40", dropLine(k))}>
+                          {cell[k][1]}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}

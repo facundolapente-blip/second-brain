@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  moveTaskColumn,
+  parseTaskColumnOrder,
   applyTaskView,
   daysLeft,
   daysLeftLabel,
@@ -295,5 +297,19 @@ describe("shiftEnd (al cambiar el inicio se mantiene la duración)", () => {
     expect(shiftEnd("", "17:00", "13:00")).toBeNull();
     expect(shiftEnd("15:00", "", "13:00")).toBeNull();
     expect(shiftEnd("17:00", "15:00", "13:00")).toBeNull();
+  });
+});
+
+describe("orden de las columnas de tareas", () => {
+  it("lee lo guardado, sin repetidas ni desconocidas, y completa lo que falta", () => {
+    expect(parseTaskColumnOrder(null)).toEqual(["date", "title", "category", "priority", "deadline", "progress", "scheduled"]);
+    expect(parseTaskColumnOrder('["deadline","date","deadline","nada"]')).toEqual(["deadline", "date", "title", "category", "priority", "progress", "scheduled"]);
+    expect(parseTaskColumnOrder("{roto")).toHaveLength(7);
+  });
+  it("mueve una columna antes o después de otra", () => {
+    const o = parseTaskColumnOrder(null);
+    expect(moveTaskColumn(o, "deadline", "date", false).slice(0, 3)).toEqual(["deadline", "date", "title"]);
+    expect(moveTaskColumn(o, "date", "title", true).slice(0, 3)).toEqual(["title", "date", "category"]);
+    expect(moveTaskColumn(o, "date", "date", true)).toBe(o);
   });
 });

@@ -107,6 +107,42 @@ export function parseTaskColumns(raw: string | null | undefined): TaskColumnWidt
   return out;
 }
 
+/** Orden de las columnas de la tabla de tareas (`AppSetting "tareas_columnas_orden"`). */
+export const TASK_COLUMN_ORDER_KEY = "tareas_columnas_orden";
+
+/**
+ * Orden guardado: solo claves conocidas, sin repetir; las que falten (una columna nueva)
+ * van al final en su lugar de fábrica. Sin nada guardado, el orden de `TASK_COLUMNS`.
+ */
+export function parseTaskColumnOrder(raw: string | null | undefined | unknown[]): TaskColumnKey[] {
+  const known = TASK_COLUMNS.map((c) => c.key) as TaskColumnKey[];
+  let v: unknown = raw;
+  if (typeof raw === "string" || raw == null) {
+    try {
+      v = JSON.parse(typeof raw === "string" ? raw : "[]");
+    } catch {
+      v = [];
+    }
+  }
+  const out: TaskColumnKey[] = [];
+  if (Array.isArray(v)) for (const k of v) if (known.includes(k as TaskColumnKey) && !out.includes(k as TaskColumnKey)) out.push(k as TaskColumnKey);
+  for (const k of known) if (!out.includes(k)) out.push(k);
+  return out;
+}
+
+/** Mueve la columna `key` antes (o después) de `target`. */
+export function moveTaskColumn(order: TaskColumnKey[], key: TaskColumnKey, target: TaskColumnKey, after: boolean): TaskColumnKey[] {
+  if (key === target) return order;
+  const rest = order.filter((k) => k !== key);
+  const at = rest.indexOf(target);
+  if (at < 0) return order;
+  rest.splice(after ? at + 1 : at, 0, key);
+  return rest;
+}
+
+/** Tipo de dato al arrastrar una columna de la tabla de tareas (no se confunde con una tarea). */
+export const TASK_COLUMN_DRAG = "text/x-columna";
+
 /** Tipo de dato al arrastrar una tarea de la tabla a un día de la semana. */
 export const TASK_DRAG = "text/x-tarea";
 
