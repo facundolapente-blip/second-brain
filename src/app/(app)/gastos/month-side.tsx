@@ -61,15 +61,18 @@ export function SideBalances({
       </p>
       <ul className="border-t border-line">
         {list.map((a, i) => {
-          const on = selection !== null && isSelected(selection, a.id);
+          // Con "Personales" (sin elegir), las personales se ven seleccionadas, igual que las de
+          // trabajo cuando se elige "Trabajo".
+          const on = selection === null ? !a.business : isSelected(selection, a.id);
+          const only = selection !== null && on && selection.length === 1;
           return (
             <li key={a.id} className="border-b border-line last:border-b-0">
               {a.business && !list[i - 1]?.business && <p className="kicker pt-3 pb-1">Trabajo</p>}
               <button
                 type="button"
-                onClick={() => onChange(on && selection?.length === 1 ? null : [a.id])}
+                onClick={() => onChange(only ? null : [a.id])}
                 aria-pressed={on}
-                title={on ? "Ver todas las cuentas" : `Ver solo ${a.name}`}
+                title={only ? "Volver a las personales" : `Ver solo ${a.name}`}
                 className={cx(
                   "-mx-2 flex min-h-12 w-[calc(100%+1rem)] items-center gap-3 rounded-[6px] px-2 text-left transition-colors hover:bg-surface-2",
                   on && "bg-accent-soft hover:bg-accent-soft",
