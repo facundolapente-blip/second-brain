@@ -325,3 +325,9 @@ describe("stripSiteSuffix", () => {
     expect(stripSiteSuffix("MarkItDown: deja de quemar tokens", "www.josegerardo.ai")).toBe("MarkItDown: deja de quemar tokens");
   });
 });
+
+describe("pickImage descarta lo que vence", () => {
+  it("Instagram y Facebook no (direcciones firmadas)", () => {
+    expect(pickImage(["https://scontent.cdninstagram.com/v/x.jpg", "https://tienda.uy/p.jpg"], "https://tienda.uy/")).toBe("https://tienda.uy/p.jpg");
+  });
+});

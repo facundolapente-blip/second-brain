@@ -21,12 +21,34 @@ export function pickImage(candidates: (string | null | undefined)[], base: strin
       const abs = new URL(decodeEntities(c.trim()), base);
       if (abs.protocol === "http:") abs.protocol = "https:";
       if (/logo|favicon/i.test(abs.pathname)) continue;
+      // Las de Instagram y Facebook son direcciones firmadas que vencen a las semanas.
+      if (EXPIRING_HOSTS.test(abs.hostname)) continue;
       if (abs.protocol === "https:" && abs.href.length <= 1000) return abs.href;
     } catch {
       // Dirección rara: probar la siguiente.
     }
   }
   return null;
+}
+
+const EXPIRING_HOSTS = /(^|\.)(fbcdn\.net|cdninstagram\.com)$/i;
+
+/**
+ * Que la imagen se pueda mostrar desde la app: responde, es una imagen y el sitio no la
+ * reserva para sí (`Cross-Origin-Resource-Policy: same-origin`, como la de claude.ai: el
+ * navegador la bloquea y deja un error en la consola). Si el sitio no contesta HEAD, se acepta.
+ */
+export async function imageOk(url: string, timeoutMs = 2500): Promise<boolean> {
+  try {
+    const r = await fetch(url, { method: "HEAD", redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+    if (r.status === 405 || r.status === 501) return true;
+    if (!r.ok) return false;
+    if (/^same-(origin|site)$/i.test(r.headers.get("cross-origin-resource-policy")?.trim() ?? "")) return false;
+    const type = r.headers.get("content-type") ?? "";
+    return !type || /^image\//i.test(type) || /octet-stream/i.test(type);
+  } catch {
+    return true;
+  }
 }
 
 /** "image" de los datos estructurados de un producto (JSON-LD), si la página los trae arriba. */
@@ -222,7 +244,7 @@ export async function fetchLinkMeta(url: string, timeoutMs = TIMEOUT_MS): Promis
       ],
       r.url || u.href,
     );
-    return { title, thumbnail };
+    return { title, thumbnail: thumbnail && (await imageOk(thumbnail)) ? thumbnail : null };
   } catch {
     return yt ? { title: null, thumbnail: youtubeThumb(yt) } : none;
   }
