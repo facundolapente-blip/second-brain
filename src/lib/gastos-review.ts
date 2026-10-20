@@ -99,3 +99,94 @@ export async function getGastosReview(): Promise<{
     undo: undo ? { at: undo.at, count: undo.count, batches: stack.length } : null,
   };
 }
+
+// ─── Historial de lo aplicado ───────────────────────────────────────────────
+
+type HistTx = { id: string; date: string; title: string | null; accountName: string; currency: string; cents: number; kind: string; categoryName: string | null };
+
+export type ReviewHistoryItem =
+  | { type: "transfer"; at: string; out: HistTx; in: HistTx | null; rate: number | null }
+  | { type: "category"; at: string; tx: HistTx | null; id: string; from: string; to: string }
+  | { type: "kept"; at: string; tx: HistTx | null; id: string };
+
+/**
+ * Todo lo que se aplicó en "Revisar movimientos" (lo que todavía no se deshizo), para
+ * chequearlo: cada cambio de moneda unido (el gasto, que ahora es la transferencia, y el
+ * ingreso que fue a la papelera), cada cambio de categoría (antes → ahora) y lo que se
+ * marcó como revisado sin cambios. Lo más nuevo primero.
+ */
+export async function getReviewHistory(): Promise<ReviewHistoryItem[]> {
+  const row = await prisma.appSetting.findUnique({ where: { key: REVIEW_UNDO_KEY } });
+  const stack = parseUndoStack(row?.value);
+  const ids = [...new Set(stack.flatMap((b) => [...b.rows.map((r) => r.id), ...b.reviewed]))];
+  const trashedIds = stack.flatMap((b) => b.trashed);
+  const [txs, accounts, cats, trash] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, date: true, title: true, kind: true, amount: true, toAmount: true, accountId: true, toAccountId: true, categoryId: true },
+    }),
+    prisma.account.findMany({ select: { id: true, name: true, currency: true } }),
+    prisma.category.findMany({ select: { id: true, name: true } }),
+    prisma.trashItem.findMany({ where: { kind: "transaction", entityId: { in: trashedIds } }, select: { entityId: true, data: true } }),
+  ]);
+  const acc = new Map(accounts.map((a) => [a.id, a]));
+  const catName = new Map(cats.map((c) => [c.id, c.name]));
+  const toHist = (t: { id: string; date: Date | string; title: string | null; kind: string; amount: unknown; accountId: string; categoryId: string | null }): HistTx => ({
+    id: t.id,
+    date: typeof t.date === "string" ? t.date.slice(0, 10) : fromDbDate(t.date),
+    title: t.title?.trim() || null,
+    accountName: acc.get(t.accountId)?.name ?? "?",
+    currency: acc.get(t.accountId)?.currency ?? "UYU",
+    cents: toCents(String(t.amount)),
+    kind: t.kind,
+    categoryName: t.categoryId ? (catName.get(t.categoryId) ?? "(borrada)") : null,
+  });
+  const byId = new Map(txs.map((t) => [t.id, t]));
+  const trashed = new Map(
+    trash.map((x) => {
+      const r = (x.data as { row?: Record<string, unknown> } | null)?.row ?? {};
+      return [x.entityId, r] as const;
+    }),
+  );
+
+  const out: ReviewHistoryItem[] = [];
+  for (const b of [...stack].reverse()) {
+    const changed = new Set<string>();
+    // Cada ingreso unido va con el gasto de su par (en la tanda, en el mismo orden).
+    const trashedQueue = [...b.trashed];
+    for (const r of b.rows) {
+      changed.add(r.id);
+      const now = byId.get(r.id);
+      if ("kind" in r.before) {
+        const inId = trashedQueue.shift();
+        if (inId) changed.add(inId);
+        const inRow = inId ? trashed.get(inId) : undefined;
+        const inTx = inRow
+          ? toHist({
+              id: inId!,
+              date: String(inRow.date),
+              title: (inRow.title as string | null) ?? null,
+              kind: "income",
+              amount: inRow.amount,
+              accountId: String(inRow.accountId),
+              categoryId: (inRow.categoryId as string | null) ?? null,
+            })
+          : null;
+        const outTx = now ? toHist({ ...now, categoryId: r.before.categoryId ?? null }) : null;
+        if (!outTx) continue;
+        const dollars = outTx.currency === "USD" ? outTx.cents : inTx?.currency === "USD" ? inTx.cents : 0;
+        const pesos = outTx.currency === "UYU" ? outTx.cents : inTx?.currency === "UYU" ? inTx.cents : 0;
+        out.push({ type: "transfer", at: b.at, out: outTx, in: inTx, rate: dollars && pesos ? Math.round((pesos / dollars) * 100) / 100 : null });
+      } else {
+        const from = r.before.categoryId ? (catName.get(r.before.categoryId) ?? "(borrada)") : "Sin clasificar";
+        out.push({ type: "category", at: b.at, id: r.id, tx: now ? toHist(now) : null, from, to: now ? (now.categoryId ? (catName.get(now.categoryId) ?? "(borrada)") : "Sin clasificar") : "(ya no existe)" });
+      }
+    }
+    for (const id of b.reviewed) {
+      if (changed.has(id) || trashedIds.includes(id)) continue;
+      const now = byId.get(id);
+      out.push({ type: "kept", at: b.at, id, tx: now ? toHist(now) : null });
+    }
+  }
+  return out;
+}

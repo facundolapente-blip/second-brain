@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowsLeftRight, Briefcase, Check, CheckCircle, HandCoins, MagnifyingGlass, Plus, Question } from "@phosphor-icons/react";
@@ -122,9 +123,17 @@ export function ReviewView({
               <b className="font-semibold">{undo.count === 0 ? "marcado como revisado" : undo.count === 1 ? "1 cambio" : `${undo.count} cambios`}</b>
               {undo.batches > 1 && <span className="text-muted"> · se puede seguir deshaciendo de a uno</span>}
             </span>
-            <Button size="sm" variant="outline" onClick={revert} disabled={pending}>
-              Deshacer lo último
-            </Button>
+            <span className="flex flex-wrap gap-2">
+              <Link
+                href="/gastos/revisar/historial"
+                className="press inline-flex h-9 items-center rounded-full border border-line-strong px-3.5 text-[13px] font-medium hover:bg-surface-2"
+              >
+                Ver todo lo que aplicaste
+              </Link>
+              <Button size="sm" variant="outline" onClick={revert} disabled={pending}>
+                Deshacer lo último
+              </Button>
+            </span>
           </div>
         )}
 
