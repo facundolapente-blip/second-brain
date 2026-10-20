@@ -213,6 +213,52 @@ function parsePlainAmount(raw: string): number | null {
 }
 
 /** Centavos al texto que se muestra en un campo de monto ("1250,5" -> "1250,50"). */
+// ─── Tipo de cambio de una transferencia entre monedas ─────────────────────
+
+/**
+ * El tipo de cambio siempre se expresa en pesos por 1 de la otra moneda ("1 US$ =
+ * $ 39,50"), pase la plata de dólares a pesos o de pesos a dólares. Entre dos monedas
+ * que no son pesos, por 1 de la moneda de origen.
+ */
+function rateBase(fromCur: string, toCur: string): "from" | "to" {
+  return fromCur === "UYU" && toCur !== "UYU" ? "to" : "from";
+}
+
+/** Tipo de cambio que da una transferencia (null si es la misma moneda o falta un monto). */
+export function exchangeRate(fromCur: string, fromCents: number, toCur: string, toCents: number): number | null {
+  if (fromCur === toCur || !(fromCents > 0) || !(toCents > 0)) return null;
+  return rateBase(fromCur, toCur) === "from" ? toCents / fromCents : fromCents / toCents;
+}
+
+/** Cuánto llega con ese tipo de cambio (en centavos de la moneda de destino). */
+export function amountFromRate(fromCur: string, fromCents: number, toCur: string, rate: number): number | null {
+  if (fromCur === toCur || !(fromCents > 0) || !(rate > 0)) return null;
+  const cents = Math.round(rateBase(fromCur, toCur) === "from" ? fromCents * rate : fromCents / rate);
+  return cents > 0 ? cents : null;
+}
+
+/** "39,5" o "39.50" → 39.5. Hasta 6 decimales; nada raro. */
+export function parseRate(raw: string): number | null {
+  const s = raw.trim().replace(/\s/g, "");
+  if (!/^\d+([.,]\d{1,6})?$/.test(s)) return null;
+  const n = Number(s.replace(",", "."));
+  return n > 0 ? n : null;
+}
+
+/** 39.5 → "39,50"; los menores a 10 con 4 decimales (0,0253). */
+export function formatRate(rate: number): string {
+  return rate.toFixed(rate >= 10 ? 2 : 4).replace(".", ",");
+}
+
+/** "1 US$ = $ 39,50" (o null si no hay tipo de cambio). */
+export function rateLabel(fromCur: string, fromCents: number, toCur: string, toCents: number): string | null {
+  const r = exchangeRate(fromCur, fromCents, toCur, toCents);
+  if (r === null) return null;
+  const [base, quote] = rateBase(fromCur, toCur) === "from" ? [fromCur, toCur] : [toCur, fromCur];
+  const sym = (c: string) => (c === "UYU" ? "$" : c === "USD" ? "US$" : c);
+  return `1 ${sym(base)} = ${sym(quote)} ${formatRate(r)}`;
+}
+
 export function centsToInput(cents: number | null | undefined): string {
   if (!cents) return "";
   const abs = Math.abs(cents);

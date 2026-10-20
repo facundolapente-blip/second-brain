@@ -11,6 +11,7 @@ import {
   effects,
   isSelected,
   passCategory,
+  rateLabel,
   PASS_CATEGORY_ID,
   sortedCurrencies,
   type AccountDTO,
@@ -236,9 +237,14 @@ export function TxRow({
   if (isTransfer) {
     const from = lk.account(tx.accountId)?.name ?? "?";
     const to = lk.account(tx.toAccountId)?.name ?? "?";
+    // Entre monedas, el tipo de cambio queda a la vista ("1 US$ = $ 39,50").
+    const rateText = rateLabel(lk.currencyOf(tx.accountId), tx.amountCents, tx.toAccountId ? lk.currencyOf(tx.toAccountId) : "", tx.toAmountCents ?? 0);
     // Sin nota, el título dice el recorrido; con nota, el recorrido baja al subtítulo.
     title = tx.title ?? `Desde ${from} a ${to}`;
-    subtitle = tx.title ? (
+    subtitle = rateText ? (
+      // Entre monedas: el tipo de cambio primero y, con título, las cuentas a continuación.
+      tx.title ? `${rateText} · ${from} → ${to}` : rateText
+    ) : tx.title ? (
       <span className="flex min-w-0 items-center gap-1">
         <span className="shrink-0">Transferencia,</span>
         <Route from={from} to={to} />

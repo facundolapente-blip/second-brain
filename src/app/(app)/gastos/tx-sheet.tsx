@@ -8,15 +8,19 @@ import Link from "next/link";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ArrowsDownUp, Check, Camera, X, CopySimple, NotePencil } from "@phosphor-icons/react";
 import { addDays, todayISO } from "@/lib/dates";
-import { currencySymbol, money } from "@/lib/format";
+import { currencySymbol } from "@/lib/format";
 import { deleteInstallments, deleteTransaction, saveTransaction, suggestCategory, duplicateTransaction } from "@/lib/offline/finance";
 import { splitInstallments } from "@/lib/card-logic";
 import { moneyCents } from "@/lib/format";
 import {
+  amountFromRate,
   centsToInput,
   cleanAmountInput,
+  exchangeRate,
+  formatRate,
   isAmountExpr,
   parseAmount,
+  parseRate,
   type AccountDTO,
   type CategoryDTO,
   type Selection,
@@ -48,6 +52,13 @@ type Draft = {
   /** Compra en cuotas (al cargar con tarjeta) y, al editar, de qué compra es. */
   installments?: string;
   installment?: TxDTO["installment"];
+  /**
+   * Transferencia entre monedas: el tipo de cambio escrito a mano. Con `rateMode`,
+   * lo que llega se calcula de ahí (y se recalcula si cambia el monto); si se escribe
+   * lo que llega, el tipo de cambio pasa a calcularse solo.
+   */
+  rate?: string;
+  rateMode?: boolean;
 };
 
 export type TxSheetHandle = {
@@ -252,7 +263,35 @@ export const TxSheet = forwardRef<
     fromTemplate: (t) => open(applyTemplate(blank(), t)),
   }));
 
-  const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
+  const set = (patch: Partial<Draft>) => setD((prev) => withRate(keepRate(prev, { ...prev, ...patch }, patch), patch));
+
+  /**
+   * Al cambiar de cuenta con los montos puestos, el tipo de cambio que había se mantiene
+   * (es pesos por dólar, vaya para donde vaya) y lo que llega se recalcula; si no, quedaba
+   * el monto viejo y el tipo de cambio daba cualquier cosa.
+   */
+  function keepRate(prev: Draft, next: Draft, patch: Partial<Draft>): Draft {
+    if (next.rateMode || patch.toAmount !== undefined || !("accountId" in patch || "toAccountId" in patch)) return next;
+    const cur = (id: string) => accounts.find((a) => a.id === id)?.currency;
+    const r = exchangeRate(cur(prev.accountId) ?? "", parseAmount(prev.amount) ?? 0, cur(prev.toAccountId) ?? "", parseAmount(prev.toAmount) ?? 0);
+    return r ? { ...next, rate: formatRate(r), rateMode: true } : next;
+  }
+
+  /**
+   * Con el tipo de cambio escrito a mano, lo que llega sale de ahí: se recalcula si
+   * cambia el monto, las cuentas o el tipo de cambio (no si se escribe lo que llega).
+   */
+  function withRate(next: Draft, patch: Partial<Draft>): Draft {
+    if (!next.rateMode || next.kind !== "transfer" || patch.toAmount !== undefined) return next;
+    if (!("amount" in patch || "accountId" in patch || "toAccountId" in patch || "rate" in patch || "rateMode" in patch)) return next;
+    const f = accounts.find((a) => a.id === next.accountId);
+    const t = accounts.find((a) => a.id === next.toAccountId);
+    const r = parseRate(next.rate ?? "");
+    const a = parseAmount(next.amount);
+    if (!f || !t || f.currency === t.currency || !r || !a) return next;
+    const cents = amountFromRate(f.currency, a, t.currency, r);
+    return cents ? { ...next, toAmount: centsToInput(cents) } : next;
+  }
 
   function onTitle(title: string) {
     set({ title });
@@ -281,15 +320,13 @@ export const TxSheet = forwardRef<
   // Las cuentas archivadas solo aparecen si el movimiento que se edita ya las usa.
   const pickable = (selected: string) => accounts.filter((a) => !a.archived || a.id === selected);
 
-  const rate = (() => {
-    if (!crossCurrency) return null;
-    const a = parseAmount(d.amount);
-    const b = parseAmount(d.toAmount);
-    if (!a || !b) return null;
-    // Cotización expresada como "1 moneda fuerte = X pesos".
-    const [hi, lo, hiCur, loCur] = a > b ? [a, b, from!.currency, to!.currency] : [b, a, to!.currency, from!.currency];
-    return `1 ${currencySymbol(loCur)} = ${money(hi / lo, hiCur)}`;
-  })();
+  // Tipo de cambio: el escrito a mano o el que dan los dos montos (siempre pesos por dólar).
+  const computedRate =
+    crossCurrency && from && to ? exchangeRate(from.currency, parseAmount(d.amount) ?? 0, to.currency, parseAmount(d.toAmount) ?? 0) : null;
+  const rateValue = d.rateMode ? (d.rate ?? "") : computedRate ? formatRate(computedRate) : "";
+  // La moneda que no es pesos: el tipo de cambio es "pesos por 1 de esa".
+  const rateBaseCur = from && to ? (from.currency === "UYU" ? to.currency : from.currency) : "USD";
+  const rateQuoteCur = from && to ? (from.currency === "UYU" ? from.currency : to.currency) : "UYU";
 
   /** Lo mismo que revisa el servidor, para no cerrar la hoja con algo que va a rechazar. */
   function validate(): string | null {
@@ -549,23 +586,51 @@ export const TxSheet = forwardRef<
               onChange={(id) => set({ toAccountId: id })}
             />
             {crossCurrency && (
-              <label className="grid gap-1.5">
-                <span className="kicker">Llega a {to?.name}</span>
-                <span className="flex h-12 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
-                  <span className="text-muted">{currencySymbol(to?.currency ?? "")}</span>
-                  <input
-                    name="toAmount"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    style={{ outline: "none" }}
-                    value={d.toAmount}
-                    onChange={(e) => set({ toAmount: cleanAmountInput(e.target.value) })}
-                    placeholder="0"
-                    className="figure h-full w-0 min-w-0 flex-1 bg-transparent text-[24px] outline-none placeholder:text-faint"
-                  />
+              // Dos maneras: lo que llegó (y el tipo de cambio sale solo) o el tipo de cambio
+              // que cobró el banco (y lo que llega se calcula).
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <label className="grid gap-1.5">
+                  <span className="kicker">Llega a {to?.name}</span>
+                  <span className="flex h-12 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+                    <span className="text-muted">{currencySymbol(to?.currency ?? "")}</span>
+                    <input
+                      name="toAmount"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      style={{ outline: "none" }}
+                      value={d.toAmount}
+                      onChange={(e) => set({ toAmount: cleanAmountInput(e.target.value), rateMode: false })}
+                      placeholder="0"
+                      className="figure h-full w-0 min-w-0 flex-1 bg-transparent text-[24px] outline-none placeholder:text-faint"
+                    />
+                  </span>
+                </label>
+                <label className="grid gap-1.5">
+                  <span className="kicker">Tipo de cambio</span>
+                  <span className="flex h-12 items-center gap-2 rounded-[4px] border border-line-strong bg-surface px-3 focus-within:border-fg/40 focus-within:ring-2 focus-within:ring-[var(--focus)]">
+                    <span className="shrink-0 text-[13px] text-muted">
+                      1 {currencySymbol(rateBaseCur)} = {currencySymbol(rateQuoteCur)}
+                    </span>
+                    <input
+                      inputMode="decimal"
+                      autoComplete="off"
+                      aria-label={`Tipo de cambio: ${currencySymbol(rateQuoteCur)} por 1 ${currencySymbol(rateBaseCur)}`}
+                      style={{ outline: "none" }}
+                      value={rateValue}
+                      onChange={(e) => set({ rate: e.target.value.replace(/[^\d.,]/g, "").slice(0, 12), rateMode: true })}
+                      placeholder="39,50"
+                      className="figure h-full w-0 min-w-0 flex-1 bg-transparent text-[20px] outline-none placeholder:text-faint"
+                    />
+                  </span>
+                </label>
+                <span className="text-xs text-muted sm:col-span-2">
+                  {d.rateMode
+                    ? "Lo que llega sale del tipo de cambio que escribiste."
+                    : computedRate
+                      ? "El tipo de cambio sale de los dos montos. También podés escribir el que te cobró el banco y lo que llega se calcula solo."
+                      : "Escribí lo que llegó o el tipo de cambio que te cobró el banco: el otro se calcula solo."}
                 </span>
-                <span className="text-xs text-muted">{rate ? `Cotización ${rate}` : "Monto en la moneda de destino."}</span>
-              </label>
+              </div>
             )}
             <Field label="Título">
               <Input
