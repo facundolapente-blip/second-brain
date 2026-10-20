@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import {
   ArrowSquareOut,
+  Check,
   CheckCircle,
   CircleNotch,
   FolderSimple,
@@ -12,6 +13,7 @@ import {
   NotePencil,
   Plus,
   PushPin,
+  Tag,
   Trash,
   X,
 } from "@phosphor-icons/react";
@@ -29,13 +31,26 @@ import { plainClick } from "@/components/tab-nav";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { tone } from "@/lib/palette";
 import { newClientId } from "@/lib/plan-logic";
-import { NOTE_SECTIONS, noteFromForm, noteHeading, sectionOf, youtubeId, youtubeThumb, type NoteDTO, type NoteSectionId } from "@/lib/notes-logic";
-import { deleteNote, moveNoteSection, saveNote, setNoteDone, setNotePinned } from "@/lib/offline/notes";
+import {
+  NO_CATEGORY,
+  NOTE_CATEGORY_MAX,
+  NOTE_SECTIONS,
+  normalizeCategory,
+  noteFromForm,
+  noteHeading,
+  sectionOf,
+  youtubeId,
+  youtubeThumb,
+  type NoteDTO,
+  type NoteSectionId,
+} from "@/lib/notes-logic";
+import { deleteNote, moveNoteSection, saveNote, setNoteCategory, setNoteDone, setNotePinned } from "@/lib/offline/notes";
 import { usePendingActions, type QueuedOp } from "@/lib/offline/queue";
 import { doneLabel, NoteCard } from "./note-card";
-import { NoteSheet, type NoteSheetActions, type NoteSheetHandle } from "./note-sheet";
+import { NoteSheet, type NoteCategory, type NoteSheetActions, type NoteSheetHandle } from "./note-sheet";
 
-type Filters = { section: NoteSectionId | null; q: string; tag: string; later: boolean; limit: number };
+/** `category`: una categoría de la sección, `NO_CATEGORY` (las que no tienen) o "" (todas). */
+type Filters = { section: NoteSectionId | null; q: string; tag: string; category: string; later: boolean; limit: number };
 type Counts = { all: number; bySection: Record<string, number>; laterVideos: number };
 type Change = { add: NoteDTO } | { remove: string } | (Partial<NoteDTO> & { id: string });
 
@@ -47,6 +62,7 @@ function hrefOf(f: Partial<Filters>, extra?: Record<string, string>) {
   if (f.section === "videos" && f.later) p.set("ver", "despues");
   if (f.q) p.set("q", f.q);
   if (f.tag) p.set("etiqueta", f.tag);
+  if (f.section && f.category) p.set("categoria", f.category);
   for (const [k, v] of Object.entries(extra ?? {})) p.set(k, v);
   const s = p.toString();
   return s ? `/notas?${s}` : "/notas";
@@ -89,6 +105,8 @@ export function NotesView({
   hasMore,
   counts,
   tags,
+  categories,
+  uncategorized,
   filters,
   today,
   openNew,
@@ -97,6 +115,8 @@ export function NotesView({
   hasMore: boolean;
   counts: Counts;
   tags: string[];
+  categories: NoteCategory[];
+  uncategorized: number;
   filters: Filters;
   today: string;
   openNew: boolean;
@@ -105,6 +125,8 @@ export function NotesView({
   const sheet = useRef<NoteSheetHandle>(null);
   const moveSheet = useRef<SheetHandle>(null);
   const [moving, setMoving] = useState<NoteDTO | null>(null);
+  const categorySheet = useRef<SheetHandle>(null);
+  const [categorizing, setCategorizing] = useState<NoteDTO | null>(null);
   const [list, apply] = useOptimistic(notes, applyChange);
   const [, start] = useSafeTransition();
 
@@ -112,20 +134,26 @@ export function NotesView({
   const pending = useMemo(() => pendingNotes(pendingOps), [pendingOps]);
   const pendingIds = new Set(pending.map((n) => n.id));
   const visible = [...pending.filter((p) => !list.some((n) => n.id === p.id)), ...list]
-    .filter((n) => (!filters.section || sectionOf(n.section).id === filters.section) && (!filters.later || !n.done))
+    .filter(
+      (n) =>
+        (!filters.section || sectionOf(n.section).id === filters.section) &&
+        (!filters.later || !n.done) &&
+        (!filters.category || (filters.category === NO_CATEGORY ? !n.category : n.category === filters.category)),
+    )
     .sort(byPinned);
   const fresh = useNewIds(visible.map((n) => n.id));
 
-  const newNote = () => sheet.current?.open(undefined, { section: filters.section });
+  const presetCategory = filters.category && filters.category !== NO_CATEGORY ? filters.category : null;
+  const newNote = () => sheet.current?.open(undefined, { section: filters.section, category: presetCategory });
   useOnNew(newNote);
   // Atajo del ícono de la app (/notas?nuevo=1): abre la hoja y saca el parámetro.
   const opened = useRef(false);
   useEffect(() => {
     if (!openNew || opened.current) return;
     opened.current = true;
-    sheet.current?.open(undefined, { section: filters.section });
+    sheet.current?.open(undefined, { section: filters.section, category: presetCategory });
     router.replace(hrefOf(filters), { scroll: false });
-  }, [openNew, filters, router]);
+  }, [openNew, filters, router, presetCategory]);
 
   const sheetActions: NoteSheetActions = {
     save(fd, note, files) {
@@ -215,6 +243,28 @@ export function NotesView({
     notifyInfo(`Movida a ${sectionOf(section).name}`);
   }
 
+  function openCategory(n: NoteDTO) {
+    setCategorizing(n);
+    categorySheet.current?.open();
+  }
+  function categorize(n: NoteDTO, raw: string | null) {
+    const category = normalizeCategory(raw);
+    if (category === n.category) return;
+    haptic("select");
+    const run = () =>
+      start(async () => {
+        apply({ id: n.id, category });
+        await setNoteCategory(n.id, category);
+        // Una categoría nueva aparece en los filtros y en la hoja.
+        if (category && !categories.some((c) => c.section === n.section && c.name === category)) router.refresh();
+      });
+    // Si la lista está filtrada por otra categoría, la nota se va con una salida corta.
+    const stays = !filters.category || (filters.category === NO_CATEGORY ? !category : filters.category === category);
+    if (stays) run();
+    else leaveThen(`[data-note="${n.id}"]`, run);
+    notifyInfo(category ? `En ${category}` : "Sin categoría");
+  }
+
   function contextMenu(e: React.MouseEvent, n: NoteDTO) {
     showContextMenu(
       e,
@@ -227,6 +277,7 @@ export function NotesView({
           icon: <CheckCircle size={15} />,
           onSelect: () => toggleDone(n),
         },
+        { label: n.category ? `Categoría: ${n.category}…` : "Ponerle categoría…", icon: <Tag size={15} />, onSelect: () => openCategory(n) },
         {
           label: "Mover a…",
           icon: <FolderSimple size={15} />,
@@ -258,6 +309,14 @@ export function NotesView({
       <main className="mx-auto grid max-w-3xl min-w-0 gap-4 px-4 pt-1 pb-10 lg:max-w-6xl lg:gap-5 lg:px-10 lg:pt-4">
         <SearchBox filters={filters} />
         <SectionPills filters={filters} counts={counts} />
+        {section && (
+          <CategoryPills
+            filters={filters}
+            categories={categories.filter((c) => c.section === section.id)}
+            uncategorized={uncategorized}
+            total={counts.bySection[section.id] ?? 0}
+          />
+        )}
 
         {(filters.section === "videos" || filters.tag) && (
           <div className="flex flex-wrap items-center gap-2">
@@ -305,6 +364,7 @@ export function NotesView({
                       onOpen: () => sheet.current?.open(n),
                       onToggleDone: () => toggleDone(n),
                       onTag: (t) => router.push(hrefOf({ ...filters, tag: t }), { scroll: false }),
+                      onCategory: () => openCategory(n),
                       onContextMenu: (e) => contextMenu(e, n),
                     }}
                   />
@@ -325,7 +385,21 @@ export function NotesView({
         )}
       </main>
 
-      <NoteSheet ref={sheet} actions={sheetActions} tags={tags} />
+      <NoteSheet ref={sheet} actions={sheetActions} tags={tags} categories={categories} />
+
+      <Sheet ref={categorySheet} title="Categoría">
+        {categorizing && (
+          <CategoryPicker
+            key={categorizing.id}
+            note={categorizing}
+            options={categories.filter((c) => c.section === sectionOf(categorizing.section).id)}
+            onPick={(c) => {
+              categorySheet.current?.close();
+              categorize(categorizing, c);
+            }}
+          />
+        )}
+      </Sheet>
 
       <Sheet ref={moveSheet} title="Mover a">
         {moving && (
@@ -482,6 +556,136 @@ function SectionPills({ filters, counts }: { filters: Filters; counts: Counts })
         })}
       </ul>
     </nav>
+  );
+}
+
+/**
+ * Categorías propias de la sección abierta ("Todas", cada una con su conteo y "Sin categoría").
+ * Solo aparece si la sección ya tiene alguna categoría.
+ */
+function CategoryPills({
+  filters,
+  categories,
+  uncategorized,
+  total,
+}: {
+  filters: Filters;
+  categories: NoteCategory[];
+  uncategorized: number;
+  total: number;
+}) {
+  const [clicked, setClicked] = useState<string | null>(null);
+  const [from, setFrom] = useState(filters.category);
+  if (from !== filters.category) {
+    setFrom(filters.category);
+    setClicked(null);
+  }
+  if (!categories.length && filters.category !== NO_CATEGORY) return null;
+  const shown = clicked ?? filters.category;
+  const items = [
+    { id: "", name: "Todas", count: total },
+    ...categories.map((c) => ({ id: c.name, name: c.name, count: c.count })),
+    ...(uncategorized ? [{ id: NO_CATEGORY, name: "Sin categoría", count: uncategorized }] : []),
+  ];
+  return (
+    <nav aria-label="Categorías" className="relative -mx-4 -mt-1 min-w-0 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+      <ul className="flex w-max gap-1.5 pb-1 lg:w-auto lg:flex-wrap">
+        {items.map((c) => {
+          const on = shown === c.id;
+          return (
+            <li key={c.id || "todas"}>
+              <Link
+                href={hrefOf({ ...filters, category: c.id })}
+                scroll={false}
+                aria-current={on ? "page" : undefined}
+                onClick={(e) => {
+                  if (plainClick(e)) {
+                    haptic("select");
+                    setClicked(c.id);
+                  }
+                }}
+                className={cx(
+                  "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] whitespace-nowrap transition-colors duration-[var(--dur-quick)]",
+                  on ? "bg-accent font-medium text-on-accent" : c.id === NO_CATEGORY ? "text-muted hover:bg-surface-2 hover:text-fg" : "bg-accent-soft text-accent-fg hover:bg-[color-mix(in_oklab,var(--accent-soft),var(--accent)_14%)]",
+                )}
+              >
+                {c.id && c.id !== NO_CATEGORY && <FolderSimple size={13} weight={on ? "fill" : "regular"} aria-hidden />}
+                {c.name}
+                <span className={cx("font-mono text-[11px] tabular", on ? "opacity-80" : "opacity-70")}>{c.count}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+/** Elegir la categoría de una nota: las de su sección, "Sin categoría" o una nueva. */
+function CategoryPicker({ note, options, onPick }: { note: NoteDTO; options: NoteCategory[]; onPick: (category: string | null) => void }) {
+  const [text, setText] = useState("");
+  const typed = normalizeCategory(text);
+  const exists = typed ? options.find((o) => o.name.toLowerCase() === typed.toLowerCase()) : undefined;
+  const section = sectionOf(note.section);
+  return (
+    <div className="grid gap-4">
+      <p className="truncate text-[13.5px] text-muted">{noteHeading(note)}</p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (typed) onPick(exists?.name ?? typed);
+        }}
+        className="flex gap-2"
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={NOTE_CATEGORY_MAX}
+          lang="es"
+          spellCheck
+          autoComplete="off"
+          enterKeyHint="done"
+          aria-label="Nueva categoría"
+          placeholder={options.length ? "Nueva categoría" : section.id === "videos" ? "IA, Música, Desarrollo personal…" : "Nombre de la categoría"}
+          className={cx(inputClass, "min-w-0 flex-1")}
+        />
+        <Button type="submit" variant="accent" disabled={!typed}>
+          {exists ? "Elegir" : "Crear"}
+        </Button>
+      </form>
+      {(options.length > 0 || note.category) && (
+        <div className="grid gap-1">
+          {options
+            .filter((o) => !typed || o.name.toLowerCase().includes(typed.toLowerCase()))
+            .map((o) => {
+              const current = note.category === o.name;
+              return (
+                <button
+                  key={o.name}
+                  type="button"
+                  onClick={() => onPick(o.name)}
+                  aria-pressed={current}
+                  className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px]"
+                >
+                  <span className={cx("inline-flex size-8 items-center justify-center rounded-lg", current ? "bg-accent text-on-accent" : "bg-accent-soft text-accent-fg")}>
+                    {current ? <Check size={16} weight="bold" aria-hidden /> : <FolderSimple size={16} weight="fill" aria-hidden />}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                  <span className="font-mono text-[12px] text-muted tabular">{o.count}</span>
+                </button>
+              );
+            })}
+          {note.category && (
+            <button type="button" onClick={() => onPick(null)} className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted">
+              <span className="inline-flex size-8 items-center justify-center rounded-lg border border-dashed border-line-strong">
+                <X size={15} aria-hidden />
+              </span>
+              Sacar la categoría
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

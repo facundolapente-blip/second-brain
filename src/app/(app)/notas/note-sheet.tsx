@@ -21,30 +21,40 @@ import {
   sectionOf,
   SUGGESTED_TAGS,
   suggestNoteTags,
+  NOTE_CATEGORY_MAX,
+  normalizeCategory,
   type NoteDTO,
   type NoteSectionId,
 } from "@/lib/notes-logic";
 import { doneLabel } from "./note-card";
 
-export type NoteSheetHandle = { open: (note?: NoteDTO, preset?: { section?: NoteSectionId | null }) => void };
+export type NoteSheetHandle = { open: (note?: NoteDTO, preset?: { section?: NoteSectionId | null; category?: string | null }) => void };
 
 /** Lo que hace la pantalla con la hoja, al instante (si el servidor falla, vuelve sola y avisa). */
+/** Una categoría propia de una sección, con cuántas notas la usan. */
+export type NoteCategory = { section: string; name: string; count: number };
+
 export type NoteSheetActions = {
   save: (fd: FormData, note: NoteDTO | undefined, files: File[]) => void;
   remove: (note: NoteDTO) => void;
 };
 
 /** Hoja para crear o editar una nota. Cerrarla (afuera, X, Escape, arrastrar) guarda lo cambiado. */
-export const NoteSheet = forwardRef<NoteSheetHandle, { actions: NoteSheetActions; tags: string[] }>(function NoteSheet({ actions, tags }, ref) {
+export const NoteSheet = forwardRef<NoteSheetHandle, { actions: NoteSheetActions; tags: string[]; categories: NoteCategory[] }>(function NoteSheet(
+  { actions, tags, categories },
+  ref,
+) {
   const sheet = useRef<SheetHandle>(null);
   const [note, setNote] = useState<NoteDTO | undefined>();
   const [preset, setPreset] = useState<NoteSectionId | null>(null);
+  const [presetCategory, setPresetCategory] = useState<string | null>(null);
   const [key, setKey] = useState(0);
   const dismiss = useRef<(() => void) | null>(null);
   useImperativeHandle(ref, () => ({
     open(n, p) {
       setNote(n);
       setPreset(p?.section ?? null);
+      setPresetCategory(p?.category ?? null);
       setKey((k) => k + 1);
       sheet.current?.open();
     },
@@ -55,7 +65,9 @@ export const NoteSheet = forwardRef<NoteSheetHandle, { actions: NoteSheetActions
         key={key}
         note={note}
         preset={preset}
+        presetCategory={presetCategory}
         knownTags={tags}
+        categories={categories}
         actions={actions}
         registerDismiss={(fn) => {
           dismiss.current = fn;
@@ -69,14 +81,18 @@ export const NoteSheet = forwardRef<NoteSheetHandle, { actions: NoteSheetActions
 function NoteForm({
   note,
   preset,
+  presetCategory,
   knownTags,
+  categories,
   actions,
   registerDismiss,
   onDone,
 }: {
   note?: NoteDTO;
   preset: NoteSectionId | null;
+  presetCategory: string | null;
   knownTags: string[];
+  categories: NoteCategory[];
   actions: NoteSheetActions;
   registerDismiss: (fn: () => void) => void;
   onDone: () => void;
@@ -93,6 +109,7 @@ function NoteForm({
   const [url, setUrl] = useState(note?.url ?? "");
   // Sección elegida a mano (al editar, la que tiene); si no, la sugiere el contenido.
   const [picked, setPicked] = useState<NoteSectionId | null>(note ? sectionOf(note.section).id : preset);
+  const [category, setCategory] = useState(note?.category ?? presetCategory ?? "");
   const [tagsText, setTagsText] = useState(note ? note.tags.join(", ") : "");
   const [tagsTouched, setTagsTouched] = useState(!!note);
   const [photoCount, setPhotoCount] = useState(note?.photos.length ?? 0);
@@ -107,6 +124,9 @@ function NoteForm({
   const tagList = normalizeTags(tagsValue);
   const detected = !url.trim() ? detectUrl(body) : null;
   const urlInvalid = url.trim() !== "" && !normalizeNoteUrl(url);
+  // Las categorías son de cada sección: se ofrecen las que ya se usan ahí.
+  const sectionCategories = categories.filter((c) => c.section === section).map((c) => c.name);
+  const categoryValue = normalizeCategory(category);
   const offer = [...new Set([...SUGGESTED_TAGS, ...knownTags])].slice(0, 10);
 
   function toggleTag(t: string) {
@@ -229,6 +249,43 @@ function NoteForm({
             );
           })}
         </div>
+      </div>
+
+      <div className="grid gap-2">
+        <Field label="Categoría (opcional)" hint={sectionCategories.length ? "Elegí una o escribí otra." : `Una categoría propia para ordenar ${sectionOf(section).name}.`}>
+          <Input
+            name="category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            maxLength={NOTE_CATEGORY_MAX}
+            placeholder={section === "videos" ? "IA, Música, Desarrollo personal…" : "Una categoría"}
+            autoComplete="off"
+          />
+        </Field>
+        {sectionCategories.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {sectionCategories.slice(0, 14).map((c) => {
+              const on = categoryValue === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    haptic("select");
+                    setCategory(on ? "" : c);
+                  }}
+                  className={cx(
+                    "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] transition-colors duration-[var(--dur-quick)]",
+                    on ? "bg-ink text-on-ink" : "bg-surface-2 text-muted hover:text-fg",
+                  )}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {section === "compras" && (

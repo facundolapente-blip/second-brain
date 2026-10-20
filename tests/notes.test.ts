@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeCategory,
   titleFromUrl,
   bodyWithoutUrl,
   classifyNote,
@@ -258,5 +259,20 @@ describe("titleFromUrl (link sin título)", () => {
     expect(titleFromUrl("https://www.facebook.com/marketplace/item/1046146951132785/")).toBe("Marketplace");
     expect(titleFromUrl("https://example.com/1234567")).toBeNull();
     expect(titleFromUrl("https://claude.ai/public/artifacts/53725aa9-66f2-4497-bbe1-ca86fbf75b9a")).toBe("Artifacts");
+  });
+});
+
+describe("normalizeCategory (categoría propia)", () => {
+  it("limpia espacios y pone mayúscula al principio", () => {
+    expect(normalizeCategory("  desarrollo   personal ")).toBe("Desarrollo personal");
+    expect(normalizeCategory("IA")).toBe("IA");
+  });
+  it("vacía o \"sin\" = sin categoría", () => {
+    expect(normalizeCategory("   ")).toBeNull();
+    expect(normalizeCategory(null)).toBeNull();
+    expect(normalizeCategory("Sin")).toBeNull();
+  });
+  it("corta en 40 caracteres", () => {
+    expect(normalizeCategory("a".repeat(60))?.length).toBe(40);
   });
 });

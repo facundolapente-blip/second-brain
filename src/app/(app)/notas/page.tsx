@@ -1,5 +1,5 @@
-import { getNoteCounts, getNotes, getNoteTags } from "@/lib/notes";
-import { isNoteSection } from "@/lib/notes-logic";
+import { countUncategorized, getNoteCategories, getNoteCounts, getNotes, getNoteTags } from "@/lib/notes";
+import { isNoteSection, normalizeCategory, NO_CATEGORY } from "@/lib/notes-logic";
 import { todayISO } from "@/lib/dates";
 import { NotesView } from "./notes-view";
 
@@ -15,7 +15,7 @@ function one(v: string | string[] | undefined): string {
 
 /**
  * Notas: videos, links, ideas y lo demás que antes iba al chat de WhatsApp con
- * uno mismo. Filtros en la dirección: ?seccion=, ?q=, ?etiqueta=, ?ver=despues
+ * uno mismo. Filtros en la dirección: ?seccion=, ?categoria= (o "sin"), ?q=, ?etiqueta=, ?ver=despues
  * (videos sin ver) y ?n= (cuántas se ven).
  */
 export default async function NotasPage({ searchParams }: PageProps<"/notas">) {
@@ -25,12 +25,17 @@ export default async function NotasPage({ searchParams }: PageProps<"/notas">) {
   const q = one(sp.q).slice(0, 100);
   const tag = one(sp.etiqueta).slice(0, 40).toLowerCase();
   const later = section === "videos" && one(sp.ver) === "despues";
+  // La categoría es de una sección: sin sección no se filtra por categoría.
+  const rawCategory = one(sp.categoria);
+  const category = !section || !rawCategory ? "" : rawCategory.toLowerCase() === NO_CATEGORY ? NO_CATEGORY : (normalizeCategory(rawCategory) ?? "");
   const limit = Math.min(2000, Math.max(PAGE, Number(one(sp.n)) || PAGE));
 
-  const [{ notes, nextCursor }, counts, tags] = await Promise.all([
-    getNotes({ section, q, tag: tag || null, done: later ? false : null, limit }),
+  const [{ notes, nextCursor }, counts, tags, categories, uncategorized] = await Promise.all([
+    getNotes({ section, q, tag: tag || null, category: category || null, done: later ? false : null, limit }),
     getNoteCounts(),
     getNoteTags(),
+    getNoteCategories(),
+    section ? countUncategorized(section) : 0,
   ]);
 
   return (
@@ -39,7 +44,9 @@ export default async function NotasPage({ searchParams }: PageProps<"/notas">) {
       hasMore={!!nextCursor}
       counts={counts}
       tags={tags}
-      filters={{ section, q, tag, later, limit }}
+      categories={categories}
+      uncategorized={uncategorized}
+      filters={{ section, q, tag, category, later, limit }}
       today={todayISO()}
       openNew={one(sp.nuevo) === "1"}
     />

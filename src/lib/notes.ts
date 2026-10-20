@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { NOTE_SECTIONS, isNoteSection, youtubeId, youtubeThumb, type NoteDTO } from "./notes-logic";
+import { NOTE_SECTIONS, NO_CATEGORY, isNoteSection, youtubeId, youtubeThumb, type NoteDTO } from "./notes-logic";
 import { toPhotoDTO } from "./photos";
 
 /**
@@ -22,6 +22,7 @@ const SELECT = {
   urlKind: true,
   thumbnail: true,
   price: true,
+  category: true,
   tags: true,
   pinned: true,
   done: true,
@@ -43,6 +44,8 @@ export type NoteFilters = {
   section?: string | null;
   q?: string | null;
   tag?: string | null;
+  /** Una categoría, o `NO_CATEGORY` para las que no tienen. */
+  category?: string | null;
   /** false = solo lo que falta ver (filtro "Ver después" de Videos). */
   done?: boolean | null;
   limit?: number;
@@ -50,10 +53,11 @@ export type NoteFilters = {
   cursor?: string | null;
 };
 
-export async function getNotes({ section, q, tag, done, limit = 60, cursor }: NoteFilters = {}) {
+export async function getNotes({ section, q, tag, category, done, limit = 60, cursor }: NoteFilters = {}) {
   const and: Prisma.NoteWhereInput[] = [];
   if (section && isNoteSection(section)) and.push({ section });
   if (tag) and.push({ tags: { has: tag } });
+  if (category) and.push({ category: category === NO_CATEGORY ? null : category });
   if (typeof done === "boolean") and.push({ done });
   const where: Prisma.NoteWhereInput = and.length ? { AND: and } : {};
   const take = Math.min(500, Math.max(1, limit));
@@ -64,7 +68,7 @@ export async function getNotes({ section, q, tag, done, limit = 60, cursor }: No
     // (es una sola persona: unas miles de notas como mucho).
     const rows = await prisma.note.findMany({ where, select: SELECT, orderBy: ORDER });
     const hits = rows.filter((r) =>
-      [r.title ?? "", r.body, r.url ?? "", r.price ?? "", ...r.tags].some((s) => fold(s).includes(needle)),
+      [r.title ?? "", r.body, r.url ?? "", r.price ?? "", r.category ?? "", ...r.tags].some((s) => fold(s).includes(needle)),
     );
     const start = cursor ? hits.findIndex((r) => r.id === cursor) + 1 : 0;
     const page = hits.slice(start, start + take);
@@ -97,6 +101,22 @@ export async function getNoteCounts() {
     bySection[id] = (bySection[id] ?? 0) + g._count._all;
   }
   return { all, bySection, laterVideos };
+}
+
+/**
+ * Categorías propias por sección, con cuántas notas tiene cada una (de la más usada a la
+ * menos) y cuántas no tienen categoría. Las usan los filtros y la hoja.
+ */
+export async function getNoteCategories(): Promise<{ section: string; name: string; count: number }[]> {
+  const rows = await prisma.note.groupBy({ by: ["section", "category"], where: { category: { not: null } }, _count: { _all: true } });
+  return rows
+    .map((r) => ({ section: isNoteSection(r.section) ? r.section : "links", name: r.category!, count: r._count._all }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "es"));
+}
+
+/** Cuántas notas de una sección no tienen categoría. */
+export async function countUncategorized(section: string): Promise<number> {
+  return prisma.note.count({ where: { section, category: null } });
 }
 
 /** Etiquetas usadas, de la más usada a la menos (para sugerir en la hoja). */

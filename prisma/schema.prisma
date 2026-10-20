@@ -739,6 +739,8 @@ model Note {
   thumbnail  String?
   /// Precio en texto libre (sección Para comprar): "260 con envío", "95 usd c/u".
   price      String?
+  /// Categoría propia que pone Facu (p. ej. en Videos: "IA", "Música", "Desarrollo personal"); null = sin categoría.
+  category   String?
   tags       String[] @default([])
   pinned     Boolean  @default(false)
   /// "Ver después": visto o hecho.
@@ -754,4 +756,5 @@ model Note {
   @@unique([source, externalId])
   @@index([section, createdAt])
   @@index([createdAt])
+  @@index([section, category])
 }

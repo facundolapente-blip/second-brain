@@ -349,6 +349,8 @@ export type NoteDTO = {
   urlKind: string | null;
   thumbnail: string | null;
   price: string | null;
+  /** Categoría propia (null = sin categoría). */
+  category: string | null;
   tags: string[];
   pinned: boolean;
   done: boolean;
@@ -359,6 +361,19 @@ export type NoteDTO = {
 };
 
 export const NOTE_TITLE_MAX = 200;
+export const NOTE_CATEGORY_MAX = 40;
+/** En la dirección, `?categoria=sin` filtra las que no tienen categoría. */
+export const NO_CATEGORY = "sin";
+
+/**
+ * Categoría escrita a mano: sin espacios de más, hasta 40 caracteres y con la primera
+ * letra en mayúscula ("ia" → "Ia"; "desarrollo personal" → "Desarrollo personal"). Vacía = null.
+ */
+export function normalizeCategory(raw: string | null | undefined): string | null {
+  const t = String(raw ?? "").replace(/\s+/g, " ").trim().slice(0, NOTE_CATEGORY_MAX).trim();
+  if (!t || t.toLowerCase() === NO_CATEGORY) return null;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 export const NOTE_BODY_MAX = 20000;
 export const NOTE_PRICE_MAX = 80;
 
@@ -372,6 +387,7 @@ export type NoteInput = {
   url: string | null;
   urlKind: UrlKind | null;
   price: string | null;
+  category: string | null;
   tags: string[];
 };
 
@@ -400,6 +416,7 @@ export function noteFromForm(fd: FormLike): { ok: true; note: NoteInput } | { ok
       url,
       urlKind: urlKindOf(url),
       price: field(fd, "price", NOTE_PRICE_MAX) || null,
+      category: normalizeCategory(String(fd.get("category") ?? "")),
       tags: normalizeTags(String(fd.get("tags") ?? "")),
     },
   };

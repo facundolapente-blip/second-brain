@@ -5,10 +5,12 @@ import {
   ArrowSquareOut,
   Check,
   CheckCircle,
+  FolderSimple,
   Globe,
   GoogleDriveLogo,
   InstagramLogo,
   Play,
+  Plus,
   PushPin,
   SoundcloudLogo,
   SpotifyLogo,
@@ -42,6 +44,8 @@ export type CardHandlers = {
   onOpen: () => void;
   onToggleDone: () => void;
   onTag: (tag: string) => void;
+  /** Toca la categoría (o "+ Categoría"): abre el selector. */
+  onCategory: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 };
 
@@ -103,6 +107,20 @@ export function NoteCard({
           <Check size={11} weight="bold" aria-hidden /> {doneLabel(n)}
         </span>
       )}
+      <button
+        type="button"
+        onClick={handlers.onCategory}
+        aria-label={n.category ? `Categoría: ${n.category}. Cambiarla` : "Ponerle una categoría"}
+        className={cx(
+          "inline-flex min-h-7 max-w-[14rem] items-center gap-1 rounded-full px-2 text-[12px] transition-colors",
+          n.category
+            ? "bg-accent-soft font-medium text-accent-fg hover:bg-[color-mix(in_oklab,var(--accent-soft),var(--accent)_14%)]"
+            : "border border-dashed border-line-strong text-muted hover:border-solid hover:text-fg",
+        )}
+      >
+        {n.category ? <FolderSimple size={12} weight="fill" aria-hidden /> : <Plus size={11} weight="bold" aria-hidden />}
+        <span className="truncate">{n.category ?? "Categoría"}</span>
+      </button>
       {n.tags.map((t) => (
         <button
           key={t}

@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { isClientId } from "./plan-logic";
-import { isNoteSection, noteFromForm, noteHeading, youtubeId, youtubeThumb } from "./notes-logic";
+import { isNoteSection, normalizeCategory, noteFromForm, noteHeading, youtubeId, youtubeThumb } from "./notes-logic";
 import { fetchLinkMeta } from "./notes";
 
 export type NoteResult = { ok: true; id: string } | { ok: false; error: string };
@@ -93,5 +93,17 @@ export async function moveNoteSection(id: string, section: string) {
   await exigirSesion();
   if (!validId(id) || !isNoteSection(section)) return;
   await prisma.note.updateMany({ where: { id }, data: { section } });
+  refrescar();
+}
+
+/** Categoría propia de una nota (vacía = sin categoría). */
+export async function setNoteCategory(id: string, category: string | null) {
+  await exigirSesion();
+  if (!validId(id)) return;
+  const value = normalizeCategory(category);
+  const n = await prisma.note.findUnique({ where: { id }, select: { title: true, body: true, url: true } });
+  if (!n) return;
+  await prisma.note.update({ where: { id }, data: { category: value } });
+  await logActivity("updated", "note", id, `${noteHeading(n)}: ${value ? `categoría ${value}` : "sin categoría"}`);
   refrescar();
 }
