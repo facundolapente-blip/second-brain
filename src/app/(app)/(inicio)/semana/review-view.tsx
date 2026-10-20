@@ -5,7 +5,7 @@ import { PeriodArrow, usePeriodNav } from "../period-nav";
 import { CaretLeft, CaretRight, CheckCircle, NotePencil } from "@phosphor-icons/react";
 import type { WeeklyReview } from "@/lib/review";
 import { addDays, formatShort, startOfWeek, todayISO, weekday } from "@/lib/dates";
-import { formatSleep, formatWeight } from "@/lib/checkin-logic";
+import { formatWeight } from "@/lib/checkin-logic";
 import { moodInfo } from "@/lib/journal-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
@@ -15,7 +15,7 @@ import { writeWeeklyReview } from "@/lib/offline/journal";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";
-import { Card, Delta, Kpi, Mini } from "../summary-ui";
+import { BodyMinis, Card, Delta, Kpi, Mini } from "../summary-ui";
 
 const WD = ["D", "L", "M", "M", "J", "V", "S"];
 
@@ -35,7 +35,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
   // En la semana en curso no entra lo que todavía se puede cumplir (lo decide `reinforce`).
   const weak = habitsSorted.filter((h) => h.reinforce);
   const maxSpent = Math.max(1, ...r.days.map((d) => d.spentCents));
-  const hasFeel = r.days.some((d) => d.mood !== null || d.energy !== null || d.sleepMin !== null);
+  const hasFeel = r.days.some((d) => d.mood !== null || d.energy !== null || d.sleepMin !== null || d.steps !== null || d.stressWatch !== null);
   // Las flechas cambian el rótulo al toque y suman toques seguidos (ver usePeriodNav).
   const nav = usePeriodNav(r.monday);
   const thisMonday = r.isCurrent ? r.monday : startOfWeek(todayISO(), 1);
@@ -168,7 +168,9 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
                 <Mini label="Ánimo promedio" value={now.mood === null ? "–" : dec1(now.mood)} sub={moodInfo(Math.round(now.mood ?? 0))?.label} />
                 <Mini label="Energía" value={now.energy === null ? "–" : `${dec1(now.energy)} / 5`} />
                 <Mini label="Estrés" value={now.stress === null ? "–" : `${dec1(now.stress)} / 5`} />
-                <Mini label="Sueño promedio" value={now.sleepMin === null ? "–" : formatSleep(Math.round(now.sleepMin / 15) * 15)} />
+                {now.sleepMin === null ? <Mini label="Sueño promedio" value="–" /> : <BodyMinis now={now} before={before} show={["sleep"]} />}
+                {/* Del reloj: los de la semana contra la anterior (en curso, hasta el mismo día). */}
+                <BodyMinis now={now} before={before} show={["steps", "stressWatch"]} />
               </dl>
               {r.weight && (
                 <p className="text-[13.5px] text-muted">

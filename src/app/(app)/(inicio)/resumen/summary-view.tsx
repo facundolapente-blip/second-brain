@@ -10,7 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import type { MonthlySummary } from "@/lib/monthly";
 import { formatMonth, formatShort, shiftMonth, todayISO, weekday } from "@/lib/dates";
-import { formatSleep, formatWeight } from "@/lib/checkin-logic";
+import { formatWeight } from "@/lib/checkin-logic";
 import { moodInfo } from "@/lib/journal-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import { FinanceIcon } from "@/lib/finance-icons";
@@ -19,7 +19,7 @@ import { moneyCents, dec1, moneyWhole } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";
-import { Card, Delta, Kpi, Mini } from "../summary-ui";
+import { BodyMinis, Card, Delta, hasWatchData, Kpi, Mini } from "../summary-ui";
 import { YearHeat } from "./year-heat";
 
 const WD = ["L", "M", "X", "J", "V", "S", "D"];
@@ -314,40 +314,46 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
           href="/analisis"
           className="lg:col-span-5 print:col-span-1 print:break-inside-avoid"
         >
-          {s.checkins === 0 && now.mood === null ? (
+          {s.checkins === 0 && now.mood === null && now.sleepMin === null && !hasWatchData(now) ? (
             <p className="text-[14px] leading-relaxed text-muted">
               Sin check-ins este {word}. Se cargan en Inicio.
             </p>
           ) : (
             <>
-              <dl className="grid grid-cols-2 gap-2">
-                <Mini
-                  label="Ánimo promedio"
-                  value={now.mood === null ? "–" : dec1(now.mood)}
-                  sub={moodInfo(Math.round(now.mood ?? 0))?.label}
-                />
-                <Mini
-                  label="Energía"
-                  value={
-                    now.energy === null ? "–" : `${dec1(now.energy)} / 5`
-                  }
-                />
-                <Mini
-                  label="Estrés"
-                  value={
-                    now.stress === null ? "–" : `${dec1(now.stress)} / 5`
-                  }
-                />
-                <Mini
-                  label="Sueño promedio"
-                  value={
-                    now.sleepMin === null
-                      ? "–"
-                      : formatSleep(Math.round(now.sleepMin / 15) * 15)
-                  }
-                />
-                {now.steps !== null && <Mini label="Pasos por día" value={nf.format(Math.round(now.steps))} />}
-              </dl>
+              {(now.mood !== null || now.energy !== null || now.stress !== null || now.sleepMin !== null) && (
+                <dl className="grid grid-cols-2 gap-2">
+                  <Mini
+                    label="Ánimo promedio"
+                    value={now.mood === null ? "–" : dec1(now.mood)}
+                    sub={moodInfo(Math.round(now.mood ?? 0))?.label}
+                  />
+                  <Mini
+                    label="Energía"
+                    value={
+                      now.energy === null ? "–" : `${dec1(now.energy)} / 5`
+                    }
+                  />
+                  <Mini
+                    label="Estrés"
+                    value={
+                      now.stress === null ? "–" : `${dec1(now.stress)} / 5`
+                    }
+                  />
+                  {now.sleepMin === null ? (
+                    <Mini label="Sueño promedio" value="–" />
+                  ) : (
+                    <BodyMinis now={now} before={before} show={["sleep"]} />
+                  )}
+                </dl>
+              )}
+              {hasWatchData(now) && (
+                <div className="grid gap-2">
+                  <p className="kicker">Del reloj</p>
+                  <dl className="grid grid-cols-2 gap-2">
+                    <BodyMinis now={now} before={before} show={["steps", "stressWatch", "hrMin", "distance", "kcal"]} />
+                  </dl>
+                </div>
+              )}
               <p className="text-[13.5px] text-muted">
                 {s.checkins} {s.checkins === 1 ? "check-in" : "check-ins"} en el{" "}
                 {word}

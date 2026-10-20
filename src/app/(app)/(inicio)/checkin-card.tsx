@@ -11,8 +11,12 @@ import {
   formatSleep,
   parseWeight,
   STRESS_LABELS,
+  WATCH_SLOTS,
+  watchSlotsFor,
+  watchValues,
   type CheckinDTO,
   type CheckinPatch,
+  type WatchDay,
 } from "@/lib/checkin-logic";
 import { MOODS } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
@@ -30,10 +34,13 @@ export function CheckinCard({
   today,
   yesterday,
   lastWeightG,
+  watch,
 }: {
   today: CheckinDTO;
   yesterday: CheckinDTO;
   lastWeightG: number | null;
+  /** Lo que mandó el reloj (solo para leer); no cuenta en "N de 5". */
+  watch: { today: WatchDay | null; yesterday: WatchDay | null };
 }) {
   const [day, setDay] = useState<"today" | "yesterday">("today");
   const [data, setData] = useState({ today, yesterday });
@@ -66,6 +73,9 @@ export function CheckinCard({
   // bajaba de renglón y la tarjeta saltaba ~45 px).
   const statusKey = pending ? "saving" : saved ? "saved" : "count";
   const filledTick = useTick(filled);
+  // Datos del reloj: los que vinieron hoy o ayer (fila fija al cambiar de día).
+  const watchSlots = watchSlotsFor([watch.today, watch.yesterday]);
+  const hasWatch = watchSlots.length > 0;
   const summary = [
     MOODS.find((m) => m.value === cur.mood)?.label,
     cur.energy ? `Energía ${ENERGY_LABELS[cur.energy - 1].toLowerCase()}` : null,
@@ -175,12 +185,15 @@ export function CheckinCard({
           {summary}
         </button>
       )}
+      {/* Plegado y la fila del reloj juntos: el espacio entre los dos va dentro del plegado,
+          así plegado no queda un hueco doble. */}
+      <div className="grid">
       {/* Plegado con el alto animado (lo de abajo sube de a poco, no de golpe). */}
       <div className="fold" data-closed={!open || undefined}>
       <div
         id="checkin-cuerpo"
         key={day}
-        className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", daySwap && "swap")}
+        className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", hasWatch && "pb-4", daySwap && "swap")}
       >
         <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label}>
           <div className="grid grid-cols-5 gap-1.5">
@@ -230,7 +243,35 @@ export function CheckinCard({
         </Row>
       </div>
       </div>
+      {hasWatch && <WatchStrip key={day} slots={watchSlots} watch={watch[day]} swap={daySwap} />}
+      </div>
     </section>
+  );
+}
+
+/**
+ * Lo que midió el reloj ese día, solo para leer: siempre los mismos casilleros para Hoy y
+ * Ayer (el que no vino va con "–"), en una grilla de 3 columnas en el celular, así al
+ * cambiar de día nada se corre. Se ve también con la tarjeta plegada.
+ */
+function WatchStrip({ slots, watch, swap }: { slots: ReturnType<typeof watchSlotsFor>; watch: WatchDay | null; swap: boolean }) {
+  const values = watchValues(watch);
+  return (
+    <div className="grid gap-1.5 border-t border-line pt-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-baseline sm:gap-x-5">
+      <p className="text-[12px] font-medium text-muted">Del reloj</p>
+      <div className={cx("relative", swap && "swap")}>
+        {/* Un día sin nada del reloj ocupa lo mismo (los casilleros quedan invisibles) y lo dice. */}
+        <dl aria-hidden={!watch || undefined} className={cx("grid grid-cols-3 gap-x-3 gap-y-1.5 sm:flex sm:flex-wrap sm:gap-x-6", !watch && "invisible")}>
+          {WATCH_SLOTS.filter((s) => slots.includes(s.id)).map((s) => (
+            <div key={s.id} className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
+              <dt className="text-[11.5px] text-muted">{s.label}</dt>
+              <dd className="truncate font-mono text-[13px] text-fg tabular">{values[s.id] ?? "–"}</dd>
+            </div>
+          ))}
+        </dl>
+        {!watch && <p className="absolute inset-0 text-[12.5px] text-muted">Todavía no llegó nada del reloj para este día.</p>}
+      </div>
+    </div>
   );
 }
 

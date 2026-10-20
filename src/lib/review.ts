@@ -30,6 +30,11 @@ export function summarize(days: DayMetrics[]) {
     stress: avg(days.map((d) => d.stress)),
     sleepMin: avg(days.map((d) => d.sleepMin)),
     steps: avg(days.map((d) => d.steps)),
+    // Del reloj (promedio de los días que mandó el dato).
+    stressWatch: avg(days.map((d) => d.stressWatch)),
+    hrMin: avg(days.map((d) => d.hrMin)),
+    distanceM: avg(days.map((d) => d.distanceM)),
+    activeKcal: avg(days.map((d) => d.activeKcal)),
   };
 }
 

@@ -180,6 +180,8 @@ async function main() {
   let routes = process.argv.slice(2);
   if (!routes.length) {
     routes = staticRoutes();
+    // Pantallas con otra vista por parámetro (la del año dibuja otros gráficos).
+    routes.push(`/salud?anio=${new Date().getFullYear()}`);
     // Una página de cada ruta con id (detalle de un hábito, una entrada del journal).
     const p = await context.newPage();
     for (const [list, re] of [

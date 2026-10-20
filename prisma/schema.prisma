@@ -427,6 +427,10 @@ model DailyCheckin {
   /// Pulso mínimo y máximo del día que midió el reloj (latidos por minuto).
   hrMin      Int?
   hrMax      Int?
+  /// Distancia del día que midió el reloj, en metros.
+  distanceM  Int?
+  /// Calorías de actividad del día (reloj), en kcal.
+  activeKcal Int?
   note       String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

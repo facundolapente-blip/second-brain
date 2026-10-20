@@ -15,7 +15,20 @@ import {
 import { bestStreak, currentStreak, excerpt, greeting, isEmptyEntry, isMood, normalizeTag, normalizeTags, wordCount } from "@/lib/journal-logic";
 import { parseValueNotes } from "@/lib/values";
 import { montevideoNow, msToNextSlot, pickForSlot, quoteSlot } from "@/lib/quotes";
-import { cleanPatch, formatSleep, formatWeight, parseWeight } from "@/lib/checkin-logic";
+import {
+  cleanPatch,
+  formatKm,
+  formatPulse,
+  formatSleep,
+  formatWeight,
+  parseWeight,
+  watchSlotsFor,
+  watchStressLevel,
+  watchValues,
+  type WatchDay,
+} from "@/lib/checkin-logic";
+import { buildInsights } from "@/lib/insights";
+import type { DayMetrics } from "@/lib/daily-metrics";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -240,5 +253,103 @@ describe("check-in", () => {
     expect(parseWeight("abc")).toBeNull();
     expect(parseWeight("10")).toBeNull();
     expect(parseWeight("500")).toBeNull();
+  });
+});
+
+describe("reloj en el check-in", () => {
+  const w = (p: Partial<WatchDay>): WatchDay => ({ steps: null, stressScore: null, hrMin: null, hrMax: null, distanceM: null, activeKcal: null, ...p });
+
+  it("niveles de estrés de Huawei", () => {
+    expect(watchStressLevel(1)).toBe("Bajo");
+    expect(watchStressLevel(29)).toBe("Bajo");
+    expect(watchStressLevel(30)).toBe("Normal");
+    expect(watchStressLevel(59)).toBe("Normal");
+    expect(watchStressLevel(60)).toBe("Medio");
+    expect(watchStressLevel(79)).toBe("Medio");
+    expect(watchStressLevel(80)).toBe("Alto");
+  });
+
+  it("distancia en km con un decimal y pulso mínimo–máximo", () => {
+    expect(formatKm(6140)).toBe("6,1 km");
+    expect(formatKm(950)).toBe("1,0 km");
+    expect(formatKm(0)).toBe("0,0 km");
+    expect(formatPulse(52, 148)).toBe("52–148");
+    expect(formatPulse(52, null)).toBe("mín. 52");
+    expect(formatPulse(null, 148)).toBe("máx. 148");
+    expect(formatPulse(null, null)).toBeNull();
+  });
+
+  it("valores escritos: solo los que vinieron", () => {
+    expect(watchValues(w({ steps: 8432, stressScore: 32, hrMin: 52, hrMax: 148, distanceM: 6140, activeKcal: 1420 }))).toEqual({
+      steps: "8.432",
+      stress: "32 · Normal",
+      pulse: "52–148",
+      distance: "6,1 km",
+      kcal: "1.420 kcal",
+    });
+    expect(watchValues(null)).toEqual({ steps: null, stress: null, pulse: null, distance: null, kcal: null });
+  });
+
+  it("casilleros: los que vinieron hoy o ayer, en orden fijo", () => {
+    expect(watchSlotsFor([w({ distanceM: 100 }), w({ steps: 10 })])).toEqual(["steps", "distance"]);
+    expect(watchSlotsFor([null, w({ hrMax: 120 })])).toEqual(["pulse"]);
+    expect(watchSlotsFor([null, null])).toEqual([]);
+  });
+});
+
+describe("cruces del reloj (buildInsights)", () => {
+  const day = (i: number, p: Partial<DayMetrics>): DayMetrics => ({
+    date: addDays("2026-09-01", i),
+    habitsDone: 0,
+    habitsDue: 0,
+    habit: {},
+    habitOpen: [],
+    mood: null,
+    energy: null,
+    stress: null,
+    sleepMin: null,
+    weightG: null,
+    steps: null,
+    stressWatch: null,
+    hrMin: null,
+    hrMax: null,
+    distanceM: null,
+    activeKcal: null,
+    wrote: false,
+    words: 0,
+    spentCents: 0,
+    incomeCents: 0,
+    blocksDone: 0,
+    blocksTotal: 0,
+    ...p,
+  });
+  const ids = (days: DayMetrics[]) => buildInsights(days, []).map((i) => i.id);
+
+  it("sueño de 7 h o más contra menos y el estrés del reloj (también días con solo datos del reloj)", () => {
+    const days = [
+      ...Array.from({ length: 5 }, (_, i) => day(i, { sleepMin: 450, stressWatch: 25 })),
+      ...Array.from({ length: 5 }, (_, i) => day(i + 5, { sleepMin: 360, stressWatch: 40 })),
+    ];
+    const found = buildInsights(days, []).find((i) => i.id === "sueno-estres-reloj");
+    expect(found?.text).toBe("Los días que dormís 7 h o más, tu estrés del reloj promedio es 25; con menos, 40");
+    expect(found?.detail).toContain("5 y 5 días");
+  });
+
+  it("menos de 5 días en un grupo o diferencia chica: nada", () => {
+    const few = [
+      ...Array.from({ length: 4 }, (_, i) => day(i, { sleepMin: 450, stressWatch: 25 })),
+      ...Array.from({ length: 6 }, (_, i) => day(i + 4, { sleepMin: 360, stressWatch: 40 })),
+    ];
+    expect(ids(few)).not.toContain("sueno-estres-reloj");
+    const close = Array.from({ length: 10 }, (_, i) => day(i, { sleepMin: i < 5 ? 450 : 360, stressWatch: i < 5 ? 30 : 32 }));
+    expect(ids(close)).not.toContain("sueno-estres-reloj");
+  });
+
+  it("8.000 pasos o más y el pulso mínimo", () => {
+    const days = Array.from({ length: 12 }, (_, i) => day(i, { steps: i < 6 ? 11000 : 3000, hrMin: i < 6 ? 52 : 57 }));
+    const found = buildInsights(days, []).find((i) => i.id === "pasos-pulso");
+    expect(found?.text).toBe("Los días con 8.000 pasos o más tu pulso mínimo promedio es 52 lpm; con menos, 57 lpm");
+    // Días sin pulso no cuentan.
+    expect(ids(days.map((d, i) => (i < 2 ? { ...d, hrMin: null } : d)))).not.toContain("pasos-pulso");
   });
 });

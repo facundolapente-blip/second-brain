@@ -179,7 +179,7 @@ export function InicioView({
         <PlanToday d={d} />
         {/* key: al cambiar de día (el Shell refresca sin desmontar) arranca de nuevo con
             las fechas nuevas; lo pendiente se manda al desmontar, con su fecha vieja. */}
-        <CheckinCard key={d.today} today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} />
+        <CheckinCard key={d.today} today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} watch={d.checkin.watch} />
         <WeekMix d={d} />
         <GastosCard d={d} delta={delta} prevName={prevName} />
         <JournalCard d={d} />

@@ -128,6 +128,31 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
     });
   }
 
+  // Reloj. Todos los días del período (los que solo tienen datos del reloj también):
+  // `split` deja afuera los que no tienen el dato.
+  // Sueño (la noche que termina ese día) y el estrés que midió el reloj ese día.
+  const sleepStress = split(days, (d) => (d.sleepMin === null ? null : d.sleepMin >= 420), (d) => d.stressWatch);
+  if (sleepStress && Math.abs(sleepStress.a - sleepStress.b) >= 3) {
+    out.push({
+      id: "sueno-estres-reloj",
+      module: "inicio",
+      text: `Los días que dormís 7 h o más, tu estrés del reloj promedio es ${Math.round(sleepStress.a)}; con menos, ${Math.round(sleepStress.b)}`,
+      detail: `Escala del reloj de 1 a 99 · ${sleepStress.na} y ${sleepStress.nb} días`,
+      weight: Math.min(1, Math.abs(sleepStress.a - sleepStress.b) / 20) + 0.2,
+    });
+  }
+  // Pasos y el pulso mínimo del día.
+  const stepsPulse = split(days, (d) => (d.steps === null ? null : d.steps >= 8000), (d) => d.hrMin);
+  if (stepsPulse && Math.abs(stepsPulse.a - stepsPulse.b) >= 2) {
+    out.push({
+      id: "pasos-pulso",
+      module: "inicio",
+      text: `Los días con 8.000 pasos o más tu pulso mínimo promedio es ${Math.round(stepsPulse.a)} lpm; con menos, ${Math.round(stepsPulse.b)} lpm`,
+      detail: `${stepsPulse.na} y ${stepsPulse.nb} días con pasos y pulso`,
+      weight: Math.min(1, Math.abs(stepsPulse.a - stepsPulse.b) / 10) + 0.2,
+    });
+  }
+
   // Escribir en el journal y los hábitos del día.
   const wroteHabits = split(
     past,

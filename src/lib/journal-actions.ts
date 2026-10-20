@@ -132,7 +132,7 @@ async function clearCheckinMood(d: Date, mood: number) {
   await prisma.dailyCheckin.updateMany({ where: { date: d, mood }, data: { mood: null } });
   // Si el check-in quedó sin ningún dato, sobra (si no, contaría como check-in cargado).
   await prisma.dailyCheckin.deleteMany({
-    where: { date: d, mood: null, energy: null, stress: null, sleepMin: null, weightG: null, steps: null, stressScore: null, hrMin: null, hrMax: null, note: null },
+    where: { date: d, mood: null, energy: null, stress: null, sleepMin: null, weightG: null, steps: null, stressScore: null, hrMin: null, hrMax: null, distanceM: null, activeKcal: null, note: null },
   });
 }
 

@@ -11,7 +11,7 @@ import { budgetState, monthShare } from "./budget-logic";
 import { getRates, toUyu } from "./fx";
 import { toCents, type CurrencyTotals } from "./finance-logic";
 import { isFreeBlock, sortBlocks, type BlockDTO } from "./plan-logic";
-import { getCheckin, lastWeight } from "./checkin";
+import { getCheckinDay, lastWeight } from "./checkin";
 
 /**
  * Resumen de los cuatro módulos para Inicio. Todo se calcula acá (servidor) y
@@ -52,8 +52,8 @@ export async function getDashboard() {
   await runSchedules();
   const rates = await getRates();
   const [checkToday, checkYesterday, weight, { budgets }, backup] = await Promise.all([
-    getCheckin(today),
-    getCheckin(addDays(today, -1)),
+    getCheckinDay(today),
+    getCheckinDay(addDays(today, -1)),
     lastWeight(),
     getCategoryBudgets(today.slice(0, 7)),
     backupWarning(),
@@ -244,7 +244,12 @@ export async function getDashboard() {
     today,
     hour: hourNow(),
     backup,
-    checkin: { today: checkToday, yesterday: checkYesterday, lastWeightG: weight },
+    checkin: {
+      today: checkToday.checkin,
+      yesterday: checkYesterday.checkin,
+      lastWeightG: weight,
+      watch: { today: checkToday.watch, yesterday: checkYesterday.watch },
+    },
     habits: {
       today: habitsToday,
       doneToday: progressToday.done,

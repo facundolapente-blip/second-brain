@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
-import { ArrowClockwise, ArrowSquareOut, CheckCircle, CircleNotch, Watch, WarningCircle } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowSquareOut, CheckCircle, CircleNotch, Heartbeat, Watch, WarningCircle } from "@phosphor-icons/react";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { Button, ConfirmButton, cx, inputClass } from "@/components/ui";
 import { formatShort } from "@/lib/dates";
@@ -104,6 +105,10 @@ export function WatchCard({ status }: { status: WatchStatus }) {
               >
                 Desconectar
               </ConfirmButton>
+              <Link href="/salud" className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-accent-fg hover:bg-surface-2">
+                <Heartbeat size={15} aria-hidden />
+                Ver en Salud
+              </Link>
             </div>
           </>
         ) : (

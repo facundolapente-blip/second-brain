@@ -72,3 +72,71 @@ export function parseWeight(raw: string): number | null {
 export const FILLED_CHECKIN = {
   OR: [{ mood: { not: null } }, { energy: { not: null } }, { stress: { not: null } }, { note: { not: null } }],
 };
+
+// ─── Reloj ──────────────────────────────────────────────────────────────────
+
+/**
+ * Lo que mandó el reloj para un día (solo lectura). El sueño y el peso no van:
+ * ya se ven en sus campos del check-in.
+ */
+export type WatchDay = {
+  steps: number | null;
+  /** Estrés del reloj, 1 a 99 (aparte del estrés 1–5 del check-in). */
+  stressScore: number | null;
+  hrMin: number | null;
+  hrMax: number | null;
+  distanceM: number | null;
+  activeKcal: number | null;
+};
+
+/** Niveles de estrés de Huawei: menos de 30 Bajo, 30–59 Normal, 60–79 Medio, 80 o más Alto. */
+export function watchStressLevel(score: number): "Bajo" | "Normal" | "Medio" | "Alto" {
+  if (score < 30) return "Bajo";
+  if (score < 60) return "Normal";
+  if (score < 80) return "Medio";
+  return "Alto";
+}
+
+/** Metros → "6,1 km" (un decimal, con coma). */
+export function formatKm(m: number): string {
+  return `${(Math.round(m / 100) / 10).toLocaleString("es-UY", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+}
+
+/** Pulso mínimo–máximo: "52–148", o el que haya. */
+export function formatPulse(min: number | null, max: number | null): string | null {
+  if (min !== null && max !== null) return `${min}–${max}`;
+  if (min !== null) return `mín. ${min}`;
+  if (max !== null) return `máx. ${max}`;
+  return null;
+}
+
+export type WatchSlot = "steps" | "stress" | "pulse" | "distance" | "kcal";
+export const WATCH_SLOTS: { id: WatchSlot; label: string }[] = [
+  { id: "steps", label: "Pasos" },
+  { id: "stress", label: "Estrés" },
+  { id: "pulse", label: "Pulso" },
+  { id: "distance", label: "Distancia" },
+  { id: "kcal", label: "Calorías" },
+];
+
+const nfUy = new Intl.NumberFormat("es-UY");
+
+/** El valor ya escrito de cada dato del reloj (null si no vino). */
+export function watchValues(w: WatchDay | null): Record<WatchSlot, string | null> {
+  return {
+    steps: w?.steps != null ? nfUy.format(w.steps) : null,
+    stress: w?.stressScore != null ? `${w.stressScore} · ${watchStressLevel(w.stressScore)}` : null,
+    pulse: w ? formatPulse(w.hrMin, w.hrMax) : null,
+    distance: w?.distanceM != null ? formatKm(w.distanceM) : null,
+    kcal: w?.activeKcal != null ? `${nfUy.format(w.activeKcal)} kcal` : null,
+  };
+}
+
+/**
+ * Qué datos del reloj mostrar para los días que se pueden elegir (Hoy/Ayer): los que
+ * vinieron en alguno, así al cambiar de día la fila no se corre (el que falta va con "–").
+ */
+export function watchSlotsFor(days: (WatchDay | null)[]): WatchSlot[] {
+  const vals = days.map(watchValues);
+  return WATCH_SLOTS.map((s) => s.id).filter((id) => vals.some((v) => v[id] !== null));
+}

@@ -36,6 +36,12 @@ export type DayMetrics = {
   stressWatch: number | null;
   /** Pulso mínimo del día (reloj), en latidos por minuto. */
   hrMin: number | null;
+  /** Pulso máximo del día (reloj). */
+  hrMax: number | null;
+  /** Distancia del día (reloj), en metros. */
+  distanceM: number | null;
+  /** Calorías de actividad del día (reloj). */
+  activeKcal: number | null;
   wrote: boolean;
   words: number;
   /** En pesos uruguayos (los dólares, con la cotización del día). */
@@ -138,6 +144,9 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
       steps: null,
       stressWatch: null,
       hrMin: null,
+      hrMax: null,
+      distanceM: null,
+      activeKcal: null,
       wrote: false,
       words: 0,
       spentCents: 0,
@@ -170,6 +179,9 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     m.steps = c.steps;
     m.stressWatch = c.stressScore;
     m.hrMin = c.hrMin;
+    m.hrMax = c.hrMax;
+    m.distanceM = c.distanceM;
+    m.activeKcal = c.activeKcal;
   }
   for (const e of entries) {
     const m = byDate.get(fromDbDate(e.date));
