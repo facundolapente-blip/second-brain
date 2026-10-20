@@ -37,6 +37,7 @@ const SELECT = {
   tags: true,
   pinned: true,
   sortKey: true,
+  stars: true,
   done: true,
   source: true,
   createdAt: true,
@@ -59,6 +60,8 @@ export type NoteFilters = {
   tag?: string | null;
   /** Una categoría, o `NO_CATEGORY` para las que no tienen. */
   category?: string | null;
+  /** Solo las que tienen al menos una estrella. */
+  important?: boolean;
   /** false = solo lo que falta ver (filtro "Ver después" de Videos). */
   done?: boolean | null;
   limit?: number;
@@ -66,10 +69,11 @@ export type NoteFilters = {
   cursor?: string | null;
 };
 
-export async function getNotes({ section, q, tag, category, done, limit = 60, cursor }: NoteFilters = {}) {
+export async function getNotes({ section, q, tag, category, important, done, limit = 60, cursor }: NoteFilters = {}) {
   const and: Prisma.NoteWhereInput[] = [];
   if (section && isNoteSection(section)) and.push({ section });
   if (tag) and.push({ tags: { has: tag } });
+  if (important) and.push({ stars: { gt: 0 } });
   if (category) and.push({ category: category === NO_CATEGORY ? null : category });
   if (typeof done === "boolean") and.push({ done });
   const where: Prisma.NoteWhereInput = and.length ? { AND: and } : {};

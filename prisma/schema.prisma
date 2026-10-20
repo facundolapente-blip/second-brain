@@ -752,6 +752,8 @@ model Note {
   category   String?
   tags       String[] @default([])
   pinned     Boolean  @default(false)
+  /// Importancia de 0 (ninguna) a 3 estrellas.
+  stars      Int      @default(0)
   /// Lugar en la lista (más alto = más arriba, después de las fijadas). Arranca en la fecha de creación (ms) y cambia al arrastrar.
   sortKey    Float    @default(dbgenerated("(EXTRACT(EPOCH FROM now()) * 1000)"))
   /// "Ver después": visto o hecho.

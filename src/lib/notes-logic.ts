@@ -353,6 +353,8 @@ export type NoteDTO = {
   category: string | null;
   tags: string[];
   pinned: boolean;
+  /** Importancia de 0 a 3 estrellas. */
+  stars: number;
   done: boolean;
   source: string | null;
   /** ISO del momento en que se creó. */
@@ -482,7 +484,18 @@ export type NoteInput = {
   price: string | null;
   category: string | null;
   tags: string[];
+  /** Solo si la hoja lo manda (el bot y los importadores no tocan las estrellas). */
+  stars?: number;
 };
+
+export const NOTE_STARS_MAX = 3;
+/** Estrellas válidas: un entero de 0 a 3 (lo demás, 0). */
+export function normalizeStars(v: unknown): number {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(NOTE_STARS_MAX, Math.max(0, n)) : 0;
+}
+/** Tocar la estrella de la tarjeta: 0 → 1 → 2 → 3 → 0. */
+export const nextStars = (n: number) => (normalizeStars(n) + 1) % (NOTE_STARS_MAX + 1);
 
 /**
  * Lee la hoja de una nota (lo usan la acción y la pantalla, para mostrar el
@@ -511,6 +524,7 @@ export function noteFromForm(fd: FormLike): { ok: true; note: NoteInput } | { ok
       price: field(fd, "price", NOTE_PRICE_MAX) || null,
       category: normalizeCategory(String(fd.get("category") ?? "")),
       tags: normalizeTags(String(fd.get("tags") ?? "")),
+      ...(fd.get("stars") !== null ? { stars: normalizeStars(fd.get("stars")) } : {}),
     },
   };
 }

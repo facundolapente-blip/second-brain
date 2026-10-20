@@ -11,6 +11,7 @@ import {
   isNoteSection,
   NOTE_CATEGORY_COLORS_KEY,
   normalizeCategory,
+  normalizeStars,
   noteFromForm,
   parseCategoryColors,
   safeJson,
@@ -108,6 +109,14 @@ export async function moveNote(id: string, sortKey: number) {
   await exigirSesion();
   if (!validId(id) || typeof sortKey !== "number" || !Number.isFinite(sortKey) || Math.abs(sortKey) > 1e15) return;
   await prisma.note.updateMany({ where: { id }, data: { sortKey } });
+  refrescar();
+}
+
+/** Importancia: de 0 a 3 estrellas. */
+export async function setNoteStars(id: string, stars: number) {
+  await exigirSesion();
+  if (!validId(id)) return;
+  await prisma.note.updateMany({ where: { id }, data: { stars: normalizeStars(stars) } });
   refrescar();
 }
 

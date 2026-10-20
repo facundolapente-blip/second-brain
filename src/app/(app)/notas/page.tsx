@@ -25,13 +25,14 @@ export default async function NotasPage({ searchParams }: PageProps<"/notas">) {
   const q = one(sp.q).slice(0, 100);
   const tag = one(sp.etiqueta).slice(0, 40).toLowerCase();
   const later = section === "videos" && one(sp.ver) === "despues";
+  const important = one(sp.importantes) === "1";
   // La categoría es de una sección: sin sección no se filtra por categoría.
   const rawCategory = one(sp.categoria);
   const category = !section || !rawCategory ? "" : rawCategory.toLowerCase() === NO_CATEGORY ? NO_CATEGORY : (normalizeCategory(rawCategory) ?? "");
   const limit = Math.min(2000, Math.max(PAGE, Number(one(sp.n)) || PAGE));
 
   const [{ notes, nextCursor }, counts, tags, categories, uncategorized] = await Promise.all([
-    getNotes({ section, q, tag: tag || null, category: category || null, done: later ? false : null, limit }),
+    getNotes({ section, q, tag: tag || null, category: category || null, important, done: later ? false : null, limit }),
     getNoteCounts(),
     getNoteTags(),
     getNoteCategories(),
@@ -46,7 +47,7 @@ export default async function NotasPage({ searchParams }: PageProps<"/notas">) {
       tags={tags}
       categories={categories}
       uncategorized={uncategorized}
-      filters={{ section, q, tag, category, later, limit }}
+      filters={{ section, q, tag, category, important, later, limit }}
       today={todayISO()}
       openNew={one(sp.nuevo) === "1"}
     />

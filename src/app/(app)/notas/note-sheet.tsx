@@ -27,6 +27,7 @@ import {
   type NoteSectionId,
 } from "@/lib/notes-logic";
 import { doneLabel } from "./note-card";
+import { StarsPicker } from "./stars";
 
 export type NoteSheetHandle = { open: (note?: NoteDTO, preset?: { section?: NoteSectionId | null; category?: string | null }) => void };
 
@@ -110,6 +111,7 @@ function NoteForm({
   // Sección elegida a mano (al editar, la que tiene); si no, la sugiere el contenido.
   const [picked, setPicked] = useState<NoteSectionId | null>(note ? sectionOf(note.section).id : preset);
   const [category, setCategory] = useState(note?.category ?? presetCategory ?? "");
+  const [stars, setStars] = useState(note?.stars ?? 0);
   const [tagsText, setTagsText] = useState(note ? note.tags.join(", ") : "");
   const [tagsTouched, setTagsTouched] = useState(!!note);
   const [photoCount, setPhotoCount] = useState(note?.photos.length ?? 0);
@@ -157,6 +159,7 @@ function NoteForm({
       {note && <input type="hidden" name="id" value={note.id} />}
       <input type="hidden" name="section" value={section} />
       <input type="hidden" name="tags" value={tagList.join(", ")} />
+      <input type="hidden" name="stars" value={stars} />
       <input type="hidden" name="hasPhotos" value={photoCount + files.length > 0 ? "1" : ""} />
       {note && <input type="hidden" name="flags" value="1" />}
 
@@ -250,6 +253,17 @@ function NoteForm({
             );
           })}
         </div>
+      </div>
+
+      <div className="grid gap-1">
+        <span className="kicker">Importancia</span>
+        <StarsPicker
+          value={stars}
+          onChange={(n) => {
+            haptic("select");
+            setStars(n);
+          }}
+        />
       </div>
 
       <div className="grid gap-2">

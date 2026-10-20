@@ -13,6 +13,7 @@ import {
   NotePencil,
   Plus,
   PushPin,
+  Star,
   Tag,
   Trash,
   X,
@@ -42,19 +43,20 @@ import {
   noteFromForm,
   noteHeading,
   sectionOf,
+  nextStars,
   sortKeyAfterMove,
   youtubeId,
   youtubeThumb,
   type NoteDTO,
   type NoteSectionId,
 } from "@/lib/notes-logic";
-import { deleteNote, moveNote, moveNoteSection, saveNote, setNoteCategory, setNoteCategoryColor, setNoteDone, setNotePinned } from "@/lib/offline/notes";
+import { deleteNote, moveNote, moveNoteSection, setNoteStars, saveNote, setNoteCategory, setNoteCategoryColor, setNoteDone, setNotePinned } from "@/lib/offline/notes";
 import { usePendingActions, type QueuedOp } from "@/lib/offline/queue";
 import { doneLabel, NoteCard } from "./note-card";
 import { NoteSheet, type NoteCategory, type NoteSheetActions, type NoteSheetHandle } from "./note-sheet";
 
 /** `category`: una categoría de la sección, `NO_CATEGORY` (las que no tienen) o "" (todas). */
-type Filters = { section: NoteSectionId | null; q: string; tag: string; category: string; later: boolean; limit: number };
+type Filters = { section: NoteSectionId | null; q: string; tag: string; category: string; important: boolean; later: boolean; limit: number };
 type Counts = { all: number; bySection: Record<string, number>; laterVideos: number };
 type Change = { add: NoteDTO } | { remove: string } | (Partial<NoteDTO> & { id: string });
 
@@ -80,6 +82,7 @@ function hrefOf(f: Partial<Filters>, extra?: Record<string, string>) {
   if (f.q) p.set("q", f.q);
   if (f.tag) p.set("etiqueta", f.tag);
   if (f.section && f.category) p.set("categoria", f.category);
+  if (f.important) p.set("importantes", "1");
   for (const [k, v] of Object.entries(extra ?? {})) p.set(k, v);
   const s = p.toString();
   return s ? `/notas?${s}` : "/notas";
@@ -107,7 +110,7 @@ function pendingNotes(ops: QueuedOp[]): NoteDTO[] {
     const parsed = noteFromForm(fd);
     if (!parsed.ok) continue;
     const yt = youtubeId(parsed.note.url);
-    out.push({ id, source: "app", createdAt: new Date(op.at).toISOString(), sortKey: op.at, photos: [], pinned: false, done: false, ...parsed.note, thumbnail: yt ? youtubeThumb(yt) : null });
+    out.push({ id, source: "app", createdAt: new Date(op.at).toISOString(), sortKey: op.at, photos: [], pinned: false, done: false, ...parsed.note, stars: parsed.note.stars ?? 0, thumbnail: yt ? youtubeThumb(yt) : null });
   }
   return out;
 }
@@ -155,7 +158,8 @@ export function NotesView({
       (n) =>
         (!filters.section || sectionOf(n.section).id === filters.section) &&
         (!filters.later || !n.done) &&
-        (!filters.category || (filters.category === NO_CATEGORY ? !n.category : n.category === filters.category)),
+        (!filters.category || (filters.category === NO_CATEGORY ? !n.category : n.category === filters.category)) &&
+        (!filters.important || n.stars > 0),
     )
     .sort(byNoteOrder);
   const fresh = useNewIds(visible.map((n) => n.id));
@@ -189,6 +193,7 @@ export function NotesView({
         sortKey: note?.sortKey ?? Date.parse(now),
         photos: note?.photos ?? [],
         ...p,
+        stars: p.stars ?? note?.stars ?? 0,
         thumbnail: yt ? youtubeThumb(yt) : note && note.url === p.url ? note.thumbnail : null,
         pinned: note ? fd.get("pinned") === "on" : false,
         done: note ? fd.get("done") === "on" : false,
@@ -301,6 +306,19 @@ export function NotesView({
     });
   }
 
+  function stars(n: NoteDTO, value: number) {
+    if (value === n.stars) return;
+    haptic(value > n.stars ? "success" : "tap");
+    const run = () =>
+      start(async () => {
+        apply({ id: n.id, stars: value });
+        await setNoteStars(n.id, value);
+      });
+    // En "Importantes", sacarle las estrellas la saca de la lista con una salida corta.
+    if (filters.important && value === 0) leaveThen(`[data-note="${n.id}"]`, run);
+    else run();
+  }
+
   function openCategory(n: NoteDTO) {
     setCategorizing(n);
     categorySheet.current?.open();
@@ -338,6 +356,13 @@ export function NotesView({
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => sheet.current?.open(n) },
         ...(n.url ? [{ label: "Abrir link", icon: <ArrowSquareOut size={15} />, onSelect: () => window.open(n.url!, "_blank", "noopener,noreferrer") }] : []),
         { label: n.pinned ? "Desfijar" : "Fijar arriba", icon: <PushPin size={15} />, onSelect: () => togglePin(n) },
+        ...[3, 2, 1, 0]
+          .filter((k) => k !== n.stars)
+          .map((k) => ({
+            label: k ? `Importancia ${"★".repeat(k)}` : "Sacar la importancia",
+            icon: <Star size={15} weight={k ? "fill" : "regular"} />,
+            onSelect: () => stars(n, k),
+          })),
         {
           label: n.done ? `Marcar como no ${doneLabel(n).toLowerCase()}` : `Marcar como ${doneLabel(n).toLowerCase()}`,
           icon: <CheckCircle size={15} />,
@@ -384,8 +409,21 @@ export function NotesView({
           />
         )}
 
-        {(filters.section === "videos" || filters.tag) && (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+            {/* Solo las importantes (con estrellas), sin cambiar el orden propio. */}
+            <Link
+              href={hrefOf({ ...filters, important: !filters.important })}
+              scroll={false}
+              aria-pressed={filters.important}
+              className={cx(
+                "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors",
+                filters.important ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
+              )}
+            >
+              <Star size={14} weight="fill" className="text-[var(--p-yellow-chip)]" aria-hidden />
+              Importantes
+              {filters.important && <X size={13} weight="bold" aria-hidden />}
+            </Link>
             {filters.section === "videos" && (
               <PillSwitch
                 label="Qué videos"
@@ -407,22 +445,21 @@ export function NotesView({
                 #{filters.tag} <X size={13} weight="bold" aria-hidden />
               </Link>
             )}
-          </div>
-        )}
+        </div>
 
         {visible.length === 0 ? (
           <Empty section={section} searching={searching} later={filters.later} onNew={newNote} />
         ) : (
-          // Filas (no columnas tipo muro): el orden propio se lee de izquierda a derecha y de arriba abajo.
+          // Columnas tipo muro (cada nota con su alto, sin huecos): el orden propio se lee de arriba abajo, columna por columna.
           <Sortable ids={visible.map((n) => n.id)} onReorder={reorder} grid disabled={visible.length < 2}>
-          <div className="grid items-start gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
+          <div className="grid gap-3 lg:block lg:columns-2 lg:gap-4 xl:columns-3">
             {visible.map((n) => (
               <SortableItem
                 key={n.id}
                 id={n.id}
                 as="div"
                 disabled={pendingIds.has(n.id)}
-                className={cx("min-w-0 rounded-[18px] [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]", fresh.has(n.id) && "reveal")}
+                className={cx("min-w-0 rounded-[18px] lg:mb-4 lg:break-inside-avoid [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]", fresh.has(n.id) && "reveal")}
                 draggingClass="rounded-[18px] shadow-[0_18px_40px_-16px_rgba(0,0,0,0.4)] scale-[1.02]"
               >
                 <div {...holdProps(n.id)}>
@@ -444,6 +481,7 @@ export function NotesView({
                       onCategory: () => openCategory(n),
                       onContextMenu: (e) => contextMenu(e, n),
                       onMore: (e) => contextMenu(e, n),
+                      onStars: () => stars(n, nextStars(n.stars)),
                     }}
                   />
                 </SwipeRow>

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { decodeEntities, pickImage, stripSiteSuffix } from "../src/lib/link-meta";
 import {
+  nextStars,
+  normalizeStars,
   byNoteOrder,
   sortKeyAfterMove,
   sortKeyBetween,
@@ -351,5 +353,14 @@ describe("orden propio de las notas", () => {
     // "m" se soltó primera entre las no fijadas: queda arriba de "b".
     expect(sortKeyAfterMove(order, 1)).toBe(500 + 60_000);
     expect([...order].sort(byNoteOrder).map((n) => n.id)).toEqual(["a", "b", "m"]);
+  });
+});
+
+describe("estrellas de importancia", () => {
+  it("de 0 a 3, y la estrella de la tarjeta da la vuelta", () => {
+    expect(normalizeStars(2)).toBe(2);
+    expect(normalizeStars(7)).toBe(3);
+    expect(normalizeStars("x")).toBe(0);
+    expect([0, 1, 2, 3].map(nextStars)).toEqual([1, 2, 3, 0]);
   });
 });

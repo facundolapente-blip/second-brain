@@ -13,6 +13,7 @@ import {
   Play,
   Plus,
   PushPin,
+  Star,
   SoundcloudLogo,
   SpotifyLogo,
   TiktokLogo,
@@ -21,6 +22,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { cx } from "@/components/ui";
+import { StarsShow } from "./stars";
 import { photoUrl } from "@/components/photos";
 import { tone } from "@/lib/palette";
 import { bodyWithoutUrl, isVideoUrl, noteDomain, noteHeading, relativeDay, sectionOf, type NoteDTO } from "@/lib/notes-logic";
@@ -50,6 +52,8 @@ export type CardHandlers = {
   onContextMenu: (e: React.MouseEvent) => void;
   /** Botón ⋯ de la tarjeta: el mismo menú que el clic derecho (borrar, mover, categoría…). */
   onMore: (e: React.MouseEvent) => void;
+  /** La estrella de la tarjeta: 0 → 1 → 2 → 3 → 0. */
+  onStars: () => void;
 };
 
 /**
@@ -141,10 +145,22 @@ export function NoteCard({
       ))}
       <button
         type="button"
+        onClick={handlers.onStars}
+        aria-label={n.stars ? `Importancia: ${n.stars} de 3 estrellas. Tocá para cambiar` : "Marcar como importante"}
+        title="Importancia"
+        className={cx(
+          "tap-tint ml-auto inline-flex min-h-8 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-surface-2",
+          !n.stars && "text-faint hover:text-muted",
+        )}
+      >
+        {n.stars ? <StarsShow n={n.stars} size={14} /> : <Star size={16} aria-hidden />}
+      </button>
+      <button
+        type="button"
         onClick={handlers.onMore}
         aria-label="Más acciones: borrar, mover, fijar…"
         title="Más acciones"
-        className="tap-tint ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        className="tap-tint inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
       >
         <DotsThree size={20} weight="bold" aria-hidden />
       </button>
