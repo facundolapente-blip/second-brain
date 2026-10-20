@@ -5,6 +5,7 @@ import {
   ArrowSquareOut,
   Check,
   CheckCircle,
+  DotsThree,
   FolderSimple,
   Globe,
   GoogleDriveLogo,
@@ -47,6 +48,8 @@ export type CardHandlers = {
   /** Toca la categoría (o "+ Categoría"): abre el selector. */
   onCategory: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  /** Botón ⋯ de la tarjeta: el mismo menú que el clic derecho (borrar, mover, categoría…). */
+  onMore: (e: React.MouseEvent) => void;
 };
 
 /**
@@ -59,6 +62,7 @@ export function NoteCard({
   note: n,
   today,
   showSection,
+  categoryColor,
   pending,
   handlers,
 }: {
@@ -66,6 +70,8 @@ export function NoteCard({
   today: string;
   /** En "Todas" se ve de qué sección es. */
   showSection: boolean;
+  /** Color de la categoría de la nota (de la paleta). */
+  categoryColor?: string;
   /** Guardada sin señal, todavía en el aparato. */
   pending?: boolean;
   handlers: CardHandlers;
@@ -80,6 +86,9 @@ export function NoteCard({
   const kindIcon = KIND_ICON[n.urlKind ?? ""] ?? Globe;
   // El tilde se dibuja solo después de tocarlo (nunca al cargar).
   const [justMarked, setJustMarked] = useState(false);
+  // La foto de la página puede no cargar (link vencido, sitio que no la presta): vuelve al ícono.
+  const [imgFailed, setImgFailed] = useState<string | null>(null);
+  const showImg = !!n.thumbnail && imgFailed !== n.thumbnail;
 
   const titleBtn = (cls: string) => (
     <button
@@ -111,11 +120,10 @@ export function NoteCard({
         type="button"
         onClick={handlers.onCategory}
         aria-label={n.category ? `Categoría: ${n.category}. Cambiarla` : "Ponerle una categoría"}
+        style={n.category ? tone(categoryColor ?? "stone") : undefined}
         className={cx(
-          "inline-flex min-h-7 max-w-[14rem] items-center gap-1 rounded-full px-2 text-[12px] transition-colors",
-          n.category
-            ? "bg-accent-soft font-medium text-accent-fg hover:bg-[color-mix(in_oklab,var(--accent-soft),var(--accent)_14%)]"
-            : "border border-dashed border-line-strong text-muted hover:border-solid hover:text-fg",
+          "inline-flex min-h-7 max-w-[14rem] items-center gap-1 rounded-full px-2 text-[12px] transition-[filter,color,border-color]",
+          n.category ? "chip-solid font-medium hover:brightness-[1.08]" : "border border-dashed border-line-strong text-muted hover:border-solid hover:text-fg",
         )}
       >
         {n.category ? <FolderSimple size={12} weight="fill" aria-hidden /> : <Plus size={11} weight="bold" aria-hidden />}
@@ -131,6 +139,15 @@ export function NoteCard({
           #{t}
         </button>
       ))}
+      <button
+        type="button"
+        onClick={handlers.onMore}
+        aria-label="Más acciones: borrar, mover, fijar…"
+        title="Más acciones"
+        className="tap-tint ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      >
+        <DotsThree size={20} weight="bold" aria-hidden />
+      </button>
     </div>
   );
 
@@ -224,15 +241,20 @@ export function NoteCard({
     return shell(
       <div className="grid gap-2 p-3.5 lg:p-4">
         <div className="flex items-start gap-3">
-          {n.thumbnail ? (
+          {showImg ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={n.thumbnail}
+              src={n.thumbnail!}
               alt=""
               loading="lazy"
+              decoding="async"
               referrerPolicy="no-referrer"
-              onError={(e) => (e.currentTarget.style.display = "none")}
-              className="size-14 shrink-0 rounded-xl bg-surface-2 object-cover"
+              onError={() => setImgFailed(n.thumbnail)}
+              className={cx(
+                "shrink-0 rounded-xl bg-white object-cover ring-1 ring-line",
+                // En Para comprar la foto es el producto: un poco más grande.
+                section.id === "compras" ? "size-16 lg:size-[72px]" : "size-14",
+              )}
             />
           ) : (
             <span style={tone(section.color)} className="chip-solid inline-flex size-10 shrink-0 items-center justify-center rounded-xl">

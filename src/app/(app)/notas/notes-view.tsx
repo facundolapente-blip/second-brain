@@ -32,6 +32,7 @@ import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui
 import { tone } from "@/lib/palette";
 import { newClientId } from "@/lib/plan-logic";
 import {
+  CATEGORY_COLORS,
   NO_CATEGORY,
   NOTE_CATEGORY_MAX,
   NOTE_SECTIONS,
@@ -44,7 +45,7 @@ import {
   type NoteDTO,
   type NoteSectionId,
 } from "@/lib/notes-logic";
-import { deleteNote, moveNoteSection, saveNote, setNoteCategory, setNoteDone, setNotePinned } from "@/lib/offline/notes";
+import { deleteNote, moveNoteSection, saveNote, setNoteCategory, setNoteCategoryColor, setNoteDone, setNotePinned } from "@/lib/offline/notes";
 import { usePendingActions, type QueuedOp } from "@/lib/offline/queue";
 import { doneLabel, NoteCard } from "./note-card";
 import { NoteSheet, type NoteCategory, type NoteSheetActions, type NoteSheetHandle } from "./note-sheet";
@@ -55,6 +56,19 @@ type Counts = { all: number; bySection: Record<string, number>; laterVideos: num
 type Change = { add: NoteDTO } | { remove: string } | (Partial<NoteDTO> & { id: string });
 
 const PAGE = 60;
+
+const COLOR_NAMES: Record<string, string> = {
+  blue: "Azul",
+  green: "Verde",
+  orange: "Naranja",
+  purple: "Violeta",
+  pink: "Rosa",
+  teal: "Petróleo",
+  red: "Rojo",
+  yellow: "Amarillo",
+  brown: "Marrón",
+  stone: "Gris",
+};
 
 function hrefOf(f: Partial<Filters>, extra?: Record<string, string>) {
   const p = new URLSearchParams();
@@ -127,6 +141,10 @@ export function NotesView({
   const [moving, setMoving] = useState<NoteDTO | null>(null);
   const categorySheet = useRef<SheetHandle>(null);
   const [categorizing, setCategorizing] = useState<NoteDTO | null>(null);
+  // Color elegido recién (se ve al instante; después llega igual del servidor).
+  const [colorPicks, setColorPicks] = useState<Record<string, string>>({});
+  const cats = categories.map((c) => ({ ...c, color: colorPicks[`${c.section}/${c.name}`] ?? c.color }));
+  const colorOf = (section: string, name: string | null) => (name ? cats.find((c) => c.section === section && c.name === name)?.color : undefined);
   const [list, apply] = useOptimistic(notes, applyChange);
   const [, start] = useSafeTransition();
 
@@ -265,6 +283,14 @@ export function NotesView({
     notifyInfo(category ? `En ${category}` : "Sin categoría");
   }
 
+  function recolor(section: string, name: string, color: string) {
+    haptic("select");
+    setColorPicks((m) => ({ ...m, [`${section}/${name}`]: color }));
+    start(async () => {
+      await setNoteCategoryColor(section, name, color);
+    });
+  }
+
   function contextMenu(e: React.MouseEvent, n: NoteDTO) {
     showContextMenu(
       e,
@@ -312,7 +338,7 @@ export function NotesView({
         {section && (
           <CategoryPills
             filters={filters}
-            categories={categories.filter((c) => c.section === section.id)}
+            categories={cats.filter((c) => c.section === section.id)}
             uncategorized={uncategorized}
             total={counts.bySection[section.id] ?? 0}
           />
@@ -359,6 +385,7 @@ export function NotesView({
                     note={n}
                     today={today}
                     showSection={!filters.section}
+                    categoryColor={colorOf(sectionOf(n.section).id, n.category)}
                     pending={pendingIds.has(n.id)}
                     handlers={{
                       onOpen: () => sheet.current?.open(n),
@@ -366,6 +393,7 @@ export function NotesView({
                       onTag: (t) => router.push(hrefOf({ ...filters, tag: t }), { scroll: false }),
                       onCategory: () => openCategory(n),
                       onContextMenu: (e) => contextMenu(e, n),
+                      onMore: (e) => contextMenu(e, n),
                     }}
                   />
                 </SwipeRow>
@@ -385,18 +413,19 @@ export function NotesView({
         )}
       </main>
 
-      <NoteSheet ref={sheet} actions={sheetActions} tags={tags} categories={categories} />
+      <NoteSheet ref={sheet} actions={sheetActions} tags={tags} categories={cats} />
 
       <Sheet ref={categorySheet} title="Categoría">
         {categorizing && (
           <CategoryPicker
             key={categorizing.id}
             note={categorizing}
-            options={categories.filter((c) => c.section === sectionOf(categorizing.section).id)}
+            options={cats.filter((c) => c.section === sectionOf(categorizing.section).id)}
             onPick={(c) => {
               categorySheet.current?.close();
               categorize(categorizing, c);
             }}
+            onColor={(name, color) => recolor(sectionOf(categorizing.section).id, name, color)}
           />
         )}
       </Sheet>
@@ -583,9 +612,9 @@ function CategoryPills({
   if (!categories.length && filters.category !== NO_CATEGORY) return null;
   const shown = clicked ?? filters.category;
   const items = [
-    { id: "", name: "Todas", count: total },
-    ...categories.map((c) => ({ id: c.name, name: c.name, count: c.count })),
-    ...(uncategorized ? [{ id: NO_CATEGORY, name: "Sin categoría", count: uncategorized }] : []),
+    { id: "", name: "Todas", count: total, color: null as string | null },
+    ...categories.map((c) => ({ id: c.name, name: c.name, count: c.count, color: c.color as string | null })),
+    ...(uncategorized ? [{ id: NO_CATEGORY, name: "Sin categoría", count: uncategorized, color: null }] : []),
   ];
   return (
     <nav aria-label="Categorías" className="relative -mx-4 -mt-1 min-w-0 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
@@ -604,12 +633,19 @@ function CategoryPills({
                     setClicked(c.id);
                   }
                 }}
+                style={c.color ? tone(c.color) : undefined}
                 className={cx(
-                  "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] whitespace-nowrap transition-colors duration-[var(--dur-quick)]",
-                  on ? "bg-accent font-medium text-on-accent" : c.id === NO_CATEGORY ? "text-muted hover:bg-surface-2 hover:text-fg" : "bg-accent-soft text-accent-fg hover:bg-[color-mix(in_oklab,var(--accent-soft),var(--accent)_14%)]",
+                  "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] whitespace-nowrap transition-colors duration-[var(--dur-quick)]",
+                  on
+                    ? c.color
+                      ? "chip-solid border-transparent font-medium"
+                      : "border-ink bg-ink font-medium text-on-ink"
+                    : c.id === NO_CATEGORY
+                      ? "border-transparent text-muted hover:bg-surface-2 hover:text-fg"
+                      : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
                 )}
               >
-                {c.id && c.id !== NO_CATEGORY && <FolderSimple size={13} weight={on ? "fill" : "regular"} aria-hidden />}
+                {c.color && !on && <span className="size-2.5 rounded-full bg-[var(--tone-chip)]" aria-hidden />}
                 {c.name}
                 <span className={cx("font-mono text-[11px] tabular", on ? "opacity-80" : "opacity-70")}>{c.count}</span>
               </Link>
@@ -622,7 +658,18 @@ function CategoryPills({
 }
 
 /** Elegir la categoría de una nota: las de su sección, "Sin categoría" o una nueva. */
-function CategoryPicker({ note, options, onPick }: { note: NoteDTO; options: NoteCategory[]; onPick: (category: string | null) => void }) {
+function CategoryPicker({
+  note,
+  options,
+  onPick,
+  onColor,
+}: {
+  note: NoteDTO;
+  options: NoteCategory[];
+  onPick: (category: string | null) => void;
+  onColor: (name: string, color: string) => void;
+}) {
+  const currentColor = options.find((o) => o.name === note.category)?.color;
   const [text, setText] = useState("");
   const typed = normalizeCategory(text);
   const exists = typed ? options.find((o) => o.name.toLowerCase() === typed.toLowerCase()) : undefined;
@@ -653,6 +700,34 @@ function CategoryPicker({ note, options, onPick }: { note: NoteDTO; options: Not
           {exists ? "Elegir" : "Crear"}
         </Button>
       </form>
+      {note.category && currentColor && (
+        <div className="grid gap-2">
+          <span className="kicker">Color de {note.category}</span>
+          <div role="radiogroup" aria-label={`Color de ${note.category}`} className="flex flex-wrap gap-2">
+            {CATEGORY_COLORS.map((c) => {
+              const on = currentColor === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={COLOR_NAMES[c]}
+                  title={COLOR_NAMES[c]}
+                  onClick={() => onColor(note.category!, c)}
+                  style={tone(c)}
+                  className={cx(
+                    "chip-solid inline-flex size-9 items-center justify-center rounded-full transition-[box-shadow] duration-[var(--dur-quick)]",
+                    on && "ring-2 ring-fg ring-offset-2 ring-offset-surface",
+                  )}
+                >
+                  {on && <Check size={15} weight="bold" aria-hidden />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {(options.length > 0 || note.category) && (
         <div className="grid gap-1">
           {options
@@ -667,7 +742,7 @@ function CategoryPicker({ note, options, onPick }: { note: NoteDTO; options: Not
                   aria-pressed={current}
                   className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px]"
                 >
-                  <span className={cx("inline-flex size-8 items-center justify-center rounded-lg", current ? "bg-accent text-on-accent" : "bg-accent-soft text-accent-fg")}>
+                  <span style={tone(o.color)} className="chip-solid inline-flex size-8 items-center justify-center rounded-lg">
                     {current ? <Check size={16} weight="bold" aria-hidden /> : <FolderSimple size={16} weight="fill" aria-hidden />}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{o.name}</span>

@@ -1,7 +1,18 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { NOTE_SECTIONS, NO_CATEGORY, isNoteSection, youtubeId, youtubeThumb, type NoteDTO } from "./notes-logic";
+import {
+  assignCategoryColors,
+  categoryColorKey,
+  NOTE_CATEGORY_COLORS_KEY,
+  NOTE_SECTIONS,
+  NO_CATEGORY,
+  isNoteSection,
+  parseCategoryColors,
+  safeJson,
+  type CategoryColor,
+  type NoteDTO,
+} from "./notes-logic";
 import { toPhotoDTO } from "./photos";
 
 /**
@@ -107,11 +118,22 @@ export async function getNoteCounts() {
  * Categorías propias por sección, con cuántas notas tiene cada una (de la más usada a la
  * menos) y cuántas no tienen categoría. Las usan los filtros y la hoja.
  */
-export async function getNoteCategories(): Promise<{ section: string; name: string; count: number }[]> {
-  const rows = await prisma.note.groupBy({ by: ["section", "category"], where: { category: { not: null } }, _count: { _all: true } });
-  return rows
-    .map((r) => ({ section: isNoteSection(r.section) ? r.section : "links", name: r.category!, count: r._count._all }))
+export async function getNoteCategories(): Promise<{ section: string; name: string; count: number; color: CategoryColor }[]> {
+  const [rows, saved] = await Promise.all([
+    prisma.note.groupBy({ by: ["section", "category"], where: { category: { not: null } }, _count: { _all: true } }),
+    getCategoryColors(),
+  ]);
+  const cats = rows.map((r) => ({ section: isNoteSection(r.section) ? r.section : "links", name: r.category!, count: r._count._all }));
+  const colors = assignCategoryColors(cats, saved);
+  return cats
+    .map((c) => ({ ...c, color: colors[categoryColorKey(c.section, c.name)] }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "es"));
+}
+
+/** Colores guardados de las categorías (las que no tienen se reparten al leer). */
+export async function getCategoryColors(): Promise<Record<string, CategoryColor>> {
+  const row = await prisma.appSetting.findUnique({ where: { key: NOTE_CATEGORY_COLORS_KEY } });
+  return parseCategoryColors(safeJson(row?.value));
 }
 
 /** Cuántas notas de una sección no tienen categoría. */
@@ -136,125 +158,4 @@ export async function getNotesSummary() {
   return { latest: latest.map(toDTO), laterVideos };
 }
 
-// ─── Título y miniatura de un link ──────────────────────────────────────────
-
-const TIMEOUT_MS = 3000;
-const MAX_BYTES = 200 * 1024;
-
-/** Un dominio que no es la compu ni la red de la casa (no se le piden cosas a la red interna). */
-function publicHost(u: URL): boolean {
-  const h = u.hostname.toLowerCase();
-  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return false;
-  if (/^\[/.test(h)) return false; // IPv6 literal
-  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224) return false;
-  }
-  return true;
-}
-
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;|&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&");
-}
-
-function clean(s: string | undefined | null): string | null {
-  const t = decodeEntities(String(s ?? "")).replace(/\s+/g, " ").trim();
-  return t ? t.slice(0, 200) : null;
-}
-
-/** Lee como mucho `MAX_BYTES` del cuerpo (una página entera puede pesar megas). */
-async function readHead(res: Response): Promise<string> {
-  const reader = res.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (size < MAX_BYTES) {
-    const { done, value } = await reader.read();
-    if (done || !value) break;
-    chunks.push(value);
-    size += value.length;
-    // El título está arriba: con el </head> alcanza.
-    if (new TextDecoder().decode(value).includes("</head>")) break;
-  }
-  reader.cancel().catch(() => {});
-  const all = new Uint8Array(Math.min(size, MAX_BYTES));
-  let off = 0;
-  for (const c of chunks) {
-    const part = c.subarray(0, Math.max(0, all.length - off));
-    all.set(part, off);
-    off += part.length;
-  }
-  return new TextDecoder().decode(all);
-}
-
-/** "Mercado Libre" en mercadolibre.com.uy, "Instagram" en instagram.com: el nombre del sitio. */
-function genericTitle(title: string, host: string): boolean {
-  const t = fold(title).replace(/[^a-z0-9]/g, "");
-  return t.length > 0 && t.length <= 30 && fold(host).replace(/[^a-z0-9.]/g, "").split(".").some((part) => part === t);
-}
-
-/**
- * Título (y miniatura si se puede) de un link, para una nota guardada sin
- * título. YouTube por oEmbed; el resto, el og:title o el <title> de la página.
- * Tres segundos como mucho y nunca falla: sin datos, devuelve nulls.
- */
-export async function fetchLinkMeta(url: string): Promise<{ title: string | null; thumbnail: string | null }> {
-  const none = { title: null, thumbnail: null };
-  let u: URL;
-  try {
-    u = new URL(url);
-  } catch {
-    return none;
-  }
-  if ((u.protocol !== "http:" && u.protocol !== "https:") || !publicHost(u)) return none;
-  const yt = youtubeId(url);
-  try {
-    if (yt) {
-      const r = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, { signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
-      const thumb = youtubeThumb(yt);
-      if (!r.ok) return { title: null, thumbnail: thumb };
-      const j = (await r.json()) as { title?: string };
-      return { title: clean(j.title), thumbnail: thumb };
-    }
-    const r = await fetch(u, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      redirect: "follow",
-      cache: "no-store",
-      headers: { "user-agent": "Mozilla/5.0 (compatible; SecondBrain/1.0)", accept: "text/html,application/xhtml+xml", "accept-language": "es-UY,es;q=0.9,en;q=0.6" },
-    });
-    // Después de las redirecciones, también tiene que ser un sitio público.
-    if (!r.ok || !publicHost(new URL(r.url || u.href)) || !/html/i.test(r.headers.get("content-type") ?? "")) {
-      r.body?.cancel().catch(() => {});
-      return none;
-    }
-    const html = await readHead(r);
-    const meta = (prop: string) =>
-      html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']`, "i"))?.[1] ??
-      html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${prop}["']`, "i"))?.[1];
-    let title = clean(meta("og:title")) ?? clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
-    // Un título que es solo el nombre del sitio ("Mercado Libre") no dice nada: mejor sin título.
-    if (title && genericTitle(title, u.hostname)) title = null;
-    const img = meta("og:image");
-    let thumbnail: string | null = null;
-    if (img) {
-      try {
-        const abs = new URL(decodeEntities(img), r.url || u.href);
-        if (abs.protocol === "https:" && abs.href.length <= 1000) thumbnail = abs.href;
-      } catch {
-        // Imagen con una dirección rara: sin miniatura.
-      }
-    }
-    return { title, thumbnail };
-  } catch {
-    return yt ? { title: null, thumbnail: youtubeThumb(yt) } : none;
-  }
-}
+export { fetchLinkMeta } from "./link-meta";

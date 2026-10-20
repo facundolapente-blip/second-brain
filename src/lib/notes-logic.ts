@@ -365,6 +365,63 @@ export const NOTE_CATEGORY_MAX = 40;
 /** En la dirección, `?categoria=sin` filtra las que no tienen categoría. */
 export const NO_CATEGORY = "sin";
 
+/** Colores de las categorías: `{ "videos/IA": "blue" }` en este AppSetting. */
+export const NOTE_CATEGORY_COLORS_KEY = "notas_categoria_colores";
+/**
+ * Orden en que se reparten los colores a las categorías nuevas de una sección (los de
+ * `PALETTE` de palette.ts, que no se importa acá porque los scripts usan este archivo).
+ */
+export const CATEGORY_COLORS = ["blue", "green", "orange", "purple", "pink", "teal", "red", "yellow", "brown", "stone"] as const;
+export type CategoryColor = (typeof CATEGORY_COLORS)[number];
+
+export const isCategoryColor = (v: unknown): v is CategoryColor => typeof v === "string" && (CATEGORY_COLORS as readonly string[]).includes(v);
+export const categoryColorKey = (section: string, name: string) => `${section}/${name}`;
+
+/** JSON guardado como texto (lo roto o vacío = null). */
+export function safeJson(v: string | null | undefined): unknown {
+  if (!v) return null;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+}
+
+/** Lee el mapa guardado (lo que no es un color válido se ignora). */
+export function parseCategoryColors(v: unknown): Record<string, CategoryColor> {
+  const out: Record<string, CategoryColor> = {};
+  if (v && typeof v === "object" && !Array.isArray(v)) for (const [k, c] of Object.entries(v)) if (isCategoryColor(c)) out[k] = c;
+  return out;
+}
+
+/**
+ * Color para una categoría nueva: el primero que todavía no usa ninguna otra de la sección;
+ * si ya están todos, uno fijo según el nombre.
+ */
+export function pickCategoryColor(used: readonly string[], name: string): CategoryColor {
+  const free = CATEGORY_COLORS.find((c) => !used.includes(c));
+  if (free) return free;
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return CATEGORY_COLORS[h % CATEGORY_COLORS.length];
+}
+
+/**
+ * Le da color a las categorías que no tienen (en orden alfabético, así es estable) sin
+ * repetir dentro de la sección mientras alcance. Devuelve el mapa completo.
+ */
+export function assignCategoryColors(cats: { section: string; name: string }[], saved: Record<string, CategoryColor>): Record<string, CategoryColor> {
+  const out = { ...saved };
+  const sorted = [...cats].sort((a, b) => a.section.localeCompare(b.section) || a.name.localeCompare(b.name, "es"));
+  for (const c of sorted) {
+    const key = categoryColorKey(c.section, c.name);
+    if (out[key]) continue;
+    const used = cats.filter((o) => o.section === c.section).map((o) => out[categoryColorKey(o.section, o.name)]).filter(Boolean);
+    out[key] = pickCategoryColor(used, c.name);
+  }
+  return out;
+}
+
 /**
  * Categoría escrita a mano: sin espacios de más, hasta 40 caracteres y con la primera
  * letra en mayúscula ("ia" → "Ia"; "desarrollo personal" → "Desarrollo personal"). Vacía = null.

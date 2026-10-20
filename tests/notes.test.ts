@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { decodeEntities, pickImage, stripSiteSuffix } from "../src/lib/link-meta";
 import {
+  assignCategoryColors,
+  parseCategoryColors,
+  pickCategoryColor,
+  safeJson,
   normalizeCategory,
   titleFromUrl,
   bodyWithoutUrl,
@@ -274,5 +279,49 @@ describe("normalizeCategory (categoría propia)", () => {
   });
   it("corta en 40 caracteres", () => {
     expect(normalizeCategory("a".repeat(60))?.length).toBe(40);
+  });
+});
+
+describe("colores de las categorías", () => {
+  it("cada categoría nueva de una sección toma un color que no se usa", () => {
+    expect(pickCategoryColor([], "IA")).toBe("blue");
+    expect(pickCategoryColor(["blue"], "Música")).toBe("green");
+  });
+  it("reparte sin repetir y respeta lo guardado", () => {
+    const cats = [
+      { section: "videos", name: "Música" },
+      { section: "videos", name: "IA" },
+      { section: "compras", name: "Ropa" },
+    ];
+    const out = assignCategoryColors(cats, { "videos/Música": "blue" });
+    expect(out["videos/Música"]).toBe("blue");
+    expect(out["videos/IA"]).toBe("green");
+    expect(out["compras/Ropa"]).toBe("blue");
+  });
+  it("lo guardado que no es un color se ignora", () => {
+    expect(parseCategoryColors({ "videos/IA": "red", "videos/X": "fucsia" })).toEqual({ "videos/IA": "red" });
+    expect(safeJson("{roto")).toBeNull();
+  });
+});
+
+describe("foto y título de un link", () => {
+  it("toma la primera imagen usable, en https y sin logos", () => {
+    expect(pickImage([null, "/img/p.jpg"], "https://tienda.uy/products/x")).toBe("https://tienda.uy/img/p.jpg");
+    expect(pickImage(["http://cdn.uy/a.jpg"], "https://tienda.uy/")).toBe("https://cdn.uy/a.jpg");
+    expect(pickImage(["https://luxo.com.uy/cdn/Luxo_-_Logo.png", "https://luxo.com.uy/cdn/buzo.jpg"], "https://luxo.com.uy/")).toBe("https://luxo.com.uy/cdn/buzo.jpg");
+  });
+  it("traduce los códigos HTML de los títulos", () => {
+    expect(decodeEntities("dise&ntilde;o &middot; Vinile 12&Prime; &ndash; A&amp;B")).toBe("diseño · Vinile 12″ – A&B");
+  });
+});
+
+describe("stripSiteSuffix", () => {
+  it("saca el nombre de la tienda del final del título", () => {
+    expect(stripSiteSuffix("Viandas congeladas - Mosca de Mori", "www.moscademori.com.uy")).toBe("Viandas congeladas");
+    expect(stripSiteSuffix("Buzo Over Pyur Martini - VCP - Tienda Online", "vcp.com.uy")).toBe("Buzo Over Pyur Martini");
+  });
+  it("no corta si el tramo no es el sitio", () => {
+    expect(stripSiteSuffix("Technics - T-SHIRT YOYAKU X TECHNICS", "yoyaku.io")).toBe("Technics - T-SHIRT YOYAKU X TECHNICS");
+    expect(stripSiteSuffix("MarkItDown: deja de quemar tokens", "www.josegerardo.ai")).toBe("MarkItDown: deja de quemar tokens");
   });
 });

@@ -6,7 +6,7 @@ import {
   deleteNote as _deleteNote,
   setNotePinned as _setNotePinned,
   setNoteDone as _setNoteDone,
-  moveNoteSection as _moveNoteSection, setNoteCategory as _setNoteCategory,
+  moveNoteSection as _moveNoteSection, setNoteCategory as _setNoteCategory, setNoteCategoryColor as _setNoteCategoryColor,
 } from "../notes-actions";
 import { queueable } from "./queue";
 export type { NoteResult } from "../notes-actions";
@@ -19,3 +19,4 @@ export const setNotePinned = queueable("notes.setNotePinned", _setNotePinned, { 
 export const setNoteDone = queueable("notes.setNoteDone", _setNoteDone, { key: (id) => `vista-${id}` });
 export const moveNoteSection = queueable("notes.moveNoteSection", _moveNoteSection, { key: (id) => `seccion-${id}` });
 export const setNoteCategory = queueable("notes.setNoteCategory", _setNoteCategory, { key: (id) => `categoria-${id}` });
+export const setNoteCategoryColor = queueable("notes.setNoteCategoryColor", _setNoteCategoryColor, { key: (section, name) => `color-${section}/${name}` });

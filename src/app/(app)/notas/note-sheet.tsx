@@ -32,7 +32,7 @@ export type NoteSheetHandle = { open: (note?: NoteDTO, preset?: { section?: Note
 
 /** Lo que hace la pantalla con la hoja, al instante (si el servidor falla, vuelve sola y avisa). */
 /** Una categoría propia de una sección, con cuántas notas la usan. */
-export type NoteCategory = { section: string; name: string; count: number };
+export type NoteCategory = { section: string; name: string; count: number; color: string };
 
 export type NoteSheetActions = {
   save: (fd: FormData, note: NoteDTO | undefined, files: File[]) => void;
@@ -125,7 +125,8 @@ function NoteForm({
   const detected = !url.trim() ? detectUrl(body) : null;
   const urlInvalid = url.trim() !== "" && !normalizeNoteUrl(url);
   // Las categorías son de cada sección: se ofrecen las que ya se usan ahí.
-  const sectionCategories = categories.filter((c) => c.section === section).map((c) => c.name);
+  const sectionCats = categories.filter((c) => c.section === section);
+  const sectionCategories = sectionCats.map((c) => c.name);
   const categoryValue = normalizeCategory(category);
   const offer = [...new Set([...SUGGESTED_TAGS, ...knownTags])].slice(0, 10);
 
@@ -264,7 +265,7 @@ function NoteForm({
         </Field>
         {sectionCategories.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {sectionCategories.slice(0, 14).map((c) => {
+            {sectionCats.slice(0, 14).map(({ name: c, color }) => {
               const on = categoryValue === c;
               return (
                 <button
@@ -275,11 +276,13 @@ function NoteForm({
                     haptic("select");
                     setCategory(on ? "" : c);
                   }}
+                  style={tone(color)}
                   className={cx(
-                    "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] transition-colors duration-[var(--dur-quick)]",
-                    on ? "bg-ink text-on-ink" : "bg-surface-2 text-muted hover:text-fg",
+                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors duration-[var(--dur-quick)]",
+                    on ? "chip-solid font-medium" : "bg-surface-2 text-muted hover:text-fg",
                   )}
                 >
+                  {!on && <span className="size-2 rounded-full bg-[var(--tone-chip)]" aria-hidden />}
                   {c}
                 </button>
               );
