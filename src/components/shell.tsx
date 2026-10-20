@@ -8,7 +8,7 @@ import { plainClick } from "./tab-nav";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Bell, CalendarCheck, ChartLineUp, Compass, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
+import { Bell, CalendarCheck, ChartLineUp, Compass, ClipboardText, ClockCounterClockwise, Database, House, List, Medal, Note, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
 import { signOut } from "@/lib/auth-client";
 import { THEME_COLOR, THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
@@ -25,6 +25,7 @@ const MODULES: Module[] = [
   { href: "/journal", label: "Journal", icon: Notebook, color: "var(--mod-journal)" },
   { href: "/gastos", label: "Gastos", icon: Wallet, color: "var(--mod-gastos)" },
   { href: "/plan", label: "Plan semanal", icon: CalendarCheck, color: "var(--mod-plan)" },
+  { href: "/notas", label: "Notas", icon: Note, color: "var(--mod-notas)" },
 ];
 
 /** Herramientas que cruzan los módulos. */
@@ -136,7 +137,8 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   onNavigate?.();
                 }}
                 aria-current={active ? "page" : undefined}
-                className={cx("h-11 text-[15px]", linkCls(active))}
+                // En la compu con poca altura (1024×768) el menú entra entero sin desplazarse.
+                className={cx("h-11 text-[15px] lg:[@media(max-height:860px)]:h-10", linkCls(active))}
               >
                 <span className="font-mono text-[11px] tabular opacity-60">{String(i).padStart(2, "0")}</span>
                 <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
@@ -147,7 +149,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </ul>
-      <p className="mt-6 mb-1.5 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
+      <p className="mt-6 mb-1.5 lg:[@media(max-height:860px)]:mt-4 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
       <ul className="grid gap-1">
         {TOOLS.map((t) => {
           const active = isActive(t.href);
@@ -162,7 +164,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   onNavigate?.();
                 }}
                 aria-current={active ? "page" : undefined}
-                className={cx("h-10 text-[14px]", linkCls(active))}
+                className={cx("h-10 text-[14px] lg:[@media(max-height:860px)]:h-8", linkCls(active))}
               >
                 <Ico size={17} weight={active ? "fill" : "regular"} aria-hidden />
                 {t.label}
@@ -533,7 +535,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
       <ContextMenuHost />
       <PullToRefresh />
       <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
-        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-side-line bg-side px-4 pt-7 pb-5 lg:flex print:hidden">
+        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 overflow-y-auto overscroll-contain border-r border-side-line bg-side px-4 pt-7 pb-5 [scrollbar-width:thin] lg:flex print:hidden lg:[@media(max-height:860px)]:gap-4 lg:[@media(max-height:860px)]:pt-5 lg:[@media(max-height:860px)]:pb-4">
           <Brand />
           <Nav />
           <div className="mt-auto grid gap-3">

@@ -5,6 +5,7 @@ import { fromDbDate, formatShort } from "./dates";
 import { moneyCents } from "./format";
 import { toCents } from "./finance-logic";
 import { deletePhotoFiles } from "./photos";
+import { noteHeading } from "./notes-logic";
 
 /**
  * Papelera de toda la app. Antes de borrar algo se guarda su foto completa
@@ -29,9 +30,10 @@ export type TrashKind =
   | "task"
   | "keyResult"
   | "objective"
-  | "photo";
+  | "photo"
+  | "note";
 
-export type Module = "gastos" | "habitos" | "journal" | "plan";
+export type Module = "gastos" | "habitos" | "journal" | "plan" | "notas";
 
 const MODULE: Record<TrashKind, Module> = {
   transaction: "gastos",
@@ -50,6 +52,7 @@ const MODULE: Record<TrashKind, Module> = {
   keyResult: "plan",
   objective: "plan",
   photo: "journal",
+  note: "notas",
 };
 
 export const KIND_LABEL: Record<TrashKind, string> = {
@@ -69,6 +72,7 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   keyResult: "Resultado clave",
   objective: "Objetivo",
   photo: "Foto",
+  note: "Nota",
 };
 
 // ─── Actividad ──────────────────────────────────────────────────────────────
@@ -185,10 +189,15 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
     case "photo": {
       const a = await db.attachment.findUnique({
         where: { id },
-        include: { journalEntry: { select: { date: true, title: true } }, transaction: { select: { title: true, date: true } } },
+        include: {
+          journalEntry: { select: { date: true, title: true } },
+          transaction: { select: { title: true, date: true } },
+          note: { select: { title: true, body: true, url: true } },
+        },
       });
       if (!a) return null;
-      const { journalEntry, transaction, ...row } = a;
+      const { journalEntry, transaction, note, ...row } = a;
+      if (note) return { label: `Foto de una nota (${noteHeading(note)})`, data: { row }, module: "notas" };
       if (journalEntry) {
         return { label: `Foto del journal (${formatShort(fromDbDate(journalEntry.date))}${journalEntry.title ? ` · ${journalEntry.title}` : ""})`, data: { row }, module: "journal" };
       }
@@ -212,6 +221,12 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
     case "keyResult": {
       const k = await db.planKeyResult.findUnique({ where: { id } });
       return k ? { label: k.title, data: { row: k } } : null;
+    }
+    case "note": {
+      const n = await db.note.findUnique({ where: { id }, include: { attachments: true } });
+      if (!n) return null;
+      const { attachments, ...row } = n;
+      return { label: noteHeading(n), data: { row, attachments } };
     }
     case "objective": {
       const o = await db.planObjective.findUnique({ where: { id }, include: { keyResults: true } });
@@ -239,6 +254,7 @@ async function remove(kind: TrashKind, id: string, db: Db) {
     task: () => db.planTask.deleteMany({ where: { id } }),
     keyResult: () => db.planKeyResult.deleteMany({ where: { id } }),
     photo: () => db.attachment.deleteMany({ where: { id } }),
+    note: () => db.note.deleteMany({ where: { id } }),
     objective: async () => {
       await db.planKeyResult.deleteMany({ where: { objectiveId: id } });
       await db.planObjective.deleteMany({ where: { id } });
@@ -391,6 +407,9 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       if (row.transactionId && !(await db.transaction.findUnique({ where: { id: row.transactionId }, select: { id: true } }))) {
         return "El movimiento de ese comprobante ya no existe: restaurá primero el movimiento.";
       }
+      if (row.noteId && !(await db.note.findUnique({ where: { id: row.noteId }, select: { id: true } }))) {
+        return "La nota de esa foto ya no existe: restaurá primero la nota.";
+      }
       await db.attachment.create({ data: row });
       return null;
     }
@@ -414,6 +433,10 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       return null;
     case "keyResult":
       await db.planKeyResult.create({ data: { ...row, objectiveId: await orNull(exists.objective, row.objectiveId) } });
+      return null;
+    case "note":
+      await db.note.create({ data: row });
+      await restoreAttachments(data, db);
       return null;
     case "objective": {
       await db.planObjective.create({ data: row });

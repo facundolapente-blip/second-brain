@@ -678,10 +678,14 @@ model Attachment {
   journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
   transactionId  String?
   transaction    Transaction?  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  /// Foto o documento de una nota (sección Archivos de Notas).
+  noteId         String?
+  note           Note?         @relation(fields: [noteId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now())
 
   @@index([journalEntryId])
   @@index([transactionId])
+  @@index([noteId])
 }
 
 /// Recibo de una acción que no aguanta repetirse (crear, duplicar, pasar de semana):
@@ -715,4 +719,39 @@ model PushSubscription {
   createdAt  DateTime  @default(now())
   /// Último aviso que llegó bien al servicio de push.
   lastUsedAt DateTime?
+}
+
+// ─── Notas ──────────────────────────────────────────────────────────────────
+
+/// Lo que Facu antes se mandaba a sí mismo por WhatsApp: videos, links, ideas,
+/// compras, cursos, música, datos y archivos. La sección es texto (los ids están
+/// en `NOTE_SECTIONS` de `src/lib/notes-logic.ts`): sumar o renombrar secciones
+/// no necesita migración.
+model Note {
+  id         String   @id @default(cuid())
+  section    String
+  title      String?
+  /// Texto libre; puede quedar vacío si la nota es solo un link.
+  body       String   @default("")
+  url        String?
+  /// youtube | instagram | tiktok | spotify | x | web… (`urlKindOf`).
+  urlKind    String?
+  thumbnail  String?
+  /// Precio en texto libre (sección Para comprar): "260 con envío", "95 usd c/u".
+  price      String?
+  tags       String[] @default([])
+  pinned     Boolean  @default(false)
+  /// "Ver después": visto o hecho.
+  done       Boolean  @default(false)
+  /// app | whatsapp | import. Junto con externalId deja importar sin duplicar.
+  source     String?
+  externalId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  attachments Attachment[]
+
+  @@unique([source, externalId])
+  @@index([section, createdAt])
+  @@index([createdAt])
 }

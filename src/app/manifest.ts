@@ -22,6 +22,8 @@ export default function manifest(): MetadataRoute.Manifest {
       { name: "Escribir en el journal", short_name: "Escribir", url: "/journal/escribir", icons: [{ src: "/icon-192", sizes: "192x192" }] },
       { name: "Hábitos de hoy", short_name: "Hábitos", url: "/habitos", icons: [{ src: "/icon-192", sizes: "192x192" }] },
       { name: "Plan de la semana", short_name: "Plan", url: "/plan", icons: [{ src: "/icon-192", sizes: "192x192" }] },
+      // Android muestra los primeros 4; este queda para los que muestran más.
+      { name: "Nueva nota", short_name: "Nota", url: "/notas?nuevo=1", icons: [{ src: "/icon-192", sizes: "192x192" }] },
     ],
     // Aparece en "Compartir" de otras apps (Android, con la app instalada).
     share_target: {

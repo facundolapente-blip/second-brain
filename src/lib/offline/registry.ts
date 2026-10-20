@@ -10,5 +10,6 @@ import "./habit";
 import "./journal";
 import "./checkin";
 import "./values";
+import "./notes";
 
 export { flushActions, pendingActions, subscribePending } from "./queue";

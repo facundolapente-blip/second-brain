@@ -18,11 +18,14 @@ export async function uploadPhoto(fd: FormData): Promise<PhotoResult> {
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No llegó la foto." };
   const entry = fd.get("journalEntryId");
   const tx = fd.get("transactionId");
+  const note = fd.get("noteId");
   let owner: PhotoOwner;
   if (validId(entry) && (await prisma.journalEntry.findUnique({ where: { id: entry }, select: { id: true } }))) {
     owner = { journalEntryId: entry };
   } else if (validId(tx) && (await prisma.transaction.findUnique({ where: { id: tx }, select: { id: true } }))) {
     owner = { transactionId: tx };
+  } else if (validId(note) && (await prisma.note.findUnique({ where: { id: note }, select: { id: true } }))) {
+    owner = { noteId: note };
   } else {
     return { ok: false, error: "Eso ya no existe." };
   }
@@ -33,8 +36,9 @@ export async function uploadPhoto(fd: FormData): Promise<PhotoResult> {
   try {
     const photo = await storePhoto(file, owner, { width: num("width"), height: num("height") });
     if ("journalEntryId" in owner) await logActivity("updated", "journal", owner.journalEntryId, "Foto agregada a una entrada");
+    else if ("noteId" in owner) await logActivity("updated", "note", owner.noteId, "Foto agregada a una nota");
     else await logActivity("updated", "transaction", owner.transactionId, "Comprobante agregado a un movimiento");
-    revalidatePath("journalEntryId" in owner ? "/journal" : "/gastos", "layout");
+    revalidatePath("journalEntryId" in owner ? "/journal" : "noteId" in owner ? "/notas" : "/gastos", "layout");
     return { ok: true, photo };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "No se pudo subir la foto." };
@@ -45,8 +49,8 @@ export async function uploadPhoto(fd: FormData): Promise<PhotoResult> {
 export async function deletePhoto(id: string) {
   await exigirSesion();
   if (!validId(id)) return;
-  const a = await prisma.attachment.findUnique({ where: { id }, select: { journalEntryId: true } });
+  const a = await prisma.attachment.findUnique({ where: { id }, select: { journalEntryId: true, noteId: true } });
   if (!a) return;
   await trashAndDelete("photo", id);
-  revalidatePath(a.journalEntryId ? "/journal" : "/gastos", "layout");
+  revalidatePath(a.journalEntryId ? "/journal" : a.noteId ? "/notas" : "/gastos", "layout");
 }

@@ -20,7 +20,7 @@ export function photosEnabled() {
 
 const folder = () => (process.env.VERCEL_ENV === "production" ? "fotos/" : "dev/fotos/");
 
-export type PhotoOwner = { journalEntryId: string } | { transactionId: string };
+export type PhotoOwner = { journalEntryId: string } | { transactionId: string } | { noteId: string };
 
 export async function storePhoto(file: File, owner: PhotoOwner, size?: { width?: number; height?: number }): Promise<PhotoDTO> {
   if (!TYPES.has(file.type)) throw new Error("Tiene que ser una imagen (JPG, PNG o WebP).");

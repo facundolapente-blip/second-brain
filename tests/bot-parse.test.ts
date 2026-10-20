@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayAtEnd, parseBlock, parseCommand, parseJournal, parseTask } from "@/lib/bot/parse";
+import { dayAtEnd, looksLikeExpense, looksLikePrice, parseBlock, parseCommand, parseJournal, parseTask } from "@/lib/bot/parse";
 
 const TODAY = "2026-10-19";
 
@@ -64,5 +64,16 @@ describe("día y hora en cualquier lugar (pedido de Facu)", () => {
   });
   it("tarea con el día adelante", () => {
     expect(parseTask("viernes llamar al banco", TODAY)).toEqual({ title: "Llamar al banco", deadline: "2026-10-23" });
+  });
+});
+
+describe("mensajes sin comando (Notas)", () => {
+  it("precio suelto después de un link de tienda", () => {
+    for (const t of ["260 con envio", "250 con envío", "95 usd c/u", "$ 1.200", "u$s 40", "1500"]) expect(looksLikePrice(t), t).toBe(true);
+    for (const t of ["350 almuerzo", "3 perfumes", "Curso nico gallusi", "260 con envio\notra cosa"]) expect(looksLikePrice(t), t).toBe(false);
+  });
+  it("gasto sin GG: un renglón que empieza con el monto y tiene palabras", () => {
+    for (const t of ["350 almuerzo itau", "+750 disco prex", "usd 20 nafta", "$ 300 taxi"]) expect(looksLikeExpense(t), t).toBe(true);
+    for (const t of ["+49 9286 9555-0", "3 perfumes\n3 libros", "https://youtu.be/abc", "Sauverox", "1500"]) expect(looksLikeExpense(t), t).toBe(false);
   });
 });

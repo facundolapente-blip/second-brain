@@ -3,7 +3,8 @@
 /*
  * Dos temas (cookie sb_tema → <html data-theme>):
  *  - Claro (por defecto): cada módulo se tiñe con su color ([data-module] en su
- *    layout): Hábitos verde, Journal lavanda, Gastos petróleo, Plan ámbar.
+ *    layout): Hábitos verde, Journal lavanda, Gastos petróleo, Plan ámbar,
+ *    Notas frambuesa.
  *  - Oscuro: carbón con un resplandor tenue del color del módulo.
  * Tipografía: Geist para todo, Geist Mono para números, fechas y rótulos.
  * Los colores de identidad (--p-*) y los estados de un día (--st-*) tienen
@@ -56,11 +57,14 @@
   --mod-gastos: #2f7f8f;
   --mod-plan: #c27a35;
   --mod-inicio: #3f5b7d;
+  /* Frambuesa: lejos del ámbar del Plan y del lavanda del Journal; 5,8:1 con blanco. */
+  --mod-notas: #a8406a;
   /* Color de cada módulo para marcas chicas (puntos, barras) en Inicio. */
   --c-habitos: var(--mod-habitos);
   --c-journal: var(--mod-journal);
   --c-gastos: var(--mod-gastos);
   --c-plan: var(--mod-plan);
+  --c-notas: var(--mod-notas);
 
   /* Estados de un día de hábito. */
   --st-done-bg: #dcecdf; --st-done-line: #3c855a; --st-done-fg: #22603b;
@@ -138,6 +142,7 @@
 [data-module="gastos"] { --mod: var(--mod-gastos); }
 [data-module="plan"] { --mod: var(--mod-plan); }
 [data-module="inicio"] { --mod: var(--mod-inicio); }
+[data-module="notas"] { --mod: var(--mod-notas); }
 /* Plan en claro: el ámbar del módulo no da contraste como acento (2,8:1 sobre el fondo y
    3,4:1 con el blanco de las casillas tildadas). El acento es un ámbar tostado (5,6:1 con
    blanco, 4,6:1 sobre --bg); el fondo y los tonos suaves siguen con --mod-plan. */
@@ -149,6 +154,7 @@
   --c-journal: color-mix(in oklab, var(--mod-journal) 70%, white);
   --c-gastos: color-mix(in oklab, var(--mod-gastos) 70%, white);
   --c-plan: color-mix(in oklab, var(--mod-plan) 75%, white);
+  --c-notas: color-mix(in oklab, var(--mod-notas) 70%, white);
   --bg: #141413; --surface: #1d1d1b; --surface-2: #252522; --surface-3: #2d2d2a; --raised: #393935;
   --border: #2c2c29; --border-strong: #3c3c38; --text: #efece5; --muted: #a29e95; --faint: #8f8b83;
   --ink: #efece5; --on-ink: #151514; --danger: #e07a70; --success: #93bf93; --focus: rgba(239, 236, 229, 0.22);

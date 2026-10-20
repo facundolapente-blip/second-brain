@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { handleBotMessage } from "@/lib/bot/bot";
+import { saveMediaNote, type IncomingMedia } from "@/lib/bot/notes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -68,7 +69,43 @@ async function reply(to: string, text: string) {
   return isTestToken(process.env.WHATSAPP_TOKEN ?? "") ? Response.json({ reply: text }) : OK();
 }
 
-type Incoming = { id?: unknown; from?: unknown; type?: unknown; text?: { body?: unknown } };
+type MediaPart = { id?: unknown; mime_type?: unknown; caption?: unknown; filename?: unknown };
+type Incoming = {
+  id?: unknown;
+  from?: unknown;
+  type?: unknown;
+  text?: { body?: unknown };
+  image?: MediaPart;
+  document?: MediaPart;
+  video?: MediaPart;
+  audio?: MediaPart;
+};
+
+const MEDIA_KINDS = ["image", "document", "video", "audio"] as const;
+const IMAGE_MAX = 8 * 1024 * 1024;
+
+/** Baja una imagen de WhatsApp (dos pasos: la URL del archivo y después el archivo, los dos con el token). */
+async function downloadImage(mediaId: string, mime: string): Promise<File | null> {
+  const token = process.env.WHATSAPP_TOKEN!;
+  if (isTestToken(token)) return null;
+  try {
+    const info = await fetch(`${GRAPH}/${encodeURIComponent(mediaId)}`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    }).then((r) => (r.ok ? (r.json() as Promise<{ url?: string; mime_type?: string; file_size?: number }>) : null));
+    if (!info?.url || (info.file_size ?? 0) > IMAGE_MAX) return null;
+    const res = await fetch(info.url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > IMAGE_MAX) return null;
+    const type = info.mime_type || mime || "image/jpeg";
+    const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+    return new File([buf], `whatsapp.${ext}`, { type });
+  } catch (e) {
+    console.error("[whatsapp] no se pudo bajar la foto:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
 type Payload = { entry?: { changes?: { value?: { messages?: Incoming[] } }[] }[] };
 
 export async function POST(req: Request) {
@@ -99,7 +136,8 @@ export async function POST(req: Request) {
   if (from !== allowed) return OK();
 
   const text = msg.type === "text" && typeof msg.text?.body === "string" ? msg.text.body : "";
-  if (!text) return reply(from, "Por ahora solo entiendo texto. Escribí ayuda para ver los ejemplos.");
+  const mediaKind = MEDIA_KINDS.find((k) => msg.type === k);
+  if (!text && !mediaKind) return reply(from, "Eso no lo puedo guardar todavía (stickers, ubicaciones, contactos). Mandá texto, links o fotos.");
 
   // Meta puede mandar el mismo mensaje dos veces: un recibo por id evita cargar el gasto repetido.
   if (typeof msg.id === "string" && msg.id) {
@@ -111,9 +149,21 @@ export async function POST(req: Request) {
     }
   }
 
+  const msgId = typeof msg.id === "string" && msg.id ? msg.id.slice(0, 120) : null;
   let answer: string;
   try {
-    answer = await handleBotMessage(text);
+    if (mediaKind) {
+      // Fotos y documentos van a Notas → Archivos (la foto se guarda; lo demás queda anotado).
+      const part = msg[mediaKind] ?? {};
+      const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+      const media: IncomingMedia = {
+        kind: mediaKind,
+        caption: str(part.caption),
+        filename: str(part.filename),
+        file: mediaKind === "image" && str(part.id) ? await downloadImage(str(part.id)!, str(part.mime_type) ?? "image/jpeg") : null,
+      };
+      answer = await saveMediaNote(media, msgId);
+    } else answer = await handleBotMessage(text, msgId);
   } catch (e) {
     console.error("[whatsapp]", e);
     answer = "Algo falló. Fijate en la app si quedó guardado antes de mandarlo de nuevo.";

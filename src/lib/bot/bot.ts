@@ -8,7 +8,9 @@ import { logActivity } from "../trash";
 import { createQuickTransaction } from "../quick-add";
 import { getDashboard } from "../dashboard";
 import { appendValueNote, VALUES_KEY } from "../values";
-import { parseBlock, parseCommand, parseJournal, parseTask } from "./parse";
+import { looksLikeExpense, looksLikePrice, parseBlock, parseCommand, parseJournal, parseTask } from "./parse";
+import { looksLikeSecret } from "../notes-logic";
+import { attachPriceToLastShop, saveTextNote } from "./notes";
 import { appendToJournal } from "../journal-append";
 
 /**
@@ -41,7 +43,13 @@ export const HELP = [
   "nota primero lo importante",
   "",
   "hoy: resumen del día",
-  "(Sin GG también entiende un gasto si empieza con el monto.)",
+  "",
+  "Todo lo demás va a Notas y se cataloga solo:",
+  "un link de YouTube, Instagram o TikTok → Videos",
+  "un link de una tienda → Para comprar (si después mandás el precio, se le suma)",
+  "cursos, música, otros links, ideas y textos → su sección",
+  "fotos → Archivos",
+  "(Un renglón que empieza con un monto sigue siendo un gasto. Contraseñas y claves no se guardan.)",
 ].join("\n");
 
 const SHORT_HELP =
@@ -51,11 +59,11 @@ const MAX_TEXT = 1000;
 /** El journal acepta textos largos (WhatsApp manda hasta 4096 caracteres). */
 const MAX_JOURNAL = 4096;
 
-export async function handleBotMessage(raw: string): Promise<string> {
+export async function handleBotMessage(raw: string, msgId: string | null = null): Promise<string> {
   const text = raw.trim();
   if (!text) return SHORT_HELP;
   const { cmd, rest } = parseCommand(text);
-  if (text.length > (cmd === "diario" ? MAX_JOURNAL : MAX_TEXT)) return `Es muy largo (máximo ${cmd === "diario" ? MAX_JOURNAL : MAX_TEXT} caracteres).`;
+  if (text.length > (cmd === "diario" || cmd === null ? MAX_JOURNAL : MAX_TEXT)) return `Es muy largo (máximo ${cmd === "diario" || cmd === null ? MAX_JOURNAL : MAX_TEXT} caracteres).`;
   const today = todayISO();
 
   switch (cmd) {
@@ -88,10 +96,20 @@ export async function handleBotMessage(raw: string): Promise<string> {
       return `${r.created ? "Empecé la entrada" : "Sumado a la entrada"} ${when} del journal (${r.words} ${r.words === 1 ? "palabra" : "palabras"} en total).`;
     }
     default: {
-      const r = await createQuickTransaction(text, undefined, "WhatsApp");
-      if (r.ok) return r.summary;
-      // Sin monto: no era un gasto.
-      return /monto/.test(r.error) ? SHORT_HELP : r.error;
+      // Sin comando: nunca guardar credenciales.
+      if (looksLikeSecret(text)) return "Eso parece una contraseña o una clave: no la guardo. Mejor guardala en un gestor de contraseñas.";
+      // "260 con envío" después de un link de tienda es su precio, no un gasto.
+      if (looksLikePrice(text)) {
+        const r = await attachPriceToLastShop(text);
+        if (r) return r;
+      }
+      // Un renglón que empieza con un monto sigue siendo un gasto (como la carga rápida).
+      if (looksLikeExpense(text)) {
+        const r = await createQuickTransaction(text, undefined, "WhatsApp");
+        if (r.ok) return r.summary;
+      }
+      // Todo lo demás va a Notas, a la sección que corresponda.
+      return await saveTextNote(text, msgId);
     }
   }
 }

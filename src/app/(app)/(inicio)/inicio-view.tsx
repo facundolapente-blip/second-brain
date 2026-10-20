@@ -22,12 +22,14 @@ import {
   NotePencil,
   Notebook,
   PiggyBank,
+  PlayCircle,
+  Plus,
   Wallet,
   WarningCircle,
   type Icon,
 } from "@phosphor-icons/react";
 import type { Dashboard } from "@/lib/dashboard";
-import { addDays, formatLong, formatMonth, formatShort as formatShortRaw, shiftMonth, weekday } from "@/lib/dates";
+import { addDays, dayOfInstant, formatLong, formatMonth, formatShort as formatShortRaw, shiftMonth, weekday } from "@/lib/dates";
 import { greeting } from "@/lib/journal-logic";
 import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
@@ -43,6 +45,9 @@ import { useTick } from "@/components/motion";
 import { CheckinCard } from "./checkin-card";
 import { QuickAdd } from "../gastos/quick-add";
 import { CategoryTag, PriorityTag } from "../plan/plan-ui";
+import { noteDomain, noteHeading, relativeDay, sectionOf, type NoteDTO } from "@/lib/notes-logic";
+
+export type NotesSummary = { latest: NoteDTO[]; laterVideos: number };
 
 const WD = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -76,7 +81,17 @@ function pct(a: number, b: number) {
 /** Meses de reserva (`getReserve`): saldo personal en pesos / gasto promedio de 3 meses. */
 export type ReserveSummary = { months: number | null; prevMonths: number | null };
 
-export function InicioView({ d, notes, reserve }: { d: Dashboard; notes: ValueNote[]; reserve: ReserveSummary }) {
+export function InicioView({
+  d,
+  notes,
+  reserve,
+  latestNotes,
+}: {
+  d: Dashboard;
+  notes: ValueNote[];
+  reserve: ReserveSummary;
+  latestNotes: NotesSummary;
+}) {
   const prevName = formatMonth(shiftMonth(d.gastos.month, -1)).split(" ")[0];
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
 
@@ -168,6 +183,7 @@ export function InicioView({ d, notes, reserve }: { d: Dashboard; notes: ValueNo
         <WeekMix d={d} />
         <GastosCard d={d} delta={delta} prevName={prevName} />
         <JournalCard d={d} />
+        <NotesCard s={latestNotes} today={d.today} />
         <Constancia d={d} />
       </main>
     </>
@@ -1077,6 +1093,62 @@ function JournalCard({ d }: { d: Dashboard }) {
   );
 }
 
+// ─── Notas: las últimas y los videos para ver ───────────────────────────────
+
+function NotesCard({ s, today }: { s: NotesSummary; today: string }) {
+  return (
+    <Card title="Notas" href="/notas" hrefLabel="Ver todas" color="var(--c-notas)" className="lg:col-span-12" i={6}>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-start">
+        <Link
+          href="/notas?seccion=videos&ver=despues"
+          className="press flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 transition-colors hover:bg-surface-3"
+        >
+          <span style={tone("red")} className="chip-solid inline-flex size-9 shrink-0 items-center justify-center rounded-xl">
+            <PlayCircle size={19} weight="fill" aria-hidden />
+          </span>
+          <span className="grid gap-0.5">
+            <span className="figure text-[22px] leading-none">{s.laterVideos}</span>
+            <span className="text-[12.5px] text-muted">{s.laterVideos === 1 ? "video para ver" : "videos para ver"}</span>
+          </span>
+        </Link>
+        {s.latest.length ? (
+          <ul className="grid gap-1 lg:grid-cols-3 lg:gap-3">
+            {s.latest.map((n) => {
+              const sec = sectionOf(n.section);
+              return (
+                <li key={n.id} className="min-w-0">
+                  <Link
+                    href={`/notas?seccion=${sec.id}`}
+                    className="tap-tint flex min-w-0 items-center gap-3 rounded-xl px-1 py-2 lg:rounded-2xl lg:bg-surface-2 lg:px-3 lg:py-3 lg:hover:bg-surface-3"
+                  >
+                    <span style={tone(sec.color)} className="chip-solid inline-flex size-8 shrink-0 items-center justify-center rounded-lg">
+                      <sec.icon size={16} weight="fill" aria-hidden />
+                    </span>
+                    <span className="grid min-w-0 gap-0.5">
+                      <span className="truncate text-[14px] font-medium">{noteHeading(n)}</span>
+                      <span className="truncate text-[12px] text-muted">
+                        {n.url ? `${noteDomain(n.url)} · ` : ""}
+                        {relativeDay(dayOfInstant(new Date(n.createdAt)), today)}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <Link
+            href="/notas?nuevo=1"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong px-4 text-[14px] text-fg transition-colors hover:bg-surface-2"
+          >
+            <Plus size={15} weight="bold" aria-hidden /> Guardar la primera nota
+          </Link>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div className="grid gap-0.5 rounded-xl bg-surface-2 px-3 py-2.5">
@@ -1100,7 +1172,7 @@ function Constancia({ d }: { d: Dashboard }) {
   const wroteN = d.journal.days.length;
 
   return (
-    <Card title="Constancia" color="var(--mod-inicio)" className="lg:col-span-12" i={6}>
+    <Card title="Constancia" color="var(--mod-inicio)" className="lg:col-span-12" i={7}>
       <p className="-mt-2 text-[13px] text-muted">Últimas {weeks} semanas. Cada cuadrito es un día.</p>
       <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
         <Heat

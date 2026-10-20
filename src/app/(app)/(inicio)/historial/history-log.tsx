@@ -38,6 +38,7 @@ const KIND: Record<string, string> = {
   keyResult: "Resultado clave",
   photo: "Foto",
   objective: "Objetivo",
+  note: "Nota",
   import: "Importación",
   trash: "Papelera",
 };
@@ -47,10 +48,11 @@ const MODULE_COLOR: Record<string, string> = {
   journal: "var(--c-journal)",
   gastos: "var(--c-gastos)",
   plan: "var(--c-plan)",
+  notas: "var(--c-notas)",
   datos: "var(--mod-inicio)",
 };
 
-const MODULE_NAME: Record<string, string> = { habitos: "Hábitos", journal: "Journal", gastos: "Gastos", plan: "Plan", datos: "Datos" };
+const MODULE_NAME: Record<string, string> = { habitos: "Hábitos", journal: "Journal", gastos: "Gastos", plan: "Plan", notas: "Notas", datos: "Datos" };
 
 const ACTION: Record<string, { label: string; icon: Icon }> = {
   created: { label: "Creaste", icon: Plus },
@@ -152,7 +154,7 @@ export function HistoryLog({
             </p>
             {items.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                {["todo", "gastos", "habitos", "journal", "plan"].map((m) => (
+                {["todo", "gastos", "habitos", "journal", "plan", "notas"].map((m) => (
                   <button
                     key={m}
                     type="button"

@@ -7,6 +7,9 @@
 import { addDays, isISODate, weekday } from "../dates";
 import { isTime, normalizeTime } from "../plan-logic";
 
+// El precio de una compra es una regla de Notas (también la usa el importador del chat).
+export { looksLikePrice } from "../notes-logic";
+
 export type BotCommand = "gasto" | "tarea" | "bloque" | "nota" | "diario" | "hoy" | "ayuda" | null;
 
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -231,4 +234,16 @@ export function parseJournal(rest: string, today: string): { date: string; text:
   const text = (m ? rest.slice(m[0].length) : rest).trim();
   if (!text) return { error: "Falta el texto. Por ejemplo: JJ hoy fue un buen día" };
   return { date, text };
+}
+
+/**
+ * Sin GG, un mensaje es gasto solo si es un renglón que empieza con el monto
+ * ("350 almuerzo", "+750 disco prex"). Una lista de varios renglones ("3 perfumes / 3 libros")
+ * va a Notas.
+ */
+export function looksLikeExpense(text: string): boolean {
+  const t = text.trim();
+  if (!t || /\n/.test(t)) return false;
+  // Y después del monto tiene que haber palabras: "+49 9286 9555-0" es un teléfono, no un ingreso.
+  return /^[+-]?\s*(?:(?:u\$s|us\$|usd|\$)\s*)?\d/i.test(t) && /[a-záéíóúñ]{2,}/i.test(t.replace(/^[+-]?\s*(?:u\$s|us\$|usd|\$)/i, ""));
 }

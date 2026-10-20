@@ -7,7 +7,7 @@ import { deletePhoto, uploadPhoto } from "@/lib/photo-actions";
 import { cx } from "./ui";
 
 export type Photo = { id: string; width: number | null; height: number | null };
-type Owner = { journalEntryId: string } | { transactionId: string };
+type Owner = { journalEntryId: string } | { transactionId: string } | { noteId: string };
 
 /** Lado más largo al subir: alcanza para verla a pantalla completa y pesa ~300 KB. */
 const MAX_SIDE = 1600;
@@ -35,6 +35,7 @@ export async function sendPhoto(file: File | Blob, owner: Owner): Promise<Photo>
   fd.set("width", String(width));
   fd.set("height", String(height));
   if ("journalEntryId" in owner) fd.set("journalEntryId", owner.journalEntryId);
+  else if ("noteId" in owner) fd.set("noteId", owner.noteId);
   else fd.set("transactionId", owner.transactionId);
   const r = await uploadPhoto(fd);
   if (!r.ok) throw new Error(r.error);
