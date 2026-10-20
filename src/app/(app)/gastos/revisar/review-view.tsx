@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowsLeftRight, Briefcase, CheckCircle, HandCoins, MagnifyingGlass, Plus, Question } from "@phosphor-icons/react";
+import { ArrowRight, ArrowsLeftRight, Briefcase, Check, CheckCircle, HandCoins, MagnifyingGlass, Plus, Question } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { TintedCard } from "@/components/tinted-card";
 import { Button, cx } from "@/components/ui";
@@ -35,43 +35,70 @@ const FIRST = 12;
  * Revisar movimientos: lo que hoy cuenta mal en los números personales, con una
  * propuesta para cada uno. Nada cambia hasta "Aplicar"; después se puede deshacer.
  */
-export function ReviewView({ data, categories, undo }: { data: ReviewData; categories: Cat[]; undo: { at: string; count: number } | null }) {
+export function ReviewView({
+  data,
+  categories,
+  undo,
+}: {
+  data: ReviewData;
+  categories: Cat[];
+  undo: { at: string; count: number; batches: number } | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useSafeTransition();
-  const [pairChoice, setPairChoice] = useState<Record<string, PairChoice>>(() =>
-    Object.fromEntries(data.pairs.map((p) => [p.key, "transfer" as const])),
-  );
+  // Lo que elegiste en cada fila (sin elegir = la propuesta). Sobrevive a aplicar otras filas.
+  const [pairChoice, setPairChoice] = useState<Record<string, PairChoice>>({});
+  const [choice, setChoice] = useState<Record<string, ReviewChoice>>({});
+  // Lo aplicado sale de la lista al toque (hasta que llegue la lista nueva).
+  const [done, setDone] = useState<Set<string>>(new Set());
   // Los agregados a mano desde la búsqueda van con "Plata de mamá".
   const [added, setAdded] = useState<ReviewItem[]>([]);
-  const mamaItems = useMemo(() => [...data.mama, ...added.filter((a) => !data.mama.some((m) => m.tx.id === a.tx.id))], [data.mama, added]);
-  const proposals = useMemo(
-    () => Object.fromEntries([...data.trabajo, ...mamaItems].map((i) => [i.tx.id, i.proposal])) as Record<string, ReviewChoice>,
-    [data.trabajo, mamaItems],
+  const pairs = data.pairs.filter((p) => !done.has(p.key));
+  const trabajo = data.trabajo.filter((i) => !done.has(i.tx.id));
+  const mamaItems = useMemo(
+    () => [...data.mama, ...added.filter((a) => !data.mama.some((m) => m.tx.id === a.tx.id))].filter((i) => !done.has(i.tx.id)),
+    [data.mama, added, done],
   );
-  const [choice, setChoice] = useState<Record<string, ReviewChoice>>(() => ({ ...proposals }));
-  const summary = summarizeChoices(pairChoice, choice);
-  const nothing = !data.pairs.length && !data.loose.length && !data.trabajo.length && !mamaItems.length;
+  const pc = (p: ExchangePair): PairChoice => pairChoice[p.key] ?? "transfer";
+  const ch = (i: ReviewItem): ReviewChoice => choice[i.tx.id] ?? i.proposal;
+  const summary = summarizeChoices(
+    Object.fromEntries(pairs.map((p) => [p.key, pc(p)])),
+    Object.fromEntries([...trabajo, ...mamaItems].map((i) => [i.tx.id, ch(i)])),
+  );
+  const nothing = !pairs.length && !data.loose.length && !trabajo.length && !mamaItems.length;
 
   const setMany = (items: ReviewItem[], pick: (i: ReviewItem) => ReviewChoice) =>
     setChoice((s) => ({ ...s, ...Object.fromEntries(items.map((i) => [i.tx.id, pick(i)])) }));
 
-  function apply() {
+  function run(input: Parameters<typeof applyGastosReview>[0], ids: string[]) {
     startTransition(async () => {
-      const r = await applyGastosReview({
-        pairs: data.pairs.map((p) => ({ outId: p.out.id, inId: p.in.id, choice: pairChoice[p.key] ?? "keep" })),
-        items: [...data.trabajo, ...mamaItems].map((i) => ({ id: i.tx.id, choice: choice[i.tx.id] ?? "keep" })),
-      });
+      const r = await applyGastosReview(input);
       if (!r.ok) return notifyError(r.error);
-      notifyInfo(r.changed ? `Listo: ${r.changed} ${r.changed === 1 ? "cambio aplicado" : "cambios aplicados"}` : "Listo: quedaron como estaban");
-      setAdded([]);
+      setDone((s) => new Set([...s, ...ids]));
+      notifyInfo(r.changed ? `Listo: ${r.changed} ${r.changed === 1 ? "cambio aplicado" : "cambios aplicados"}` : "Listo: quedó como estaba");
       router.refresh();
     });
   }
+  /** Aplicar todo lo que se ve. */
+  function apply() {
+    run(
+      {
+        pairs: pairs.map((p) => ({ outId: p.out.id, inId: p.in.id, choice: pc(p) })),
+        items: [...trabajo, ...mamaItems].map((i) => ({ id: i.tx.id, choice: ch(i) })),
+      },
+      [...pairs.map((p) => p.key), ...trabajo.map((i) => i.tx.id), ...mamaItems.map((i) => i.tx.id)],
+    );
+  }
+  /** Aplicar solo un par o un movimiento. */
+  const applyPair = (p: ExchangePair) => run({ pairs: [{ outId: p.out.id, inId: p.in.id, choice: pc(p) }], items: [] }, [p.key]);
+  const applyItem = (i: ReviewItem) => run({ pairs: [], items: [{ id: i.tx.id, choice: ch(i) }] }, [i.tx.id]);
   function revert() {
     startTransition(async () => {
       const r = await undoGastosReview();
       if (!r.ok) return notifyError(r.error);
-      notifyInfo("Se deshizo la revisión");
+      // Lo deshecho vuelve a la lista con lo que venga del servidor.
+      setDone(new Set());
+      notifyInfo("Se deshizo lo último");
       router.refresh();
     });
   }
@@ -90,10 +117,12 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
         {undo && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-surface px-4 py-3">
             <span className="text-[13.5px]">
-              Última revisión: <b className="font-semibold">{undo.count === 1 ? "1 cambio" : `${undo.count} cambios`}</b> el {formatShort(undo.at.slice(0, 10))}
+              Lo último que aplicaste:{" "}
+              <b className="font-semibold">{undo.count === 0 ? "marcado como revisado" : undo.count === 1 ? "1 cambio" : `${undo.count} cambios`}</b>
+              {undo.batches > 1 && <span className="text-muted"> · se puede seguir deshaciendo de a uno</span>}
             </span>
             <Button size="sm" variant="outline" onClick={revert} disabled={pending}>
-              Deshacer esta revisión
+              Deshacer lo último
             </Button>
           </div>
         )}
@@ -104,11 +133,11 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
           </EmptyBlock>
         )}
 
-        {(data.pairs.length > 0 || data.loose.length > 0) && (
+        {(pairs.length > 0 || data.loose.length > 0) && (
           <TintedCard
             icon={ArrowsLeftRight}
             title="Cambios de dólares"
-            meta={`${data.pairs.length === 1 ? "1 par" : `${data.pairs.length} pares`} · cargados como gasto + ingreso`}
+            meta={`${pairs.length === 1 ? "1 par" : `${pairs.length} pares`} · cargados como gasto + ingreso`}
             bodyClassName="gap-3!"
           >
             <p className="text-[13px] leading-relaxed text-muted">
@@ -118,11 +147,11 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
             <BulkRow
               label="Todos:"
               actions={[
-                { label: "Unir", onClick: () => setPairChoice(Object.fromEntries(data.pairs.map((p) => [p.key, "transfer" as const]))) },
-                { label: "Dejar como están", onClick: () => setPairChoice(Object.fromEntries(data.pairs.map((p) => [p.key, "keep" as const]))) },
+                { label: "Unir todos", onClick: () => setPairChoice(Object.fromEntries(pairs.map((p) => [p.key, "transfer" as const]))) },
+                { label: "Dejar como están", onClick: () => setPairChoice(Object.fromEntries(pairs.map((p) => [p.key, "keep" as const]))) },
               ]}
             />
-            <Folded items={data.pairs} year={(p) => p.out.date.slice(0, 4)}>
+            <Folded items={pairs} year={(p) => p.out.date.slice(0, 4)}>
               {(p: ExchangePair) => (
                 <div key={p.key} className="grid gap-2.5 rounded-xl border border-line p-3">
                   <div className="grid gap-1.5">
@@ -134,14 +163,17 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
                       {p.out.date === p.in.date ? "Mismo día" : `${formatShort(p.out.date)} y ${formatShort(p.in.date)}`} · $ {p.rate.toFixed(2).replace(".", ",")} por
                       dólar
                     </span>
-                    <ChoiceChips
-                      value={pairChoice[p.key] ?? "keep"}
-                      options={[
-                        { value: "transfer", label: "Unir en una transferencia" },
-                        { value: "keep", label: "Dejar como está" },
-                      ]}
-                      onChange={(v) => setPairChoice((s) => ({ ...s, [p.key]: v }))}
-                    />
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <ChoiceChips
+                        value={pc(p)}
+                        options={[
+                          { value: "transfer", label: "Unir en una transferencia" },
+                          { value: "keep", label: "Dejar como está" },
+                        ]}
+                        onChange={(v) => setPairChoice((s) => ({ ...s, [p.key]: v }))}
+                      />
+                      <ApplyOne onClick={() => applyPair(p)} disabled={pending} />
+                    </span>
                   </div>
                 </div>
               )}
@@ -168,11 +200,11 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
           </TintedCard>
         )}
 
-        {data.trabajo.length > 0 && (
+        {trabajo.length > 0 && (
           <TintedCard
             icon={Briefcase}
             title="Negocio en cuentas personales"
-            meta={data.trabajo.length === 1 ? "1 movimiento" : `${data.trabajo.length} movimientos`}
+            meta={trabajo.length === 1 ? "1 movimiento" : `${trabajo.length} movimientos`}
             bodyClassName="gap-3!"
           >
             <ul className="grid gap-1.5 text-[13px] leading-relaxed text-muted">
@@ -192,12 +224,12 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
             <BulkRow
               label="Todos:"
               actions={[
-                { label: "Propuestas", onClick: () => setMany(data.trabajo, (i) => i.proposal) },
-                { label: "Del negocio", onClick: () => setMany(data.trabajo, () => "trabajo") },
-                { label: "Dejar como están", onClick: () => setMany(data.trabajo, () => "keep") },
+                { label: "Propuestas", onClick: () => setMany(trabajo, (i) => i.proposal) },
+                { label: "Del negocio", onClick: () => setMany(trabajo, () => "trabajo") },
+                { label: "Dejar como están", onClick: () => setMany(trabajo, () => "keep") },
               ]}
             />
-            <ItemList items={data.trabajo} group="trabajo" choice={choice} setChoice={setChoice} categories={categories} />
+            <ItemList items={trabajo} group="trabajo" value={ch} setChoice={setChoice} categories={categories} onApply={applyItem} pending={pending} />
           </TintedCard>
         )}
 
@@ -222,11 +254,11 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
                   { label: "Dejar como están", onClick: () => setMany(mamaItems, () => "keep") },
                 ]}
               />
-              <ItemList items={mamaItems} group="mama" choice={choice} setChoice={setChoice} categories={categories} />
+              <ItemList items={mamaItems} group="mama" value={ch} setChoice={setChoice} categories={categories} onApply={applyItem} pending={pending} />
             </>
           )}
           <AddSearch
-            exclude={new Set([...data.trabajo, ...mamaItems].map((i) => i.tx.id).concat(data.pairs.flatMap((p) => [p.out.id, p.in.id])))}
+            exclude={new Set([...data.trabajo, ...data.mama, ...added].map((i) => i.tx.id).concat(data.pairs.flatMap((p) => [p.out.id, p.in.id])))}
             onAdd={(t) => {
               setAdded((a) => [...a, { tx: t, proposal: "mama", reason: "Agregado a mano" }]);
               setChoice((c) => ({ ...c, [t.id]: "mama" }));
@@ -237,9 +269,12 @@ export function ReviewView({ data, categories, undo }: { data: ReviewData; categ
         {!nothing && (
           // Pegado abajo mientras se baja por la lista (arriba de la barra del celular).
           <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-3 rounded-2xl border bg-surface px-4 py-3 shadow-[var(--card-shadow)] lg:bottom-6">
-            <span className="min-w-0 text-[13px] leading-snug text-muted">{summaryText(summary)}</span>
+            <span className="grid min-w-0 gap-0.5 text-[13px] leading-snug">
+              <span className="font-medium text-fg">Aplicar todo lo que se ve, o de a uno con el botón de cada fila</span>
+              <span className="text-muted">{summaryText(summary)}</span>
+            </span>
             <Button variant="accent" onClick={apply} disabled={pending} className="shrink-0">
-              {pending ? "Aplicando…" : summary.total ? `Aplicar ${summary.total}` : "Marcar como revisados"}
+              {pending ? "Aplicando…" : summary.total ? `Aplicar todo (${summary.total})` : "Marcar todo como revisado"}
             </Button>
           </div>
         )}
@@ -259,6 +294,20 @@ function summaryText(s: ReturnType<typeof summarizeChoices>) {
   return parts.length ? parts.join(" · ") : "Todo queda como está";
 }
 
+/** Aplica solo esta fila con lo elegido. */
+function ApplyOne({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="press inline-flex h-8 items-center gap-1 rounded-full border border-dashed border-accent-fg/60 bg-accent-soft px-3 text-[12.5px] font-semibold text-accent-fg disabled:opacity-50"
+    >
+      Aplicar este <ArrowRight size={12} weight="bold" aria-hidden />
+    </button>
+  );
+}
+
 /** Botones para elegir lo mismo en todo un grupo. */
 function BulkRow({ label, actions }: { label: string; actions: { label: string; onClick: () => void }[] }) {
   return (
@@ -268,7 +317,10 @@ function BulkRow({ label, actions }: { label: string; actions: { label: string; 
         <button
           key={a.label}
           type="button"
-          onClick={a.onClick}
+          onClick={() => {
+            a.onClick();
+            notifyInfo(`Marcado: ${a.label.toLowerCase()} en todo el grupo. Se aplica con el botón de abajo.`);
+          }}
           className="press inline-flex h-8 items-center rounded-full bg-surface-2 px-3 font-medium text-fg hover:bg-[color-mix(in_oklab,var(--surface-2)_80%,var(--text))]"
         >
           {a.label}
@@ -322,20 +374,25 @@ function TxLine({ t }: { t: ReviewTx }) {
 function ItemList({
   items,
   group,
-  choice,
+  value: valueOf,
   setChoice,
   categories,
+  onApply,
+  pending,
 }: {
   items: ReviewItem[];
   group: "trabajo" | "mama";
-  choice: Record<string, ReviewChoice>;
+  value: (i: ReviewItem) => ReviewChoice;
   setChoice: React.Dispatch<React.SetStateAction<Record<string, ReviewChoice>>>;
   categories: Cat[];
+  onApply: (i: ReviewItem) => void;
+  pending: boolean;
 }) {
   return (
     <Folded items={items} year={(i) => i.tx.date.slice(0, 4)}>
-      {({ tx, reason }: ReviewItem) => {
-        const value = choice[tx.id] ?? "keep";
+      {(item: ReviewItem) => {
+        const { tx, reason } = item;
+        const value = valueOf(item);
         const opts = choicesFor(group, tx);
         const own = categories.filter((c) => c.kind === tx.kind);
         return (
@@ -369,6 +426,7 @@ function ItemList({
                   </option>
                 ))}
               </select>
+              <ApplyOne onClick={() => onApply(item)} disabled={pending} />
             </div>
           </div>
         );
@@ -394,6 +452,7 @@ function ChoiceChips<T extends string>({ value, options, onChange }: { value: T 
               on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong bg-surface text-fg hover:bg-surface-2",
             )}
           >
+            {on && <Check size={12} weight="bold" className="mr-1" aria-hidden />}
             {o.label}
           </button>
         );

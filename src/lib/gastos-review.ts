@@ -52,20 +52,29 @@ export type ReviewUndo = {
   reviewed: string[];
 };
 
-export function parseUndo(raw: string | null | undefined): ReviewUndo | null {
+/**
+ * Lo aplicado, de a una tanda por vez (se puede aplicar de a un movimiento): "Deshacer"
+ * vuelve atrás la última y, si se toca de nuevo, la anterior. Acepta el formato viejo
+ * (una sola tanda).
+ */
+export function parseUndoStack(raw: string | null | undefined): ReviewUndo[] {
   try {
-    const v = JSON.parse(raw ?? "null");
-    return v && typeof v === "object" && Array.isArray(v.rows) ? (v as ReviewUndo) : null;
+    const v = JSON.parse(raw ?? "[]");
+    const list = Array.isArray(v) ? v : [v];
+    return list.filter((u): u is ReviewUndo => !!u && typeof u === "object" && Array.isArray(u.rows));
   } catch {
-    return null;
+    return [];
   }
 }
+
+/** Cuántas tandas se guardan para deshacer (las más viejas se olvidan). */
+export const UNDO_KEEP = 300;
 
 /** Lo que muestra la pantalla: los movimientos dudosos que todavía no se revisaron. */
 export async function getGastosReview(): Promise<{
   data: ReviewData;
   categories: { id: string; name: string; kind: "expense" | "income" }[];
-  undo: { at: string; count: number } | null;
+  undo: { at: string; count: number; batches: number } | null;
 }> {
   const [reviewedRow, undoRow, rows, cats] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: REVIEWED_KEY } }),
@@ -82,10 +91,11 @@ export async function getGastosReview(): Promise<{
     }),
   ]);
   const reviewed = parseReviewed(reviewedRow?.value);
-  const undo = parseUndo(undoRow?.value);
+  const stack = parseUndoStack(undoRow?.value);
+  const undo = stack.at(-1);
   return {
     data: buildReview(rows.filter((r) => !reviewed.has(r.id)).map(toReviewTx)),
     categories: cats.map((c) => ({ id: c.id, name: c.name, kind: c.kind === "income" ? "income" : "expense" })),
-    undo: undo ? { at: undo.at, count: undo.count } : null,
+    undo: undo ? { at: undo.at, count: undo.count, batches: stack.length } : null,
   };
 }

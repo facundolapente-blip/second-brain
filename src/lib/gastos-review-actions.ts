@@ -8,7 +8,7 @@ import { normTitle } from "./smart-logic";
 import { toCents } from "./finance-logic";
 import { logActivity, trashAndDelete } from "./trash";
 import { restoreItem } from "./trash-actions";
-import { parseUndo, reviewSelect, toReviewTx, type ReviewUndo } from "./gastos-review";
+import { parseUndoStack, reviewSelect, toReviewTx, UNDO_KEEP, type ReviewUndo } from "./gastos-review";
 import {
   parseReviewed,
   REVIEW_CATEGORIES,
@@ -211,24 +211,24 @@ export async function applyGastosReview(input: {
     create: { key: REVIEWED_KEY, value: JSON.stringify([...reviewed]) },
     update: { value: JSON.stringify([...reviewed]) },
   });
-  if (undo.count || undo.flags.length) {
-    await prisma.appSetting.upsert({
-      where: { key: REVIEW_UNDO_KEY },
-      create: { key: REVIEW_UNDO_KEY, value: JSON.stringify(undo) },
-      update: { value: JSON.stringify(undo) },
-    });
-    await logActivity("updated", "transaction", null, `Revisión de movimientos: ${undo.count} ${undo.count === 1 ? "cambio" : "cambios"}`);
+  // Se guarda también lo que solo se marcó como revisado (deshacer lo vuelve a la lista).
+  if (undo.count || undo.reviewed.length) {
+    const prev = parseUndoStack((await prisma.appSetting.findUnique({ where: { key: REVIEW_UNDO_KEY } }))?.value);
+    const value = JSON.stringify([...prev, undo].slice(-UNDO_KEEP));
+    await prisma.appSetting.upsert({ where: { key: REVIEW_UNDO_KEY }, create: { key: REVIEW_UNDO_KEY, value }, update: { value } });
+    if (undo.count) await logActivity("updated", "transaction", null, `Revisión de movimientos: ${undo.count} ${undo.count === 1 ? "cambio" : "cambios"}`);
   }
   refrescar();
   return { ok: true, changed: undo.count };
 }
 
-/** Vuelve todo como estaba antes de la última revisión aplicada. */
+/** Vuelve atrás lo último que se aplicó (tocarlo de nuevo, lo anterior). */
 export async function undoGastosReview(): Promise<ReviewResult> {
   await exigirSesion();
   const row = await prisma.appSetting.findUnique({ where: { key: REVIEW_UNDO_KEY } });
-  const undo = parseUndo(row?.value);
-  if (!undo) return { ok: false, error: "No hay ninguna revisión para deshacer." };
+  const stack = parseUndoStack(row?.value);
+  const undo = stack.at(-1);
+  if (!undo) return { ok: false, error: "No hay nada para deshacer." };
   // Si después se editó una de las transferencias que se armaron o se sacó de la papelera
   // un ingreso, deshacer movería un saldo: no se hace.
   for (const r of undo.rows) {
@@ -256,8 +256,9 @@ export async function undoGastosReview(): Promise<ReviewResult> {
     create: { key: REVIEWED_KEY, value: JSON.stringify([...reviewed]) },
     update: { value: JSON.stringify([...reviewed]) },
   });
-  await prisma.appSetting.delete({ where: { key: REVIEW_UNDO_KEY } });
-  await logActivity("restored", "transaction", null, `Se deshizo la revisión de movimientos (${undo.count} ${undo.count === 1 ? "cambio" : "cambios"})`);
+  const rest = JSON.stringify(stack.slice(0, -1));
+  await prisma.appSetting.update({ where: { key: REVIEW_UNDO_KEY }, data: { value: rest } });
+  if (undo.count) await logActivity("restored", "transaction", null, `Se deshizo la revisión de movimientos (${undo.count} ${undo.count === 1 ? "cambio" : "cambios"})`);
   refrescar();
   return { ok: true, changed: undo.count };
 }
