@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SlideOnChange, SwapOnChange } from "@/components/motion-wrap";
 import Form from "next/form";
 import { CaretDown, MagnifyingGlass, PenNib, Plus } from "@phosphor-icons/react/dist/ssr";
-import { getMonthEntries, getRangeEntries } from "@/lib/journal";
+import { getMonthEntries, getRangeEntries, getSameDayOtherYears } from "@/lib/journal";
 import { addDays, diffDays, formatLong, formatShort, isISODate, monthBounds, todayISO, weekday } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
@@ -19,6 +19,9 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 
 const WEEK_HEAD = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+/** "20 de octubre" (sin año ni día de la semana). */
+const formatDayMonth = (iso: string) =>
+  new Intl.DateTimeFormat("es-UY", { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`));
 const field =
   "h-11 rounded-[10px] border border-line-strong bg-surface px-3 text-[14px] text-fg outline-none focus:border-accent";
 const goBtn =
@@ -39,7 +42,14 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
   const { from, to } = monthBounds(month);
   const selected = isISODate(diaRaw) && diaRaw >= from && diaRaw <= to ? diaRaw : today >= from && today <= to ? today : null;
 
-  const [entries, rangeEntries] = await Promise.all([getMonthEntries(month), range ? getRangeEntries(range.from, range.to) : null]);
+  const [entries, rangeEntries, otherYears] = await Promise.all([
+    getMonthEntries(month),
+    range ? getRangeEntries(range.from, range.to) : null,
+    // El mismo día en los años anteriores, como recuerdo del día elegido.
+    selected && !range ? getSameDayOtherYears(selected) : [],
+  ]);
+  const otherYearsByYear = new Map<string, typeof otherYears>();
+  for (const e of otherYears) otherYearsByYear.set(e.date.slice(0, 4), [...(otherYearsByYear.get(e.date.slice(0, 4)) ?? []), e]);
   const byDay = new Map<string, typeof entries>();
   for (const e of entries) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e]);
 
@@ -230,6 +240,27 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
           ) : (
             <JCard icon="book" title="Ningún día elegido" meta="Fuera de este mes">
               <p className="text-[15px] text-muted">Tocá un día para ver lo que escribiste.</p>
+            </JCard>
+          )}
+
+          {/* Recuerdo: lo que escribiste ese mismo día en los años anteriores. */}
+          {!range && selected && otherYears.length > 0 && (
+            <JCard
+              icon="history"
+              title={`El ${formatDayMonth(selected)} otros años`}
+              meta={`${otherYears.length === 1 ? "1 entrada" : `${otherYears.length} entradas`} en ${otherYearsByYear.size === 1 ? "1 año" : `${otherYearsByYear.size} años`}`}
+              bodyClassName="jr-rows gap-0! py-1! lg:py-2!"
+            >
+              {[...otherYearsByYear].map(([year, list]) => (
+                <div key={year}>
+                  <p className="kicker pt-3 pb-1">
+                    {year} · hace {Number(selected.slice(0, 4)) - Number(year)} {Number(selected.slice(0, 4)) - Number(year) === 1 ? "año" : "años"}
+                  </p>
+                  {list.map((e, i) => (
+                    <EntryCard key={e.id} entry={e} index={i} />
+                  ))}
+                </div>
+              ))}
             </JCard>
           )}
 

@@ -224,6 +224,26 @@ export async function getQuickStats() {
 
 export type QuickStatsDTO = Awaited<ReturnType<typeof getQuickStats>>;
 
+/**
+ * Lo escrito el mismo día (mes y día) en los años anteriores al del día dado, del año
+ * más cercano al más viejo. Un 29 de febrero solo encuentra otros 29 de febrero.
+ */
+export async function getSameDayOtherYears(day: string) {
+  const [y, m, d] = day.split("-").map(Number);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dates: string[] = [];
+  for (let i = 1; i <= 40; i++) {
+    const iso = `${y - i}-${pad(m)}-${pad(d)}`;
+    if (isISODate(iso)) dates.push(iso);
+  }
+  const rows = await prisma.journalEntry.findMany({
+    where: { AND: [NOT_EMPTY, { date: { in: dates.map(toDbDate) } }] },
+    select: CARD_SELECT,
+    orderBy: [{ date: "desc" }, { createdAt: "asc" }],
+  });
+  return rows.map((r) => toCard(r, 160));
+}
+
 /** Entradas de un mes para el calendario. */
 export async function getMonthEntries(month: string) {
   const { from, to } = monthBounds(month);
