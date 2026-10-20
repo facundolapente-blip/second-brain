@@ -1,3 +1,4 @@
+import { FILLED_CHECKIN } from "@/lib/checkin-logic";
 import { prisma } from "@/lib/prisma";
 import { fromDbDate } from "@/lib/dates";
 import { backupsEnabled, getBackupStatus, listBackups, type BackupInfo } from "@/lib/backup";
@@ -17,7 +18,7 @@ export default async function DatosPage() {
     prisma.journalEntry.findFirst({ where: { body: { not: "" } }, orderBy: { date: "desc" }, select: { date: true } }),
     prisma.transaction.count(),
     prisma.transaction.findFirst({ orderBy: { date: "desc" }, select: { date: true } }),
-    prisma.dailyCheckin.count(),
+    prisma.dailyCheckin.count({ where: FILLED_CHECKIN }),
     prisma.planBlock.count(),
     prisma.dailyCheckin.count({ where: { steps: { not: null } } }),
     prisma.dailyCheckin.findFirst({ where: { steps: { not: null } }, orderBy: { date: "desc" }, select: { date: true } }),

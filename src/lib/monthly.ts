@@ -1,4 +1,5 @@
 import "server-only";
+import { FILLED_CHECKIN } from "./checkin-logic";
 import { prisma } from "./prisma";
 import { addDays, fromDbDate, monthBounds, shiftMonth, toDbDate, todayISO } from "./dates";
 import { getDailyMetrics, habitTotals, type DayMetrics } from "./daily-metrics";
@@ -44,7 +45,7 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
       select: { id: true, title: true, completedAt: true },
       orderBy: { completedAt: "asc" },
     }),
-    prisma.dailyCheckin.count({ where: { date: { gte: toDbDate(from), lte: toDbDate(to) } } }),
+    prisma.dailyCheckin.count({ where: { date: { gte: toDbDate(from), lte: toDbDate(to) }, ...FILLED_CHECKIN } }),
   ]);
 
   const days = all.filter((d) => d.date >= from);

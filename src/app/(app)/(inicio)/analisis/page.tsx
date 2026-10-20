@@ -1,3 +1,4 @@
+import { FILLED_CHECKIN } from "@/lib/checkin-logic";
 import { addDays, todayISO, toDbDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { getDailyMetrics } from "@/lib/daily-metrics";
@@ -20,7 +21,7 @@ export default async function AnalisisPage({ searchParams }: PageProps<"/analisi
   // journal, así que no sirve para contarlos): el mismo número que muestra Datos.
   const [{ days, habits }, checkinDays] = await Promise.all([
     getDailyMetrics(from, to),
-    prisma.dailyCheckin.count({ where: { date: { gte: toDbDate(from), lte: toDbDate(to) } } }),
+    prisma.dailyCheckin.count({ where: { date: { gte: toDbDate(from), lte: toDbDate(to) }, ...FILLED_CHECKIN } }),
   ]);
   return (
     <div data-module="inicio" className="min-h-dvh">

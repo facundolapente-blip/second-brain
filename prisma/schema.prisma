@@ -420,8 +420,10 @@ model DailyCheckin {
   sleepMin   Int?
   /// Peso en gramos.
   weightG    Int?
-  /// Pasos del día (importados de Google Fit, Samsung Health o un CSV).
+  /// Pasos del día (del reloj por intervals.icu, o importados de Google Fit, Samsung Health o un CSV).
   steps      Int?
+  /// Estrés promedio medido por el reloj (Huawei, de 1 a 99). Aparte de `stress`, que es la sensación del check-in.
+  stressScore Int?
   note       String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

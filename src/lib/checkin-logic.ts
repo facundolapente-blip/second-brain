@@ -64,3 +64,11 @@ export function parseWeight(raw: string): number | null {
   if (!raw.trim() || !Number.isFinite(n) || n < 20 || n > 400) return null;
   return Math.round(n * 1000);
 }
+
+/**
+ * Filtro (Prisma) de un check-in cargado por Facu: ánimo, energía, estrés o nota. Las filas
+ * que solo tienen lo que mandó el reloj (pasos, sueño, peso, estrés del reloj) no cuentan.
+ */
+export const FILLED_CHECKIN = {
+  OR: [{ mood: { not: null } }, { energy: { not: null } }, { stress: { not: null } }, { note: { not: null } }],
+};
