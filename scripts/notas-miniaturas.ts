@@ -47,16 +47,40 @@ async function one(n: Row, timeoutMs: number, last: boolean) {
 
 // Primero de a 5; lo que no salió, de a uno y con más paciencia (hay tiendas que no
 // contestan varios pedidos juntos).
+// Nunca dos pedidos al mismo sitio a la vez: el segundo espera a la segunda pasada.
+const busy = new Set<string>();
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return u;
+  }
+};
 let i = 0;
 await Promise.all(
   Array.from({ length: PARALLEL }, async () => {
-    while (i < notes.length) await one(notes[i++], 8000, false);
+    while (i < notes.length) {
+      const n = notes[i++];
+      const host = hostOf(n.url!);
+      if (busy.has(host)) {
+        missed.push(n);
+        continue;
+      }
+      busy.add(host);
+      await one(n, 8000, false);
+      busy.delete(host);
+    }
   }),
 );
 if (missed.length) console.log(`\nSegunda pasada, de a uno: ${missed.length}\n`);
+// Thomann, por ejemplo, contesta 429 si se le piden dos páginas seguidas: 20 s entre pedidos al mismo sitio.
+const lastHit = new Map<string, number>();
 for (const n of missed) {
+  const host = hostOf(n.url!);
+  const wait = (lastHit.get(host) ?? 0) + 20000 - Date.now();
+  if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
   await one(n, 15000, true);
-  await new Promise((ok) => setTimeout(ok, 2500));
+  lastHit.set(host, Date.now());
 }
 
 console.log(`\nCon foto: ${found} de ${notes.length} · títulos nuevos: ${titles}`);
