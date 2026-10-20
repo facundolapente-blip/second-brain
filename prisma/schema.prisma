@@ -752,6 +752,8 @@ model Note {
   category   String?
   tags       String[] @default([])
   pinned     Boolean  @default(false)
+  /// Lugar en la lista (más alto = más arriba, después de las fijadas). Arranca en la fecha de creación (ms) y cambia al arrastrar.
+  sortKey    Float    @default(dbgenerated("(EXTRACT(EPOCH FROM now()) * 1000)"))
   /// "Ver después": visto o hecho.
   done       Boolean  @default(false)
   /// app | whatsapp | import. Junto con externalId deja importar sin duplicar.
@@ -765,5 +767,6 @@ model Note {
   @@unique([source, externalId])
   @@index([section, createdAt])
   @@index([createdAt])
+  @@index([pinned, sortKey])
   @@index([section, category])
 }

@@ -103,6 +103,14 @@ export async function setNotePinned(id: string, pinned: boolean) {
   refrescar();
 }
 
+/** Lugar de una nota en la lista (al arrastrarla entre otras dos; ver `sortKeyAfterMove`). */
+export async function moveNote(id: string, sortKey: number) {
+  await exigirSesion();
+  if (!validId(id) || typeof sortKey !== "number" || !Number.isFinite(sortKey) || Math.abs(sortKey) > 1e15) return;
+  await prisma.note.updateMany({ where: { id }, data: { sortKey } });
+  refrescar();
+}
+
 /** "Ver después": visto o hecho. */
 export async function setNoteDone(id: string, done: boolean) {
   await exigirSesion();

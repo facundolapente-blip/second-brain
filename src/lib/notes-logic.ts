@@ -357,10 +357,46 @@ export type NoteDTO = {
   source: string | null;
   /** ISO del momento en que se creó. */
   createdAt: string;
+  /** Lugar en la lista (más alto = más arriba); arranca en la fecha de creación en ms y cambia al arrastrar. */
+  sortKey: number;
   photos: { id: string; width: number | null; height: number | null }[];
 };
 
 export const NOTE_TITLE_MAX = 200;
+
+/** Un minuto en ms: el paso al soltar una nota arriba o abajo de todo. */
+const SORT_STEP = 60_000;
+
+/**
+ * Lugar para una nota soltada entre `above` y `below` (los lugares de sus vecinas en la
+ * lista, de arriba abajo; más alto = más arriba). Arriba de todo, un poco más que la primera;
+ * abajo de todo, un poco menos que la última.
+ */
+export function sortKeyBetween(above: number | null | undefined, below: number | null | undefined, now = Date.now()): number {
+  const a = above ?? null;
+  const b = below ?? null;
+  if (a !== null && b !== null) return (a + b) / 2;
+  if (a !== null) return a - SORT_STEP;
+  if (b !== null) return b + SORT_STEP;
+  return now;
+}
+
+/**
+ * Lugar nuevo para la nota que quedó en `to` dentro de `order` (la lista ya reordenada).
+ * Las vecinas que cuentan son las del mismo grupo (fijadas con fijadas): las fijadas
+ * siempre van arriba.
+ */
+export function sortKeyAfterMove(order: Pick<NoteDTO, "id" | "pinned" | "sortKey">[], to: number): number {
+  const n = order[to];
+  const above = order.slice(0, to).reverse().find((x) => x.pinned === n.pinned);
+  const below = order.slice(to + 1).find((x) => x.pinned === n.pinned);
+  return sortKeyBetween(above?.sortKey, below?.sortKey);
+}
+
+/** Orden de la lista: fijadas arriba, después por lugar (el más alto primero). */
+export function byNoteOrder(a: Pick<NoteDTO, "id" | "pinned" | "sortKey">, b: Pick<NoteDTO, "id" | "pinned" | "sortKey">) {
+  return Number(b.pinned) - Number(a.pinned) || b.sortKey - a.sortKey || b.id.localeCompare(a.id);
+}
 export const NOTE_CATEGORY_MAX = 40;
 /** En la dirección, `?categoria=sin` filtra las que no tienen categoría. */
 export const NO_CATEGORY = "sin";

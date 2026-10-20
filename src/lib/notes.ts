@@ -36,6 +36,7 @@ const SELECT = {
   category: true,
   tags: true,
   pinned: true,
+  sortKey: true,
   done: true,
   source: true,
   createdAt: true,
@@ -44,7 +45,8 @@ const SELECT = {
 
 type Row = Prisma.NoteGetPayload<{ select: typeof SELECT }>;
 
-const ORDER: Prisma.NoteOrderByWithRelationInput[] = [{ pinned: "desc" }, { createdAt: "desc" }, { id: "desc" }];
+/** Fijadas arriba; después el lugar de cada una (arranca en su fecha y cambia al arrastrarla). */
+const ORDER: Prisma.NoteOrderByWithRelationInput[] = [{ pinned: "desc" }, { sortKey: "desc" }, { id: "desc" }];
 
 function toDTO(r: Row): NoteDTO {
   const { attachments, createdAt, ...rest } = r;

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { decodeEntities, pickImage, stripSiteSuffix } from "../src/lib/link-meta";
 import {
+  byNoteOrder,
+  sortKeyAfterMove,
+  sortKeyBetween,
   assignCategoryColors,
   parseCategoryColors,
   pickCategoryColor,
@@ -329,5 +332,24 @@ describe("stripSiteSuffix", () => {
 describe("pickImage descarta lo que vence", () => {
   it("Instagram y Facebook no (direcciones firmadas)", () => {
     expect(pickImage(["https://scontent.cdninstagram.com/v/x.jpg", "https://tienda.uy/p.jpg"], "https://tienda.uy/")).toBe("https://tienda.uy/p.jpg");
+  });
+});
+
+describe("orden propio de las notas", () => {
+  it("el lugar entre dos vecinas, arriba o abajo de todo", () => {
+    expect(sortKeyBetween(300, 100)).toBe(200);
+    expect(sortKeyBetween(null, 100)).toBe(60_100);
+    expect(sortKeyBetween(300, null)).toBe(300 - 60_000);
+    expect(sortKeyBetween(null, null, 5)).toBe(5);
+  });
+  it("las vecinas que cuentan son las del mismo grupo (fijadas arriba)", () => {
+    const order = [
+      { id: "a", pinned: true, sortKey: 900 },
+      { id: "m", pinned: false, sortKey: 50 },
+      { id: "b", pinned: false, sortKey: 500 },
+    ];
+    // "m" se soltó primera entre las no fijadas: queda arriba de "b".
+    expect(sortKeyAfterMove(order, 1)).toBe(500 + 60_000);
+    expect([...order].sort(byNoteOrder).map((n) => n.id)).toEqual(["a", "b", "m"]);
   });
 });

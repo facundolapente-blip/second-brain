@@ -20,6 +20,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { PillSwitch } from "@/components/pill-switch";
 import { SwipeRow } from "@/components/swipe-row";
+import { Sortable, SortableItem } from "@/components/sortable";
 import { showContextMenu } from "@/components/context-menu";
 import { leaveThen, useNewIds } from "@/components/motion";
 import { useOnNew } from "@/components/nav-add";
@@ -33,6 +34,7 @@ import { tone } from "@/lib/palette";
 import { newClientId } from "@/lib/plan-logic";
 import {
   CATEGORY_COLORS,
+  byNoteOrder,
   NO_CATEGORY,
   NOTE_CATEGORY_MAX,
   NOTE_SECTIONS,
@@ -40,12 +42,13 @@ import {
   noteFromForm,
   noteHeading,
   sectionOf,
+  sortKeyAfterMove,
   youtubeId,
   youtubeThumb,
   type NoteDTO,
   type NoteSectionId,
 } from "@/lib/notes-logic";
-import { deleteNote, moveNoteSection, saveNote, setNoteCategory, setNoteCategoryColor, setNoteDone, setNotePinned } from "@/lib/offline/notes";
+import { deleteNote, moveNote, moveNoteSection, saveNote, setNoteCategory, setNoteCategoryColor, setNoteDone, setNotePinned } from "@/lib/offline/notes";
 import { usePendingActions, type QueuedOp } from "@/lib/offline/queue";
 import { doneLabel, NoteCard } from "./note-card";
 import { NoteSheet, type NoteCategory, type NoteSheetActions, type NoteSheetHandle } from "./note-sheet";
@@ -104,15 +107,11 @@ function pendingNotes(ops: QueuedOp[]): NoteDTO[] {
     const parsed = noteFromForm(fd);
     if (!parsed.ok) continue;
     const yt = youtubeId(parsed.note.url);
-    out.push({ id, source: "app", createdAt: new Date(op.at).toISOString(), photos: [], pinned: false, done: false, ...parsed.note, thumbnail: yt ? youtubeThumb(yt) : null });
+    out.push({ id, source: "app", createdAt: new Date(op.at).toISOString(), sortKey: op.at, photos: [], pinned: false, done: false, ...parsed.note, thumbnail: yt ? youtubeThumb(yt) : null });
   }
   return out;
 }
 
-/** Fijadas arriba; después de la más nueva a la más vieja. */
-function byPinned(a: NoteDTO, b: NoteDTO) {
-  return Number(b.pinned) - Number(a.pinned) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
-}
 
 export function NotesView({
   notes,
@@ -158,7 +157,7 @@ export function NotesView({
         (!filters.later || !n.done) &&
         (!filters.category || (filters.category === NO_CATEGORY ? !n.category : n.category === filters.category)),
     )
-    .sort(byPinned);
+    .sort(byNoteOrder);
   const fresh = useNewIds(visible.map((n) => n.id));
 
   const presetCategory = filters.category && filters.category !== NO_CATEGORY ? filters.category : null;
@@ -181,10 +180,13 @@ export function NotesView({
       if (!parsed.ok) return;
       const p = parsed.note;
       const yt = youtubeId(p.url);
+      const now = new Date().toISOString();
       const next: NoteDTO = {
         id,
         source: note?.source ?? "app",
-        createdAt: note?.createdAt ?? new Date().toISOString(),
+        createdAt: note?.createdAt ?? now,
+        // Nueva: arriba de todo (su lugar es el momento en que se creó).
+        sortKey: note?.sortKey ?? Date.parse(now),
         photos: note?.photos ?? [],
         ...p,
         thumbnail: yt ? youtubeThumb(yt) : note && note.url === p.url ? note.thumbnail : null,
@@ -259,6 +261,44 @@ export function NotesView({
     if (filters.section) leaveThen(`[data-note="${n.id}"]`, run);
     else run();
     notifyInfo(`Movida a ${sectionOf(section).name}`);
+  }
+
+  // Arrastrar para cambiar el lugar (sin importar la fecha). En el celular, mantener
+  // apretado: mientras tanto el deslizar (Visto, Borrar) no se dispara.
+  const [held, setHeld] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const holdStart = useRef<{ x: number; y: number } | null>(null);
+  const holdProps = (id: string) => ({
+    onTouchStartCapture: (e: React.TouchEvent) => {
+      const t = e.touches[0];
+      holdStart.current = { x: t.clientX, y: t.clientY };
+      clearTimeout(holdTimer.current);
+      holdTimer.current = setTimeout(() => setHeld(id), 250);
+    },
+    onTouchMoveCapture: (e: React.TouchEvent) => {
+      const st = holdStart.current;
+      const t = e.touches[0];
+      if (st && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 8) clearTimeout(holdTimer.current);
+    },
+    onTouchEndCapture: () => {
+      clearTimeout(holdTimer.current);
+      setHeld(null);
+    },
+    onTouchCancelCapture: () => {
+      clearTimeout(holdTimer.current);
+      setHeld(null);
+    },
+  });
+  function reorder(ids: string[], moved: { id: string; to: number }) {
+    const byId = new Map(visible.map((n) => [n.id, n]));
+    const order = ids.map((id) => byId.get(id)).filter((n): n is NoteDTO => !!n);
+    if (order.length !== ids.length || pendingIds.has(moved.id)) return;
+    const sortKey = sortKeyAfterMove(order, moved.to);
+    haptic("select");
+    start(async () => {
+      apply({ id: moved.id, sortKey });
+      await moveNote(moved.id, sortKey);
+    });
   }
 
   function openCategory(n: NoteDTO) {
@@ -373,13 +413,23 @@ export function NotesView({
         {visible.length === 0 ? (
           <Empty section={section} searching={searching} later={filters.later} onNew={newNote} />
         ) : (
-          <div className="grid gap-3 lg:block lg:columns-2 lg:gap-4 xl:columns-3">
+          // Filas (no columnas tipo muro): el orden propio se lee de izquierda a derecha y de arriba abajo.
+          <Sortable ids={visible.map((n) => n.id)} onReorder={reorder} grid disabled={visible.length < 2}>
+          <div className="grid items-start gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
             {visible.map((n) => (
-              <div key={n.id} className={cx("min-w-0 lg:mb-4 lg:break-inside-avoid", fresh.has(n.id) && "reveal")}>
+              <SortableItem
+                key={n.id}
+                id={n.id}
+                as="div"
+                disabled={pendingIds.has(n.id)}
+                className={cx("min-w-0 rounded-[18px] [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]", fresh.has(n.id) && "reveal")}
+                draggingClass="rounded-[18px] shadow-[0_18px_40px_-16px_rgba(0,0,0,0.4)] scale-[1.02]"
+              >
+                <div {...holdProps(n.id)}>
                 <SwipeRow
                   className="rounded-[18px] lg:overflow-visible"
-                  left={{ label: doneLabel(n), icon: <CheckCircle size={20} weight="bold" />, tone: "done", onAction: () => toggleDone(n) }}
-                  right={{ label: "Borrar", icon: <Trash size={20} weight="bold" />, tone: "danger", onAction: () => sheetActions.remove(n) }}
+                  left={held === n.id ? undefined : { label: doneLabel(n), icon: <CheckCircle size={20} weight="bold" />, tone: "done", onAction: () => toggleDone(n) }}
+                  right={held === n.id ? undefined : { label: "Borrar", icon: <Trash size={20} weight="bold" />, tone: "danger", onAction: () => sheetActions.remove(n) }}
                 >
                   <NoteCard
                     note={n}
@@ -397,9 +447,11 @@ export function NotesView({
                     }}
                   />
                 </SwipeRow>
-              </div>
+                </div>
+              </SortableItem>
             ))}
           </div>
+          </Sortable>
         )}
 
         {hasMore && (

@@ -116,6 +116,7 @@ for (const m of msgs) {
         source: "import",
         externalId,
         createdAt: m.at,
+        sortKey: m.at.getTime(),
       },
       update: {},
       select: { id: true },
