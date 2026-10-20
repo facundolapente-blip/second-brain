@@ -34,10 +34,10 @@ export async function connectWatch(_prev: WatchResult | null, fd: FormData): Pro
   };
 }
 
-/** "Sincronizar ahora": los últimos 30 días. */
+/** "Sincronizar ahora": el último año (así entra también lo viejo que Huawei mandó a intervals.icu después de conectar). */
 export async function syncWatchNow(): Promise<WatchResult> {
   await exigirSesion();
-  const r = await syncWatch({ days: 30 });
+  const r = await syncWatch({ days: 365 });
   if (!r) return { ok: false, error: "El reloj no está conectado." };
   // También con error: la tarjeta muestra el problema guardado.
   refrescar();
