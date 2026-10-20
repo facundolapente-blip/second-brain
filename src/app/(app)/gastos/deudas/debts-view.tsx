@@ -88,7 +88,7 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
           <EmptyBlock title="Nada pendiente" icon={<Handshake size={22} weight="fill" />}>
             <p className="max-w-[52ch] text-[13.5px] leading-relaxed text-muted">
               Cuando pagues algo por otro (&ldquo;la nafta, me pagan después&rdquo;) o te presten plata, anotalo acá. Al
-              saldarlo podés cargar la devolución como reintegro y el gasto queda bien.
+              saldarlo podés cargar el movimiento de la devolución.
             </p>
             <Button size="sm" onClick={() => edit(null)}>
               <Plus size={14} weight="bold" aria-hidden /> Anotar una deuda
@@ -273,8 +273,8 @@ function SettleForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useSafeTransition();
   const back = debt.direction === "owed_to_me";
-  // Lo que te devuelven puede ser el reintegro de un gasto (la nafta que pagaste por otro).
-  const cats = categories.filter((c) => (back ? true : c.kind === "expense"));
+  // Lo que te devuelven entra como ingreso y lo que pagás sale como gasto (sin reintegros).
+  const cats = categories.filter((c) => c.kind === (back ? "income" : "expense"));
 
   function go(withTx: boolean) {
     start(async () => {

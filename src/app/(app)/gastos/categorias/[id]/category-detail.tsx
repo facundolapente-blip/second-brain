@@ -89,8 +89,8 @@ export function CategoryDetail({
   const months = new Map<string, TxDTO[]>();
   for (const t of shown) months.set(t.date.slice(0, 7), [...(months.get(t.date.slice(0, 7)) ?? []), t]);
 
-  // A dónde se pueden pasar: las del mismo tipo (y, para ingresos, también las de gasto: reintegro).
-  const targets = categories.filter((c) => !c.adjustment && c.id !== category.id && (c.kind === category.kind || category.kind === "income"));
+  // A dónde se pueden pasar: las del mismo tipo (sin reintegros: un ingreso no resta de un gasto).
+  const targets = categories.filter((c) => !c.adjustment && c.id !== category.id && c.kind === category.kind);
   const Icon = FINANCE_ICONS[category.icon] ?? Tag;
 
   function toggle(id: string) {
@@ -254,7 +254,6 @@ export function CategoryDetail({
               {targets.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
-                  {c.kind !== category.kind ? " (reintegro)" : ""}
                 </option>
               ))}
               <option value="none">Sin clasificar</option>

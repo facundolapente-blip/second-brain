@@ -315,8 +315,6 @@ export const TxSheet = forwardRef<
   const to = accounts.find((a) => a.id === d.toAccountId);
   const crossCurrency = d.kind === "transfer" && !!from && !!to && from.currency !== to.currency;
   const kindCats = categories.filter((c) => c.kind === (d.kind === "income" ? "income" : "expense") && !c.adjustment);
-  // Un ingreso puede ser el reintegro de un gasto: resta de esa categoría.
-  const refundCats = d.kind === "income" ? categories.filter((c) => c.kind === "expense" && !c.adjustment) : [];
   // Las cuentas archivadas solo aparecen si el movimiento que se edita ya las usa.
   const pickable = (selected: string) => accounts.filter((a) => !a.archived || a.id === selected);
 
@@ -671,20 +669,6 @@ export const TxSheet = forwardRef<
                 </CategoryChip>
               ))}
             </div>
-            {refundCats.length > 0 && (
-              <details className="group" open={refundCats.some((c) => c.id === d.categoryId)}>
-                <summary className="inline-flex min-h-10 cursor-pointer items-center text-[13px] text-muted select-none hover:text-fg">
-                  ¿Es un reintegro? Elegí de qué gasto (resta de esa categoría)
-                </summary>
-                <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-5">
-                  {refundCats.map((c) => (
-                    <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => pickCategory(c.id)}>
-                      <CategoryAvatar category={c} size={34} />
-                    </CategoryChip>
-                  ))}
-                </div>
-              </details>
-            )}
           </div>
         )}
 
