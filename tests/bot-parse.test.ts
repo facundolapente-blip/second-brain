@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayAtEnd, parseCommand, parseJournal, parseTask } from "@/lib/bot/parse";
+import { dayAtEnd, parseBlock, parseCommand, parseJournal, parseTask } from "@/lib/bot/parse";
 
 const TODAY = "2026-10-19";
 
@@ -45,5 +45,24 @@ describe("parseJournal", () => {
 describe("fechas del bot", () => {
   it("acepta una fecha ISO al final", () => {
     expect(dayAtEnd(["pagar", "2026-10-25"], TODAY)).toEqual({ date: "2026-10-25", used: 1 });
+  });
+});
+
+describe("día y hora en cualquier lugar (pedido de Facu)", () => {
+  // TODAY = lunes 19/10/2026
+  it("bloque con el día y la hora adelante", () => {
+    expect(parseBlock("Domingo 17hs Estadio", TODAY)).toEqual({ title: "Estadio", date: "2026-10-25", startTime: "17:00", endTime: null });
+    expect(parseBlock("mañana 18 gym", TODAY)).toEqual({ title: "Gym", date: "2026-10-20", startTime: "18:00", endTime: null });
+    expect(parseBlock("jueves 18:30-20:30 ORT", TODAY)).toEqual({ title: "ORT", date: "2026-10-22", startTime: "18:30", endTime: "20:30" });
+  });
+  it("lo de siempre sigue igual", () => {
+    expect(parseBlock("gym mañana 18", TODAY)).toEqual({ title: "Gym", date: "2026-10-20", startTime: "18:00", endTime: null });
+    expect(parseBlock("capítulo 3", TODAY)).toEqual({ title: "Capítulo 3", date: TODAY, startTime: null, endTime: null });
+  });
+  it("un número suelto en el medio sin día no es una hora", () => {
+    expect(parseBlock("gym 3 series", TODAY)).toEqual({ title: "Gym 3 series", date: TODAY, startTime: null, endTime: null });
+  });
+  it("tarea con el día adelante", () => {
+    expect(parseTask("viernes llamar al banco", TODAY)).toEqual({ title: "Llamar al banco", deadline: "2026-10-23" });
   });
 });

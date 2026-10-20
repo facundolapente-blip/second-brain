@@ -122,13 +122,46 @@ export function timeAtEnd(words: string[]): { start: string; end: string | null;
 
 const capital = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
+/**
+ * Día en cualquier lugar del mensaje ("domingo estadio", "estadio el domingo a la noche"):
+ * el primero que aparece, con su "el" / "para el" delante. Devuelve las palabras sin el día
+ * y dónde estaba (para aceptar una hora suelta justo después: "domingo 17 estadio").
+ */
+export function dayAnywhere(words: string[], today: string): { date: string; rest: string[]; at: number } | null {
+  for (let i = 0; i < words.length; i++) {
+    const d = dayAtEnd(words.slice(0, i + 1), today);
+    if (!d) continue;
+    const from = i + 1 - d.used;
+    return { date: d.date, rest: [...words.slice(0, from), ...words.slice(i + 1)], at: from };
+  }
+  return null;
+}
+
+/**
+ * Hora (o rango) en cualquier lugar: solo si es claramente una hora ("17hs", "18:30",
+ * "18-20", "a las 18"), o un número suelto en la posición `bareAt` (justo después del día).
+ */
+export function timeAnywhere(words: string[], bareAt: number | null): { start: string; end: string | null; rest: string[] } | null {
+  for (let i = 0; i < words.length; i++) {
+    const t = timeAtEnd(words.slice(0, i + 1));
+    if (!t) continue;
+    const from = i + 1 - t.used;
+    if (!t.strong && from !== bareAt) continue;
+    return { start: t.start, end: t.end, rest: [...words.slice(0, from), ...words.slice(i + 1)] };
+  }
+  return null;
+}
+
 /** "tarea llamar al banco viernes" → título "Llamar al banco", deadline el viernes. */
 export function parseTask(rest: string, today: string): { title: string; deadline: string | null } | { error: string } {
   const words = rest.trim().split(/\s+/).filter(Boolean);
   const day = words.length > 1 ? dayAtEnd(words, today) : null;
-  const title = capital(words.slice(0, words.length - (day?.used ?? 0)).join(" ").slice(0, 160).trim());
+  // Si no está al final, el día puede ir en cualquier lado ("TT viernes llamar al banco").
+  const any = !day && words.length > 1 ? dayAnywhere(words, today) : null;
+  const titleWords = any && any.rest.length ? any.rest : words.slice(0, words.length - (day?.used ?? 0));
+  const title = capital(titleWords.join(" ").slice(0, 160).trim());
   if (!title) return { error: "Falta el nombre de la tarea. Por ejemplo: tarea llamar al banco viernes" };
-  return { title, deadline: day?.date ?? null };
+  return { title, deadline: day?.date ?? (any && any.rest.length ? any.date : null) };
 }
 
 /**
@@ -164,6 +197,20 @@ export function parseBlock(
         time = t2;
         words = rest2.slice(0, rest2.length - t2.used);
       } else words = rest2;
+    }
+  }
+  // Segunda pasada: día y hora en cualquier lugar ("Domingo 17hs Estadio", "mañana 18 gym").
+  if (!date && !time && words.length > 1) {
+    const d = dayAnywhere(words, today);
+    const base = d && d.rest.length ? d.rest : words;
+    const t = timeAnywhere(base, d && d.rest.length ? d.at : null);
+    if (d && d.rest.length) {
+      date = d.date;
+      words = d.rest;
+    }
+    if (t && t.rest.length) {
+      time = { start: t.start, end: t.end, used: 0, strong: true };
+      words = t.rest;
     }
   }
   const title = capital(words.join(" ").slice(0, 120).trim());
