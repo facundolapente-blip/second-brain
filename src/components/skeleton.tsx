@@ -37,3 +37,68 @@ export function LoadingRegion({ label, children, className = "" }: { label: stri
     </main>
   );
 }
+
+/**
+ * Tarjeta con cabecera teñida mientras carga (la forma de `TintedCard`): banda del color
+ * del módulo con el ícono real y el título (o un hueso), y el cuerpo con lo que se pase.
+ */
+export function CardSkeleton({
+  icon: Ico,
+  title,
+  meta = "w-32",
+  pill,
+  bar,
+  extra,
+  className = "",
+  bodyClassName = "",
+  children,
+}: {
+  icon: React.ComponentType<{ size?: number; weight?: "fill" }>;
+  /** Texto del título, o el ancho del hueso (`"w-24"`) si el título depende de los datos. */
+  title: string;
+  meta?: string | null;
+  pill?: string;
+  bar?: boolean;
+  extra?: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  children?: React.ReactNode;
+}) {
+  const boneTitle = /^w-/.test(title);
+  return (
+    <section aria-hidden className={`tcard ${className}`}>
+      <header className="tcard-head">
+        <span className="tcard-ico">
+          <Ico size={18} weight="fill" />
+        </span>
+        <span className="grid min-w-0 gap-1.5">
+          {boneTitle ? <Bone className={`h-4 ${title}`} /> : <span className="tcard-title truncate">{title}</span>}
+          {meta && <Bone className={`h-3 ${meta}`} />}
+        </span>
+        {pill ? <Bone className={`h-8 rounded-full ${pill}`} /> : <span />}
+        {bar && <span className="tcard-bar" />}
+        {extra && <div className="col-span-3 mt-2.5 min-w-0">{extra}</div>}
+      </header>
+      <div className={`tcard-body ${bodyClassName}`}>{children}</div>
+    </section>
+  );
+}
+
+/** Tarjeta de cifra mientras carga (la forma de `StatTile`). */
+export function StatSkeleton({ icon: Ico, label, className = "" }: { icon: React.ComponentType<{ size?: number; weight?: "fill" }>; label: string; className?: string }) {
+  return (
+    <div aria-hidden className={`tcard tstat ${className}`}>
+      <header className="tcard-head">
+        <span className="tcard-ico">
+          <Ico size={15} weight="fill" />
+        </span>
+        <span className="tcard-title truncate">{label}</span>
+        <span />
+      </header>
+      <div className="tcard-body">
+        <Bone className="h-8 w-16" />
+        <Bone className="h-3 w-24" />
+      </div>
+    </div>
+  );
+}
