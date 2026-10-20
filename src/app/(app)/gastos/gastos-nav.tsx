@@ -22,6 +22,7 @@ const TABS: Tab[] = [
   { href: "/gastos/sin-clasificar", label: "Sin clasificar", mobile: false },
   { href: "/gastos/plantillas", label: "Plantillas", mobile: false },
   { href: "/gastos/recurrentes", label: "Recurrentes", mobile: false },
+  { href: "/gastos/revisar", label: "Revisar", mobile: false },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -39,7 +40,7 @@ function mobileActive(pathname: string, href: string) {
   if (href === "/gastos") {
     return (
       pathname === "/gastos" ||
-      ["/gastos/buscar", "/gastos/categorias", "/gastos/sin-clasificar", "/gastos/plantillas", "/gastos/recurrentes", "/gastos/deudas"].some((p) =>
+      ["/gastos/buscar", "/gastos/categorias", "/gastos/sin-clasificar", "/gastos/plantillas", "/gastos/recurrentes", "/gastos/deudas", "/gastos/revisar"].some((p) =>
         pathname.startsWith(p),
       )
     );

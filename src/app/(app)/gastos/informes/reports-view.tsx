@@ -14,6 +14,7 @@ import {
   byCategory,
   byMonth,
   isSelected,
+  personalFlowRows,
   type AccountDTO,
   type CategoryDTO,
   type FlowRow,
@@ -159,7 +160,12 @@ export function ReportsView({
   const draw = useDraw(drawKey);
 
   const scoped = useMemo(() => {
-    const mine = rows.filter((r) => isSelected(scope, r.accountId));
+    // De la plata de otra persona, solo la diferencia del mes; con "Personales", sin trabajo.
+    const mine = personalFlowRows(
+      rows.filter((r) => isSelected(scope, r.accountId)),
+      lk.currencyOf,
+      selection === null,
+    );
     if (!allPesos) return mine.filter((r) => lk.currencyOf(r.accountId) === currency);
     return mine.map((r) => {
       const cur = lk.currencyOf(r.accountId);
@@ -167,7 +173,7 @@ export function ReportsView({
       const per = cur === "USD" ? rate : (todayRates[cur] ?? 0);
       return { ...r, cents: Math.round(r.cents * per) };
     });
-  }, [rows, scope, lk, currency, allPesos, rate, todayRates]);
+  }, [rows, scope, selection, lk, currency, allPesos, rate, todayRates]);
   const yearMode = period.kind === "year";
   const year = yearMode ? period.year : month.slice(0, 4);
   const prevYear = String(Number(year) - 1);

@@ -6,7 +6,7 @@ import { getHabitsWithLogs } from "./habits";
 import { currentStreak as habitStreak, dayProgress, dayState, habitDayMark, habitScore, hasScore, packAll, showsOn } from "./habit-logic";
 import { getWrittenDays, NOT_EMPTY } from "./journal";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
-import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL, runSchedules } from "./finance";
+import { getAccounts, getCardSummaries, getCategoryBudgets, getPassFlows, NOT_ADJUSTMENT, PERSONAL, runSchedules } from "./finance";
 import { budgetState, monthShare } from "./budget-logic";
 import { getRates, toUyu } from "./fx";
 import { toCents, type CurrencyTotals } from "./finance-logic";
@@ -51,14 +51,16 @@ export async function getDashboard() {
 
   await runSchedules();
   const rates = await getRates();
-  const [checkToday, checkYesterday, weight, { budgets }, backup] = await Promise.all([
+  const [checkToday, checkYesterday, weight, { budgets }, backup, pass] = await Promise.all([
     getCheckinDay(today),
     getCheckinDay(addDays(today, -1)),
     lastWeight(),
     getCategoryBudgets(today.slice(0, 7)),
     backupWarning(),
+    // Plata de otra persona: solo la diferencia del mes.
+    getPassFlows(monthBounds(prevMonth).from, monthBounds(month).to),
   ]);
-  const [habitData, archivedData, written, lastEntry, accounts, flows, categories, blocks, blockLogs, tasks, habitOrderFlag] = await Promise.all([
+  const [habitData, archivedData, written, lastEntry, accounts, txFlows, categoryRows, blocks, blockLogs, tasks, habitOrderFlag] = await Promise.all([
     getHabitsWithLogs(),
     // Los archivados cuentan en los días de antes (Tu semana, Constancia), no en los de hoy.
     getHabitsWithLogs({ archived: true }),
@@ -144,6 +146,8 @@ export async function getDashboard() {
   const monthWritten = written.filter((d) => d.startsWith(month)).length;
 
   // ─── Gastos ───────────────────────────────────────────────────────────────
+  const flows = [...txFlows, ...pass.flows];
+  const categories = [...categoryRows, pass.category];
   const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
   const catById = new Map(categories.map((c) => [c.id, c]));
   const spentByDay = new Map<string, number>();

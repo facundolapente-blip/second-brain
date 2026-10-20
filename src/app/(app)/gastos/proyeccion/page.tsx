@@ -1,4 +1,5 @@
 import { getAccounts, getCategories, getFlowRows, getSchedules } from "@/lib/finance";
+import { personalFlowRows } from "@/lib/finance-logic";
 import { monthBounds, shiftMonth, todayISO } from "@/lib/dates";
 import { occurrencesBetween } from "@/lib/schedule-logic";
 import { buildProjection } from "@/lib/projection";
@@ -20,9 +21,12 @@ export default async function ProyeccionPage() {
   const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
   // Solo lo personal: las cuentas de trabajo no entran en la proyección.
   const work = new Set(accounts.filter((a) => a.business).map((a) => a.id));
-  const flows = rows
-    .filter((r) => r.date <= today && !work.has(r.accountId))
-    .map((r) => ({ date: r.date, kind: r.kind, categoryId: r.categoryId, cents: toUyu(r.cents, currencyOf.get(r.accountId) ?? "UYU", rates) }));
+  // De la plata de otra persona, solo la diferencia del mes; sin categorías de trabajo.
+  const flows = personalFlowRows(
+    rows.filter((r) => r.date <= today && !work.has(r.accountId)),
+    (id) => currencyOf.get(id) ?? "UYU",
+    true,
+  ).map((r) => ({ date: r.date, kind: r.kind, categoryId: r.categoryId, cents: toUyu(r.cents, currencyOf.get(r.accountId) ?? "UYU", rates) }));
 
   // Recurrentes que faltan este mes (después de hoy), en pesos.
   const end = monthBounds(month).to;

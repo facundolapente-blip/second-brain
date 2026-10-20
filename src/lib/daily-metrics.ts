@@ -6,7 +6,7 @@ import { habitDayMark } from "./habit-logic";
 import { isEmptyEntry, wordCount } from "./journal-logic";
 import { REVIEW_TEMPLATE } from "./review-logic";
 import { toCents } from "./finance-logic";
-import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
+import { getPassFlows, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { isFreeBlock } from "./plan-logic";
 
@@ -104,7 +104,7 @@ export function habitTotals(h: HabitRef, days: DayMetrics[]): { done: number; du
 
 export async function getDailyMetrics(from: string, to: string): Promise<{ days: DayMetrics[]; habits: HabitRef[] }> {
   const range = { gte: toDbDate(from), lte: toDbDate(to) };
-  const [active, archived, checkins, entries, accounts, txs, blocks, blockLogs] = await Promise.all([
+  const [active, archived, checkins, entries, accounts, txRows, blocks, blockLogs, pass] = await Promise.all([
     getHabitsWithLogs(),
     // Los archivados también: cuentan en los días antes de archivarse (si no, desaparecen del pasado).
     getHabitsWithLogs({ archived: true }),
@@ -121,7 +121,10 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     prisma.planBlock.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),
     // Tarjetas que se pasaron a otra semana: cuentan en el día donde estaban.
     prisma.planBlockLog.findMany({ where: { date: range }, select: { date: true, title: true, done: true } }),
+    // Plata de otra persona: solo la diferencia del mes, repartida en los días en que se movió.
+    getPassFlows(from, to),
   ]);
+  const txs = [...txRows, ...pass.flows];
   const rates = await getRates();
   const today = active.today;
   const habits = [...active.habits, ...archived.habits];

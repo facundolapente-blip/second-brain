@@ -42,6 +42,10 @@ export type CategoryDTO = {
   txCount: number;
   /** "Ajuste de saldo": no cuenta como gasto ni ingreso. */
   adjustment?: boolean;
+  /** De trabajo: no cuenta en los gastos ni ingresos personales. */
+  business?: boolean;
+  /** Plata de otra persona: cuenta solo la diferencia del mes (`netPassThrough`). */
+  pass?: boolean;
 };
 
 export type TxDTO = {
@@ -397,20 +401,29 @@ export type FlowRow = {
   accountId: string;
   categoryId: string | null;
   cents: number;
+  /** Categoría de trabajo: fuera de los números personales. */
+  business?: boolean;
+  /** Plata de otra persona: se reemplaza por la diferencia del mes (`personalFlowRows`). */
+  pass?: boolean;
 };
 
 /**
  * Cómo cuenta un movimiento en gastos e ingresos: las transferencias y los
  * ajustes de saldo no cuentan; un ingreso con categoría de gasto es un
- * reintegro y resta de ese gasto (cents negativos).
+ * reintegro y resta de ese gasto (cents negativos). Con `personal`, las
+ * categorías de trabajo tampoco; con `skipPass`, la plata de otra persona
+ * tampoco (quien llama suma la diferencia del mes con `netPassThrough`).
  */
 export function flowOf(
   tx: Pick<TxDTO, "kind" | "amountCents" | "categoryId">,
-  categoryOf: (id: string | null) => Pick<CategoryDTO, "kind" | "adjustment"> | undefined,
+  categoryOf: (id: string | null) => Pick<CategoryDTO, "kind" | "adjustment" | "business" | "pass"> | undefined,
+  opts: { personal?: boolean; skipPass?: boolean } = {},
 ): { kind: "expense" | "income"; cents: number } | null {
   if (tx.kind === "transfer") return null;
   const c = categoryOf(tx.categoryId);
   if (c?.adjustment) return null;
+  if (opts.personal && c?.business) return null;
+  if (opts.skipPass && c?.pass) return null;
   if (tx.kind === "income" && c?.kind === "expense") return { kind: "expense", cents: -tx.amountCents };
   return { kind: tx.kind, cents: tx.amountCents };
 }
@@ -422,6 +435,139 @@ export function toFlowRows(txs: TxDTO[]): FlowRow[] {
     rows.push({ id: t.id, title: t.title, date: t.date, kind: t.kind, accountId: t.accountId, categoryId: t.categoryId, cents: t.amountCents });
   }
   return rows;
+}
+
+// ─── Plata de otra persona ──────────────────────────────────────────────────
+
+/** Categoría que no existe en la base: la diferencia del mes de la plata de otra persona. */
+export const PASS_CATEGORY_ID = "plata-ajena";
+
+/**
+ * Nombre de esa diferencia: "Diferencia con mamá" si las categorías son "Gastos mamá"
+ * e "Ingresos mamá" (lo que queda al sacar Gastos/Ingresos/Plata de); si no, genérico.
+ */
+export function passLabel(names: string[]): string {
+  const who = new Set(
+    names.map((n) =>
+      n
+        .trim()
+        .replace(/^(gastos?|ingresos?|plata|pagos?)\s+(de\s+|por\s+|x\s+)?/i, "")
+        .trim()
+        .toLowerCase(),
+    ),
+  );
+  const [one] = [...who];
+  return who.size === 1 && one ? `Diferencia con ${one}` : "Diferencia de plata de otros";
+}
+
+/** La categoría de la diferencia, para buscarla por id junto a las de verdad (nunca en listas). */
+export function passCategory(categories: Pick<CategoryDTO, "name" | "pass">[]): CategoryDTO {
+  return {
+    id: PASS_CATEGORY_ID,
+    name: passLabel(categories.filter((c) => c.pass).map((c) => c.name)),
+    kind: "expense",
+    icon: "HandCoins",
+    color: "pink",
+    order: 9999,
+    txCount: 0,
+  };
+}
+
+export type PassIn = { date: string; kind: "expense" | "income"; cents: number; currency: string; accountId: string };
+export type PassOut = PassIn & { key: string };
+
+/**
+ * Plata de otra persona (tu madre te da $ 2.000 y gastás $ 1.800 en lo que te
+ * pidió): por separado no cuenta, solo la diferencia del mes ($ 200 de ingreso;
+ * si gastaste más de lo que te dio, la diferencia es gasto). Se calcula por mes y
+ * moneda, día a día con lo acumulado: así los gráficos por día y el acumulado del
+ * mes suman justo la diferencia del mes. Un día puede dar negativo (el reintegro
+ * llega después de la compra: el gasto de antes se descuenta).
+ * `cents` de entrada siempre positivos; la salida puede tener negativos.
+ */
+export function netPassThrough(rows: PassIn[]): PassOut[] {
+  const groups = new Map<string, PassIn[]>();
+  for (const r of rows) {
+    const k = `${r.date.slice(0, 7)}|${r.currency}`;
+    const g = groups.get(k);
+    if (g) g.push(r);
+    else groups.set(k, [r]);
+  }
+  const out: PassOut[] = [];
+  for (const [k, list] of groups) {
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    let inc = 0;
+    let exp = 0;
+    let shownExp = 0;
+    let shownInc = 0;
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (r.kind === "income") inc += r.cents;
+      else exp += r.cents;
+      // Se cierra el día cuando el que sigue es de otro día.
+      if (list[i + 1]?.date === r.date) continue;
+      const netExp = Math.max(0, exp - inc);
+      const netInc = Math.max(0, inc - exp);
+      if (netExp !== shownExp) out.push({ ...r, kind: "expense", cents: netExp - shownExp, key: `${k}|${r.date}|e` });
+      if (netInc !== shownInc) out.push({ ...r, kind: "income", cents: netInc - shownInc, key: `${k}|${r.date}|i` });
+      shownExp = netExp;
+      shownInc = netInc;
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Las filas de gastos e ingresos tal como cuentan en los números personales: sin
+ * las de trabajo (si `dropBusiness`) y con la plata de otra persona reemplazada por
+ * la diferencia del mes (categoría `PASS_CATEGORY_ID`).
+ */
+export function personalFlowRows(rows: FlowRow[], currencyOf: (accountId: string) => string, dropBusiness: boolean): FlowRow[] {
+  const keep: FlowRow[] = [];
+  const pass: PassIn[] = [];
+  for (const r of rows) {
+    if (dropBusiness && r.business) continue;
+    if (r.pass) pass.push({ date: r.date, kind: r.kind, cents: r.cents, currency: currencyOf(r.accountId), accountId: r.accountId });
+    else keep.push(r);
+  }
+  if (!pass.length) return keep;
+  return [
+    ...keep,
+    ...netPassThrough(pass).map((p) => ({
+      id: `pasa:${p.key}`,
+      title: "Diferencia del mes",
+      date: p.date,
+      kind: p.kind,
+      accountId: p.accountId,
+      categoryId: PASS_CATEGORY_ID,
+      cents: p.cents,
+    })),
+  ];
+}
+
+/**
+ * Cómo cuentan unos movimientos en ingresos y gastos (moneda, tipo, monto y categoría):
+ * `flowOf` de cada uno, con la plata de otra persona reemplazada por la diferencia del
+ * mes y, con `personal`, sin las categorías de trabajo.
+ */
+export function txFlowEntries(
+  txs: TxDTO[],
+  categoryOf: (id: string | null) => Pick<CategoryDTO, "kind" | "adjustment" | "business" | "pass"> | undefined,
+  currencyOf: (accountId: string) => string,
+  personal: boolean,
+): { currency: string; kind: "expense" | "income"; cents: number; categoryId: string | null }[] {
+  const out: { currency: string; kind: "expense" | "income"; cents: number; categoryId: string | null }[] = [];
+  const pass: PassIn[] = [];
+  for (const t of txs) {
+    if (t.kind !== "transfer" && categoryOf(t.categoryId)?.pass) {
+      pass.push({ date: t.date, kind: t.kind, cents: t.amountCents, currency: currencyOf(t.accountId), accountId: t.accountId });
+      continue;
+    }
+    const f = flowOf(t, categoryOf, { personal });
+    if (f) out.push({ currency: currencyOf(t.accountId), kind: f.kind, cents: f.cents, categoryId: t.categoryId });
+  }
+  for (const p of netPassThrough(pass)) out.push({ currency: p.currency, kind: p.kind, cents: p.cents, categoryId: PASS_CATEGORY_ID });
+  return out;
 }
 
 /** Total por categoría (null = sin clasificar), de mayor a menor. */

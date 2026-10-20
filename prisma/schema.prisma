@@ -177,6 +177,12 @@ model Category {
   archivedAt   DateTime?
   /// "Ajuste de saldo": corrige el saldo de una cuenta sin contar como gasto ni ingreso.
   isAdjustment Boolean                @default(false)
+  /// "De trabajo": sus movimientos no cuentan en los gastos ni ingresos personales,
+  /// aunque salgan de una cuenta personal (compras y ventas de discos, por ejemplo).
+  isBusiness   Boolean                @default(false)
+  /// "Plata de otra persona" (Gastos mamá / Ingresos mamá): mueve el saldo pero en los
+  /// números cuenta solo la diferencia del mes entre lo que entró y lo que se gastó.
+  isPassThrough Boolean               @default(false)
   transactions Transaction[]
   templates    TxTemplate[]
   schedules    ScheduledTransaction[]

@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { getDailyMetrics, habitTotals, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
-import { NOT_ADJUSTMENT, PERSONAL } from "./finance";
+import { getPassFlows, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 
@@ -45,7 +45,7 @@ export async function getWeeklyReview(day: string) {
   const sunday = addDays(monday, 6);
   const prevMonday = addDays(monday, -7);
 
-  const [{ days: all, habits }, txs, categories, tasksDone, tasksNext, review] = await Promise.all([
+  const [{ days: all, habits }, txRows, categoryRows, tasksDone, tasksNext, review, pass] = await Promise.all([
     getDailyMetrics(prevMonday, sunday),
     prisma.transaction.findMany({
       // Gastos y reintegros (ingresos con categoría de gasto): el reintegro resta de su categoría,
@@ -75,7 +75,11 @@ export async function getWeeklyReview(day: string) {
       select: { id: true, body: true },
       orderBy: { createdAt: "asc" },
     }),
+    getPassFlows(monday, sunday),
   ]);
+  // Plata de otra persona: la diferencia del mes cuando es gasto (como categoría propia).
+  const txs = [...txRows, ...pass.flows.filter((f) => f.kind === "expense")];
+  const categories = [...categoryRows, pass.category];
 
   // En la semana en curso se compara contra la anterior hasta el mismo día
   // (como el resumen del mes): si no, todo da en baja hasta el domingo.

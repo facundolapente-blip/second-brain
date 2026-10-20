@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { addDays, fromDbDate, monthBounds, shiftMonth, toDbDate, todayISO } from "./dates";
 import { getDailyMetrics, habitTotals, type DayMetrics } from "./daily-metrics";
 import { toCents } from "./finance-logic";
-import { getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL } from "./finance";
+import { getCategoryBudgets, getPassFlows, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { isEmptyEntry, wordCount } from "./journal-logic";
 import { REVIEW_TEMPLATE } from "./review-logic";
@@ -22,7 +22,7 @@ export type Period = { kind: "month"; key: string } | { kind: "year"; key: strin
  */
 async function summarizeRange(period: Period, from: string, to: string, prevFrom: string, prevTo: string, isCurrent: boolean) {
   const today = todayISO();
-  const [{ days: all, habits }, txs, categories, budgets, entries, tasksDone, checkins] = await Promise.all([
+  const [{ days: all, habits }, txRows, categoryRows, budgets, entries, tasksDone, checkins, pass] = await Promise.all([
     getDailyMetrics(prevFrom, to),
     prisma.transaction.findMany({
       // Gastos y reintegros (ingresos con categoría de gasto): el reintegro resta de su categoría,
@@ -46,7 +46,11 @@ async function summarizeRange(period: Period, from: string, to: string, prevFrom
       orderBy: { completedAt: "asc" },
     }),
     prisma.dailyCheckin.count({ where: { date: { gte: toDbDate(from), lte: toDbDate(to) }, ...FILLED_CHECKIN } }),
+    getPassFlows(from, to),
   ]);
+  // Plata de otra persona: la diferencia del mes cuando es gasto (como categoría propia).
+  const txs = [...txRows, ...pass.flows.filter((f) => f.kind === "expense")];
+  const categories = [...categoryRows, pass.category];
 
   const days = all.filter((d) => d.date >= from);
   const before = all.filter((d) => d.date >= prevFrom && d.date <= prevTo);

@@ -15,7 +15,7 @@ import { GastosTabs } from "../gastos-nav";
 import { CategoryAvatar } from "../shared";
 
 type Kind = "expense" | "income";
-type Draft = { id?: string; name: string; kind: Kind; icon: string; color: string; txCount: number };
+type Draft = { id?: string; name: string; kind: Kind; icon: string; color: string; txCount: number; business?: boolean; pass?: boolean };
 
 export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
   const sheet = useRef<SheetHandle>(null);
@@ -76,12 +76,19 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   <li key={c.id} className="rise border-b border-line last:border-b-0" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
-                      onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount })}
+                      onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount, business: c.business, pass: c.pass })}
                       className="flex min-h-16 w-full items-center gap-3.5 px-1 py-2.5 text-left transition-colors hover:bg-surface-2/70"
                     >
                       <CategoryAvatar category={c} />
                       <span className="grid min-w-0 flex-1 gap-0.5">
-                        <span className="truncate text-[15px] font-medium">{c.name}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-[15px] font-medium">{c.name}</span>
+                          {(c.business || c.pass) && (
+                            <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
+                              {c.pass ? "Solo la diferencia" : "Trabajo"}
+                            </span>
+                          )}
+                        </span>
                         <span className="text-[13px] text-muted">
                           {c.txCount === 0 ? "Sin movimientos" : c.txCount === 1 ? "1 movimiento" : `${c.txCount} movimientos`}
                         </span>
@@ -165,6 +172,41 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="flex min-h-11 items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                name="pass"
+                checked={!!draft.pass}
+                onChange={(e) => setDraft({ ...draft, pass: e.target.checked, business: e.target.checked ? false : draft.business })}
+                className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
+              />
+              <span className="grid gap-0.5">
+                <span className="font-medium">Plata de otra persona</span>
+                <span className="text-[12.5px] text-muted">
+                  Lo que te dan para comprarle algo a alguien (Gastos mamá, Ingresos mamá). Mueve el saldo, pero en los números cuenta solo la diferencia
+                  del mes: si te dieron $ 2.000 y gastaste $ 1.800, son $ 200 de ingreso.
+                </span>
+              </span>
+            </label>
+            <label className="flex min-h-11 items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                name="business"
+                checked={!!draft.business}
+                disabled={!!draft.pass}
+                onChange={(e) => setDraft({ ...draft, business: e.target.checked })}
+                className="mt-0.5 size-5 shrink-0 accent-[var(--accent)] disabled:opacity-40"
+              />
+              <span className="grid gap-0.5">
+                <span className="font-medium">De trabajo</span>
+                <span className="text-[12.5px] text-muted">
+                  No cuenta en tus gastos ni ingresos personales (Inicio, Informes, presupuestos, meses de reserva), aunque salga de una cuenta personal.
+                </span>
+              </span>
+            </label>
           </div>
 
           {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}

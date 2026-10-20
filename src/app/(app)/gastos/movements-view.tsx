@@ -6,7 +6,7 @@ import { PendingFinance, useQueuedTxs } from "./pending-list";
 import Link from "next/link";
 import { useEffect, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, SquaresFour, Tag, Wallet } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, ListChecks, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, SquaresFour, Tag, Wallet } from "@phosphor-icons/react";
 import { StatTile, TintedCard } from "@/components/tinted-card";
 import { Menu } from "@/components/menu";
 import { formatShort } from "@/lib/dates";
@@ -14,7 +14,7 @@ import { moneyCents, moneyWhole } from "@/lib/format";
 import {
   balanceByCurrency,
   centsToInput,
-  flowOf,
+  txFlowEntries,
   dayLabel,
   groupByDay,
   periodIncludes,
@@ -173,19 +173,18 @@ export function MovementsView({
     // Por moneda y categoría, para la mezcla de las tarjetas de ingresos y gastos.
     const incCat: Record<string, Record<string, number>> = {};
     const expCat: Record<string, Record<string, number>> = {};
-    for (const t of visible) {
-      // Transferencias y ajustes no cuentan; un reintegro resta del gasto.
-      const f = flowOf(t, lk.category);
-      if (!f) continue;
-      const c = lk.currencyOf(t.accountId);
+    // Transferencias y ajustes no cuentan; un reintegro resta del gasto; de la plata de
+    // otra persona, solo la diferencia del mes; con "Personales", nada de trabajo.
+    for (const f of txFlowEntries(visible, lk.category, lk.currencyOf, selection === null)) {
+      const c = f.currency;
       const target = f.kind === "income" ? inc : exp;
       target[c] = (target[c] ?? 0) + f.cents;
       const byCat = ((f.kind === "income" ? incCat : expCat)[c] ??= {});
-      const k = t.categoryId ?? "none";
+      const k = f.categoryId ?? "none";
       byCat[k] = (byCat[k] ?? 0) + f.cents;
     }
     return { inc, exp, incCat, expCat };
-  }, [visible, lk]);
+  }, [visible, lk, selection]);
   // Neto = ingresos − gastos (como Informes): sin transferencias ni ajustes de saldo.
   const net = useMemo(() => {
     const out: Record<string, number> = {};
@@ -288,13 +287,14 @@ export function MovementsView({
                       { label: "Plantillas", icon: <Copy size={16} aria-hidden />, onSelect: () => router.push("/gastos/plantillas") },
                       { label: "Deudas", icon: <Handshake size={16} aria-hidden />, onSelect: () => router.push("/gastos/deudas") },
                       { label: "Categorías", icon: <SquaresFour size={16} aria-hidden />, onSelect: () => router.push("/gastos/categorias") },
+                      { label: "Revisar movimientos", icon: <ListChecks size={16} aria-hidden />, onSelect: () => router.push("/gastos/revisar") },
                     ]}
                   />
                 </div>
               </div>
               <div className="hidden gap-4 lg:grid">
                 <SideBalances accounts={accounts} selection={selection} onChange={setSelection} />
-                <CategorySpend txs={visible} lk={lk} month={reportMonth} />
+                <CategorySpend txs={visible} lk={lk} month={reportMonth} personal={selection === null} />
               </div>
             </aside>
 

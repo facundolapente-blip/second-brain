@@ -308,7 +308,15 @@ export async function saveCategory(_prev: ActionResult | null, fd: FormData): Pr
   if (!name) return { ok: false, error: "Ponele un nombre." };
   const kind = texto(fd, "kind") === "income" ? "income" : "expense";
   const color = texto(fd, "color");
-  const data = { name, icon: texto(fd, "icon", 40) || "Tag", color: isPaletteKey(color) ? color : "stone" };
+  // "De trabajo" y "Plata de otra persona" no van juntas: la segunda gana.
+  const isPassThrough = fd.get("pass") === "on";
+  const data = {
+    name,
+    icon: texto(fd, "icon", 40) || "Tag",
+    color: isPaletteKey(color) ? color : "stone",
+    isPassThrough,
+    isBusiness: !isPassThrough && fd.get("business") === "on",
+  };
   try {
     if (id) {
       // El tipo no cambia al editar: los movimientos ya clasificados quedarían incoherentes.

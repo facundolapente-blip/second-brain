@@ -10,6 +10,8 @@ import { FinanceIcon, TransferIcon, UncategorizedIcon } from "@/lib/finance-icon
 import {
   effects,
   isSelected,
+  passCategory,
+  PASS_CATEGORY_ID,
   sortedCurrencies,
   type AccountDTO,
   type CategoryDTO,
@@ -27,6 +29,8 @@ export function useLookups(accounts: AccountDTO[], categories: CategoryDTO[]) {
   return useMemo(() => {
     const acc = new Map(accounts.map((a) => [a.id, a]));
     const cat = new Map(categories.map((c) => [c.id, c]));
+    // La diferencia del mes de la plata de otra persona (no es una categoría de la base).
+    cat.set(PASS_CATEGORY_ID, passCategory(categories));
     return {
       account: (id: string | null) => (id ? acc.get(id) : undefined),
       category: (id: string | null) => (id ? cat.get(id) : undefined),

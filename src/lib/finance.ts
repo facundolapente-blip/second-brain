@@ -17,6 +17,9 @@ import { convertCents, rolloverCarry, type CategoryBudgetDTO, type ForeignSpend,
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { getRates, toUyu } from "./fx";
 import {
+  netPassThrough,
+  passCategory,
+  PASS_CATEGORY_ID,
   SELECTION_COOKIE,
   toCents,
   type AccountDTO,
@@ -200,6 +203,8 @@ export async function getCategories(): Promise<CategoryDTO[]> {
     order: c.order,
     txCount: c._count.transactions,
     adjustment: c.isAdjustment,
+    business: c.isBusiness,
+    pass: c.isPassThrough,
   }));
 }
 
@@ -260,7 +265,16 @@ export async function getFlowRows(fromMonth: string, toMonth: string): Promise<F
       date: { gte: toDbDate(monthBounds(fromMonth).from), lte: toDbDate(monthBounds(toMonth).to) },
       ...NOT_ADJUSTMENT,
     },
-    select: { id: true, title: true, date: true, kind: true, accountId: true, categoryId: true, amount: true, category: { select: { kind: true } } },
+    select: {
+      id: true,
+      title: true,
+      date: true,
+      kind: true,
+      accountId: true,
+      categoryId: true,
+      amount: true,
+      category: { select: { kind: true, isBusiness: true, isPassThrough: true } },
+    },
   });
   // Un ingreso con categoría de gasto es un reintegro: resta de ese gasto.
   return rows.map((r) => {
@@ -273,6 +287,8 @@ export async function getFlowRows(fromMonth: string, toMonth: string): Promise<F
       accountId: r.accountId,
       categoryId: r.categoryId,
       cents: refund ? -toCents(r.amount) : toCents(r.amount),
+      ...(r.category?.isBusiness ? { business: true } : {}),
+      ...(r.category?.isPassThrough ? { pass: true } : {}),
     };
   });
 }
@@ -281,7 +297,58 @@ export async function getFlowRows(fromMonth: string, toMonth: string): Promise<F
  * Filtro de Prisma: solo movimientos de cuentas personales (las de trabajo no
  * cuentan en Inicio, Presupuestos, Proyección, Análisis ni los resúmenes).
  */
-export const PERSONAL = { account: { isBusiness: false } } satisfies Prisma.TransactionWhereInput;
+export const PERSONAL = {
+  account: { isBusiness: false },
+  // Tampoco las categorías de trabajo (discos comprados o vendidos desde una cuenta
+  // personal) ni la plata de otra persona: de esa cuenta solo la diferencia del mes,
+  // que se suma aparte con `getPassFlows`. Va con NOT (no OR/AND) para combinarse con
+  // `...NOT_ADJUSTMENT` y con los AND de cada consulta.
+  NOT: { category: { OR: [{ isBusiness: true }, { isPassThrough: true }] } },
+} satisfies Prisma.TransactionWhereInput;
+
+/**
+ * La plata de otra persona de las cuentas personales entre `from` y `to`, ya como la
+ * diferencia de cada mes (`netPassThrough`), con la forma de las filas de movimientos
+ * para sumarla a los gastos e ingresos (categoría `PASS_CATEGORY_ID`; `amount` en pesos
+ * de la moneda de la cuenta, puede ser negativo). Lee desde el 1.° del mes de `from`:
+ * la diferencia se acumula en el mes.
+ */
+export async function getPassFlows(from: string, to: string) {
+  const [rows, cats] = await Promise.all([
+    prisma.transaction.findMany({
+      where: {
+        kind: { in: ["expense", "income"] },
+        date: { gte: toDbDate(monthBounds(from.slice(0, 7)).from), lte: toDbDate(to) },
+        account: { isBusiness: false },
+        category: { isPassThrough: true },
+      },
+      select: { date: true, kind: true, amount: true, accountId: true, account: { select: { currency: true } } },
+    }),
+    prisma.category.findMany({ where: { isPassThrough: true }, select: { name: true } }),
+  ]);
+  const category = passCategory(cats.map((c) => ({ name: c.name, pass: true })));
+  const flows = netPassThrough(
+    rows.map((r) => ({
+      date: fromDbDate(r.date),
+      kind: r.kind === "income" ? ("income" as const) : ("expense" as const),
+      cents: toCents(r.amount),
+      currency: r.account.currency,
+      accountId: r.accountId,
+    })),
+  )
+    .filter((p) => p.date >= from)
+    .map((p) => ({
+      date: toDbDate(p.date),
+      kind: p.kind,
+      amount: p.cents / 100,
+      accountId: p.accountId,
+      categoryId: PASS_CATEGORY_ID,
+      title: category.name,
+      category: { kind: p.kind },
+      account: { currency: p.currency },
+    }));
+  return { flows, category };
+}
 
 /** Filtro de Prisma: deja afuera los "Ajuste de saldo" (no son gasto ni ingreso). */
 export const NOT_ADJUSTMENT = {
@@ -765,7 +832,7 @@ export const getReserve = cache(async function getReserve() {
   const today = todayISO();
   const month = today.slice(0, 7);
   const first = shiftMonth(month, -14);
-  const [series, rows, rates, goalRow] = await Promise.all([
+  const [series, txRows, rates, goalRow, pass] = await Promise.all([
     getNetWorthSeries(12),
     prisma.transaction.findMany({
       where: {
@@ -778,7 +845,9 @@ export const getReserve = cache(async function getReserve() {
     }),
     getRates(),
     prisma.appSetting.findUnique({ where: { key: RESERVE_GOAL_KEY } }),
+    getPassFlows(monthBounds(first).from, addDays(monthBounds(month).from, -1)),
   ]);
+  const rows = [...txRows, ...pass.flows];
   // Gasto por mes en pesos (un ingreso con categoría de gasto es un reintegro: resta).
   const spent: Record<string, number> = {};
   for (const r of rows) {
