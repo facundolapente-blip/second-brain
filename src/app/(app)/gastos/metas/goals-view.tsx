@@ -4,6 +4,8 @@ import { useGastosNew } from "../new-action";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus, Target } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
+import { EmptyBlock } from "../shared";
 import { addToGoal, archiveGoal, deleteGoal, saveGoal, type ActionResult } from "@/lib/offline/finance";
 import type { GoalDTO } from "@/lib/finance";
 import { centsToInput, type AccountDTO } from "@/lib/finance-logic";
@@ -52,9 +54,7 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
       />
       <main className="mx-auto grid max-w-3xl gap-4 px-4 pt-2 pb-10 lg:max-w-6xl lg:px-10 lg:pt-6">
         {active.length === 0 ? (
-          <div className="grid justify-items-start gap-2 rounded-[20px] border border-dashed border-line-strong p-5">
-            <Target size={24} className="text-accent-fg" aria-hidden />
-            <p className="text-[15px] font-medium">Ninguna meta todavía</p>
+          <EmptyBlock title="Ninguna meta todavía" icon={<Target size={22} weight="fill" />}>
             <p className="max-w-[56ch] text-[13.5px] leading-relaxed text-muted">
               Por ejemplo &ldquo;US$ 2.000 para el viaje antes de marzo&rdquo;. Vinculala a una cuenta (Inversiones prex) y el
               avance es su saldo, o sumá a mano lo que vas guardando. Te dice cuánto juntar por mes.
@@ -62,9 +62,20 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
             <Button size="sm" onClick={() => edit(null)}>
               <Plus size={14} weight="bold" aria-hidden /> Nueva meta
             </Button>
-          </div>
+          </EmptyBlock>
         ) : (
-          <ul className="grid gap-3 lg:grid-cols-2">
+          <TintedCard
+            icon={Target}
+            title="Metas de ahorro"
+            meta={`${active.length === 1 ? "1 meta" : `${active.length} metas`} · ${active.filter((g) => g.targetCents > 0 && g.savedCents >= g.targetCents).length} cumplidas`}
+            action={
+              <button type="button" onClick={() => edit(null)} className="tcard-pill press">
+                <Plus size={13} weight="bold" aria-hidden /> Nueva
+              </button>
+            }
+            bodyClassName="gap-0! px-4! pt-1! pb-0! lg:px-5!"
+          >
+          <ul className="-mb-px grid lg:grid-cols-2 lg:gap-x-10">
             {active.map((g, i) => {
               // Hacia abajo: 99,6% no es "100%" ni "¡Llegaste!" (eso solo con lo juntado completo).
               const reached = g.targetCents > 0 && g.savedCents >= g.targetCents;
@@ -73,7 +84,7 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
               const acc = g.accountId ? accounts.find((a) => a.id === g.accountId) : null;
               const left = g.deadline ? diffDays(g.deadline, today) : null;
               return (
-                <li key={g.id} className="rise grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5" style={{ "--i": i } as React.CSSProperties}>
+                <li key={g.id} className={cx("rise grid content-start gap-3 border-b border-line py-4", active.length % 2 === 1 && i === active.length - 1 && "lg:col-span-2")} style={{ "--i": i } as React.CSSProperties}>
                   <button type="button" onClick={() => edit(g)} className="flex items-center gap-3 text-left">
                     <span style={tone(g.color)} className="chip-solid inline-flex size-11 shrink-0 items-center justify-center rounded-xl">
                       <FinanceIcon name={g.icon} size={20} weight="fill" aria-hidden />
@@ -126,6 +137,7 @@ export function GoalsView({ goals, accounts, today }: { goals: GoalDTO[]; accoun
               );
             })}
           </ul>
+          </TintedCard>
         )}
         {archived.length > 0 && (
           <p className="text-[13px] text-muted">

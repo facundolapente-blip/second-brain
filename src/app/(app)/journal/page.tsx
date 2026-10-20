@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SwapOnChange } from "@/components/motion-wrap";
-import { Fire, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
+import { Fire } from "@phosphor-icons/react/dist/ssr";
+import { JCard } from "./cards";
 import { cookies } from "next/headers";
 import { getAllTags, getEntries, getEntry, getHome, getQuickStats } from "@/lib/journal";
 import { formatLong } from "@/lib/dates";
@@ -80,7 +81,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       />
 
       <main className="mx-auto max-w-3xl px-4 pt-3 lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-8">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:gap-8">
         {!filtering && (
           <section className="rise grid gap-3 pt-1 lg:pt-0">
             <p className="kicker">{formatLong(home.today)}</p>
@@ -111,24 +112,26 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
         {entries.length === 0 ? (
           filtering ? (
-            <div className="grid justify-items-center gap-2 py-16 text-center">
-              <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
-                <MagnifyingGlass size={20} aria-hidden />
-              </span>
-              <p className="display text-[24px]">No hay entradas que coincidan</p>
-              <p className="max-w-[36ch] text-sm text-muted">Probá con otra palabra o sacá algún filtro. La búsqueda no distingue tildes ni mayúsculas.</p>
-            </div>
+            <JCard icon="search" title="Sin resultados" meta="Ninguna entrada coincide" action={{ href: "/journal", label: "Limpiar" }}>
+              <p className="max-w-[44ch] text-[14.5px] leading-relaxed text-muted">
+                Probá con otra palabra o sacá algún filtro. La búsqueda no distingue tildes ni mayúsculas.
+              </p>
+            </JCard>
           ) : (
             <EmptyJournal />
           )
         ) : (
-<SwapOnChange k={`${q}|${tag}|${mood}`}>          <div className="grid gap-10">
-            {years.map((g) => (
-              <section key={g.year} className="grid">
-                <h2 className="figure z-10 -mx-4 flex items-baseline gap-3 border-b border-fg/80 bg-bg/92 px-4 pt-2 pb-2 text-[30px] backdrop-blur-md max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0 lg:text-[36px]">
-                  {g.year}
-                </h2>
-                <div className="grid">
+<SwapOnChange k={`${q}|${tag}|${mood}`}>          <div className="grid gap-5 lg:gap-6">
+            {/* Un año por tarjeta; en el celular la cabecera del año queda pegada arriba (journal.css). */}
+            {years.map((g, gi) => (
+              <JCard
+                key={g.year}
+                className="jr-year"
+                icon="notebook"
+                title={g.year}
+                meta={`${g.items.length}${hasMore && gi === years.length - 1 ? "+" : ""} ${g.items.length === 1 ? "entrada" : "entradas"}`}
+                bodyClassName="gap-0! py-1! lg:py-2!"
+              >
                   {g.items.map((e) => (
                     <EntryCard
                       key={e.id}
@@ -138,8 +141,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
                       selected={reading?.id === e.id}
                     />
                   ))}
-                </div>
-              </section>
+              </JCard>
             ))}
             {hasMore && (
               <Link
@@ -161,11 +163,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         {/* Una entrada elegida se dibuja al toque con lo de la tarjeta y se completa al llegar. */}
         <ReaderSlot reading={reading} closeHref={closeHref}>
             <>
-              {home.memory && !memoryDismissed && (
-                <div className="rounded-2xl border border-line bg-surface px-6 pb-1 [&>section]:border-y-0">
-                  <MemoryCard memory={home.memory} today={home.today} />
-                </div>
-              )}
+              {home.memory && !memoryDismissed && <MemoryCard memory={home.memory} today={home.today} />}
               <QuickStatsCard stats={quick} />
             </>
         </ReaderSlot>
@@ -193,7 +191,7 @@ function FilterSummary({
   if (tag) parts.push(`#${tag}`);
   if (mood) parts.push(`ánimo ${moodInfo(mood)!.label.toLowerCase()}`);
   return (
-    <div className="reveal flex items-center gap-3 border-y border-line py-3 text-[15px]">
+    <div className="reveal flex items-center gap-3 rounded-full border bg-surface py-2 pr-2 pl-5 text-[15px]">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
           {count}
@@ -201,7 +199,7 @@ function FilterSummary({
         </span>{" "}
         <span className="text-muted">{parts.join(", ")}</span>
       </span>
-      <Link href="/journal" className="shrink-0 font-medium text-accent-fg">
+      <Link href="/journal" className="inline-flex min-h-10 shrink-0 items-center rounded-full px-3 font-medium text-accent-fg hover:bg-surface-2">
         Limpiar
       </Link>
     </div>

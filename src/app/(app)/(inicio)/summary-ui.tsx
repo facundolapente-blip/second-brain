@@ -1,10 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowDownRight, ArrowUpRight } from "@phosphor-icons/react";
+import { ArrowDownRight, ArrowUpRight, CalendarCheck, Medal, Notebook, Wallet, type Icon } from "@phosphor-icons/react";
 import { Fragment } from "react";
 import { cx } from "@/components/ui";
+import { StatTile, TintedCard, type CardTone } from "@/components/tinted-card";
 import { formatKm, formatSleep, watchStressLevel } from "@/lib/checkin-logic";
+import { formatShort } from "@/lib/dates";
+import { moneyWhole } from "@/lib/format";
+import { bucketDays } from "@/lib/review-logic";
 
 /** Piezas compartidas por la revisión semanal y el resumen del mes. */
 
@@ -47,16 +50,6 @@ export function Delta({
   );
 }
 
-export function Kpi({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
-  return (
-    <div className="grid content-start gap-1.5 rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10 lg:p-4">
-      <span className="text-[12px] font-medium opacity-85">{label}</span>
-      <span className="figure text-[26px] lg:text-[30px]">{value}</span>
-      <span className="min-h-5">{children}</span>
-    </div>
-  );
-}
-
 /** Cifra chica. `delta`: la comparación con el período anterior (un `<Delta plain />`). */
 export function Mini({ label, value, sub, delta }: { label: string; value: string; sub?: string; delta?: React.ReactNode }) {
   return (
@@ -74,32 +67,190 @@ export function Mini({ label, value, sub, delta }: { label: string; value: strin
   );
 }
 
+/** Sección del resumen o de la revisión: tarjeta con cabecera teñida del módulo que muestra. */
 export function Card({
   title,
-  color,
+  tone,
+  icon,
+  meta,
   href,
+  hrefLabel = "Abrir",
   className,
   children,
 }: {
   title: string;
-  color: string;
+  tone?: CardTone;
+  icon: Icon;
+  meta?: React.ReactNode;
   href?: string;
+  hrefLabel?: string;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section aria-label={title} className={cx("rise grid min-w-0 content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}>
-      <header className="flex items-center gap-2">
-        <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
-        <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
-        {href && (
-          <Link href={href} className="-my-2 -mr-2 ml-auto inline-flex min-h-11 items-center px-2 text-[13px] text-muted hover:text-fg">
-            Abrir
-          </Link>
-        )}
-      </header>
+    <TintedCard tone={tone} icon={icon} title={title} meta={meta} action={href ? { href, label: hrefLabel } : undefined} className={className}>
       {children}
-    </section>
+    </TintedCard>
+  );
+}
+
+/** Lo que necesitan las cifras de arriba de cada día y del período (como los da `summarize`). */
+type TileDay = { date: string; habitsDone: number; habitsDue: number; wrote: boolean; spentCents: number; blocksDone: number; blocksTotal: number };
+type TileTotals = { habitPct: number | null; wroteDays: number; spentCents: number; blocksDone: number; blocksTotal: number };
+
+/** Sin cambio: "Igual que antes"; sin con qué comparar (antes en 0 o sin datos), lo dice. */
+function sameOrNone(now: number | null, before: number | null, unit: "%" | "pts" = "%") {
+  return now !== null && before !== null && (unit !== "%" || before !== 0) ? "Igual que antes" : "Sin datos para comparar";
+}
+
+/** ¿`<Delta>` muestra un cambio? (sin comparación o "igual que antes", el "vs." sobra). */
+function hasDelta(now: number | null, before: number | null, unit: "%" | "pts" = "%") {
+  if (now === null || before === null) return false;
+  if (unit !== "%") return Math.round(now - before) !== 0;
+  return before !== 0 && Math.round(((now - before) / before) * 100) !== 0;
+}
+
+/** Barras chicas del período (un día, una semana o un mes cada una) con el color del módulo de la tarjeta. */
+function TileBars({ values, max, from, to }: { values: (number | null)[]; max?: number; from: string; to: string }) {
+  const top = max ?? Math.max(1, ...values.map((v) => v ?? 0));
+  return (
+    <>
+      <span aria-hidden className="flex h-8 items-end gap-[3px]">
+        {values.map((v, i) => (
+          <span key={i} className="flex h-full min-w-0 flex-1 items-end overflow-hidden rounded-[3px] bg-surface-3">
+            <span
+              className="w-full rounded-[3px] bg-[var(--head-chip)]"
+              style={{ height: v ? `${Math.max(10, Math.min(100, (v / top) * 100))}%` : 0 }}
+            />
+          </span>
+        ))}
+      </span>
+      <span aria-hidden className="tmini-cap">
+        <span>{from}</span>
+        <span>{to}</span>
+      </span>
+    </>
+  );
+}
+
+const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((n, x) => n + f(x), 0);
+
+/**
+ * Las cuatro cifras de arriba (Revisión semanal y Resumen): una tarjeta por módulo con su
+ * color, la cifra, la comparación con el período anterior y una tira de cómo fue
+ * (de a un día en la semana, por semana en el mes, por mes en el año).
+ */
+export function ModuleTiles({
+  days,
+  now,
+  before,
+  totalDays,
+  vs,
+  links,
+}: {
+  days: TileDay[];
+  now: TileTotals;
+  before: TileTotals;
+  totalDays: number;
+  /** "vs. semana anterior". */
+  vs: string;
+  links: { habitos: string; journal: string; gastos: string; plan: string };
+}) {
+  const buckets = bucketDays(days);
+  const daily = buckets.length === days.length;
+  const from = days.length ? formatShort(days[0].date) : "";
+  const to = days.length ? formatShort(days[days.length - 1].date) : "";
+  const sub = (show: boolean, delta: React.ReactNode, fallback: string) =>
+    show ? (
+      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        {delta}
+        <span>{vs}</span>
+      </span>
+    ) : (
+      fallback
+    );
+  // En el celular la cifra va un poco más chica: "$ 122.375" no entra en media pantalla a 32 px.
+  const fit = "max-sm:[&_.tstat-fig]:text-[25px]!";
+  return (
+    <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4 print:grid-cols-4">
+      <StatTile
+        tone="habitos"
+        icon={Medal}
+        label="Hábitos"
+        href={links.habitos}
+        figure={now.habitPct === null ? "–" : now.habitPct}
+        unit={now.habitPct === null ? undefined : "%"}
+        sub={sub(hasDelta(now.habitPct, before.habitPct, "pts"), <Delta now={now.habitPct} before={before.habitPct} unit="pts" plain />, sameOrNone(now.habitPct, before.habitPct, "pts"))}
+        className={fit}
+      >
+        <TileBars
+          values={buckets.map((b) => {
+            const due = sum(b.days, (d) => d.habitsDue);
+            return due ? sum(b.days, (d) => d.habitsDone) / due : null;
+          })}
+          max={1}
+          from={from}
+          to={to}
+        />
+      </StatTile>
+      <StatTile
+        tone="journal"
+        icon={Notebook}
+        label="Días escritos"
+        href={links.journal}
+        figure={now.wroteDays}
+        unit={`de ${totalDays}`}
+        sub={sub(hasDelta(now.wroteDays, before.wroteDays), <Delta now={now.wroteDays} before={before.wroteDays} plain />, sameOrNone(now.wroteDays, before.wroteDays))}
+        className={fit}
+      >
+        {daily ? (
+          <>
+            <span aria-hidden className="tmini-seg" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
+              {days.map((d) => (
+                <span key={d.date} data-on={d.wrote ? "" : undefined} />
+              ))}
+            </span>
+            <span aria-hidden className="tmini-cap">
+              <span>{from}</span>
+              <span>{to}</span>
+            </span>
+          </>
+        ) : (
+          <TileBars values={buckets.map((b) => b.days.filter((d) => d.wrote).length / b.days.length)} max={1} from={from} to={to} />
+        )}
+      </StatTile>
+      <StatTile
+        tone="gastos"
+        icon={Wallet}
+        label="Gastado"
+        href={links.gastos}
+        figure={moneyWhole(now.spentCents)}
+        sub={sub(hasDelta(now.spentCents, before.spentCents), <Delta now={now.spentCents} before={before.spentCents} goodUp={false} plain />, sameOrNone(now.spentCents, before.spentCents))}
+        className={fit}
+      >
+        <TileBars values={buckets.map((b) => sum(b.days, (d) => d.spentCents))} from={from} to={to} />
+      </StatTile>
+      <StatTile
+        tone="plan"
+        icon={CalendarCheck}
+        label="Plan"
+        href={links.plan}
+        figure={now.blocksDone}
+        unit={`de ${now.blocksTotal}`}
+        sub={sub(hasDelta(now.blocksDone, before.blocksDone), <Delta now={now.blocksDone} before={before.blocksDone} plain />, sameOrNone(now.blocksDone, before.blocksDone))}
+        className={fit}
+      >
+        <TileBars
+          values={buckets.map((b) => {
+            const total = sum(b.days, (d) => d.blocksTotal);
+            return total ? sum(b.days, (d) => d.blocksDone) / total : null;
+          })}
+          max={1}
+          from={from}
+          to={to}
+        />
+      </StatTile>
+    </div>
   );
 }
 

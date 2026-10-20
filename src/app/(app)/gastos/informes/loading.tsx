@@ -11,7 +11,7 @@ export default function Loading() {
       >
         <div className="grid gap-3 lg:col-span-12 lg:grid-cols-[1fr_minmax(0,340px)] lg:items-center">
           <Bone className="h-6 w-40" />
-          <Bone className="h-[92px] rounded-[8px]" />
+          <Bone className="h-[92px] rounded-[20px]" />
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4 lg:col-span-12">
           {["h-10", "h-7", "h-7", "h-7"].map((h, i) => (
@@ -23,7 +23,7 @@ export default function Loading() {
         </div>
         <div className="grid gap-3 lg:col-span-7">
           <Bone className="h-5 w-32" />
-          <Bone className="h-[180px] rounded-[8px]" />
+          <Bone className="h-[180px] rounded-[20px]" />
         </div>
         <div className="grid content-start gap-3.5 lg:col-span-5">
           {Array.from({ length: 4 }, (_, i) => (

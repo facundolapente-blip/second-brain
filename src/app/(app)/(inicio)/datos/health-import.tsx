@@ -7,6 +7,7 @@ import { importHealth, type HealthImportResult } from "@/lib/offline/checkin";
 import { parseHealthFile, type HealthParse } from "@/lib/health-parse";
 import { formatShort } from "@/lib/dates";
 import { cx } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 
 const nf = new Intl.NumberFormat("es-UY");
 
@@ -38,16 +39,7 @@ export function HealthImport({ status }: { status: string }) {
   const sleep = parsed?.days.filter((d) => d.sleepMin).length ?? 0;
 
   return (
-    <div className="grid content-start gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
-      <header className="flex items-center gap-2.5">
-        <span className="inline-flex size-9 items-center justify-center rounded-xl bg-[var(--mod-inicio)] text-white">
-          <Footprints size={18} weight="fill" aria-hidden />
-        </span>
-        <span className="grid">
-          <span className="text-[15px] font-semibold">Pasos y sueño</span>
-          <span className="text-[12px] text-muted">{status}</span>
-        </span>
-      </header>
+    <TintedCard as="div" tone="inicio" icon={Footprints} title="Pasos y sueño" meta={status} bodyClassName="gap-3!">
       <p className="text-[13px] leading-relaxed text-muted">
         Google Fit: exportalo desde Google Takeout (solo &quot;Fit&quot;) y subí el .zip. Samsung Health: Configuración → Descargar datos
         personales, y subí el .zip o los .csv. También sirve un CSV con columnas fecha y pasos. Los pasos se cruzan con tu ánimo y tus
@@ -100,6 +92,6 @@ export function HealthImport({ status }: { status: string }) {
           {result.ok ? result.message : result.error}
         </p>
       )}
-    </div>
+    </TintedCard>
   );
 }

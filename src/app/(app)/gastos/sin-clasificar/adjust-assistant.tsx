@@ -7,6 +7,7 @@ import { convertToTransfer, markAsAdjustment } from "@/lib/offline/finance";
 import { formatShort } from "@/lib/dates";
 import type { AccountDTO, TxDTO } from "@/lib/finance-logic";
 import { Button, cx, inputClass } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 import { Amount, type Lookups } from "../shared";
 
 /**
@@ -40,18 +41,20 @@ export function AdjustAssistant({
   }
 
   return (
-    <section className="mb-6 grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5" aria-label="Ajustes o transferencias">
+    <TintedCard
+      icon={Scales}
+      title="¿Ajustes o transferencias?"
+      meta={`${txs.length === 1 ? "1 movimiento" : `${txs.length} movimientos`} sin título ni categoría`}
+      bodyClassName="gap-3!"
+    >
       <div className="grid gap-1">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-          <Scales size={17} aria-hidden /> ¿Ajustes o transferencias?
-        </h2>
         <p className="text-[13.5px] leading-relaxed text-muted">
           Estos {txs.length} movimientos no tienen título ni categoría. Casi siempre son ajustes de saldo o plata que
           pasaste entre tus cuentas, y hoy cuentan como ingresos o gastos de verdad. Marcalos como ajuste (siguen moviendo el
           saldo, pero no cuentan en los números) o decí de qué cuenta vino la plata.
         </p>
       </div>
-      <ul className="grid divide-y divide-line border-y border-line">
+      <ul className="grid divide-y divide-line border-b border-line">
         {txs.map((t) => {
           const acc = lk.account(t.accountId);
           const same = accounts.filter((a) => a.id !== t.accountId && a.currency === acc?.currency && !a.archived);
@@ -126,6 +129,6 @@ export function AdjustAssistant({
           Marcar los {txs.length} como ajuste
         </Button>
       )}
-    </section>
+    </TintedCard>
   );
 }

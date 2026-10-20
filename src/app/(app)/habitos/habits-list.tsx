@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 import {
   Leaf,
   Archive,
+  Medal,
   ArrowCounterClockwise,
   CalendarBlank,
   ChartBar,
@@ -35,6 +36,7 @@ import { Sortable, SortableItem } from "@/components/sortable";
 import { HabitForm, hasMarks, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { WeekCount } from "./day-rows";
+import { TintedCard } from "@/components/tinted-card";
 
 export function HabitsList({
   habits,
@@ -190,26 +192,30 @@ export function HabitsList({
         )}
 
         {habits.length === 0 ? (
-          <div className="mt-6 border-y border-line py-10 text-[15px] text-muted">
+          <TintedCard icon={archived ? Archive : Medal} title={archived ? "Archivados" : "Tus hábitos"} meta={archived ? "Ninguno archivado" : "Todavía ninguno"}>
             {archived ? (
-              "No hay hábitos archivados."
+              <p className="text-[14.5px] leading-relaxed text-muted">
+                No hay hábitos archivados. Archivar uno lo saca de Hoy sin borrar su historial.
+              </p>
             ) : (
               <div className="grid justify-items-start gap-3">
-                <p>Todavía no creaste ningún hábito.</p>
+                <p className="max-w-[46ch] text-[14.5px] leading-relaxed text-muted">
+                  Todavía no creaste ningún hábito. Elegí la frecuencia y marcalo cada día en Hoy.
+                </p>
                 <Button variant="accent" onClick={() => form.current?.create()}>
                   <Plus size={16} weight="bold" /> Crear hábito
                 </Button>
               </div>
             )}
-          </div>
+          </TintedCard>
         ) : visible.length === 0 ? (
-          <p className="display py-16 text-center text-[22px] text-muted">Ningún hábito coincide.</p>
+          <p className="rounded-[20px] border bg-surface px-5 py-12 text-center text-[15px] text-muted">Ningún hábito coincide.</p>
         ) : (
           // Mantener apretado una tarjeta (o clic y arrastrar) y moverla para cambiar el orden.
           <Sortable ids={visible.map((h) => h.id)} onReorder={reorder} grid disabled={archived}>
-          <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+          <div className="grid gap-3 lg:grid-cols-2 lg:gap-5">
           {visible.map((h) => (
-            <SortableItem key={h.id} id={h.id} as="div" disabled={archived} draggingClass="rounded-2xl shadow-[0_16px_40px_-14px_rgba(0,0,0,0.4)]">
+            <SortableItem key={h.id} id={h.id} as="div" disabled={archived} draggingClass="rounded-[20px] shadow-[0_16px_40px_-14px_rgba(0,0,0,0.4)]">
             <HabitCard
               habit={h}
               logs={logs[h.id] ?? {}}
@@ -257,7 +263,7 @@ function HabitCard({
 
   return (
     <article
-      className="rounded-2xl border border-line bg-surface px-3.5 pt-3.5 pb-1 lg:px-4 lg:pt-4 lg:pb-1.5"
+      className="h-full rounded-[20px] border bg-surface px-4 pt-4 pb-1 lg:px-5 lg:pt-5 lg:pb-1.5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="grid min-w-0 gap-1">

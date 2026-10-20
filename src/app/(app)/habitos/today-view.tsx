@@ -1,9 +1,9 @@
 "use client";
 
-import { useKeepHeight, useSlide } from "@/components/motion";
+import { useKeepHeight, useSlide, useTick } from "@/components/motion";
 import { useOnNew } from "@/components/nav-add";
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "@phosphor-icons/react";
+import { Medal, Plus } from "@phosphor-icons/react";
 import { addDays, diffDays, formatLong, weekday } from "@/lib/dates";
 import { dayProgress, WEEKDAY_SHORT, type PackedLogMap, showsOn } from "@/lib/habit-logic";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
@@ -13,7 +13,8 @@ import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "./ha
 import { DayComplete, HabitDayRows, useJustCompleted, useStickyDay } from "./day-rows";
 import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
-import { TodayPanel } from "./today-panel";
+import { TodayFacts, TodayPanel, todayStats } from "./today-panel";
+import { TintedCard } from "@/components/tinted-card";
 import { useSwipe } from "@/components/swipe";
 
 const PAST = 30;
@@ -77,10 +78,18 @@ export function TodayView({
   const formEl = useMemo(() => <HabitForm ref={form} categories={categories} today={today} />, [categories, today]);
 
 
+  const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+  const doneTick = useTick(progress.done);
+  const pctTick = useTick(pct);
+  // Rachas, puntaje y la semana: con las marcas diferidas (nunca en el render urgente).
+  const stats = useMemo(() => todayStats(habits, deferredLogs, today), [habits, deferredLogs, today]);
+  const left = progress.total - progress.done;
+  const dayName = selected === today ? "Hoy" : relativeTitle(selected, today);
+
   return (
     <>
       <PageHeader
-        title={selected === today ? "Hoy" : relativeTitle(selected, today)}
+        title="Hábitos"
         kicker={formatLong(selected)}
         wide
         tabs={<HabitsTabs />}
@@ -91,44 +100,85 @@ export function TodayView({
         }
       />
 
-      <main className="mx-auto max-w-3xl lg:grid lg:max-w-6xl lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_340px] lg:px-10 lg:pt-6">
-        <section className="min-w-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]">
-        <DateStrip
-          days={days}
-          selected={selected}
-          today={today}
-          onSelect={onSelect}
-        />
+      <main className="mx-auto grid max-w-3xl gap-3.5 px-4 pt-1 lg:max-w-6xl lg:items-start lg:gap-6 lg:px-10 lg:pt-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid min-w-0 gap-3.5 lg:gap-5">
+          {/* El avance del día (va con el toque: es una cuenta chica) y la tira de días. */}
+          <TintedCard
+            className="hh-sum"
+            icon={Medal}
+            title={
+              <span className="hh-title">
+                {dayName} <span aria-hidden className="opacity-50">·</span>{" "}
+                <b key={doneTick.key} className={cx("figure", doneTick.className)}>
+                  {progress.done}
+                </b>
+                <span className="hh-of">de {progress.total}</span>
+              </span>
+            }
+            meta={
+              progress.total === 0
+                ? "Nada programado para este día"
+                : left === 0
+                  ? "Completaste todo lo del día"
+                  : `${left === 1 ? "Falta 1" : `Faltan ${left}`} para cerrar el día`
+            }
+            action={
+              <span key={pctTick.key} className={cx("hh-pct figure", pctTick.className)} aria-label={`${pct}% hecho`}>
+                {pct}
+                <small>%</small>
+              </span>
+            }
+            progress={progress.total ? progress.done / progress.total : 0}
+            headExtra={
+              <>
+                {habits.length > 0 && (
+                  <div className="xl:hidden">
+                    <TodayFacts stats={stats} />
+                  </div>
+                )}
+                <DateStrip days={days} selected={selected} today={today} onSelect={onSelect} />
+              </>
+            }
+          />
 
-        <div {...swipe} className="touch-pan-y">
-        <div key={selected} ref={keepRef} style={keepStyle} className={cx("px-4 lg:px-6", daySlide)}>
-          {habits.length === 0 ? (
-            <EmptyState onCreate={() => form.current?.create()} />
-          ) : visible.length === 0 ? (
-            <p className="display py-20 text-center text-[22px] text-muted">No hay hábitos para este día.</p>
-          ) : (
-            <HabitDayRows
-              habits={visible}
-              logs={logs}
-              day={selected}
-              today={today}
-              mark={mark}
-              onOpen={(h) => daySheet.current?.show(h, selected)}
-              onReorder={reorder}
-              celebrate={celebrate}
-              className="border-b border-line lg:border-b-0"
-              rowClassName="bg-bg py-1.5 lg:bg-surface lg:py-4"
-            />
-          )}
-          {/* Cambiar de día no es "completar" (useJustCompleted mira el día elegido). */}
-          {visible.length > 0 && <DayComplete {...progress} celebrate={celebrate} />}
+          <section aria-label="Hábitos del día" className="hh-list overflow-hidden rounded-[22px] border bg-surface">
+            {visible.length > 0 && (
+              <div className="flex items-baseline justify-between gap-3 px-4 pt-3.5 pb-1 lg:px-6 lg:pt-4">
+                <span className="kicker">{selected === today ? "Para hoy" : `Para ${dayName.toLowerCase()}`}</span>
+                <span className="font-mono text-[11.5px] text-muted tabular">
+                  {visible.length} {visible.length === 1 ? "hábito" : "hábitos"}
+                </span>
+              </div>
+            )}
+            <div {...swipe} className="touch-pan-y">
+              <div key={selected} ref={keepRef} style={keepStyle} className={cx("px-4 lg:px-6", daySlide)}>
+                {habits.length === 0 ? (
+                  <EmptyState onCreate={() => form.current?.create()} />
+                ) : visible.length === 0 ? (
+                  <p className="py-16 text-center text-[15px] text-muted">No hay hábitos para este día.</p>
+                ) : (
+                  <HabitDayRows
+                    habits={visible}
+                    logs={logs}
+                    day={selected}
+                    today={today}
+                    mark={mark}
+                    onOpen={(h) => daySheet.current?.show(h, selected)}
+                    onReorder={reorder}
+                    celebrate={celebrate}
+                    rowClassName="bg-surface py-[7px] lg:py-4"
+                  />
+                )}
+                {/* Cambiar de día no es "completar" (useJustCompleted mira el día elegido). */}
+                {visible.length > 0 && <DayComplete {...progress} celebrate={celebrate} />}
+              </div>
+            </div>
+          </section>
         </div>
-        </div>
-        </section>
 
         {habits.length > 0 && (
           <div className="hidden lg:block">
-            <TodayPanel habits={habits} logs={deferredLogs} selected={selected} today={today} />
+            <TodayPanel stats={stats} today={today} />
           </div>
         )}
       </main>
@@ -202,13 +252,13 @@ const DateStrip = memo(function DateStrip({
   }
 
   return (
-    <div className="relative border-b border-line">
+    <div className="relative mt-1.5">
       <div
         ref={scroller}
         role="group"
         aria-label="Días"
         onKeyDown={onKeyDown}
-        className="relative flex snap-x gap-1 overflow-x-auto px-3 pt-1 pb-3 [scrollbar-width:none] lg:px-5 lg:pt-4 [&::-webkit-scrollbar]:hidden"
+        className="relative -mr-3 -ml-3.5 flex snap-x scroll-px-3.5 gap-[5px] overflow-x-auto px-3.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {days.map((d) => {
           const active = d === selected;
@@ -222,8 +272,8 @@ const DateStrip = memo(function DateStrip({
               tabIndex={active ? 0 : -1}
               aria-label={`${longLabel(d)}${isToday ? ", hoy" : ""}`}
               className={cx(
-                "relative flex h-[68px] w-[50px] shrink-0 snap-center flex-col items-center justify-center gap-1 rounded-[6px] transition-colors duration-200",
-                active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
+                "relative flex h-16 w-[46px] shrink-0 snap-center flex-col items-center justify-center gap-1 rounded-[10px] transition-colors duration-200 lg:w-[50px]",
+                active ? "bg-ink text-on-ink" : "hh-day bg-surface text-fg hover:bg-surface-2",
               )}
               aria-pressed={active}
             >
@@ -236,7 +286,7 @@ const DateStrip = memo(function DateStrip({
               >
                 {WEEKDAY_SHORT[weekday(d)]}
               </span>
-              <span aria-hidden className="figure text-[23px]">
+              <span aria-hidden className="figure text-[22px]">
                 {Number(d.slice(8))}
               </span>
               {isToday && (
@@ -259,8 +309,8 @@ const DateStrip = memo(function DateStrip({
           onSelect(today);
         }}
         className={cx(
-          "absolute top-[calc(50%-4px)] z-10 inline-flex h-8 -translate-y-1/2 items-center rounded-full bg-ink px-3.5 text-[12.5px] font-medium text-on-ink shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)] transition-[opacity,visibility] duration-[160ms] ease-out lg:top-[calc(50%+6px)]",
-          todayOff === "left" ? "left-2" : "right-2",
+          "absolute top-1/2 z-10 inline-flex h-8 -translate-y-1/2 items-center rounded-full bg-ink px-3.5 text-[12.5px] font-medium text-on-ink shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)] transition-[opacity,visibility] duration-[160ms] ease-out",
+          todayOff === "left" ? "left-0" : "right-0",
           todayOff ? "visible opacity-100" : "invisible opacity-0",
         )}
       >
@@ -280,9 +330,9 @@ function centerDay(box: HTMLElement | null, d: string, smooth: boolean) {
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="mt-8 grid justify-items-start gap-3 border-y border-line py-10">
-      <p className="kicker">Hábitos</p>
-      <h2 className="display text-[30px]">Todavía no hay hábitos</h2>
+    <div className="grid justify-items-start gap-3 py-8 lg:py-10">
+      <p className="kicker">Para empezar</p>
+      <h2 className="display text-[26px]">Todavía no hay hábitos</h2>
       <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
         Creá el primero. Elegí la frecuencia (todos los días, algunos días o unas veces por semana) y marcalo acá cada día.
       </p>

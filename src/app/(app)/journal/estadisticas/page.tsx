@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowRight, Fire, Trophy } from "@phosphor-icons/react/dist/ssr";
 import { getStats } from "@/lib/journal";
 import { formatLong, formatMonth, shiftMonth, todayISO } from "@/lib/dates";
 import { MOODS, moodInfo } from "@/lib/journal-logic";
@@ -10,6 +8,7 @@ import { MonthColumns, MonthHeatmap, WeekdayBars } from "./stats-charts";
 import { SlideOnChange } from "@/components/motion-wrap";
 import { JournalMonthNav } from "../month-nav";
 import { NavDim } from "../../gastos/period-step";
+import { JCard, JStat } from "../cards";
 
 export const metadata = { title: "Estadísticas · Journal" };
 
@@ -25,10 +24,6 @@ function daysInMonth(m: string) {
   return new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
 
-
-/** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
-const CARD =
-  "lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]";
 
 export default async function StatsPage({ searchParams }: PageProps<"/journal/estadisticas">) {
   const sp = await searchParams;
@@ -47,12 +42,11 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
       <>
         <JournalHeader title="Estadísticas" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
         <main className="mx-auto max-w-3xl px-4 pt-6 lg:px-10">
-          <div className="grid justify-items-start gap-2 border-y border-line py-10">
-            <h2 className="display text-[30px]">Todavía no hay números</h2>
+          <JCard icon="chart" title="Todavía no hay números" meta="Sin entradas">
             <p className="max-w-[52ch] text-[15px] leading-relaxed text-muted">
               Cuando escribas tus primeras entradas vas a ver acá tu racha, cuánto escribís y en qué meses.
             </p>
-          </div>
+          </JCard>
         </main>
       </>
     );
@@ -62,9 +56,9 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
     <>
       <JournalHeader title="Estadísticas" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
-      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-3 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-8">
-        {/* Lo grande: todo lo escrito. Una sola cifra protagonista. */}
-        <section className="rise grid gap-6 lg:col-span-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-10 lg:pb-4">
+      <main className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-3 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-8">
+        {/* Lo grande: todo lo escrito. Una sola cifra protagonista; al lado, tres cifras en tarjetas. */}
+        <section className="grid gap-5 pb-2 lg:col-span-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-10 lg:pb-3">
           <div className="grid gap-1">
             <span className="kicker">Entradas escritas</span>
             <span className="figure pt-2 text-[88px] lg:text-[112px]">{nf.format(s.totalEntries)}</span>
@@ -74,37 +68,32 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
             </span>
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-line border-y border-line lg:self-end">
-            <div className="grid content-start gap-1 py-4 pr-3 sm:py-5">
-              <span className="kicker flex items-center gap-1">
-                <Fire size={13} weight="fill" className="text-[var(--p-orange-solid)]" aria-hidden /> Racha
-              </span>
-              <span className="figure pt-1 text-[36px]">{s.streak}</span>
-              <span className="text-[13px] text-muted">{s.streak === 1 ? "día seguido" : "días seguidos"}</span>
-            </div>
-            <div className="grid content-start gap-1 px-3 py-4 sm:px-5 sm:py-5">
-              <span className="kicker flex items-center gap-1">
-                <Trophy size={13} weight="fill" className="text-[var(--p-yellow-solid)]" aria-hidden /> Récord
-              </span>
-              <span className="figure pt-1 text-[36px]">{s.best}</span>
-              <span className="text-[13px] text-muted">días</span>
-            </div>
-            <div className="grid content-start gap-1 py-4 pl-3 sm:py-5 sm:pl-5">
-              <span className="kicker">Por entrada</span>
-              <span className="figure pt-1 text-[36px]">
-                {nf.format(Math.round(s.totalWords / s.totalEntries))}
-              </span>
-              <span className="text-[13px] text-muted">palabras</span>
-            </div>
+          <div className="grid grid-cols-2 gap-2.5 lg:self-end lg:gap-3">
+            <JStat icon="fire" label="Racha" figure={s.streak} sub={s.streak === 1 ? "día seguido" : "días seguidos"} />
+            <JStat icon="trophy" label="Récord" figure={s.best} sub="días" />
+            <JStat
+              icon="pen"
+              label="Por entrada"
+              figure={nf.format(Math.round(s.totalWords / s.totalEntries))}
+              sub="palabras"
+            />
+            {s.longest && (
+              <JStat
+                icon="text"
+                label="La más larga"
+                href={`/journal/${s.longest.id}`}
+                figure={nf.format(s.longest.words)}
+                sub={`palabras, ${s.longest.title || formatLong(s.longest.date)}`}
+              />
+            )}
           </div>
           {s.streak === 0 && (
-            <p className="-mt-3 text-[13px] text-muted lg:col-start-2 lg:mt-0">Escribí hoy para arrancar una racha nueva.</p>
+            <p className="-mt-2 text-[13px] text-muted lg:col-start-2 lg:mt-0">Escribí hoy para arrancar una racha nueva.</p>
           )}
         </section>
 
         {s.firstDate && (
-          <section className={`grid content-start gap-3 lg:col-span-7 ${CARD}`}>
-            <h2 className="display text-[28px]">Constancia</h2>
+          <JCard icon="calendar-check" title="Constancia" meta="Días escritos por mes" className="lg:col-span-7">
             <MonthHeatmap
               firstMonth={s.firstDate.slice(0, 7)}
               currentMonth={current}
@@ -112,10 +101,16 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               perMonth={s.perMonth}
               todayDay={Number(today.slice(8))}
             />
-          </section>
+          </JCard>
         )}
 
-        <section className={`grid gap-5 border-t border-line pt-8 lg:col-span-12 lg:row-start-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-x-10 ${CARD}`}>
+        <JCard
+          icon="chart"
+          title="Mes a mes"
+          meta="Cifras del mes y entradas de los últimos 12"
+          className="lg:col-span-12 lg:row-start-3"
+          bodyClassName="grid! gap-5! lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-x-10! lg:p-7!"
+        >
           <div className="grid content-start gap-5">
           {/* El nombre cambia al toque (las flechas quedan quietas: no pierden el foco); las cifras llegan después. */}
           <JournalMonthNav month={month} base="/journal/estadisticas?mes=" max={current} titleClassName="text-[28px]" />
@@ -191,35 +186,16 @@ export default async function StatsPage({ searchParams }: PageProps<"/journal/es
               height={170}
             />
           </div>
-        </section>
+        </JCard>
 
-        <section
-          className={`grid gap-8 border-t border-line pt-8 sm:grid-cols-2 lg:col-span-5 lg:col-start-8 lg:row-start-2 lg:grid-cols-1 lg:content-start lg:gap-7 ${CARD}`}
+        <JCard
+          icon="calendar"
+          title="Qué días escribís"
+          meta="Entradas por día de la semana"
+          className="lg:col-span-5 lg:col-start-8 lg:row-start-2"
         >
-          <div className="grid content-start gap-3">
-            <h2 className="display text-[24px]">Qué días escribís</h2>
-            <WeekdayBars values={s.perWeekday} />
-          </div>
-          {s.longest && (
-            <div className="grid content-start gap-3">
-              <h2 className="display text-[24px]">La entrada más larga</h2>
-              <Link
-                href={`/journal/${s.longest.id}`}
-                className="group grid gap-1 border-y border-line py-4 transition-colors hover:border-fg/50"
-              >
-                <span className="figure text-[52px]">{nf.format(s.longest.words)}</span>
-                <span className="kicker">palabras</span>
-                <span className="mt-3 flex items-center gap-2 font-serif text-[18px]">
-                  <span className="min-w-0 flex-1 truncate first-letter:uppercase">
-                    {/* formatLong ya trae el año cuando no es el actual. */}
-                    {s.longest.title || formatLong(s.longest.date)}
-                  </span>
-                  <ArrowRight size={16} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
-                </span>
-              </Link>
-            </div>
-          )}
-        </section>
+          <WeekdayBars values={s.perWeekday} />
+        </JCard>
       </main>
     </>
   );

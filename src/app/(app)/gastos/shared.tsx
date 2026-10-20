@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { ArrowRight, CaretLeft, CaretRight, Camera, CloudArrowUp } from "@phosphor-icons/react";
 import { formatMonth, shiftMonth } from "@/lib/dates";
-import { moneyCents, moneySigned } from "@/lib/format";
+import { moneyCents, moneySigned, shortNumber } from "@/lib/format";
 import { tone } from "@/lib/palette";
 import { FinanceIcon, TransferIcon, UncategorizedIcon } from "@/lib/finance-icons";
 import {
@@ -347,20 +347,103 @@ export function MonthNav({ month, basePath, current }: { month: string; basePath
   );
 }
 
+/**
+ * Estado vacío (diseño 4): tarjeta del módulo con el ícono en un cuadrado lleno del
+ * petróleo, título y lo que se puede hacer. `inline` = sin tarjeta, dentro de otra.
+ */
 export function EmptyBlock({
   title,
   icon,
   children,
+  inline,
+  className,
 }: {
   title: string;
   icon?: React.ReactNode;
   children?: React.ReactNode;
+  inline?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="mt-6 grid justify-items-start gap-3 border-y border-line py-10">
-      {icon && <span className="inline-flex text-accent-fg">{icon}</span>}
-      <h2 className="display text-[30px]">{title}</h2>
+    <div className={cx(inline ? "grid justify-items-start gap-2.5 py-2" : "tcard items-start gap-3 px-5 py-8 lg:px-7 lg:py-10", className)}>
+      {icon && (
+        <span aria-hidden className={cx("tcard-ico", !inline && "size-11! rounded-[13px]!")}>
+          {icon}
+        </span>
+      )}
+      <h2 className={cx("font-semibold tracking-[-0.02em] text-balance", inline ? "text-[16px]" : "text-[22px] lg:text-[24px]")}>{title}</h2>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Barras chicas de las tarjetas de cifra: una por fila (rótulo, barra, cifra corta),
+ * todas en la misma escala. La primera va en el color del módulo; las de referencia, en gris.
+ */
+export function MiniBars({
+  rows,
+  label,
+}: {
+  rows: { label: string; cents: number; color?: string; muted?: boolean }[];
+  label: string;
+}) {
+  const max = Math.max(1, ...rows.map((r) => Math.abs(r.cents)));
+  return (
+    <div className="grid gap-1.5" role="img" aria-label={label}>
+      {rows.map((r) => (
+        <span key={r.label} className="grid grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-2 font-mono text-[10.5px] text-muted">
+          <span className="truncate">{r.label}</span>
+          <span className="h-1.5 overflow-hidden rounded-full bg-surface-3">
+            <span
+              className="bar-anim block h-full rounded-full"
+              style={{ width: `${Math.max(2, (Math.abs(r.cents) / max) * 100)}%`, background: r.color ?? (r.muted ? "var(--faint)" : "var(--head-chip)") }}
+            />
+          </span>
+          <span className="tabular">{shortNumber(r.cents / 100)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Mezcla por categoría para una tarjeta de cifra: barra partida con las tres más
+ * grandes (cada una en su color) y el resto en gris, y la primera escrita debajo.
+ */
+export function CategoryMix({ parts, lk, what }: { parts: Record<string, number>; lk: Lookups; what: string }) {
+  const rows = Object.entries(parts)
+    .filter(([, c]) => c > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const total = rows.reduce((n, [, c]) => n + c, 0);
+  if (!total) return null;
+  const top = rows.slice(0, 3);
+  const rest = total - top.reduce((n, [, c]) => n + c, 0);
+  const name = (id: string) => (id === "none" ? "Sin clasificar" : (lk.category(id)?.name ?? "Sin clasificar"));
+  const pct = (c: number) => Math.round((c / total) * 100);
+  return (
+    <div className="grid gap-1.5">
+      <span
+        className="flex h-2 gap-[2px] overflow-hidden rounded-full"
+        role="img"
+        aria-label={`${what}: ${top.map(([id, c]) => `${name(id)} ${pct(c)}%`).join(", ")}${rest > 0 ? `, el resto ${pct(rest)}%` : ""}`}
+      >
+        {top.map(([id, c]) => {
+          const cat = lk.category(id === "none" ? null : id);
+          return (
+            <span
+              key={id}
+              style={{ ...(cat ? tone(cat.color) : {}), width: `${(c / total) * 100}%` }}
+              className={cx("bar-anim h-full min-w-[3px]", cat ? "bg-tone-solid" : "bg-line-strong")}
+            />
+          );
+        })}
+        {rest > 0 && <span className="h-full min-w-[3px] bg-surface-3" style={{ width: `${(rest / total) * 100}%` }} />}
+      </span>
+      <span className="tmini-cap">
+        <span className="truncate">{name(top[0][0])}</span>
+        <span>{pct(top[0][1])}%</span>
+      </span>
     </div>
   );
 }

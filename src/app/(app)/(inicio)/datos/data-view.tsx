@@ -9,6 +9,7 @@ import { WatchCard } from "./watch-card";
 import type { WatchStatus } from "@/lib/watch";
 import { formatShort } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
+import { TintedCard, type CardTone } from "@/components/tinted-card";
 import { cx } from "@/components/ui";
 
 type Stats = {
@@ -34,9 +35,7 @@ export function DataView({ stats, backups, watch }: { stats: Stats; backups: Rea
     <>
       <PageHeader title="Datos" kicker="Backups y exportación" wide />
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
-        <section className="grid gap-3 lg:col-span-12">
-          <WatchCard status={watch} />
-        </section>
+        <WatchCard status={watch} />
 
         <section className="rise grid gap-3 lg:col-span-12">
           <h2 className="text-[15px] font-semibold">Importar un backup</h2>
@@ -44,54 +43,51 @@ export function DataView({ stats, backups, watch }: { stats: Stats; backups: Rea
             Subí el archivo que exporta cada app. No se borra nada: lo nuevo se suma, lo que ya estaba no se duplica y las
             notas, ánimos y etiquetas que pusiste acá se respetan.
           </p>
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
             <ImportCard
               kind="habitnow"
               title="HabitNow"
               icon={Medal}
-              color="var(--c-habitos)"
+              tone="habitos"
               accept=".hn"
               how="En HabitNow: Ajustes → Backup → Exportar. Es un archivo .hn."
-              status={`${nf.format(stats.habits)} hábitos, ${nf.format(stats.logs)} marcas${stats.lastLog ? `, la última del ${formatShort(stats.lastLog)}` : ""}`}
+              status={`${count(stats.logs, "marca", "marcas")}${stats.lastLog ? ` · últ. ${formatShort(stats.lastLog)}` : ""}`}
             />
             <ImportCard
               kind="mydiary"
               title="My Diary"
               icon={Notebook}
-              color="var(--c-journal)"
+              tone="journal"
               accept=".pdf,.docx,.txt"
               how="En My Diary: Exportar en PDF (o Word). Desde PDF solo se agregan las entradas que faltan."
-              status={`${count(stats.entries, "entrada", "entradas")}${stats.lastEntry ? `, la última del ${formatShort(stats.lastEntry)}` : ""}`}
+              status={`${count(stats.entries, "entrada", "entradas")}${stats.lastEntry ? ` · últ. ${formatShort(stats.lastEntry)}` : ""}`}
             />
             <ImportCard
               kind="gastos"
               title="App de gastos"
               icon={Wallet}
-              color="var(--c-gastos)"
+              tone="gastos"
               accept=".csv"
               how="Exportá el CSV de la app. Las transferencias no vienen en el export: cargalas acá a mano."
-              status={`${count(stats.txs, "movimiento", "movimientos")}${stats.lastTx ? `, el último del ${formatShort(stats.lastTx)}` : ""}`}
+              status={`${count(stats.txs, "movimiento", "movimientos")}${stats.lastTx ? ` · últ. ${formatShort(stats.lastTx)}` : ""}`}
             />
             <HealthImport
-              status={stats.stepDays ? `Pasos de ${count(stats.stepDays, "día", "días")}${stats.lastSteps ? `, el último del ${formatShort(stats.lastSteps)}` : ""}` : "Todavía sin datos"}
+              status={stats.stepDays ? `${count(stats.stepDays, "día", "días")} con pasos${stats.lastSteps ? ` · últ. ${formatShort(stats.lastSteps)}` : ""}` : "Todavía sin datos"}
             />
           </div>
         </section>
 
-        <section className="rise grid gap-4 rounded-[20px] border border-line bg-surface p-4 lg:col-span-12 lg:p-5" style={{ "--i": 2 } as React.CSSProperties}>
-          <div className="grid gap-1">
-            <h2 className="text-[15px] font-semibold">Descargar tus datos</h2>
-            <p className="text-[13.5px] text-muted">
-              Una copia tuya, para guardar o abrir en otro lado. Incluye {count(stats.checkins, "check-in", "check-ins")} y{" "}
-              {count(stats.blocks, "bloque", "bloques")} del plan.
-            </p>
-          </div>
+        <TintedCard icon={DownloadSimple} title="Descargar tus datos" meta="JSON, CSV o Markdown" className="lg:col-span-12">
+          <p className="text-[13.5px] text-muted">
+            Una copia tuya, para guardar o abrir en otro lado. Incluye {count(stats.checkins, "check-in", "check-ins")} y{" "}
+            {count(stats.blocks, "bloque", "bloques")} del plan.
+          </p>
           <div className="grid gap-2 sm:grid-cols-3">
             <Download href="/api/exportar?formato=json" title="Todo (JSON comprimido)" sub="Respaldo completo, se abre con doble clic" />
             <Download href="/api/exportar?formato=gastos" title="Gastos (CSV)" sub="Para Excel o Google Sheets" />
             <Download href="/api/exportar?formato=journal" title="Journal (Markdown)" sub="Todas las entradas en un archivo" />
           </div>
-        </section>
+        </TintedCard>
         {backups}
       </main>
     </>
@@ -101,8 +97,8 @@ export function DataView({ stats, backups, watch }: { stats: Stats; backups: Rea
 function ImportCard({
   kind,
   title,
-  icon: Ico,
-  color,
+  icon,
+  tone,
   accept,
   how,
   status,
@@ -110,7 +106,7 @@ function ImportCard({
   kind: string;
   title: string;
   icon: Icon;
-  color: string;
+  tone: CardTone;
   accept: string;
   how: string;
   status: string;
@@ -120,56 +116,49 @@ function ImportCard({
   const input = useRef<HTMLInputElement>(null);
 
   return (
-    <form action={action} className="grid content-start gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
-      <input type="hidden" name="tipo" value={kind} />
-      <header className="flex items-center gap-2.5">
-        <span className="inline-flex size-9 items-center justify-center rounded-xl text-white" style={{ background: color }}>
-          <Ico size={18} weight="fill" aria-hidden />
-        </span>
-        <span className="grid">
-          <span className="text-[15px] font-semibold">{title}</span>
-          <span className="text-[12px] text-muted">{status}</span>
-        </span>
-      </header>
-      <p className="text-[13px] leading-relaxed text-muted">{how}</p>
-      <label
-        className={cx(
-          "flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-dashed px-3 transition-colors",
-          name ? "border-fg/40 bg-surface-2" : "border-line-strong hover:bg-surface-2",
-        )}
-      >
-        <FileArrowUp size={20} className="shrink-0 text-muted" aria-hidden />
-        <span className={cx("min-w-0 truncate text-[13.5px]", !name && "text-muted")}>{name ?? "Elegir archivo"}</span>
-        <input
-          ref={input}
-          type="file"
-          name="archivo"
-          accept={accept}
-          required
-          className="sr-only"
-          onChange={(e) => setName(e.target.files?.[0]?.name ?? null)}
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={pending || !name}
-        className="inline-flex h-11 items-center justify-center rounded-full bg-ink px-5 text-[14px] font-medium text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
-      >
-        {pending ? "Importando…" : "Importar"}
-      </button>
-      {state && (
-        <p
-          role="status"
+    <TintedCard as="div" tone={tone} icon={icon} title={title} meta={status}>
+      <form action={action} className="grid flex-1 content-start gap-3">
+        <input type="hidden" name="tipo" value={kind} />
+        <p className="text-[13px] leading-relaxed text-muted">{how}</p>
+        <label
           className={cx(
-            "reveal flex gap-2 rounded-xl p-3 text-[13px] leading-relaxed",
-            state.ok ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
+            "flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-dashed px-3 transition-colors",
+            name ? "border-fg/40 bg-surface-2" : "border-line-strong hover:bg-surface-2",
           )}
         >
-          {state.ok ? <CheckCircle size={17} weight="fill" className="mt-0.5 shrink-0" aria-hidden /> : <WarningCircle size={17} weight="fill" className="mt-0.5 shrink-0" aria-hidden />}
-          {state.ok ? state.message : state.error}
-        </p>
-      )}
-    </form>
+          <FileArrowUp size={20} className="shrink-0 text-muted" aria-hidden />
+          <span className={cx("min-w-0 truncate text-[13.5px]", !name && "text-muted")}>{name ?? "Elegir archivo"}</span>
+          <input
+            ref={input}
+            type="file"
+            name="archivo"
+            accept={accept}
+            required
+            className="sr-only"
+            onChange={(e) => setName(e.target.files?.[0]?.name ?? null)}
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={pending || !name}
+          className="inline-flex h-11 items-center justify-center rounded-full bg-ink px-5 text-[14px] font-medium text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
+        >
+          {pending ? "Importando…" : "Importar"}
+        </button>
+        {state && (
+          <p
+            role="status"
+            className={cx(
+              "reveal flex gap-2 rounded-xl p-3 text-[13px] leading-relaxed",
+              state.ok ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]",
+            )}
+          >
+            {state.ok ? <CheckCircle size={17} weight="fill" className="mt-0.5 shrink-0" aria-hidden /> : <WarningCircle size={17} weight="fill" className="mt-0.5 shrink-0" aria-hidden />}
+            {state.ok ? state.message : state.error}
+          </p>
+        )}
+      </form>
+    </TintedCard>
   );
 }
 

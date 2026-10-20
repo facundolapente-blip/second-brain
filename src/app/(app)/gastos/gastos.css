@@ -131,3 +131,11 @@
 @keyframes fin-fade {
   from { opacity: 0; }
 }
+
+/* ─── Diseño 4: tarjetas con cabecera teñida (TintedCard / StatTile) ─────────
+   Las listas con días o meses pegados arriba en el celular van en una tarjeta con
+   `fin-clip`: overflow clip (no hidden) recorta las esquinas sin volverse contenedor
+   de scroll, así el encabezado del día sigue pegado arriba de la pantalla. */
+.tcard.fin-clip {
+  overflow: clip;
+}

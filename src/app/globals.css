@@ -1075,3 +1075,114 @@ dialog.sheet.closing-drag::backdrop {
   background: color-mix(in oklab, var(--surface) 94%, white);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 -12px 40px -16px rgba(0, 0, 0, 0.7);
 }
+
+/* ─── Tarjetas con cabecera teñida (diseño 4, 2026-10-20) ─────────────────────
+   Toda la web: la cabecera es una banda con el tono suave del color del módulo
+   (ícono en cuadrado lleno, título, dato, acción en píldora) y el cuerpo es blanco.
+   El color sale de --mod: en cada módulo, el suyo (Hábitos verde, Journal lavanda,
+   Gastos petróleo, Plan ámbar, Notas frambuesa, Inicio azul pizarra). En Inicio cada
+   tarjeta toma el del módulo que muestra con data-tone. Componentes: TintedCard y
+   StatTile (components/tinted-card.tsx). */
+[data-tone="habitos"] { --mod: var(--mod-habitos); }
+[data-tone="journal"] { --mod: var(--mod-journal); }
+[data-tone="gastos"] { --mod: var(--mod-gastos); }
+[data-tone="plan"] { --mod: var(--mod-plan); }
+[data-tone="inicio"] { --mod: var(--mod-inicio); }
+[data-tone="notas"] { --mod: var(--mod-notas); }
+.tcard {
+  --head-bg: color-mix(in oklab, var(--mod) 13%, white);
+  --head-fg: color-mix(in oklab, var(--mod) 70%, black);
+  --head-chip: color-mix(in oklab, var(--mod) 92%, black);
+  --head-chip-fg: #ffffff;
+  --head-line: color-mix(in oklab, var(--mod) 16%, transparent);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid color-mix(in oklab, var(--mod) 12%, transparent);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(30, 40, 30, 0.05), 0 16px 34px -16px color-mix(in oklab, var(--mod) 35%, transparent);
+}
+:root[data-theme="oscuro"] .tcard {
+  --head-bg: color-mix(in oklab, var(--mod) 22%, #1d1d1b);
+  --head-fg: color-mix(in oklab, var(--mod) 42%, white);
+  --head-chip: color-mix(in oklab, var(--mod) 70%, white);
+  --head-chip-fg: #141413;
+  --head-line: color-mix(in oklab, var(--mod) 26%, transparent);
+  border-color: color-mix(in oklab, var(--mod) 18%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 34px -18px color-mix(in oklab, var(--mod) 30%, transparent);
+}
+.tcard-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 12px 12px 12px 14px;
+  background: var(--head-bg);
+  color: var(--head-fg);
+  border-bottom: 1px solid var(--head-line);
+}
+.tcard-ico {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--head-chip);
+  color: var(--head-chip-fg);
+}
+.tcard-title {
+  font-size: 15.5px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.tcard-meta {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  opacity: 0.92;
+}
+.tcard-pill {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--head-fg);
+  font-size: 13px;
+  font-weight: 550;
+  box-shadow: 0 0 0 1px var(--head-line);
+  transition: background-color var(--dur-quick, 0.15s) var(--ease-out, ease);
+}
+.tcard-pill:hover { background: color-mix(in oklab, var(--surface) 80%, var(--head-bg)); }
+.tcard-bar {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--head-fg) 14%, transparent);
+}
+.tcard-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--head-chip); transition: width var(--dur-state, 0.3s) var(--ease-out, ease); }
+.tcard-body { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: 16px; padding: 16px 18px 18px; }
+/* Tarjeta de cifra: la misma cabecera, más chica, y la cifra grande en el cuerpo. */
+.tstat .tcard-head { padding: 9px 10px 9px 11px; column-gap: 8px; }
+.tstat .tcard-ico { width: 26px; height: 26px; border-radius: 8px; }
+.tstat .tcard-title { font-size: 12.5px; font-weight: 600; }
+.tstat .tcard-body { gap: 6px; padding: 12px 14px 14px; }
+.tstat-fig { font-size: 32px; font-weight: 780; line-height: 1; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tstat-fig small { margin-left: 3px; font-size: 0.42em; font-weight: 600; letter-spacing: -0.01em; color: var(--muted); }
+.tstat-sub { font-size: 12px; line-height: 1.35; color: var(--muted); }
+/* Segmentos y tiras chicas de las cifras (con el color del módulo de la tarjeta). */
+.tmini-seg { display: grid; gap: 3px; }
+.tmini-seg > span { height: 7px; border-radius: 999px; background: var(--surface-3); }
+.tmini-seg > span[data-on] { background: var(--head-chip); }
+.tmini-cap { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.02em; color: var(--muted); }

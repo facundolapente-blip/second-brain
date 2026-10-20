@@ -7,8 +7,8 @@ export default function Loading() {
       <HeaderSkeleton title="Cuentas" tabs={6} wide />
       <LoadingRegion label="Cargando cuentas" className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         <div className="grid grid-cols-2 gap-2 pt-2 pb-5 lg:gap-4 lg:pt-6">
-          <Bone className="h-[94px] rounded-[8px] lg:h-[118px] lg:rounded-2xl" />
-          <Bone className="h-[94px] rounded-[8px] lg:h-[118px] lg:rounded-2xl" />
+          <Bone className="h-[94px] rounded-[20px] lg:h-[118px] lg:rounded-[20px]" />
+          <Bone className="h-[94px] rounded-[20px] lg:h-[118px] lg:rounded-[20px]" />
         </div>
         <div className="grid gap-0.5 border-t border-line pt-2 lg:hidden">
           {Array.from({ length: 6 }, (_, i) => (
@@ -24,7 +24,7 @@ export default function Loading() {
         </div>
         <div className="hidden grid-cols-3 gap-4 lg:grid">
           {Array.from({ length: 6 }, (_, i) => (
-            <Bone key={i} className="h-[154px] rounded-2xl" />
+            <Bone key={i} className="h-[154px] rounded-[20px]" />
           ))}
         </div>
       </LoadingRegion>

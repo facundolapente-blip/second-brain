@@ -4,7 +4,8 @@ import { useSwap } from "@/components/motion";
 import { PillSwitch } from "@/components/pill-switch";
 import { usePeriodNav } from "../period-nav";
 import { useState } from "react";
-import { Lightbulb } from "@phosphor-icons/react";
+import { CalendarBlank, ChartLineUp, Lightbulb, Medal, Notebook, Smiley, Wallet, type Icon } from "@phosphor-icons/react";
+import { TintedCard, type CardTone } from "@/components/tinted-card";
 import type { Corr, Insight } from "@/lib/insights";
 import { METRICS, WEEKDAY_NAMES } from "@/lib/insights";
 import { formatShort } from "@/lib/dates";
@@ -64,8 +65,8 @@ export function AnalysisView({
         actions={<div className="hidden sm:block">{rangeSwitch}</div>}
       />
       <div className="mx-auto flex max-w-6xl px-4 pb-2 sm:hidden">{rangeSwitch}</div>
-      <main key={range} {...nav.bodyProps} className={cx("mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4", rangeSwap)}>
-        <Card title="Lo que se ve en tus datos" className="xl:col-span-12">
+      <main key={range} {...nav.bodyProps} className={cx("mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 md:grid-cols-2 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4", rangeSwap)}>
+        <Card title="Lo que se ve en tus datos" icon={Lightbulb} meta={insights.length ? `${Math.min(8, insights.length)} ${insights.length === 1 ? "cruce" : "cruces"} · ${checkinDays} días con check-in` : `${checkinDays} días con check-in`} className="md:col-span-2 xl:col-span-12">
           {insights.length === 0 ? (
             <p className="text-[14px] leading-relaxed text-muted">
               Todavía no aparece ninguna relación clara. Hace falta al menos 5 días de cada lado para comparar.
@@ -104,60 +105,48 @@ export function AnalysisView({
           </p>
         </Card>
 
-        <Card title="Semana a semana" className="xl:col-span-12">
-          {weeks.some((w) => w.days < 7) && (
-            <p className="-mt-2 text-[12.5px] text-muted">Las semanas cortadas por el período (con menos de 7 días) van más claras.</p>
-          )}
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            <MiniBars
-              title="Hábitos cumplidos"
-              color="var(--c-habitos)"
-              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.habitPct, text: w.habitPct === null ? "–" : `${w.habitPct}%` }))}
-              max={100}
-            />
-            <MiniBars
-              title="Gasto (pesos)"
-              color="var(--c-gastos)"
-              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.spentCents, text: moneyCents(w.spentCents) }))}
-            />
-            <MiniBars
-              title="Días escritos"
-              color="var(--c-journal)"
-              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.wrote, text: `${w.wrote} de ${w.days}` }))}
-              max={7}
-            />
-            <MiniBars
-              title="Ánimo promedio"
-              color="var(--mod-inicio)"
-              items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: w.mood, text: w.mood === null ? "sin datos" : dec1(w.mood) }))}
-              max={5}
-            />
-          </div>
-          <TableToggle>
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="text-left text-muted">
-                  <th className="py-1.5 font-normal">Semana del</th>
-                  <th className="py-1.5 text-right font-normal">Hábitos</th>
-                  <th className="py-1.5 text-right font-normal">Gasto</th>
-                  <th className="py-1.5 text-right font-normal">Días escritos</th>
-                  <th className="py-1.5 text-right font-normal">Ánimo</th>
-                </tr>
-              </thead>
-              <tbody className="tabular">
-                {[...weeks].reverse().map((w) => (
-                  <tr key={w.monday} className="border-t border-line">
-                    <td className="py-1">{weekLabel(w)}</td>
-                    <td className="py-1 text-right">{w.habitPct === null ? "–" : `${w.habitPct}%`}</td>
-                    <td className="py-1 text-right">{moneyCents(w.spentCents)}</td>
-                    <td className="py-1 text-right">{w.wrote}</td>
-                    <td className="py-1 text-right">{w.mood === null ? "–" : dec1(w.mood)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableToggle>
-        </Card>
+        {weeks.some((w) => w.days < 7) && (
+          <p className="text-[12.5px] text-muted md:col-span-2 xl:col-span-12">Semana a semana · las semanas cortadas por el período (con menos de 7 días) van más claras.</p>
+        )}
+        <WeekCard
+          title="Hábitos cumplidos"
+          tone="habitos"
+          icon={Medal}
+          color="var(--c-habitos)"
+          weeks={weeks}
+          value={(w) => w.habitPct}
+          text={(w) => (w.habitPct === null ? "–" : `${w.habitPct}%`)}
+          max={100}
+        />
+        <WeekCard
+          title="Gasto (pesos)"
+          tone="gastos"
+          icon={Wallet}
+          color="var(--c-gastos)"
+          weeks={weeks}
+          value={(w) => w.spentCents}
+          text={(w) => moneyCents(w.spentCents)}
+        />
+        <WeekCard
+          title="Días escritos"
+          tone="journal"
+          icon={Notebook}
+          color="var(--c-journal)"
+          weeks={weeks}
+          value={(w) => w.wrote}
+          text={(w) => `${w.wrote} de ${w.days}`}
+          max={7}
+        />
+        <WeekCard
+          title="Ánimo promedio"
+          tone="inicio"
+          icon={Smiley}
+          color="var(--mod-inicio)"
+          weeks={weeks}
+          value={(w) => w.mood}
+          text={(w) => (w.mood === null ? "sin datos" : dec1(w.mood))}
+          max={5}
+        />
 
         <WeekdayCard weekdays={weekdays} />
         <CorrCard corr={corr} />
@@ -171,12 +160,75 @@ function weekLabel(w: Week) {
   return w.days < 7 ? `${formatShort(w.monday)} (${w.days} ${w.days === 1 ? "día" : "días"})` : formatShort(w.monday);
 }
 
-function Card({ title, className, children }: { title: string; className?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  tone,
+  icon,
+  meta,
+  className,
+  children,
+}: {
+  title: string;
+  tone?: CardTone;
+  icon: Icon;
+  meta?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section aria-label={title} className={cx("rise grid min-w-0 content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}>
-      <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+    <TintedCard tone={tone} icon={icon} title={title} meta={meta} className={className}>
       {children}
-    </section>
+    </TintedCard>
+  );
+}
+
+/** Una serie semanal (un módulo): su tarjeta con su color, las barras y su tabla. */
+function WeekCard({
+  title,
+  tone,
+  icon,
+  color,
+  weeks,
+  value,
+  text,
+  max,
+}: {
+  title: string;
+  tone: CardTone;
+  icon: Icon;
+  color: string;
+  weeks: Week[];
+  value: (w: Week) => number | null;
+  text: (w: Week) => string;
+  max?: number;
+}) {
+  return (
+    <Card title={title} tone={tone} icon={icon} meta={`${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}`} className="md:col-span-1 xl:col-span-3">
+      <MiniBars
+        title={title}
+        color={color}
+        items={weeks.map((w) => ({ key: w.monday, label: weekLabel(w), partial: w.days < 7, value: value(w), text: text(w) }))}
+        max={max}
+      />
+      <TableToggle>
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-muted">
+              <th className="py-1.5 font-normal">Semana del</th>
+              <th className="py-1.5 text-right font-normal">{title}</th>
+            </tr>
+          </thead>
+          <tbody className="tabular">
+            {[...weeks].reverse().map((w) => (
+              <tr key={w.monday} className="border-t border-line">
+                <td className="py-1">{weekLabel(w)}</td>
+                <td className="py-1 text-right">{text(w)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableToggle>
+    </Card>
   );
 }
 
@@ -207,15 +259,9 @@ function MiniBars({
   const shown = items[focus ?? last];
   return (
     <div className="grid content-start gap-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-medium">
-          <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
-          {title}
-        </h3>
-        <span className="tabular truncate text-[12px] text-muted" aria-live="polite">
-          {shown ? `${shown.label}: ${shown.text}` : ""}
-        </span>
-      </div>
+      <p className="tabular min-h-5 truncate text-[12.5px] text-muted" aria-live="polite" aria-label={title}>
+        {shown ? `${shown.label}: ${shown.text}` : ""}
+      </p>
       <div className="flex h-24 items-end gap-[3px]">
         {items.map((it, i) => (
           <button
@@ -253,7 +299,7 @@ function WeekdayCard({ weekdays }: { weekdays: Weekday[] }) {
   const cell = (pct: number, color: string) => `color-mix(in oklab, ${color} ${Math.round(6 + Math.min(100, pct) * 0.39)}%, var(--surface-2))`;
 
   return (
-    <Card title="Por día de la semana" className="xl:col-span-6">
+    <Card title="Por día de la semana" icon={CalendarBlank} meta="Hábitos, gasto y journal" className="md:col-span-2 xl:col-span-6">
       {best && worst && (
         <p className="text-[13.5px] leading-relaxed text-muted">
           Tu mejor día para los hábitos es el <strong className="font-medium text-fg">{WEEKDAY_NAMES[best.weekday].toLowerCase()}</strong> (
@@ -333,7 +379,7 @@ function CorrCard({ corr }: { corr: Corr[][] }) {
 
   const f = focus ? corr[focus[0]][focus[1]] : null;
   return (
-    <Card title="Qué se mueve junto" className="xl:col-span-6">
+    <Card title="Qué se mueve junto" icon={ChartLineUp} meta={`${pairs.length} ${pairs.length === 1 ? "par" : "pares"} con datos`} className="md:col-span-2 xl:col-span-6">
       <p className="tabular min-h-5 text-[12.5px] text-muted" aria-live="polite">
         {focus && f
           ? `${METRICS[focus[0]].label} y ${METRICS[focus[1]].label}: ${f.r === null ? `pocos datos (${f.n} días)` : `${f.r.toFixed(2)}, ${read(f.r)} · ${f.n} días`}`

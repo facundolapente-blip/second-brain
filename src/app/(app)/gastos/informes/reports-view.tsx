@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { quiet } from "@/components/safe-action";
 import { saveReportRate } from "@/lib/offline/finance";
-import { ArrowDownRight, ArrowSquareOut, ArrowUpRight, CaretDown, ChartBar } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowDownRight, ArrowSquareOut, ArrowUpRight, CalendarBlank, CaretDown, ChartBar, ChartLineUp, ChartPieSlice, Scales, TrendUp, type Icon } from "@phosphor-icons/react";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import { addDays, formatMonth, monthBounds, shiftMonth, weekday } from "@/lib/dates";
 import { currencySymbol, moneyCents, shortNumber, moneyWhole } from "@/lib/format";
 import {
@@ -23,7 +24,7 @@ import { cx, Segmented } from "@/components/ui";
 import { AccountChips, AccountSwitcher } from "../account-switcher";
 import { GastosTabs } from "../gastos-nav";
 import { useSelection } from "../selection";
-import { CategoryAvatar, useLookups } from "../shared";
+import { CategoryAvatar, EmptyBlock, MiniBars, useLookups } from "../shared";
 import { PeriodNav } from "../period-nav";
 import { NavDim, usePeriodSwipe } from "../period-step";
 import { normTitle } from "@/lib/smart-logic";
@@ -93,9 +94,6 @@ function RateField({ rate, todayUsd, onChange }: { rate: number; todayUsd: numbe
   );
 }
 
-/** En la computadora cada bloque es una tarjeta con el aro y la sombra del tema. */
-const CARD =
-  "lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]";
 
 function daysInMonth(m: string) {
   const [y, mo] = m.split("-").map(Number);
@@ -270,7 +268,7 @@ export function ReportsView({
     <>
       <PageHeader title="Informes" wide tabs={<GastosTabs />} />
 
-      <main {...swipe} className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-2 pb-8 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-6">
+      <main {...swipe} className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-2 pb-8 lg:max-w-6xl lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-6">
         {/* Filtros: una sola fila arriba de todo lo que afectan. */}
         <div className="lg:col-span-12">
           <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
@@ -298,25 +296,19 @@ export function ReportsView({
           <AccountSwitcher accounts={accounts} selection={selection} onChange={setSelection} />
         </section>
 
-        <NavDim className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
+        <NavDim className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
         {empty ? (
-          <div className="grid justify-items-start gap-2 border-y border-line py-10 lg:col-span-12">
-            <span className="inline-flex text-accent-fg">
-              <ChartBar size={22} aria-hidden />
-            </span>
-            <h2 className="display text-[28px]">Sin movimientos{allPesos ? "" : ` en ${currency}`}</h2>
+          <EmptyBlock title={`Sin movimientos${allPesos ? "" : ` en ${currency}`}`} icon={<ChartBar size={22} weight="fill" />} className="lg:col-span-12">
             <p className="max-w-[44ch] text-sm leading-relaxed text-muted">
               No hay gastos ni ingresos {yearMode ? `en ${year}` : "en estos meses"} para las cuentas elegidas. Probá con otra moneda o con todas las cuentas.
             </p>
-          </div>
+          </EmptyBlock>
         ) : (
           <>
-            <section
-              className={`grid grid-cols-2 gap-x-6 gap-y-6 overflow-hidden border-y border-line py-6 sm:grid-cols-4 lg:col-span-12 ${CARD}`}
-              aria-label={yearMode ? "Cifras del año" : "Cifras del mes"}
-            >
-              <div key={drawKey} className={cx("col-span-full grid grid-cols-subgrid gap-y-6", statsMotion)}>
+            <section className="lg:col-span-12" aria-label={yearMode ? "Cifras del año" : "Cifras del mes"}>
+              <div key={drawKey} className={cx("grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4", statsMotion)}>
               <Stat
+                icon={ArrowUpRight}
                 label={isCurrent || isCurrentYear ? "Gastado hasta hoy" : "Gastos"}
                 cents={cur.expense}
                 prevCents={prevCmp.expense}
@@ -324,47 +316,72 @@ export function ReportsView({
                 currency={currency}
                 upIsGood={false}
                 hero
+                bars={[
+                  { label: yearMode ? year : shortMonth(month), cents: cur.expense, color: "var(--fin-out)" },
+                  { label: yearMode ? prevYear : shortMonth(prevMonth), cents: prevCmp.expense, muted: true },
+                ]}
               />
               <Stat
+                icon={ArrowDownLeft}
                 label="Ingresos"
                 cents={cur.income}
                 prevCents={prevCmp.income}
                 compareLabel={compareLabel}
                 currency={currency}
                 upIsGood
+                bars={[
+                  { label: yearMode ? year : shortMonth(month), cents: cur.income, color: "var(--fin-in)" },
+                  { label: yearMode ? prevYear : shortMonth(prevMonth), cents: prevCmp.income, muted: true },
+                ]}
               />
-              <Stat label="Neto" cents={cur.income - cur.expense} currency={currency} signed />
-              <Stat label="Gasto por día" cents={Math.round(cur.expense / Math.max(1, elapsed) / 100) * 100} currency={currency} hint={`en ${elapsed} días`} />
+              <Stat
+                icon={Scales}
+                label="Neto"
+                cents={cur.income - cur.expense}
+                currency={currency}
+                signed
+                hint="Ingresos menos gastos"
+                bars={[
+                  { label: "entró", cents: cur.income, color: "var(--fin-in)" },
+                  { label: "salió", cents: cur.expense, color: "var(--fin-out)" },
+                ]}
+              />
+              <Stat
+                icon={CalendarBlank}
+                label="Gasto por día"
+                cents={Math.round(cur.expense / Math.max(1, elapsed) / 100) * 100}
+                currency={currency}
+                hint={`En ${elapsed} días`}
+                className="col-span-2 sm:col-span-1"
+              >
+                {/* Cuánto del período pasó: de a 5 días en un mes, de a un mes en un año. */}
+                <PeriodSegments done={yearMode ? Math.ceil((elapsed / daysOfYear) * 12) : Math.ceil(elapsed / 5)} total={yearMode ? 12 : Math.ceil((isCurrent ? daysInMonth(month) : elapsed) / 5)} label={`${elapsed} días con datos`} />
+              </Stat>
               </div>
             </section>
 
             <div className="grid min-w-0 content-start gap-12 lg:col-span-7 lg:gap-5">
               {!yearMode && (
-              <section className={`grid content-start gap-3 ${CARD}`}>
-                <div className="grid gap-0.5">
-                  <h2 className="display text-[28px]">Ritmo del mes</h2>
-                  <p className="text-[14px] text-muted">Gasto acumulado día a día contra {monthName(prevMonth)}.</p>
-                </div>
+              <TintedCard icon={ChartLineUp} title="Ritmo del mes" meta={`Acumulado día a día contra ${monthName(prevMonth)}`} bodyClassName="gap-3!">
                 <PaceChart rows={scoped} month={month} prevMonth={prevMonth} lastDay={isCurrent ? cutDay : daysInMonth(month)} currency={currency} drawKey={drawKey} draw={draw} />
-              </section>
+              </TintedCard>
               )}
 
-              <section className={`grid content-start gap-3 ${CARD}`}>
-                <div className="grid gap-0.5">
-                  <h2 className="display text-[28px]">Qué días gastás</h2>
-                  <p className="text-[14px] text-muted">
-                    {yearMode
-                      ? `Gasto promedio por día de la semana en ${year}.`
-                      : `Gasto promedio por día de la semana, desde ${monthName(months[0])} de ${months[0].slice(0, 4)}.`}
-                  </p>
-                </div>
+              <TintedCard
+                icon={CalendarBlank}
+                title="Qué días gastás"
+                meta={yearMode ? `Promedio por día de la semana en ${year}` : `Promedio por día, desde ${monthName(months[0])} de ${months[0].slice(0, 4)}`}
+                bodyClassName="gap-3!"
+              >
                 <WeekdaySpend values={weekdayAvg} currency={currency} />
-              </section>
+              </TintedCard>
             </div>
 
-            <section className={`grid min-w-0 content-start gap-4 lg:col-span-5 ${CARD}`}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="display text-[28px]">Por categoría</h2>
+            <TintedCard
+              icon={ChartPieSlice}
+              title="Por categoría"
+              meta={`${moneyWhole(total, currency)} · ${cats.length === 1 ? "1 categoría" : `${cats.length} categorías`}`}
+              headExtra={
                 <div className="w-48 max-w-full">
                   <Segmented
                     value={kind}
@@ -375,7 +392,9 @@ export function ReportsView({
                     ]}
                   />
                 </div>
-              </div>
+              }
+              className="lg:col-span-5"
+            >
               {cats.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted">
                   No hay {kind === "expense" ? "gastos" : "ingresos"}
@@ -400,39 +419,46 @@ export function ReportsView({
                   today={today}
                 />
               )}
-            </section>
+            </TintedCard>
 
-            <section className={`grid content-start gap-3 lg:col-span-12 ${CARD}`}>
-              <h2 className="display text-[28px]">
-                {yearMode ? (
+            <TintedCard
+              icon={ChartBar}
+              title={
+                yearMode ? (
                   `Mes a mes en ${year}`
                 ) : (
                   <>
                     Últimos <span className="lg:hidden">{Math.min(6, months.length)}</span>
                     <span className="hidden lg:inline">{months.length}</span> meses
                   </>
-                )}
-              </h2>
+                )
+              }
+              meta="Ingresos y gastos por mes"
+              className="lg:col-span-12"
+              bodyClassName="gap-3!"
+            >
               <div className="lg:hidden">
                 <MonthlyColumns data={phoneEvolution} current={month} currency={currency} drawKey={drawKey} draw={draw} />
               </div>
               <div className="hidden lg:block">
                 <MonthlyColumns data={evolution} current={month} currency={currency} height={220} drawKey={drawKey} draw={draw} />
               </div>
-            </section>
+            </TintedCard>
 
-            <section className={`grid content-start gap-3 lg:col-span-12 ${CARD}`}>
-              <div className="grid gap-0.5">
-                <h2 className="display text-[28px]">{yearMode ? `Ahorro por mes en ${year}` : "Ahorro por mes"}</h2>
-                <p className="text-[14px] text-muted">Ingresos menos gastos. Arriba de la línea sobró, abajo faltó.</p>
-              </div>
+            <TintedCard
+              icon={TrendUp}
+              title={yearMode ? `Ahorro por mes en ${year}` : "Ahorro por mes"}
+              meta="Ingresos menos gastos: arriba sobró, abajo faltó"
+              className="lg:col-span-12"
+              bodyClassName="gap-3!"
+            >
               <div className="lg:hidden">
                 <NetColumns data={phoneEvolution} current={month} currency={currency} drawKey={drawKey} draw={draw} />
               </div>
               <div className="hidden lg:block">
                 <NetColumns data={evolution} current={month} currency={currency} height={200} drawKey={drawKey} draw={draw} />
               </div>
-            </section>
+            </TintedCard>
           </>
         )}
         </NavDim>
@@ -444,6 +470,7 @@ export function ReportsView({
 // ─── Cifras ─────────────────────────────────────────────────────────────────
 
 function Stat({
+  icon,
   label,
   cents,
   prevCents,
@@ -453,7 +480,11 @@ function Stat({
   signed,
   hero,
   hint,
+  bars,
+  className,
+  children,
 }: {
+  icon: Icon;
   label: string;
   cents: number;
   prevCents?: number;
@@ -463,40 +494,64 @@ function Stat({
   signed?: boolean;
   hero?: boolean;
   hint?: string;
+  /** Este período contra el de comparación, en barras chicas. */
+  bars?: { label: string; cents: number; color?: string; muted?: boolean }[];
+  className?: string;
+  children?: React.ReactNode;
 }) {
   const delta = prevCents !== undefined && prevCents > 0 ? (cents - prevCents) / prevCents : null;
   const good = delta !== null && (upIsGood ? delta >= 0 : delta <= 0);
+  const text = `${signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}${moneyWhole(cents, currency)}`;
   return (
-    <div className={cx("grid content-start gap-1", hero && "col-span-2 sm:col-span-1")}>
-      <span className="kicker">{label}</span>
-      {/* Siempre en un renglón: las cifras largas (un año entero) van un poco más chicas. */}
-      <span
-        className={cx(
-          "figure pt-1 whitespace-nowrap",
-          hero
-            ? moneyWhole(cents, currency).length > 11
-              ? "text-[32px] lg:text-[36px]"
-              : "text-[44px]"
-            : moneyWhole(cents, currency).length > 11
-              ? "text-[22px] lg:text-[24px]"
-              : "text-[28px]",
-        )}
-      >
-        {signed && cents !== 0 ? (cents > 0 ? "+ " : "− ") : ""}
-        {moneyWhole(cents, currency)}
-      </span>
-      {delta !== null && Math.abs(delta) >= 0.005 ? (
-        <span className={cx("inline-flex items-center gap-1 text-[12.5px]", good ? "fin-income" : "text-danger")}>
-          {delta > 0 ? <ArrowUpRight size={13} weight="bold" aria-hidden /> : <ArrowDownRight size={13} weight="bold" aria-hidden />}
-          <span>
-            {delta > 0 ? "+" : "−"}
-            {Math.abs(Math.round(delta * 100))}% <span className="text-muted">{compareLabel}</span>
-          </span>
+    <StatTile
+      icon={icon}
+      label={label}
+      className={cx(hero && "col-span-2 sm:col-span-1", className)}
+      figure={
+        // Siempre en un renglón: las cifras largas (un año entero) van un poco más chicas.
+        <span
+          className={
+            hero
+              ? text.length > 11
+                ? "text-[30px] sm:text-[24px] lg:text-[30px]"
+                : "text-[38px] sm:text-[28px] lg:text-[34px]"
+              : text.length > 9
+                ? "text-[20px] sm:text-[22px] lg:text-[26px]"
+                : "text-[24px] sm:text-[26px] lg:text-[30px]"
+          }
+        >
+          {text}
         </span>
-      ) : (
-        hint && <span className="text-[12.5px] text-muted">{hint}</span>
-      )}
-    </div>
+      }
+      sub={
+        delta !== null && Math.abs(delta) >= 0.005 ? (
+          <span className={cx("inline-flex items-center gap-1", good ? "fin-income" : "text-danger")}>
+            {delta > 0 ? <ArrowUpRight size={13} weight="bold" aria-hidden /> : <ArrowDownRight size={13} weight="bold" aria-hidden />}
+            <span>
+              {delta > 0 ? "+" : "−"}
+              {Math.abs(Math.round(delta * 100))}% <span className="text-muted">{compareLabel}</span>
+            </span>
+          </span>
+        ) : (
+          hint
+        )
+      }
+    >
+      {bars && bars.some((b) => b.cents > 0) && <MiniBars label={bars.map((b) => `${b.label}: ${moneyWhole(b.cents, currency)}`).join(", ")} rows={bars} />}
+      {children}
+    </StatTile>
+  );
+}
+
+/** Segmentos chicos de lo que pasó del período (los hechos en el color del módulo). */
+function PeriodSegments({ done, total, label }: { done: number; total: number; label: string }) {
+  const n = Math.max(1, total);
+  return (
+    <span className="tmini-seg" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }} role="img" aria-label={label}>
+      {Array.from({ length: n }, (_, i) => (
+        <span key={i} data-on={i < done ? "" : undefined} />
+      ))}
+    </span>
   );
 }
 

@@ -3,7 +3,8 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { leaveThen } from "@/components/motion";
 import { useOptimistic, useRef, useState } from "react";
-import { CheckCircle, Tag } from "@phosphor-icons/react";
+import { CheckCircle, Sparkle, Tag } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { swipeApply, TxGestures, useTxActions } from "../tx-actions";
 import { formatMonth, formatShort } from "@/lib/dates";
 import { applySuggestions, setTransactionCategory } from "@/lib/offline/finance";
@@ -12,7 +13,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button, Sheet, type SheetHandle } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
 import { AdjustAssistant } from "./adjust-assistant";
-import { Amount, CategoryAvatar, useLookups } from "../shared";
+import { Amount, CategoryAvatar, EmptyBlock, useLookups } from "../shared";
 
 /**
  * Gastos e ingresos que quedaron sin categoría. Tocar uno abre las categorías
@@ -91,32 +92,37 @@ export function UncategorizedView({
     <>
       <PageHeader title="Sin clasificar" tabs={<GastosTabs />} />
 
-      <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-8 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl gap-4 px-4 pt-2 pb-6 lg:px-8 lg:pt-6">
         {list.length === 0 ? (
-          <div className="mt-6 flex items-center gap-3 border-y border-line py-8">
-            <CheckCircle size={28} weight="fill" className="text-accent" />
-            <div className="grid gap-0.5">
-              <h2 className="display text-[24px]">Todo clasificado</h2>
-              <p className="text-sm text-muted">Los movimientos que cargues sin categoría van a aparecer acá.</p>
-            </div>
-          </div>
+          <EmptyBlock title="Todo clasificado" icon={<CheckCircle size={22} weight="fill" />}>
+            <p className="text-sm text-muted">Los movimientos que cargues sin categoría van a aparecer acá.</p>
+          </EmptyBlock>
         ) : (
           <>
             <AdjustAssistant txs={untitled} accounts={accounts} lk={lk} onDone={(ids) => removeOptimistic(ids)} />
             {withSuggestion.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-line bg-surface p-4">
+              <TintedCard
+                icon={Sparkle}
+                title="Se pueden clasificar solos"
+                meta={withSuggestion.length === 1 ? "1 sugerencia" : `${withSuggestion.length} sugerencias`}
+                bodyClassName="gap-3! sm:flex-row! sm:items-center!"
+              >
                 <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-muted">
-                  <strong className="font-medium text-fg">{withSuggestion.length}</strong> se pueden clasificar solos:
-                  se parecen a otros que ya clasificaste (por el título).
+                  Se parecen a otros que ya clasificaste (por el título).
                 </p>
-                <Button size="sm" onClick={acceptAll}>
+                <Button size="sm" onClick={acceptAll} className="self-start sm:self-auto">
                   Aplicar las {withSuggestion.length} sugerencias
                 </Button>
-              </div>
+              </TintedCard>
             )}
-            <p className="pb-4 text-[15px] text-muted">
-              {titled.length === 1 ? "1 movimiento" : `${titled.length} movimientos`} con título y sin categoría. Tocá uno para clasificarlo.
-            </p>
+            {titled.length > 0 && (
+            <TintedCard
+              icon={Tag}
+              title="Sin clasificar"
+              meta={`${titled.length === 1 ? "1 movimiento" : `${titled.length} movimientos`} con título · tocá uno`}
+              className="fin-clip"
+              bodyClassName="gap-0! px-4! pt-0! pb-2! lg:px-5!"
+            >
             <ul className="grid">
               {titled.map((t, i) => {
                 const acc = lk.account(t.accountId);
@@ -125,7 +131,7 @@ export function UncategorizedView({
                 return (
                   <li key={t.id} data-leave={t.id}>
                     {newMonth && (
-                      <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-bg/92 px-4 pt-4 pb-2 text-[20px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
+                      <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-surface/92 px-4 pt-4 pb-2 text-[18px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0 lg:text-[20px]">
                         {formatMonth(t.date.slice(0, 7))}
                       </h2>
                     )}
@@ -182,6 +188,8 @@ export function UncategorizedView({
                 );
               })}
             </ul>
+            </TintedCard>
+            )}
           </>
         )}
       </main>

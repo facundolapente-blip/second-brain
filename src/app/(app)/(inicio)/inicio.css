@@ -1,10 +1,6 @@
-/* Inicio: encabezado que se compacta al bajar (InicioView). El encabezado grande
-   (PageHeader) deja de ser fijo y se va con la página; a los 40 px aparece arriba
-   una barra de un renglón (título de 17 px) con un fundido de 160 ms. La barra no
+/* Inicio: el saludo grande se va con la página; a los 40 px aparece arriba una
+   barra de un renglón (título de 17 px) con un fundido de 160 ms. La barra no
    ocupa lugar (alto 0), así que nada se corre. */
-.inicio-head > header {
-  position: relative;
-}
 .inicio-compact {
   opacity: 0;
   visibility: hidden;
@@ -20,4 +16,89 @@
   .inicio-compact {
     display: none;
   }
+}
+
+/* ─── Diseño 4 (tarjetas con cabecera teñida) ───────────────────────────────
+   Las tarjetas son TintedCard/StatTile (components/tinted-card.tsx); acá solo lo
+   propio de Inicio: los gráficos chicos de las cifras y el cuerpo de algunas
+   tarjetas. Los colores salen de las variables de la tarjeta (--head-*). */
+
+/* Cifras: en el celular la cifra se achica para que "$ 22.375" entre en media pantalla. */
+@media (max-width: 1023px) {
+  .ini-bento .tstat-fig { font-size: clamp(24px, 7.4vw, 30px); }
+  /* Cabecera chica más justa (sin la flecha) para que el rótulo entre en media pantalla. */
+  .ini-bento .tstat .tcard-head { column-gap: 7px; padding: 9px 9px 9px 10px; }
+  .ini-bento .tstat .tcard-head > svg:last-child { display: none; }
+  .ini-bento .tstat .tcard-ico { width: 22px; height: 22px; border-radius: 7px; }
+  .ini-bento .tstat .tcard-ico svg { width: 13px; height: 13px; }
+  .ini-bento .tstat .tcard-title { font-size: 12px; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .ini-bento .tstat-fig { font-size: 30px; }
+}
+
+/* Tira de los últimos 14 días (racha de journal). */
+.ini-strip { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+.ini-strip > span { aspect-ratio: 1; border-radius: 3px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+.ini-strip > span[data-on] { background: var(--head-chip); box-shadow: none; }
+.ini-strip > span[data-today] { box-shadow: inset 0 0 0 1.5px var(--head-fg); }
+.ini-strip > span[data-on][data-today] { box-shadow: 0 0 0 1.5px var(--head-fg); }
+
+/* Dos barras para comparar (gasto y reserva: este mes contra el anterior). */
+.ini-cmp { display: grid; gap: 5px; }
+.ini-cmp-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.ini-cmp-v { text-align: right; color: var(--text); white-space: nowrap; }
+.ini-track, .ini-bar { display: block; height: 7px; overflow: hidden; border-radius: 999px; background: var(--surface-2); }
+.ini-bar { background: var(--surface-3); }
+.ini-track > span, .ini-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--border-strong); }
+.ini-track > span[data-on], .ini-bar > span { background: var(--head-chip); }
+
+/* Hábitos de hoy: filas pegadas arriba (sin el espacio entre piezas del cuerpo). */
+.tcard-body.ini-habits-body { gap: 0; padding-top: 6px; }
+@media (max-width: 1023px) {
+  .tcard-body.ini-habits-body { padding-left: 12px; padding-right: 12px; }
+}
+/* La etiqueta de frecuencia en un renglón (lo que no entra es el "0/5 esta semana", que se corta). */
+.ini-habits-body li .rounded-\[3px\] { flex-shrink: 0; white-space: nowrap; }
+/* Día completo: la barra de la cabecera brilla una vez (solo tras el toque que lo completa). */
+.ini-glow .tcard-bar { animation: ini-bar-glow 900ms var(--ease-out); }
+@keyframes ini-bar-glow {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--head-chip) 55%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in oklab, var(--head-chip) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ini-glow .tcard-bar { animation: none; }
+}
+
+/* ¿Cómo estás?: el título es el botón de plegar; el toque ocupa más que el renglón. */
+.ini-check .tcard-title { overflow: visible; }
+
+/* Gastos del mes: tres columnas en la compu (cifra y gráfico · en qué se fue · saldo y
+   carga rápida), una debajo de otra en el celular. La carga rápida abre su vista
+   previa hacia abajo: la tarjeta no la recorta. */
+.tcard.ini-gastos { overflow: visible; }
+.ini-gastos > .tcard-head { border-radius: 19px 19px 0 0; }
+.tcard-body.ini-gastos-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 16px 0; }
+.ini-gastos-body > div { display: flex; min-width: 0; flex-direction: column; gap: 10px; padding: 0 16px; }
+.ini-gastos-body > div + div { border-top: 1px solid var(--border); padding-top: 16px; }
+@media (min-width: 1280px) {
+  .tcard-body.ini-gastos-body { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.95fr); gap: 0; padding: 20px 0; }
+  .ini-gastos-body > div { padding: 0 22px; }
+  .ini-gastos-body > div + div { border-top: 0; border-left: 1px solid var(--border); padding-top: 0; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  /* Compu chica: la cifra y el gráfico arriba a lo ancho, debajo las otras dos columnas. */
+  .tcard-body.ini-gastos-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; padding: 20px 0; }
+  .ini-gastos-body > div:first-child { grid-column: 1 / -1; padding-bottom: 20px; }
+  .ini-gastos-body > div { padding: 0 22px; }
+  .ini-gastos-body > div + div { padding-top: 20px; }
+  .ini-gastos-body > div + div + div { border-left: 1px solid var(--border); }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { PeriodArrow, usePeriodNav } from "../period-nav";
-import { CaretLeft, CaretRight, CheckCircle, NotePencil } from "@phosphor-icons/react";
+import { ArrowRight, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Medal, NotePencil, Smiley, Wallet } from "@phosphor-icons/react";
 import type { WeeklyReview } from "@/lib/review";
 import { addDays, formatShort, startOfWeek, todayISO, weekday } from "@/lib/dates";
 import { formatWeight } from "@/lib/checkin-logic";
@@ -15,7 +15,8 @@ import { writeWeeklyReview } from "@/lib/offline/journal";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";
-import { BodyMinis, Card, Delta, Kpi, Mini } from "../summary-ui";
+import { TintedCard } from "@/components/tinted-card";
+import { BodyMinis, Card, Mini, ModuleTiles } from "../summary-ui";
 
 const WD = ["D", "L", "M", "M", "J", "V", "S"];
 
@@ -64,50 +65,49 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         }
       />
       <main {...nav.bodyProps} className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
-        <section aria-label="Resumen de la semana" className="hero rise rounded-[22px] p-5 xl:col-span-12 lg:p-7">
-          <p className="hero-sub text-[13px]">{r.isCurrent ? "Semana en curso, hasta hoy · comparada con la anterior hasta el mismo día" : "Comparado con la semana anterior"}</p>
-          <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            <Kpi label="Hábitos cumplidos" value={now.habitPct === null ? "–" : `${now.habitPct}%`}>
-              <Delta now={now.habitPct} before={before.habitPct} unit="pts" />
-            </Kpi>
-            <Kpi label="Días escritos" value={`${now.wroteDays} de ${r.elapsed}`}>
-              <Delta now={now.wroteDays} before={before.wroteDays} />
-            </Kpi>
-            <Kpi label="Gastado" value={moneyWhole(now.spentCents)}>
-              <Delta now={now.spentCents} before={before.spentCents} goodUp={false} />
-            </Kpi>
-            <Kpi label="Bloques del plan" value={`${now.blocksDone} de ${now.blocksTotal}`}>
-              <Delta now={now.blocksDone} before={before.blocksDone} />
-            </Kpi>
-          </div>
+        <section aria-label="Resumen de la semana" className="grid gap-2.5 xl:col-span-12">
+          <p className="text-[13px] text-muted">
+            {r.isCurrent ? "Semana en curso, hasta hoy · comparada con la anterior hasta el mismo día" : "Comparado con la semana anterior"}
+          </p>
+          <ModuleTiles
+            days={r.days}
+            now={now}
+            before={before}
+            totalDays={r.elapsed}
+            vs="vs. semana anterior"
+            links={{
+              habitos: "/habitos",
+              journal: `/journal/calendario?mes=${r.monday.slice(0, 7)}`,
+              gastos: `/gastos?desde=${r.monday}&hasta=${addDays(r.monday, 6)}`,
+              plan: `/plan?semana=${r.monday}`,
+            }}
+          />
         </section>
 
         {/* Reflexión */}
-        <section className="rise grid gap-3 rounded-[20px] border border-line bg-surface p-4 xl:col-span-12 lg:flex lg:items-center lg:p-5">
-          <div className="grid gap-1 lg:flex-1">
-            <h2 className="text-[15px] font-semibold">Tu reflexión</h2>
-            <p className="text-[13.5px] text-muted">
-              {r.review?.written
-                ? "Ya la empezaste. Podés seguirla cuando quieras."
-                : "Cuatro preguntas: qué salió bien, qué no, qué aprendiste y qué cambiás. Queda en el journal."}
-            </p>
-          </div>
-          <form action={writeWeeklyReview.bind(null, r.monday)}>
-            <button
-              type="submit"
-              disabled={r.isFuture}
-              className="group inline-flex h-12 w-full items-center justify-between gap-3 rounded-full bg-ink pr-1.5 pl-5 text-[14px] font-medium text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-50 lg:w-auto"
-            >
-              {r.review ? "Abrir la reflexión" : "Escribir la reflexión"}
-              <span className="inline-flex size-9 items-center justify-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-0.5">
-                <NotePencil size={17} aria-hidden />
-              </span>
-            </button>
-          </form>
-        </section>
+        <TintedCard
+          tone="journal"
+          icon={NotePencil}
+          title="Tu reflexión"
+          meta={r.review?.written ? "Ya la empezaste" : "Queda en el journal"}
+          className="xl:col-span-12"
+          action={
+            <form action={writeWeeklyReview.bind(null, r.monday)}>
+              <button type="submit" disabled={r.isFuture} className="tcard-pill press disabled:opacity-50">
+                {r.review ? "Abrir" : "Escribir"} <ArrowRight size={13} aria-hidden />
+              </button>
+            </form>
+          }
+        >
+          <p className="text-[13.5px] leading-relaxed text-muted">
+            {r.review?.written
+              ? "Podés seguirla cuando quieras."
+              : "Cuatro preguntas: qué salió bien, qué no, qué aprendiste y qué cambiás la semana que viene."}
+          </p>
+        </TintedCard>
 
         {/* Hábitos */}
-        <Card title="Hábitos" color="var(--c-habitos)" className="xl:col-span-7" href="/habitos">
+        <Card title="Hábitos" tone="habitos" icon={Medal} meta={habitsSorted.length ? `${habitsSorted.length} ${habitsSorted.length === 1 ? "hábito" : "hábitos"} · ${strong.length} firmes` : undefined} className="xl:col-span-7" href="/habitos" hrefLabel="Hábitos">
           {habitsSorted.length === 0 ? (
             <p className="text-[14px] text-muted">Esta semana no tocaba ningún hábito.</p>
           ) : (
@@ -136,7 +136,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </Card>
 
         {/* Cómo te sentiste */}
-        <Card title="Cómo estuviste" color="var(--mod-inicio)" className="xl:col-span-5" href="/">
+        <Card title="Cómo estuviste" tone="inicio" icon={Smiley} meta={hasFeel ? `Ánimo ${now.mood === null ? "–" : dec1(now.mood)} · energía ${now.energy === null ? "–" : dec1(now.energy)}` : "Sin check-ins"} className="xl:col-span-5" href="/" hrefLabel="Inicio">
           {!hasFeel ? (
             <p className="text-[14px] leading-relaxed text-muted">
               Sin check-ins esta semana. Cargalo en Inicio (ánimo, energía, estrés, sueño y peso) y acá vas a ver cómo
@@ -184,7 +184,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </Card>
 
         {/* Gastos */}
-        <Card title="Gastos" color="var(--c-gastos)" className="xl:col-span-7" href="/gastos">
+        <Card title="Gastos" tone="gastos" icon={Wallet} meta={`Ingresos ${moneyWhole(now.incomeCents)}`} className="xl:col-span-7" href="/gastos" hrefLabel="Gastos">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
             <p className="figure text-[30px]">{moneyWhole(now.spentCents)}</p>
             <p className="pb-1 text-[13px] text-muted">
@@ -231,7 +231,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
         </Card>
 
         {/* Plan y journal */}
-        <Card title="Plan y journal" color="var(--c-plan)" className="xl:col-span-5" href="/plan">
+        <Card title="Plan y journal" tone="plan" icon={CalendarCheck} meta={`${r.tasksDone.length} ${r.tasksDone.length === 1 ? "tarea terminada" : "tareas terminadas"}`} className="xl:col-span-5" href="/plan" hrefLabel="Plan">
           <dl className="grid grid-cols-2 gap-2">
             <Mini
               label="Bloques hechos"

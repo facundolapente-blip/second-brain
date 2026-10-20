@@ -3,7 +3,8 @@
 import { useGastosNew } from "../new-action";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Plus } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowUpRight, Plus } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { deleteCategory, saveCategory } from "@/lib/offline/finance";
 import { FINANCE_ICONS, FinanceIcon } from "@/lib/finance-icons";
 import { PALETTE, tone } from "@/lib/palette";
@@ -54,27 +55,25 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         }
       />
 
-      <main className="mx-auto grid max-w-3xl gap-10 px-4 pt-2 lg:max-w-6xl lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:px-10 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl gap-4 px-4 pt-2 pb-6 lg:max-w-6xl lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:gap-5 lg:px-10 lg:pt-6">
         {sections.map((s) => {
           const list = categories.filter((c) => c.kind === s.kind && !c.adjustment);
           return (
-            <section
+            <TintedCard
               key={s.kind}
-              className="grid gap-1 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:px-6 lg:pt-4 lg:pb-3 lg:shadow-[var(--card-shadow)]"
-            >
-              <div className="flex items-baseline justify-between border-b border-fg/80 pb-2">
-                <h2 className="display text-[26px]">{s.title}</h2>
-                <button
-                  type="button"
-                  onClick={() => create(s.kind)}
-                  className="inline-flex min-h-11 items-center text-[13px] font-medium text-accent-fg hover:underline"
-                >
-                  Agregar
+              icon={s.kind === "expense" ? ArrowUpRight : ArrowDownLeft}
+              title={s.title}
+              meta={list.length === 1 ? "1 categoría" : `${list.length} categorías`}
+              action={
+                <button type="button" onClick={() => create(s.kind)} className="tcard-pill press">
+                  <Plus size={13} weight="bold" aria-hidden /> Agregar
                 </button>
-              </div>
+              }
+              bodyClassName="gap-0! px-4! pt-1! pb-2! lg:px-5!"
+            >
               <ul className={cx("grid grid-cols-1 sm:grid-cols-2 sm:gap-x-8", s.kind === "income" && "lg:grid-cols-1")}>
                 {list.map((c, i) => (
-                  <li key={c.id} className="rise border-b border-line" style={{ "--i": i } as React.CSSProperties}>
+                  <li key={c.id} className="rise border-b border-line last:border-b-0" style={{ "--i": i } as React.CSSProperties}>
                     <button
                       type="button"
                       onClick={() => open({ id: c.id, name: c.name, kind: c.kind, icon: c.icon, color: c.color, txCount: c.txCount })}
@@ -91,7 +90,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
                   </li>
                 ))}
               </ul>
-            </section>
+            </TintedCard>
           );
         })}
       </main>

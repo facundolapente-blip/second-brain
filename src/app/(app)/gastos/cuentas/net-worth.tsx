@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Briefcase, ChartBar } from "@phosphor-icons/react";
 import { formatMonth } from "@/lib/dates";
 import { moneyCents, moneyWhole } from "@/lib/format";
+import { TintedCard } from "@/components/tinted-card";
 import { Tick } from "../motion";
 
 /**
@@ -13,13 +15,18 @@ import { Tick } from "../motion";
 export function NetWorth({
   series,
   usdRate,
-  title = "Patrimonio total, en pesos",
+  title = "Patrimonio total",
+  business,
   note,
+  className,
 }: {
   series: { month: string; cents: number }[];
   usdRate: number | null;
   title?: string;
+  /** El de la empresa (cuentas de trabajo): otro ícono. */
+  business?: boolean;
   note?: string;
+  className?: string;
 }) {
   const [focus, setFocus] = useState<number | null>(null);
   const now = series.at(-1)?.cents ?? 0;
@@ -30,18 +37,20 @@ export function NetWorth({
   const label = (m: string) => formatMonth(m).split(" ")[0].slice(0, 3);
 
   return (
-    <section aria-label={title} className="grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
+    <TintedCard
+      icon={business ? Briefcase : ChartBar}
+      title={title}
+      meta={`En pesos${usdRate ? ` · US$ 1 = ${moneyCents(Math.round(usdRate * 100))}` : ""}`}
+      className={className}
+      bodyClassName="gap-3!"
+    >
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-        <div>
-          <p className="kicker">{title}</p>
-          <p className="figure mt-1 text-[34px]">
-            <Tick value={now}>{moneyWhole(now)}</Tick>
-          </p>
-        </div>
-        <p className="pb-1 text-[13px] text-muted">
+        <p className="figure text-[34px] leading-none">
+          <Tick value={now}>{moneyWhole(now)}</Tick>
+        </p>
+        <p className="text-[13px] text-muted">
           {diff >= 0 ? "+" : "−"}
           {moneyWhole(Math.abs(diff))} en 12 meses
-          {usdRate ? ` · US$ 1 = ${moneyCents(Math.round(usdRate * 100))}` : ""}
         </p>
       </div>
       <p className="tabular min-h-5 text-[12.5px] text-muted first-letter:uppercase" aria-live="polite">
@@ -88,6 +97,6 @@ export function NetWorth({
       <p className="text-[11.5px] text-muted">
         {note ? `${note} ` : ""}Con la cotización de hoy para todos los meses: es una referencia, no el valor exacto de cada momento.
       </p>
-    </section>
+    </TintedCard>
   );
 }

@@ -3,7 +3,9 @@
 import { useGastosNew } from "../new-action";
 import { quiet, safeForm, useSafeTransition } from "@/components/safe-action";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Handshake, Plus } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowUpRight, CheckCircle, Handshake, Plus, User } from "@phosphor-icons/react";
+import { StatTile, TintedCard } from "@/components/tinted-card";
+import { EmptyBlock } from "../shared";
 import { deleteDebt, reopenDebt, saveDebt, settleDebt, type ActionResult } from "@/lib/offline/finance";
 import type { DebtDTO } from "@/lib/finance";
 import { centsToInput, type AccountDTO, type CategoryDTO } from "@/lib/finance-logic";
@@ -31,6 +33,18 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
     for (const d of open) if (d.direction === dir) t[d.currency] = (t[d.currency] ?? 0) + d.amountCents;
     return Object.entries(t).map(([c, v]) => moneyCents(v, c)).join(" + ") || "$ 0";
   };
+  const count = (dir: Dir) => {
+    const n = open.filter((d) => d.direction === dir).length;
+    return n === 0 ? "Nada pendiente" : n === 1 ? "1 deuda abierta" : `${n} deudas abiertas`;
+  };
+  // Cabecera de cada persona: lo que queda con ella, neto por moneda.
+  const personMeta = (list: DebtDTO[]) => {
+    const t: Record<string, number> = {};
+    for (const d of list) t[d.currency] = (t[d.currency] ?? 0) + (d.direction === "owed_to_me" ? d.amountCents : -d.amountCents);
+    return Object.entries(t)
+      .map(([c, v]) => (v === 0 ? `Quedan a mano en ${c}` : v > 0 ? `Te debe ${moneyCents(v, c)}` : `Le debés ${moneyCents(-v, c)}`))
+      .join(" · ");
+  };
   // Por persona: cuánto queda pendiente con cada uno.
   const people = new Map<string, DebtDTO[]>();
   for (const d of open) people.set(d.person, [...(people.get(d.person) ?? []), d]);
@@ -55,25 +69,23 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
         }
       />
       <main className="mx-auto grid max-w-3xl gap-5 px-4 pt-2 pb-10 lg:px-10 lg:pt-6">
-        <dl className="grid grid-cols-2 gap-3">
-          <div className="grid gap-1 rounded-2xl border border-line bg-surface p-4">
-            <dt className="flex items-center gap-1.5 text-[12.5px] text-muted">
-              <ArrowDownLeft size={14} weight="bold" className="text-[var(--st-done-fg)]" aria-hidden /> Te deben
-            </dt>
-            <dd className="figure text-[24px]">{sum("owed_to_me")}</dd>
-          </div>
-          <div className="grid gap-1 rounded-2xl border border-line bg-surface p-4">
-            <dt className="flex items-center gap-1.5 text-[12.5px] text-muted">
-              <ArrowUpRight size={14} weight="bold" className="text-[var(--st-fail-fg)]" aria-hidden /> Debés
-            </dt>
-            <dd className="figure text-[24px]">{sum("i_owe")}</dd>
-          </div>
-        </dl>
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile
+            icon={ArrowDownLeft}
+            label="Te deben"
+            figure={<span className={sum("owed_to_me").length > 9 ? "text-[20px] sm:text-[26px]" : "text-[24px] sm:text-[30px]"}>{sum("owed_to_me")}</span>}
+            sub={count("owed_to_me")}
+          />
+          <StatTile
+            icon={ArrowUpRight}
+            label="Debés"
+            figure={<span className={sum("i_owe").length > 9 ? "text-[20px] sm:text-[26px]" : "text-[24px] sm:text-[30px]"}>{sum("i_owe")}</span>}
+            sub={count("i_owe")}
+          />
+        </div>
 
         {open.length === 0 ? (
-          <div className="grid justify-items-start gap-2 rounded-[20px] border border-dashed border-line-strong p-5">
-            <Handshake size={24} className="text-accent-fg" aria-hidden />
-            <p className="text-[15px] font-medium">Nada pendiente</p>
+          <EmptyBlock title="Nada pendiente" icon={<Handshake size={22} weight="fill" />}>
             <p className="max-w-[52ch] text-[13.5px] leading-relaxed text-muted">
               Cuando pagues algo por otro (&ldquo;la nafta, me pagan después&rdquo;) o te presten plata, anotalo acá. Al
               saldarlo podés cargar la devolución como reintegro y el gasto queda bien.
@@ -81,15 +93,20 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
             <Button size="sm" onClick={() => edit(null)}>
               <Plus size={14} weight="bold" aria-hidden /> Anotar una deuda
             </Button>
-          </div>
+          </EmptyBlock>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-4">
             {[...people].map(([person, list]) => (
-              <section key={person} className="grid gap-1 rounded-[20px] border border-line bg-surface p-2">
-                <h2 className="px-3 pt-2 text-[15px] font-semibold">{person}</h2>
+              <TintedCard
+                key={person}
+                icon={User}
+                title={person}
+                meta={personMeta(list)}
+                bodyClassName="gap-0! px-4! py-1! lg:px-5!"
+              >
                 <ul className="grid divide-y divide-line">
                   {list.map((d) => (
-                    <li key={d.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <li key={d.id} className="flex items-center gap-3 py-2.5">
                       <button type="button" onClick={() => edit(d)} className="grid min-w-0 flex-1 text-left">
                         <span className={cx("text-[14.5px] font-medium", d.direction === "owed_to_me" ? "fin-income" : "")}>
                           {d.direction === "owed_to_me" ? "Te debe " : "Le debés "}
@@ -114,20 +131,27 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
                     </li>
                   ))}
                 </ul>
-              </section>
+              </TintedCard>
             ))}
           </div>
         )}
 
         {settled.length > 0 && (
-          <div className="grid gap-2">
-            <button type="button" onClick={() => setShowSettled((v) => !v)} className="kicker inline-flex min-h-10 items-center hover:text-fg">
-              {showSettled ? "Ocultar" : "Ver"} saldadas ({settled.length})
-            </button>
+          <TintedCard
+            icon={CheckCircle}
+            title="Saldadas"
+            meta={settled.length === 1 ? "1 deuda" : `${settled.length} deudas`}
+            action={
+              <button type="button" onClick={() => setShowSettled((v) => !v)} aria-expanded={showSettled} className="tcard-pill press">
+                {showSettled ? "Ocultar" : "Ver"}
+              </button>
+            }
+            bodyClassName={showSettled ? "gap-0! px-4! py-1! lg:px-5!" : "hidden!"}
+          >
             {showSettled && (
-              <ul className="reveal grid divide-y divide-line rounded-2xl border border-line bg-surface">
+              <ul className="reveal grid divide-y divide-line">
                 {settled.map((d) => (
-                  <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-muted">
+                  <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-muted">
                     <span className="min-w-0 flex-1 basis-56 truncate text-[13.5px]">
                       {d.person} · {d.direction === "owed_to_me" ? "te devolvió" : "le pagaste"} {moneyCents(d.amountCents, d.currency)} ·{" "}
                       {formatShort(d.settledAt!)}
@@ -150,7 +174,7 @@ export function DebtsView({ debts, accounts, categories }: { debts: DebtDTO[]; a
                 ))}
               </ul>
             )}
-          </div>
+          </TintedCard>
         )}
       </main>
 

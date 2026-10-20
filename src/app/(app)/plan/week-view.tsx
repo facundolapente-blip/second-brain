@@ -14,7 +14,7 @@ import { haptic } from "@/components/haptics";
 import { useSwipe } from "@/components/swipe";
 import { SwipeRow } from "@/components/swipe-row";
 import { PillSwitch } from "@/components/pill-switch";
-import { ArrowArcRight, ArrowRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank } from "@phosphor-icons/react";
+import { ArrowArcRight, ArrowRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank, CalendarDots } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask, saveBlock } from "@/lib/offline/plan";
 import { addDays, formatShort, startOfWeek, weekday } from "@/lib/dates";
 import {
@@ -35,17 +35,19 @@ import {
   isBlockNow,
 } from "@/lib/plan-logic";
 import { PageHeader } from "@/components/page-header";
+import { TintedCard } from "@/components/tinted-card";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
 import { Sortable, SortableItem } from "@/components/sortable";
 import { BlockSheet, type BlockDraft, type BlockSheetActions, type BlockSheetHandle } from "./block-sheet";
-import { CategoryTag, categoryMap, PriorityTag, useNow } from "./plan-ui";
+import { CategoryTag, categoryMap, HEAD_SWITCH, PriorityTag, useNow } from "./plan-ui";
 import { PlanTabs } from "./plan-nav";
 import { PlanWeekContext } from "./plan-context";
 import { land, ringWhileMenu } from "./drag-motion";
 import { BoardHours, BoardList } from "./week-board";
 
 const SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
 
 // Hacia dónde se tocó (flechas, "Hoy"): el próximo montaje desliza desde ese lado
 // y lo consume. Entrar al Plan desde otro módulo no desliza (no es avanzar).
@@ -472,145 +474,158 @@ export function WeekView({
 
       <main className="mx-auto max-w-6xl px-4 lg:max-w-[110rem] lg:px-10">
         {top}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 lg:pt-5">
-          <div className="flex items-center gap-1">
-            <Link
-              href={prev}
-              scroll={false}
-              onClick={() => markSlide("prev")}
-              aria-label={`${unit} anterior`}
-              title={`${unit} anterior (←)`}
-              className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
-            >
-              <CaretLeft size={18} />
-            </Link>
-            <h2 className="overflow-hidden text-center">
-              <span key={start} className={cx("display inline-block min-w-40 text-[21px]", slide)}>
-                {formatShort(days[0])} al {formatShort(days[6])}
-              </span>
-            </h2>
-            <Link
-              href={next}
-              scroll={false}
-              onClick={() => markSlide("next")}
-              aria-label={`${unit} siguiente`}
-              title={`${unit} siguiente (→)`}
-              className="inline-flex size-11 items-center justify-center rounded-full text-fg hover:bg-surface-2"
-            >
-              <CaretRight size={18} />
-            </Link>
-          </div>
-          {/* Qué avanzan las flechas (se recuerda). */}
-          <PillSwitch
-            label="Las flechas avanzan"
-            value={step}
-            options={[
-              { value: "dia", label: "Día" },
-              { value: "semana", label: "Semana" },
-            ]}
-            onChange={setStep}
-          />
-          {!isThisWeek && (
-            <Link
-              href={todayHref}
-              scroll={false}
-              title="Atajo: T"
-              onClick={() => markSlide(today > start ? "next" : "prev")}
-              className="inline-flex min-h-11 items-center text-sm font-medium text-accent-fg hover:underline"
-            >
-              {step === "dia" ? "Hoy" : "Esta semana"}
-            </Link>
-          )}
-          {work.length > 0 && (
-            <p className="kicker tabular ml-auto">
-              <span key={doneTick.key} className={doneTick.className}>
-                {doneCount}
-              </span>{" "}
-              de {work.length} hechos
+        {/* La semana: tarjeta con cabecera teñida. En la banda, el período con sus flechas,
+            cuántos bloques van hechos (con la barra) y los selectores Día/Semana y Lista/Por horas. */}
+        <TintedCard
+          icon={CalendarDots}
+          className="plan-week-card mt-5 lg:mt-7"
+          title={
+            <span key={start} className={cx("inline-block tabular", slide)}>
+              {formatShort(days[0])} al {formatShort(days[6])}
+            </span>
+          }
+          meta={
+            work.length > 0 ? (
+              <>
+                <span key={doneTick.key} className={doneTick.className}>
+                  {doneCount}
+                </span>{" "}
+                de {work.length} hechos
+              </>
+            ) : (
+              "Nada planeado todavía"
+            )
+          }
+          progress={work.length > 0 ? doneCount / work.length : undefined}
+          action={
+            <span className="flex items-center gap-1.5">
+              <Link
+                href={prev}
+                scroll={false}
+                onClick={() => markSlide("prev")}
+                aria-label={`${unit} anterior`}
+                title={`${unit} anterior (←)`}
+                className="tcard-pill press size-9 justify-center px-0!"
+              >
+                <CaretLeft size={16} weight="bold" />
+              </Link>
+              <Link
+                href={next}
+                scroll={false}
+                onClick={() => markSlide("next")}
+                aria-label={`${unit} siguiente`}
+                title={`${unit} siguiente (→)`}
+                className="tcard-pill press size-9 justify-center px-0!"
+              >
+                <CaretRight size={16} weight="bold" />
+              </Link>
+            </span>
+          }
+          headExtra={
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              {/* Qué avanzan las flechas (se recuerda). */}
+              <PillSwitch
+                label="Las flechas avanzan"
+                value={step}
+                options={[
+                  { value: "dia", label: "Día" },
+                  { value: "semana", label: "Semana" },
+                ]}
+                onChange={setStep}
+                {...HEAD_SWITCH}
+                item="h-8 px-2.5 text-[12.5px]"
+              />
+              {!isThisWeek && (
+                <Link
+                  href={todayHref}
+                  scroll={false}
+                  title="Atajo: T"
+                  onClick={() => markSlide(today > start ? "next" : "prev")}
+                  className="inline-flex min-h-9 items-center text-[13.5px] font-semibold text-[var(--head-fg)] underline decoration-[color-mix(in_oklab,var(--head-fg)_35%,transparent)] underline-offset-4 hover:decoration-current"
+                >
+                  {step === "dia" ? "Hoy" : "Esta semana"}
+                </Link>
+              )}
+              <ViewToggle view={view} onChange={setView} className="ml-auto" />
+            </div>
+          }
+        >
+          {copyMsg && (
+            <p role="status" className="reveal border-l-[1.5px] border-accent py-1 pl-3 text-[14px] text-accent-fg">
+              {copyMsg}{" "}
+              {copyMsg.startsWith("Listo") && (
+                <Link href={`/plan?semana=${addDays(monday, 7)}`} className="font-medium underline underline-offset-4">
+                  Ir a esa semana
+                </Link>
+              )}
             </p>
           )}
-        </div>
-        {copyMsg && (
-          <p role="status" className="reveal mb-3 border-l-[1.5px] border-accent py-1 pl-3 text-[14px] text-accent-fg">
-            {copyMsg}{" "}
-            {copyMsg.startsWith("Listo") && (
-              <Link href={`/plan?semana=${addDays(monday, 7)}`} className="font-medium underline underline-offset-4">
-                Ir a esa semana
-              </Link>
-            )}
-          </p>
-        )}
 
-        {/* Celular: tira de días + lista del día elegido */}
-        <div className="lg:hidden">
-          {/* Deslizar sobre la tira cambia de semana. */}
-          <div {...stripSwipe} className={cx("mb-5 grid grid-cols-7 gap-1 border-y border-line py-2", slide)} role="tablist" aria-label="Días">
-            {days.map((d) => {
-              const active = d === selected;
-              const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
-              const pending = byDay.get(d)!.some((b) => !b.done && !isFreeBlock(b));
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => pickDay(d)}
-                  className={cx(
-                    "tap-tint relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[6px] transition-colors",
-                    active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
-                    // El día recién elegido acusa el toque (solo después de tocar, no al cargar).
-                    active && daySlide && "plan-pick",
-                  )}
-                >
-                  <span className={cx("font-mono text-[10px] font-medium tracking-[0.08em] uppercase", active ? "text-on-ink" : "text-muted")}>{SHORT[weekday(d)]}</span>
-                  <span className="figure text-[21px]">{Number(d.slice(8))}</span>
-                  <span
+          {/* Celular: tira de días + lista del día elegido */}
+          <div className="lg:hidden">
+            {/* Deslizar sobre la tira cambia de semana. */}
+            <div {...stripSwipe} className={cx("mb-4 grid grid-cols-7 gap-1 border-b border-line pb-3", slide)} role="tablist" aria-label="Días">
+              {days.map((d) => {
+                const active = d === selected;
+                const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
+                const pending = byDay.get(d)!.some((b) => !b.done && !isFreeBlock(b));
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => pickDay(d)}
                     className={cx(
-                      "mt-0.5 h-1.5 w-1.5 rounded-full",
-                      count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-ink" : "bg-accent") : active ? "bg-on-ink/50" : "bg-faint",
+                      "tap-tint relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[10px] transition-colors",
+                      active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
+                      // El día recién elegido acusa el toque (solo después de tocar, no al cargar).
+                      active && daySlide && "plan-pick",
                     )}
-                    aria-hidden
-                  />
-                  {d === today && !active && <span className="absolute inset-x-3 top-0 h-[2px] rounded-b-full bg-accent" aria-hidden />}
-                </button>
-              );
-            })}
+                  >
+                    <span className={cx("font-mono text-[10px] font-medium tracking-[0.08em] uppercase", active ? "text-on-ink" : "text-muted")}>{SHORT[weekday(d)]}</span>
+                    <span className="figure text-[21px]">{Number(d.slice(8))}</span>
+                    <span
+                      className={cx(
+                        "mt-0.5 h-1.5 w-1.5 rounded-full",
+                        count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-ink" : "bg-accent") : active ? "bg-on-ink/50" : "bg-faint",
+                      )}
+                      aria-hidden
+                    />
+                    {d === today && !active && <span className="absolute inset-x-3 top-0 h-[2px] rounded-b-full bg-accent" aria-hidden />}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Deslizar de costado sobre la lista cambia de día (como tocar otro en la tira). */}
+            <div {...listSwipe} key={`${view}-${selected}`} ref={keepRef} style={keepStyle} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
+              {view === "lista" ? (
+                <DayList
+                  day={selected}
+                  today={today}
+                  now={now}
+                  blocks={byDay.get(selected)!}
+                  cats={cats}
+                  onToggle={toggle}
+                  onEdit={openEdit}
+                  onNew={() => openNew(selected)}
+                  onMove={move}
+                  onTomorrow={toTomorrow}
+                />
+              ) : (
+                // Por horas en el celular: el calendario del día elegido en la tira.
+                <BoardHours {...boardProps} days={[selected]} todoFolded={todoFolded} openSeq={hoursSeq} />
+              )}
+            </div>
           </div>
-          <div className="mb-3 flex justify-end">
-            <ViewToggle view={view} onChange={setView} />
-          </div>
-          {/* Deslizar de costado sobre la lista cambia de día (como tocar otro en la tira). */}
-          <div {...listSwipe} key={`${view}-${selected}`} ref={keepRef} style={keepStyle} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
-            {view === "lista" ? (
-              <DayList
-                day={selected}
-                today={today}
-                now={now}
-                blocks={byDay.get(selected)!}
-                cats={cats}
-                onToggle={toggle}
-                onEdit={openEdit}
-                onNew={() => openNew(selected)}
-                onMove={move}
-                onTomorrow={toTomorrow}
-              />
-            ) : (
-              // Por horas en el celular: el calendario del día elegido en la tira.
-              <BoardHours {...boardProps} days={[selected]} todoFolded={todoFolded} openSeq={hoursSeq} />
-            )}
-          </div>
-        </div>
 
-        {/* Escritorio: lista de 7 columnas o calendario por horas; los bloques se arrastran. */}
-        <div className="hidden lg:block">
-          <div className="mb-3 flex justify-end">
-            <ViewToggle view={view} onChange={setView} />
+          {/* Escritorio: lista de 7 columnas o calendario por horas; los bloques se arrastran. */}
+          <div className="hidden lg:block">
+            <div key={view} className={slide || (viewSwap ? "swap" : undefined)}>
+              {view === "lista" ? <BoardList {...boardProps} /> : <BoardHours {...boardProps} todoFolded={todoFolded} />}
+            </div>
           </div>
-          <div key={view} className={slide || (viewSwap ? "swap" : undefined)}>
-            {view === "lista" ? <BoardList {...boardProps} /> : <BoardHours {...boardProps} todoFolded={todoFolded} />}
-          </div>
-        </div>
+        </TintedCard>
       </main>
 
       <BlockSheet ref={sheet} categories={categories} tasks={tasks} actions={sheetActions} />
@@ -703,7 +718,7 @@ function DayList({
                   key={b.id}
                   id={b.id}
                   disabled={!!b.startTime}
-                  className={cx("border-b border-line bg-bg", fresh.has(b.id) && "reveal")}
+                  className={cx("border-b border-line bg-surface", fresh.has(b.id) && "reveal")}
                   draggingClass="rounded-xl shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
                 >
                   {/* Deslizar: a la derecha "Hecho" (un "Libre" no se tilda), a la izquierda "Mañana". */}
@@ -711,7 +726,7 @@ function DayList({
                     left={held === b.id || isFreeBlock(b) || b.done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: () => onToggle(b) }}
                     right={held === b.id ? undefined : { label: "Mañana", icon: <ArrowRight size={20} weight="bold" />, tone: "accent", onAction: () => onTomorrow(b) }}
                   >
-                    <div {...holdProps(b.id)} className={cx("tap-tint grid grid-cols-[60px_1fr] items-start gap-3 bg-bg", isFreeBlock(b) && "free-row")}>
+                    <div {...holdProps(b.id)} className={cx("tap-tint grid grid-cols-[60px_1fr] items-start gap-3 bg-surface", isFreeBlock(b) && "free-row")}>
                       <span className={cx("pt-3 text-right font-mono text-[13px] leading-tight font-medium tabular", live ? "text-accent-fg" : "text-fg/80")}>
                         {b.startTime ? (
                           <span className="inline-flex items-center justify-end gap-1.5">
@@ -863,17 +878,19 @@ export function BlockCard({
 }
 
 /** Lista o Por horas (en el celular y en la compu). */
-function ViewToggle({ view, onChange }: { view: "lista" | "horas"; onChange: (v: "lista" | "horas") => void }) {
+function ViewToggle({ view, onChange, className }: { view: "lista" | "horas"; onChange: (v: "lista" | "horas") => void; className?: string }) {
   return (
     <PillSwitch
       label="Vista"
+      className={className}
+      {...HEAD_SWITCH}
       value={view}
       options={[
         { value: "lista", label: "Lista" },
         { value: "horas", label: "Por horas" },
       ]}
       onChange={onChange}
-      item="h-8 px-3.5 text-[12.5px]"
+      item="h-8 px-2.5 text-[12.5px]"
     />
   );
 }

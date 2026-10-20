@@ -22,6 +22,7 @@ import { MOODS } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
 import { useTick } from "@/components/motion";
+import { TintedCard } from "@/components/tinted-card";
 import { haptic } from "@/components/haptics";
 import { HOLD_CLASS, useHoldRepeat } from "../habitos/hold-repeat";
 import { MoodIcon } from "../journal/journal-ui";
@@ -35,12 +36,14 @@ export function CheckinCard({
   yesterday,
   lastWeightG,
   watch,
+  className,
 }: {
   today: CheckinDTO;
   yesterday: CheckinDTO;
   lastWeightG: number | null;
   /** Lo que mandó el reloj (solo para leer); no cuenta en "N de 5". */
   watch: { today: WatchDay | null; yesterday: WatchDay | null };
+  className?: string;
 }) {
   const [day, setDay] = useState<"today" | "yesterday">("today");
   const [data, setData] = useState({ today, yesterday });
@@ -130,43 +133,50 @@ export function CheckinCard({
     setSaved(false);
   }
 
+  const status = (
+    <span className="tabular grid" aria-live="polite">
+      <StatusLine on={statusKey === "count"}>
+        <span key={filledTick.key} className={filledTick.className}>
+          {filled}
+        </span>{" "}
+        de 5<span className="hidden sm:inline"> · cada toque se guarda solo</span>
+      </StatusLine>
+      <StatusLine on={statusKey === "saving"}>Guardando…</StatusLine>
+      <StatusLine on={statusKey === "saved"}>
+        <Check size={12} weight="bold" aria-hidden className={statusKey === "saved" ? "check-draw" : undefined} /> Guardado
+      </StatusLine>
+    </span>
+  );
+
+  // Tarjeta con cabecera teñida (diseño 4): el título pliega y despliega, el estado de
+  // guardado va como dato (siempre en el mismo lugar) y Hoy/Ayer como acción.
   return (
-    <section
-      aria-label="Check-in del día"
-      style={{ "--i": 1 } as React.CSSProperties}
-      className="rise grid gap-4 rounded-[20px] border border-line bg-surface p-4 lg:col-span-12 lg:p-5"
-    >
-      <header className="flex items-center gap-3">
-        {/* En el celular el estado va debajo del título (al lado no entraba con el selector);
-            desde sm, en la misma línea. Siempre en el mismo lugar. */}
-        <div className="flex min-w-0 flex-col sm:flex-row sm:items-center sm:gap-3">
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            aria-controls="checkin-cuerpo"
-            className="-my-2 -ml-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
-          >
-            <span aria-hidden className="size-2 rounded-full bg-[var(--mod-inicio)]" />
-            <h2 className="text-[15px] font-semibold tracking-tight">¿Cómo estás?</h2>
-            <CaretDown size={13} weight="bold" aria-hidden className={cx("text-muted transition-transform duration-200", !open && "-rotate-90")} />
-          </button>
-          <span className="tabular -mt-1 grid pl-5 text-[12.5px] leading-[18px] text-muted sm:mt-0 sm:pl-0" aria-live="polite">
-            <StatusLine on={statusKey === "count"}>
-              <span key={filledTick.key} className={filledTick.className}>
-                {filled}
-              </span>{" "}
-              de 5
-            </StatusLine>
-            <StatusLine on={statusKey === "saving"}>Guardando…</StatusLine>
-            <StatusLine on={statusKey === "saved"}>
-              <Check size={12} weight="bold" aria-hidden className={statusKey === "saved" ? "check-draw" : undefined} /> Guardado
-            </StatusLine>
-          </span>
-        </div>
+    <TintedCard
+      tone="inicio"
+      icon={Smiley}
+      className={cx("ini-check", className)}
+      bodyClassName={cx("pt-[18px]!", !open && !summary && !hasWatch && "hidden!")}
+      title={
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls="checkin-cuerpo"
+          aria-label="¿Cómo estás? Check-in del día"
+          className="-my-3 -ml-1 inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg px-1"
+        >
+          <span className="truncate">¿Cómo estás?</span>
+          <CaretDown size={13} weight="bold" aria-hidden className={cx("shrink-0 opacity-70 transition-transform duration-200", !open && "-rotate-90")} />
+        </button>
+      }
+      meta={status}
+      action={
         <PillSwitch
           label="Día"
-          className="ml-auto shrink-0"
+          className="shrink-0"
+          track="bg-surface shadow-[0_0_0_1px_var(--head-line)]"
+          thumb="bg-[var(--head-bg)]"
+          on="text-[var(--head-fg)]"
           value={day}
           options={[
             { value: "today", label: "Hoy" },
@@ -178,10 +188,10 @@ export function CheckinCard({
           }}
           item="h-8 px-3.5 text-[12.5px]"
         />
-      </header>
-
+      }
+    >
       {!open && summary && (
-        <button type="button" onClick={() => setOpen(true)} className="reveal -mt-2 truncate text-left text-[13.5px] text-muted">
+        <button type="button" onClick={() => setOpen(true)} className="reveal truncate text-left text-[13.5px] text-muted">
           {summary}
         </button>
       )}
@@ -193,9 +203,9 @@ export function CheckinCard({
       <div
         id="checkin-cuerpo"
         key={day}
-        className={cx("grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_0.9fr_0.9fr]", hasWatch && "pb-4", daySwap && "swap")}
+        className={cx("grid grid-cols-2 gap-x-[18px] gap-y-[18px]", hasWatch && "pb-4", daySwap && "swap")}
       >
-        <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label}>
+        <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label} className="col-span-2">
           <div className="grid grid-cols-5 gap-1.5">
             {MOODS.map((m) => {
               const on = cur.mood === m.value;
@@ -245,7 +255,7 @@ export function CheckinCard({
       </div>
       {hasWatch && <WatchStrip key={day} slots={watchSlots} watch={watch[day]} swap={daySwap} />}
       </div>
-    </section>
+    </TintedCard>
   );
 }
 
@@ -294,9 +304,9 @@ function countFilled(c: CheckinDTO) {
   return (["mood", "energy", "stress", "sleepMin", "weightG"] as const).filter((k) => c[k] !== null).length;
 }
 
-function Row({ icon, label, hint, children }: { icon: React.ReactNode; label: string; hint?: string; children: React.ReactNode }) {
+function Row({ icon, label, hint, children, className }: { icon: React.ReactNode; label: string; hint?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="grid content-start gap-2">
+    <div className={cx("grid min-w-0 content-start gap-2", className)}>
       <p className="flex items-center gap-1.5 text-[12.5px] text-muted">
         {icon}
         <span className="font-medium text-fg">{label}</span>

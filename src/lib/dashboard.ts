@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { backupWarning } from "./backup";
 import { addDays, diffDays, fromDbDate, monthBounds, shiftMonth, startOfWeek, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
-import { currentStreak as habitStreak, dayProgress, dayState, habitDayMark, packAll, showsOn } from "./habit-logic";
+import { currentStreak as habitStreak, dayProgress, dayState, habitDayMark, habitScore, hasScore, packAll, showsOn } from "./habit-logic";
 import { getWrittenDays, NOT_EMPTY } from "./journal";
 import { currentStreak as journalStreak, excerpt, wordCount } from "./journal-logic";
 import { getAccounts, getCardSummaries, getCategoryBudgets, NOT_ADJUSTMENT, PERSONAL, runSchedules } from "./finance";
@@ -135,6 +135,9 @@ export async function getDashboard() {
   const habitHistory: { date: string; done: number; due: number }[] = [];
   for (let iso = heatFrom; iso <= today; iso = addDays(iso, 1)) habitHistory.push({ date: iso, ...habitDay(iso) });
   const bestHabitStreak = [...habitsToday].sort((a, b) => b.streak - a.streak)[0] ?? null;
+  // Puntaje promedio (como el panel de Hoy): solo los que ya tienen días que cuenten.
+  const scores = habits.flatMap((h) => (hasScore(h, logs[h.id] ?? {}, today) ? [habitScore(h, logs[h.id] ?? {}, today)] : []));
+  const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
 
   // ─── Journal ──────────────────────────────────────────────────────────────
   const writtenSet = new Set(written);
@@ -215,12 +218,17 @@ export async function getDashboard() {
   const planCats = new Map(
     (await prisma.planCategory.findMany({ select: { id: true, name: true, color: true } })).map((c) => [c.id, c]),
   );
-  const dueTasks = tasks
+  const nearTasks = tasks
     .filter((t) => t.deadline)
     .map((t) => ({ ...t, deadline: fromDbDate(t.deadline!), left: diffDays(fromDbDate(t.deadline!), today) }))
     .filter((t) => t.left <= 7)
-    .sort((a, b) => a.left - b.left || b.priority - a.priority)
-    .slice(0, 5);
+    .sort((a, b) => a.left - b.left || b.priority - a.priority);
+  const dueTasks = nearTasks.slice(0, 5);
+  // Los bloques de la semana (con los que se pasaron a otra), por día: los segmentos de la cifra del Plan.
+  const weekBlocks = [...blockDTOs, ...pastLogs]
+    .filter((b) => !isFreeBlock(b))
+    .map((b) => ({ date: b.date, done: b.done }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   // ─── La semana, los cuatro juntos ─────────────────────────────────────────
   const week: DayMix[] = [];
@@ -261,6 +269,9 @@ export async function getDashboard() {
       manualOrder: !!habitOrderFlag,
       history: habitHistory,
       best: bestHabitStreak && bestHabitStreak.streak > 0 ? bestHabitStreak : null,
+      /** Puntaje promedio de los hábitos con días que cuentan (null si ninguno) y cuántos son. */
+      avgScore,
+      scoredCount: scores.length,
     },
     journal: {
       streak: journalStreak(writtenSet, today),
@@ -320,12 +331,15 @@ export async function getDashboard() {
     plan: {
       today: todayBlocks.map((b) => ({ ...b, category: b.categoryId ? (planCats.get(b.categoryId) ?? null) : null })),
       dueTasks,
+      /** Tareas abiertas con el deadline vencido (todas, no solo las 5 de la lista). */
+      overdue: nearTasks.filter((t) => t.left < 0).length,
+      weekBlocks,
       // Lo que viene en la semana, para cuando hoy no hay nada.
       upcoming: sortBlocks(blockDTOs.filter((b) => b.date > today && !isFreeBlock(b)))
         .sort((a, b) => a.date.localeCompare(b.date))
         .slice(0, 4),
-      weekDone: [...blockDTOs, ...pastLogs].filter((b) => b.done && !isFreeBlock(b)).length,
-      weekTotal: [...blockDTOs, ...pastLogs].filter((b) => !isFreeBlock(b)).length,
+      weekDone: weekBlocks.filter((b) => b.done).length,
+      weekTotal: weekBlocks.length,
     },
     week,
     heatFrom,

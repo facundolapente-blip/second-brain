@@ -224,3 +224,11 @@ const nowStore = {
 export function useNow(): number {
   return useSyncExternalStore(nowStore.subscribe, nowStore.get, nowStore.server);
 }
+
+/** Selectores dentro de la banda teñida de una tarjeta: el riel y el texto toman el tono de la cabecera. */
+export const HEAD_SWITCH = {
+  track: "bg-[color-mix(in_oklab,var(--head-fg)_11%,transparent)]",
+  thumb: "bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.12)]",
+  on: "text-fg",
+  off: "text-[var(--head-fg)] hover:text-fg",
+};

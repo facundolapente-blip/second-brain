@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, Check } from "@phosphor-icons/react";
+import { Bank, ChartPieSlice, Check } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { moneyWhole } from "@/lib/format";
 import { tone } from "@/lib/palette";
 import {
@@ -37,20 +37,20 @@ export function SideBalances({
   const list = [...visible.filter((a) => !a.business), ...visible.filter((a) => a.business)];
 
   return (
-    <section aria-label="Saldos" className="rounded-2xl border border-line bg-surface px-5 pt-4 pb-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Saldos</h2>
-        {selection !== null && (
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="inline-flex min-h-9 items-center text-[13px] font-medium text-accent-fg hover:underline"
-          >
+    <TintedCard
+      icon={Bank}
+      title="Saldos"
+      meta={visible.length === 1 ? "1 cuenta" : `${visible.length} cuentas`}
+      action={
+        selection !== null ? (
+          <button type="button" onClick={() => onChange(null)} className="tcard-pill press">
             Ver todas
           </button>
-        )}
-      </div>
-      <p className="pt-0.5 pb-2 text-[12.5px] text-muted">
+        ) : undefined
+      }
+      bodyClassName="gap-2! pt-3! pb-2!"
+    >
+      <p className="text-[12.5px] text-muted">
         {hasWork ? "Total personal" : "Total"}{" "}
         {cur.map((c, i) => (
           <span key={c}>
@@ -84,7 +84,7 @@ export function SideBalances({
           );
         })}
       </ul>
-    </section>
+    </TintedCard>
   );
 }
 
@@ -122,15 +122,17 @@ export function CategorySpend({
   const max = Math.max(1, ...shown.map((r) => r.cents), rest);
 
   return (
-    <section aria-label="Gasto por categoría" className="rounded-2xl border border-line bg-surface px-5 pt-4 pb-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Gasto por categoría</h2>
-        {cur && <span className="font-mono text-[12px] text-muted tabular">{moneyWhole(total, cur)}</span>}
-      </div>
+    <TintedCard
+      icon={ChartPieSlice}
+      title="Gasto por categoría"
+      meta={cur ? `${moneyWhole(total, cur)} en total` : "Sin gastos"}
+      action={{ href: `/gastos/informes?mes=${month}`, label: "Informes" }}
+      bodyClassName="gap-3!"
+    >
       {rows.length === 0 ? (
-        <p className="py-4 text-[14px] text-muted">Sin gastos este mes en las cuentas elegidas.</p>
+        <p className="py-2 text-[14px] text-muted">Sin gastos este mes en las cuentas elegidas.</p>
       ) : (
-        <ul className="mt-3 grid gap-2.5">
+        <ul className="grid gap-2.5">
           {shown.map((r) => {
             const cat = lk.category(r.id);
             return (
@@ -178,16 +180,10 @@ export function CategorySpend({
         </ul>
       )}
       {curs.length > 1 && (
-        <p className="mt-3 text-[12.5px] text-muted">
+        <p className="text-[12.5px] text-muted">
           Solo {cur}. También hubo gastos en {curs.slice(1).join(", ")}.
         </p>
       )}
-      <Link
-        href={`/gastos/informes?mes=${month}`}
-        className="mt-2 inline-flex min-h-11 items-center gap-1 text-[13px] font-medium text-accent-fg hover:underline"
-      >
-        Ver informes <ArrowRight size={13} aria-hidden />
-      </Link>
-    </section>
+    </TintedCard>
   );
 }

@@ -28,6 +28,7 @@ import { dec1, shortNumber } from "@/lib/format";
 import { tone } from "@/lib/palette";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 
 const nf = new Intl.NumberFormat("es-UY", { maximumFractionDigits: 0 });
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -102,12 +103,24 @@ export function HealthView({ data }: { data: HealthData }) {
         return { key: d.date, label: formatShort(d.date), tick: [1, 8, 15, 22, 29].includes(day) ? String(day) : null, partialToday: d.date === today, v: d };
       });
   const has = (k: HealthKey) => points.some((p) => p.v[k] !== null);
+  // Los gráficos van de a dos: si son impares, el último ocupa todo el ancho (sin hueco al lado).
+  const charts = [
+    has("steps") && "steps",
+    has("sleepMin") && "sleepMin",
+    has("stress") && "stress",
+    (has("hrMin") || has("hrMax")) && "hr",
+    has("distanceM") && "distanceM",
+    has("activeKcal") && "activeKcal",
+    has("weightG") && "weightG",
+  ].filter(Boolean);
+  const wide = (k: keyof typeof METRIC) => (charts.length % 2 === 1 && charts.at(-1) === k ? "lg:col-span-2" : undefined);
 
   const compare = period.isCurrent
-    ? `${isYear ? "Año" : "Mes"} en curso, comparado con ${isYear ? period.prevKey : monthWord(period.prevKey)} hasta el mismo día.`
+    ? `${isYear ? "Año" : "Mes"} en curso: promedio por día con datos, comparado con ${isYear ? period.prevKey : monthWord(period.prevKey)} hasta el mismo día.`
     : `Promedio por día con datos, comparado con ${isYear ? period.prevKey : monthWord(period.prevKey)}.`;
 
   const stressLvl = s.stress.avg === null ? null : stressLevel(s.stress.avg);
+  const withWeight = !!(s.weight.last || s.weight.prevLast);
   const weightChange = s.weight.last && s.weight.prevLast ? changeOf(s.weight.last.value / 1000, s.weight.prevLast.value / 1000, "diff", 1) : null;
 
   return (
@@ -140,19 +153,21 @@ export function HealthView({ data }: { data: HealthData }) {
       />
       <main {...nav.bodyProps} className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-2 lg:gap-5 lg:px-10 lg:pt-4">
         {!data.hasData ? (
-          <section aria-label="Sin datos" className="grid justify-items-start gap-3 rounded-[20px] border border-line bg-surface p-5 lg:col-span-2 lg:p-7">
-            <span className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--mod-inicio)] text-white">
-              <Watch size={20} weight="fill" aria-hidden />
-            </span>
-            <h2 className="text-[17px] font-semibold tracking-tight">Este {isYear ? "año" : "mes"} no hay datos del reloj</h2>
+          <TintedCard
+            icon={Watch}
+            title={`Este ${isYear ? "año" : "mes"} no hay datos del reloj`}
+            meta="Pasos, sueño, estrés, pulso y peso"
+            action={{ href: "/datos", label: "Datos" }}
+            className="lg:col-span-2"
+          >
             <p className="max-w-[56ch] text-[14px] leading-relaxed text-muted">
               Los pasos, el sueño, el estrés, el pulso, la distancia, las calorías y el peso llegan solos desde el reloj Huawei (por intervals.icu) o se importan de
               Google Fit o Samsung Health.
             </p>
-            <Link href="/datos" className="inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink hover:opacity-90">
+            <Link href="/datos" className="inline-flex min-h-11 items-center self-start rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink hover:opacity-90">
               Ir a Datos → Reloj Huawei
             </Link>
-          </section>
+          </TintedCard>
         ) : (
           <>
             <Hero days={data.days} today={today} isYear={isYear} />
@@ -162,17 +177,18 @@ export function HealthView({ data }: { data: HealthData }) {
                 {compare}
                 {period.isCurrent && " Hoy no entra en los promedios de pasos, estrés, pulso, distancia y calorías: el día no terminó."}
               </p>
-              <div className={cx("grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:gap-3", (s.weight.last || s.weight.prevLast) ? "lg:grid-cols-4" : "xl:grid-cols-6")}>
-                <Tile metric="steps" label="Pasos por día" value={s.steps.avg === null ? "–" : nf.format(s.steps.avg)} spark={points.map((p) => p.v.steps)} goal={STEPS_GOAL}>
+              {/* Con peso son 7: los pasos ocupan dos lugares (y el peso dos en tres columnas), así no queda ningún hueco. */}
+              <div className={cx("grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:gap-3", withWeight ? "lg:grid-cols-4" : "xl:grid-cols-6")}>
+                <Tile className={withWeight ? "col-span-2" : undefined} metric="steps" label="Pasos" value={s.steps.avg === null ? "–" : nf.format(s.steps.avg)} spark={points.map((p) => p.v.steps)} goal={STEPS_GOAL}>
                   <Change value={changeOf(s.steps.avg, s.steps.prevAvg, "pct")} unit="%" good="up" vs={vs} />
                 </Tile>
-                <Tile metric="sleepMin" label="Sueño promedio" value={sleepText(s.sleepMin.avg)} spark={points.map((p) => p.v.sleepMin)} goal={SLEEP_GOAL_MIN}>
+                <Tile metric="sleepMin" label="Sueño" value={sleepText(s.sleepMin.avg)} spark={points.map((p) => p.v.sleepMin)} goal={SLEEP_GOAL_MIN}>
                   <Change value={changeOf(s.sleepMin.avg, s.sleepMin.prevAvg, "pct")} unit="%" good="up" vs={vs} />
                 </Tile>
                 <Tile
                   metric="stress"
                   color={stressLvl?.tone}
-                  label="Estrés promedio"
+                  label="Estrés"
                   value={s.stress.avg === null ? "–" : nf.format(s.stress.avg)}
                   badge={stressLvl && <span style={tone(stressLvl.tone)} className="chip-solid rounded-full px-2 py-0.5 text-[11.5px] font-medium">{stressLvl.label}</span>}
                   spark={points.map((p) => p.v.stress)}
@@ -181,27 +197,28 @@ export function HealthView({ data }: { data: HealthData }) {
                 </Tile>
                 <Tile
                   metric="hr"
-                  label="Pulso mín. / máx."
+                  label="Pulso"
                   value={s.hrMin.avg === null && s.hrMax.avg === null ? "–" : `${s.hrMin.avg === null ? "–" : nf.format(s.hrMin.avg)} / ${s.hrMax.avg === null ? "–" : nf.format(s.hrMax.avg)}`}
-                  badge={<span className="text-[12px] text-muted">lpm</span>}
+                  unit="lpm"
                   spark={points.map((p) => p.v.hrMin)}
                 >
                   <Change value={changeOf(s.hrMin.avg, s.hrMin.prevAvg, "diff")} unit=" lpm" good="down" vs={`mín. ${vs}`} />
                 </Tile>
-                <Tile metric="distanceM" label="Distancia por día" value={kmText(s.distanceM.avg)} spark={points.map((p) => p.v.distanceM)}>
+                <Tile metric="distanceM" label="Distancia" value={kmText(s.distanceM.avg)} spark={points.map((p) => p.v.distanceM)}>
                   <Change value={changeOf(s.distanceM.avg, s.distanceM.prevAvg, "pct")} unit="%" good="up" vs={vs} />
                 </Tile>
                 <Tile
                   metric="activeKcal"
-                  label="Calorías por día"
+                  label="Calorías"
                   value={s.activeKcal.avg === null ? "–" : nf.format(s.activeKcal.avg)}
-                  badge={<span className="text-[12px] text-muted">kcal</span>}
+                  unit="kcal"
                   spark={points.map((p) => p.v.activeKcal)}
                 >
                   <Change value={changeOf(s.activeKcal.avg, s.activeKcal.prevAvg, "pct")} unit="%" good="up" vs={vs} />
                 </Tile>
-                {(s.weight.last || s.weight.prevLast) && (
+                {withWeight && (
                   <Tile
+                    className="md:col-span-2 lg:col-span-1"
                     metric="weightG"
                     label="Peso"
                     value={formatWeight(s.weight.last?.value ?? null)}
@@ -218,6 +235,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Pasos"
                 metric="steps"
+                className={wide("steps")}
                 goal={STEPS_GOAL}
                 avg={s.steps.avg}
                 points={points}
@@ -233,6 +251,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Sueño"
                 metric="sleepMin"
+                className={wide("sleepMin")}
                 goal={SLEEP_GOAL_MIN}
                 avg={s.sleepMin.avg}
                 points={points}
@@ -249,6 +268,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Estrés"
                 metric="stress"
+                className={wide("stress")}
                 avg={s.stress.avg}
                 points={points}
                 isYear={isYear}
@@ -269,6 +289,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Pulso"
                 metric="hr"
+                className={wide("hr")}
                 kind="range"
                 points={points}
                 isYear={isYear}
@@ -290,6 +311,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Distancia"
                 metric="distanceM"
+                className={wide("distanceM")}
                 avg={s.distanceM.avg}
                 points={points}
                 isYear={isYear}
@@ -303,6 +325,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Calorías de actividad"
                 metric="activeKcal"
+                className={wide("activeKcal")}
                 avg={s.activeKcal.avg}
                 points={points}
                 isYear={isYear}
@@ -316,6 +339,7 @@ export function HealthView({ data }: { data: HealthData }) {
               <Chart
                 title="Peso"
                 metric="weightG"
+                className={wide("weightG")}
                 kind="range"
                 points={points}
                 isYear={isYear}
@@ -337,15 +361,17 @@ export function HealthView({ data }: { data: HealthData }) {
   );
 }
 
-/** Una cifra del período: ícono y color de la medida, el número grande, una tira con cómo fue el período y el cambio. Lleva a su gráfico. */
+/** Una cifra del período (tarjeta de cifra): el número grande, una tira con cómo fue el período en el color de la medida y el cambio. Lleva a su gráfico. */
 function Tile({
   metric,
   color,
   label,
   value,
+  unit,
   badge,
   spark,
   goal,
+  className,
   children,
 }: {
   metric: keyof typeof METRIC;
@@ -353,52 +379,49 @@ function Tile({
   color?: string;
   label: string;
   value: string;
+  unit?: string;
   badge?: React.ReactNode;
   spark: (number | null)[];
   goal?: number;
+  className?: string;
   children?: React.ReactNode;
 }) {
   const m = METRIC[metric];
   const c = color ?? m.color;
-  const Ico = m.icon;
   const vals = spark.filter((v): v is number => v !== null);
   const hi = Math.max(...vals, goal ?? 0, 1);
   const lo = metric === "hr" || metric === "weightG" ? Math.min(...vals) * 0.9 : 0;
   return (
-    <a
+    <StatTile
+      icon={m.icon}
+      label={label}
       href={`#${m.id}`}
-      className="group grid min-w-0 content-start rounded-2xl border border-line bg-surface p-3.5 transition-[border-color] hover:border-line-strong lg:p-4"
-    >
-      <dl className="grid min-w-0 content-start gap-2">
-      <dt className="flex items-center gap-2 text-[12px] font-medium text-muted">
-        <ToneSquare solid size={24} style={tone(c)} className="rounded-[7px]">
-          <Ico size={14} weight="fill" aria-hidden />
-        </ToneSquare>
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="grid gap-2">
-        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="figure text-[24px] leading-tight whitespace-nowrap lg:text-[28px]">{value}</span>
+      figure={value}
+      unit={unit}
+      // "7 h 30 min" o "62 / 171" no entran a 32 px en media pantalla: la cifra va como antes (24/28).
+      className={cx("[&_.tstat-fig]:text-[24px]! lg:[&_.tstat-fig]:text-[28px]!", className)}
+      sub={
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {badge}
+          {children}
         </span>
-        {vals.length > 1 && (
-          <span aria-hidden className="flex h-7 items-end gap-px">
-            {spark.map((v, i) => (
-              <span
-                key={i}
-                className="min-w-0 flex-1 rounded-t-[2px]"
-                style={{
-                  height: v === null ? "2px" : `${Math.max(8, ((v - lo) / (hi - lo)) * 100)}%`,
-                  background: v === null ? "var(--line)" : goal !== undefined && v < goal ? soft(c, 32) : soft(c, 80),
-                }}
-              />
-            ))}
-          </span>
-        )}
-        <span className="min-h-5">{children}</span>
-      </dd>
-      </dl>
-    </a>
+      }
+    >
+      {vals.length > 1 && (
+        <span aria-hidden className="flex h-7 items-end gap-px">
+          {spark.map((v, i) => (
+            <span
+              key={i}
+              className="min-w-0 flex-1 rounded-t-[2px]"
+              style={{
+                height: v === null ? "2px" : `${Math.max(8, ((v - lo) / (hi - lo)) * 100)}%`,
+                background: v === null ? "var(--line)" : goal !== undefined && v < goal ? soft(c, 32) : soft(c, 80),
+              }}
+            />
+          ))}
+        </span>
+      )}
+    </StatTile>
   );
 }
 
@@ -413,21 +436,27 @@ function Hero({ days, today, isYear }: { days: HealthDay[]; today: string; isYea
     h.farthest && { metric: "distanceM" as const, label: "Más lejos", value: kmText(h.farthest.value), date: when(h.farthest.date) },
   ].filter(Boolean) as { metric: keyof typeof METRIC; label: string; value: string; date: string }[];
   if (!h.stepsGoal.of && !h.sleepGoal.of && !records.length) return null;
+  const goals = h.stepsGoal.of > 0 || h.sleepGoal.of > 0;
   return (
-    <section
-      aria-label="Cómo te fue"
-      className="grid gap-5 rounded-[22px] border border-line bg-surface p-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-7 lg:col-span-2 lg:p-6"
+    <TintedCard
+      icon={Trophy}
+      title={`Cómo te fue en el ${isYear ? "año" : "mes"}`}
+      meta={`Metas: ${nf.format(STEPS_GOAL)} pasos y 7 h de sueño`}
+      className="lg:col-span-2"
+      bodyClassName={cx(goals && records.length > 0 && "sm:grid! sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] sm:items-start sm:gap-7!")}
     >
-      <div className="flex justify-center gap-5 sm:justify-start sm:gap-7">
-        {h.stepsGoal.of > 0 && <Ring color={METRIC.steps.color} hit={h.stepsGoal.hit} of={h.stepsGoal.of} label={`días con ${nf.format(STEPS_GOAL)} pasos`} />}
-        {h.sleepGoal.of > 0 && <Ring color={METRIC.sleepMin.color} hit={h.sleepGoal.hit} of={h.sleepGoal.of} label="noches de 7 h o más" />}
-      </div>
+      {goals && (
+        <div className="grid content-start gap-4">
+          {h.stepsGoal.of > 0 && <GoalBar metric="steps" hit={h.stepsGoal.hit} of={h.stepsGoal.of} label={`días con ${nf.format(STEPS_GOAL)} pasos`} />}
+          {h.sleepGoal.of > 0 && <GoalBar metric="sleepMin" hit={h.sleepGoal.hit} of={h.sleepGoal.of} label="noches de 7 h o más" />}
+        </div>
+      )}
       {records.length > 0 && (
         <div className="grid min-w-0 gap-2.5">
-          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight">
+          <h3 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight">
             <Trophy size={15} weight="fill" className="text-[var(--p-yellow-chip)]" aria-hidden />
             Lo mejor del {isYear ? "año" : "mes"}
-          </h2>
+          </h3>
           <ul className="grid grid-cols-2 gap-2">
             {records.map((r) => {
               const M = METRIC[r.metric];
@@ -446,27 +475,36 @@ function Hero({ days, today, isYear }: { days: HealthDay[]; today: string; isYea
           </ul>
         </div>
       )}
-    </section>
+    </TintedCard>
   );
 }
 
-/** Anillo de cuántos días se llegó a la meta, con la cifra adentro. */
-function Ring({ color, hit, of, label }: { color: string; hit: number; of: number; label: string }) {
-  const pct = of ? (hit / of) * 100 : 0;
+/** Cuántos días se llegó a la meta: "14 de 30 días con 8.000 pasos" y una barra fina con el color de la medida (sin anillos). */
+function GoalBar({ metric, hit, of, label }: { metric: keyof typeof METRIC; hit: number; of: number; label: string }) {
+  const M = METRIC[metric];
+  const pct = of ? Math.round((hit / of) * 100) : 0;
   return (
-    <figure className="grid justify-items-center gap-1.5" aria-label={`${hit} de ${of} ${label}`}>
-      <span className="relative inline-grid size-[104px] place-items-center lg:size-[116px]">
-        <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90" aria-hidden>
-          <circle cx="50" cy="50" r="42" fill="none" stroke={soft(color, 18)} strokeWidth="10" />
-          <circle cx="50" cy="50" r="42" fill="none" stroke={chip(color)} strokeWidth="10" strokeLinecap="round" pathLength={100} strokeDasharray={`${pct} 100`} />
-        </svg>
-        <span className="grid justify-items-center leading-none">
-          <span className="figure text-[26px] lg:text-[30px]">{hit}</span>
-          <span className="mt-0.5 font-mono text-[11px] text-muted">de {of}</span>
+    <div className="grid gap-2">
+      <p className="flex items-center gap-2.5">
+        <ToneSquare solid size={28} style={tone(M.color)} className="rounded-[8px]">
+          <M.icon size={15} weight="fill" aria-hidden />
+        </ToneSquare>
+        <span className="min-w-0 text-[13.5px] leading-snug text-muted">
+          <span className="figure text-[22px] text-fg">{hit}</span> de {of} {label}
         </span>
+      </p>
+      <span
+        role="progressbar"
+        aria-label={`${hit} de ${of} ${label}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        className="block h-2 overflow-hidden rounded-full"
+        style={{ background: soft(M.color, 18) }}
+      >
+        <span className="bar-anim block h-full rounded-full" style={{ width: `${pct}%`, background: chip(M.color) }} />
       </span>
-      <figcaption className="max-w-[9.5rem] text-center text-[12px] leading-snug text-muted">{label}</figcaption>
-    </figure>
+    </div>
   );
 }
 
@@ -523,7 +561,9 @@ function Chart({
   barColor,
   legend,
   note,
+  className,
 }: {
+  className?: string;
   title: string;
   metric: keyof typeof METRIC;
   /** Meta: los días por debajo van con el color más suave. */
@@ -580,20 +620,21 @@ function Chart({
   const showAvg = avg !== null && avg !== undefined && kind === "bars" && (!refLine || Math.abs(pct(avg) - pct(refLine.value)) >= 8);
 
   return (
-    <section id={METRIC[metric].id} aria-label={title} className="grid min-w-0 scroll-mt-20 content-start gap-3.5 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
-      <header className="flex items-start justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
-          <ToneSquare solid size={30} style={tone(M.color)} className="rounded-[9px]">
-            <M.icon size={17} weight="fill" aria-hidden />
-          </ToneSquare>
-          {title}
-        </h2>
-        {/* El día señalado (el último con dato si no se señala ninguno), en grande. */}
+    <TintedCard
+      id={METRIC[metric].id}
+      icon={M.icon}
+      title={title}
+      meta={avg !== null && avg !== undefined ? `prom. ${fmt(avg)}` : undefined}
+      className={cx("scroll-mt-20", className)}
+      bodyClassName="gap-3.5!"
+      action={
+        // El día señalado (el último con dato si no se señala ninguno), en grande.
         <p className="grid min-w-0 justify-items-end text-right" aria-live="polite">
           <span className="figure truncate text-[19px] leading-tight lg:text-[21px]">{shown ? valueOf(shown) : "–"}</span>
-          <span className="truncate text-[12px] text-muted">{shown ? whenOf(shown) : ""}</span>
+          <span className="truncate text-[12px]">{shown ? whenOf(shown) : ""}</span>
         </p>
-      </header>
+      }
+    >
 
       <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
         {/* Eje: los valores de las líneas de guía. */}
@@ -751,6 +792,6 @@ function Chart({
           </table>
         </div>
       </details>
-    </section>
+    </TintedCard>
   );
 }

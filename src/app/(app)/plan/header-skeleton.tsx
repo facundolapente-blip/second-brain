@@ -1,11 +1,12 @@
 import { DotsThreeVertical, List } from "@phosphor-icons/react/dist/ssr";
 import { Bone } from "@/components/skeleton";
+import type { Icon } from "@phosphor-icons/react";
 
 /**
  * Encabezado del Plan mientras carga: igual al de verdad (mismo ancho que la semana,
  * título, pestañas y acciones), así no se corre nada cuando llega la pantalla.
  */
-export function PlanHeaderSkeleton({ title, active, action, extra, narrow }: { title: string; active: 0 | 1; action: string; extra?: string; narrow?: boolean }) {
+export function PlanHeaderSkeleton({ title, active, action, extra, narrow, noMenu }: { title: string; active: 0 | 1; action: string; extra?: string; narrow?: boolean; /** Sin el menú de tres puntos (Objetivos). */ noMenu?: boolean }) {
   return (
     <div className="plan-head contents" data-w={narrow ? "96" : undefined}>
       <header className="sticky top-0 z-20 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
@@ -18,7 +19,7 @@ export function PlanHeaderSkeleton({ title, active, action, extra, narrow }: { t
             <div className="ml-auto flex items-center gap-0.5">
               {extra ? (
                 <Bone className={`h-9 rounded-full ${extra}`} />
-              ) : (
+              ) : noMenu ? null : (
                 <span aria-hidden className="inline-flex size-9 items-center justify-center text-muted">
                   <DotsThreeVertical size={20} weight="bold" />
                 </span>
@@ -36,5 +37,49 @@ export function PlanHeaderSkeleton({ title, active, action, extra, narrow }: { t
         </div>
       </header>
     </div>
+  );
+}
+
+/**
+ * Tarjeta con cabecera teñida mientras carga (la misma forma que `TintedCard`):
+ * ícono, título, el dato en gris, la píldora y, si va, la barra fina y lo de abajo de la banda.
+ */
+export function CardSkeleton({
+  icon: Ico,
+  title,
+  meta = "w-32",
+  pill,
+  bar,
+  extra,
+  className = "",
+  bodyClassName = "",
+  children,
+}: {
+  icon: Icon;
+  title: React.ReactNode;
+  meta?: string;
+  pill?: string;
+  bar?: boolean;
+  extra?: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section className={`tcard ${className}`}>
+      <header className="tcard-head">
+        <span className="tcard-ico" aria-hidden>
+          <Ico size={18} weight="fill" />
+        </span>
+        <span className="grid min-w-0 gap-1.5">
+          <span className="tcard-title">{title}</span>
+          <Bone className={`h-3 ${meta}`} />
+        </span>
+        {pill ? <Bone className={`h-9 rounded-full ${pill}`} /> : <span />}
+        {bar && <span className="tcard-bar" aria-hidden />}
+        {extra && <div className="col-span-3 mt-2.5 min-w-0">{extra}</div>}
+      </header>
+      <div className={`tcard-body ${bodyClassName}`}>{children}</div>
+    </section>
   );
 }

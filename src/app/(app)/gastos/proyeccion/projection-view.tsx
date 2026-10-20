@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownRight, ArrowUpRight } from "@phosphor-icons/react";
+import { ArrowDownRight, ArrowUpRight, CalendarBlank, CalendarCheck, ChartLineUp, ChartPieSlice, Receipt, TrendUp, Wallet, type Icon } from "@phosphor-icons/react";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import type { Projection } from "@/lib/projection";
 import type { CategoryDTO } from "@/lib/finance-logic";
 import { formatMonth } from "@/lib/dates";
@@ -9,7 +10,7 @@ import { moneyCents } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { cx } from "@/components/ui";
 import { GastosTabs } from "../gastos-nav";
-import { CategoryAvatar } from "../shared";
+import { CategoryAvatar, MiniBars } from "../shared";
 
 const pct = (a: number, b: number) => (b ? Math.round(((a - b) / b) * 100) : null);
 const monthName = (m: string) => formatMonth(m).split(" ")[0];
@@ -56,10 +57,10 @@ export function ProjectionView({
     <>
       <PageHeader title="Proyección" wide tabs={<GastosTabs />} />
       <main className="mx-auto grid max-w-3xl grid-cols-1 gap-5 px-4 pt-2 pb-10 lg:max-w-6xl lg:grid-cols-12 lg:gap-6 lg:px-10 lg:pt-6">
-        <section className="hero grid gap-4 rounded-[22px] p-5 lg:col-span-12 lg:p-7" aria-label="Cierre del mes">
-          <p className="hero-sub max-w-3xl text-[15px] leading-relaxed lg:text-[17px]">
+        <section className="grid gap-3 lg:col-span-12 lg:gap-4" aria-label="Cierre del mes">
+          <p className="max-w-3xl text-[15px] leading-relaxed text-muted lg:text-[17px]">
             Si seguís a este ritmo, en {name} vas a gastar alrededor de{" "}
-            <strong className="font-semibold text-white">{moneyCents(p.projected)}</strong>
+            <strong className="font-semibold text-fg">{moneyCents(p.projected)}</strong>
             {vsAvg !== null && (
               <>
                 , {Math.abs(vsAvg) < 3 ? "parecido a" : vsAvg > 0 ? `un ${vsAvg}% más que` : `un ${-vsAvg}% menos que`} tu promedio
@@ -67,26 +68,59 @@ export function ProjectionView({
             )}
             .{growing && cat.get(growing.categoryId ?? "") && ` La que más sube: ${cat.get(growing.categoryId ?? "")!.name}.`}
           </p>
-          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            <Tile label={`Gastado hasta hoy (día ${p.elapsed} de ${p.days})`} value={moneyCents(p.spent)} />
-            <Tile label="Proyección al cierre" value={moneyCents(p.projected)} sub={`falta gastar ~${moneyCents(remaining)}`} />
-            <Tile label="Promedio de 3 meses" value={moneyCents(p.avgMonth)} sub={`${monthName(p.hist.at(-1)?.month ?? p.month)}: ${moneyCents(p.lastMonth)}`} />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            <Tile icon={Receipt} label="Gastado" value={moneyCents(p.spent)} sub={`Hasta hoy, día ${p.elapsed} de ${p.days}`}>
+              {/* El mes que pasó, en segmentos (un tramo por cada 5 días aprox.). */}
+              <span className="tmini-seg" style={{ gridTemplateColumns: `repeat(${Math.ceil(p.days / 5)}, 1fr)` }} role="img" aria-label={`Pasaron ${p.elapsed} de ${p.days} días`}>
+                {Array.from({ length: Math.ceil(p.days / 5) }, (_, i) => (
+                  <span key={i} data-on={i * 5 < p.elapsed ? "" : undefined} />
+                ))}
+              </span>
+            </Tile>
+            <Tile icon={ChartLineUp} label="Al cierre" value={moneyCents(p.projected)} sub={`Falta gastar ~${moneyCents(remaining)}`}>
+              <MiniBars
+                label={`Proyección ${moneyCents(p.projected)} contra el promedio de ${moneyCents(p.avgMonth)}`}
+                rows={[
+                  { label: monthName(p.month).slice(0, 3), cents: p.projected },
+                  { label: "prom.", cents: p.avgMonth, muted: true },
+                ]}
+              />
+            </Tile>
+            <Tile icon={CalendarCheck} label="Promedio" value={moneyCents(p.avgMonth)} sub="De los últimos 3 meses">
+              {p.hist.length > 0 && (
+                <MiniBars
+                  label={`Gasto de los últimos meses: ${p.hist.slice(-3).map((h) => `${monthName(h.month)} ${moneyCents(h.expense)}`).join(", ")}`}
+                  rows={p.hist.slice(-3).reverse().map((h, i) => ({ label: monthName(h.month).slice(0, 3), cents: h.expense, muted: i > 0 }))}
+                />
+              )}
+            </Tile>
             <Tile
-              label="Saldo total a fin de mes"
+              icon={Wallet}
+              label="Saldo a fin de mes"
               value={`${endBalance < 0 ? "−" : ""}${moneyCents(Math.abs(endBalance))}`}
-              sub={`hoy ${moneyCents(balance)} · entran ~${moneyCents(incomeLeft)}, salen ~${moneyCents(Math.max(remaining, p.upcoming.expense))}`}
-            />
+              sub={`Entran ~${moneyCents(incomeLeft)}, salen ~${moneyCents(Math.max(remaining, p.upcoming.expense))}`}
+            >
+              <MiniBars
+                label={`Hoy ${moneyCents(balance)}, a fin de mes ${moneyCents(endBalance)}`}
+                rows={[
+                  { label: "hoy", cents: balance, muted: true },
+                  { label: "fin", cents: endBalance, color: endBalance < 0 ? "var(--st-fail-line)" : undefined },
+                ]}
+              />
+            </Tile>
           </div>
         </section>
 
-        <Card title={`Cómo viene ${name}`} className="lg:col-span-7">
+        <Card icon={ChartLineUp} title={`Cómo viene ${name}`} meta="Gasto acumulado del mes" className="lg:col-span-7">
           <MonthChart p={p} />
         </Card>
 
-        <Card title="Próximos meses" className="lg:col-span-5">
-          <p className="-mt-1 text-[13px] leading-relaxed text-muted">
-            Según tus últimos 6 meses{Math.abs(p.trendPct) >= 0.05 ? `, el gasto viene ${p.trendPct > 0 ? "subiendo" : "bajando"}` : ""}.
-          </p>
+        <Card icon={CalendarBlank} title="Próximos meses" meta="Según tus últimos 6 meses" className="lg:col-span-5">
+          {Math.abs(p.trendPct) >= 0.05 && (
+            <p className="-mt-1 flex items-center gap-1.5 text-[13px] leading-relaxed text-muted">
+              <TrendUp size={14} aria-hidden className={p.trendPct > 0 ? undefined : "-scale-y-100"} /> El gasto viene {p.trendPct > 0 ? "subiendo" : "bajando"}.
+            </p>
+          )}
           <ul className="grid gap-2">
             {p.next.map((n) => (
               <li key={n.month} className="grid gap-1.5 rounded-xl bg-surface-2 p-3">
@@ -126,7 +160,7 @@ export function ProjectionView({
           </details>
         </Card>
 
-        <Card title="Por categoría, al cierre del mes" className="lg:col-span-12">
+        <Card icon={ChartPieSlice} title="Por categoría, al cierre del mes" meta={`${p.categories.length} categorías`} className="lg:col-span-12">
           {p.categories.length === 0 ? (
             <p className="text-[14px] text-muted">Todavía no hay gastos para proyectar.</p>
           ) : (
@@ -175,22 +209,19 @@ export function ProjectionView({
   );
 }
 
-function Card({ title, className, children }: { title: string; className?: string; children: React.ReactNode }) {
+function Card({ icon, title, meta, className, children }: { icon: Icon; title: string; meta?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section aria-label={title} className={cx("grid min-w-0 content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}>
-      <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+    <TintedCard icon={icon} title={title} meta={meta} className={className}>
       {children}
-    </section>
+    </TintedCard>
   );
 }
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Tile({ icon, label, value, sub, children }: { icon: Icon; label: string; value: string; sub?: string; children?: React.ReactNode }) {
   return (
-    <div className="grid content-start gap-1.5 rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10 lg:p-4">
-      <span className="text-[12px] font-medium opacity-85">{label}</span>
-      <span className="figure text-[24px] lg:text-[28px]">{value}</span>
-      {sub && <span className="hero-sub text-[11.5px] leading-snug">{sub}</span>}
-    </div>
+    <StatTile icon={icon} label={label} figure={<span className={value.length > 8 ? "text-[22px] sm:text-[28px]" : "text-[26px] sm:text-[30px]"}>{value}</span>} sub={sub}>
+      {children}
+    </StatTile>
   );
 }
 

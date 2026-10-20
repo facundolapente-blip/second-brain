@@ -10,6 +10,7 @@ import {
   CircleNotch,
   FolderSimple,
   MagnifyingGlass,
+  Note,
   NotePencil,
   Plus,
   PushPin,
@@ -19,6 +20,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
+import { TintedCard } from "@/components/tinted-card";
 import { PillSwitch } from "@/components/pill-switch";
 import { SwipeRow } from "@/components/swipe-row";
 import { Sortable, SortableItem } from "@/components/sortable";
@@ -385,19 +387,31 @@ export function NotesView({
 
   const section = filters.section ? sectionOf(filters.section) : null;
   const searching = !!(filters.q || filters.tag);
+  // Dato de la cabecera: cuántas hay en la sección (o en total) y, si hay filtros, cuántas se ven.
+  const total = section ? (counts.bySection[section.id] ?? 0) : counts.all;
+  const filtered = searching || filters.important || !!filters.category || filters.later;
+  const plural = (n: number) => `${n} ${n === 1 ? "nota" : "notas"}`;
+  const meta = filtered
+    ? `${visible.length}${hasMore ? "+" : ""} de ${plural(total)}`
+    : `${plural(total)}${section?.id === "videos" && counts.laterVideos ? ` · ${counts.laterVideos} por ver` : ""}`;
 
   return (
     <>
-      <PageHeader
-        title="Notas"
-        wide
-        actions={
-          <Button variant="accent" size="sm" className="max-lg:hidden" onClick={newNote}>
-            <Plus size={16} weight="bold" /> Nueva nota
-          </Button>
-        }
-      />
+      <PageHeader title="Notas" wide />
       <main className="mx-auto grid max-w-3xl min-w-0 gap-4 px-4 pt-1 pb-10 lg:max-w-6xl lg:gap-5 lg:px-10 lg:pt-4">
+        {/* Cabecera teñida: la sección abierta, cuántas hay y "Nueva nota"; abajo, la búsqueda y todos los filtros juntos. */}
+        <TintedCard
+          icon={section?.icon ?? Note}
+          title={section ? section.name : "Todas las notas"}
+          meta={meta}
+          action={
+            <button type="button" className="tcard-pill press" onClick={newNote} title="Nueva nota">
+              <Plus size={14} weight="bold" aria-hidden /> <span className="max-sm:hidden">Nueva nota</span>
+              <span className="sm:hidden">Nueva</span>
+            </button>
+          }
+          bodyClassName="gap-3! lg:gap-3.5!"
+        >
         <SearchBox filters={filters} />
         <SectionPills filters={filters} counts={counts} />
         {section && (
@@ -446,6 +460,7 @@ export function NotesView({
               </Link>
             )}
         </div>
+        </TintedCard>
 
         {visible.length === 0 ? (
           <Empty section={section} searching={searching} later={filters.later} onNew={newNote} />
@@ -643,7 +658,7 @@ function SectionPills({ filters, counts }: { filters: Filters; counts: Counts })
     ...NOTE_SECTIONS.map((s) => ({ id: s.id as string, name: s.short ?? s.name, count: counts.bySection[s.id] ?? 0, icon: s.icon, color: s.color })),
   ];
   return (
-    <nav ref={nav} aria-label="Secciones" className="relative -mx-4 min-w-0 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <nav ref={nav} aria-label="Secciones" className="relative -mx-[18px] min-w-0 overflow-x-auto px-[18px] [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
       <ul className="flex w-max gap-1.5 pb-1 lg:w-auto lg:flex-wrap">
         {items.map((s) => {
           const on = shown === s.id;
@@ -707,7 +722,7 @@ function CategoryPills({
     ...(uncategorized ? [{ id: NO_CATEGORY, name: "Sin categoría", count: uncategorized, color: null }] : []),
   ];
   return (
-    <nav aria-label="Categorías" className="relative -mx-4 -mt-1 min-w-0 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Categorías" className="relative -mx-[18px] -mt-1 min-w-0 overflow-x-auto px-[18px] [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
       <ul className="flex w-max gap-1.5 pb-1 lg:w-auto lg:flex-wrap">
         {items.map((c) => {
           const on = shown === c.id;

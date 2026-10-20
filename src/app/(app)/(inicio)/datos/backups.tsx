@@ -6,6 +6,7 @@ import { ArrowsClockwise, CheckCircle, ClockCounterClockwise, DownloadSimple, Wa
 import { backupNow, type BackupResult } from "@/lib/backup-actions";
 import type { BackupInfo, BackupStatus } from "@/lib/backup";
 import { cx } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 
 const when = new Intl.DateTimeFormat("es-UY", {
   timeZone: "America/Montevideo",
@@ -27,32 +28,40 @@ export function Backups({ enabled, backups, status }: { enabled: boolean; backup
   const failed = status && !status.ok;
 
   return (
-    <section className="rise grid gap-4 rounded-[20px] border border-line bg-surface p-4 lg:col-span-12 lg:p-5" style={{ "--i": 3 } as React.CSSProperties}>
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="grid min-w-0 flex-1 gap-1">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-            <ClockCounterClockwise size={18} aria-hidden />
-            Respaldo automático
-          </h2>
-          <p className="text-[13.5px] text-muted">
-            Todos los días a las 6 de la mañana se guarda una copia completa en un almacén privado, aparte de la base. Quedan las de
-            los últimos 30 días y una por mes durante un año. Para tener otra copia fuera de la nube, bajala a la compu cada tanto:
-            tocá cualquiera de la lista o &quot;Todo (JSON comprimido)&quot; en Exportar.
-          </p>
-        </div>
-        {enabled && (
+    <TintedCard
+      icon={ClockCounterClockwise}
+      title="Respaldo automático"
+      meta={
+        !enabled
+          ? "Solo en la versión publicada"
+          : backups.length
+            ? `${backups.length} ${backups.length === 1 ? "copia" : "copias"} · todos los días a las 6`
+            : "Todos los días a las 6"
+      }
+      className="lg:col-span-12"
+      action={
+        enabled ? (
           <form action={action}>
-            <button
-              type="submit"
-              disabled={pending}
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-[14px] font-medium text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-            >
-              <ArrowsClockwise size={16} className={cx(pending && "animate-spin")} aria-hidden />
-              {pending ? "Guardando…" : "Hacer uno ahora"}
+            <button type="submit" disabled={pending} className="tcard-pill press disabled:opacity-50">
+              <ArrowsClockwise size={14} className={cx(pending && "animate-spin")} aria-hidden />
+              {pending ? (
+                "Guardando…"
+              ) : (
+                <>
+                  <span className="max-sm:hidden">Hacer uno ahora</span>
+                  <span className="sm:hidden">Ahora</span>
+                </>
+              )}
             </button>
           </form>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
+      <p className="text-[13.5px] text-muted">
+        Todos los días a las 6 de la mañana se guarda una copia completa en un almacén privado, aparte de la base. Quedan las de
+        los últimos 30 días y una por mes durante un año. Para tener otra copia fuera de la nube, bajala a la compu cada tanto:
+        tocá cualquiera de la lista o &quot;Todo (JSON comprimido)&quot; en Exportar.
+      </p>
 
       {(state || failed) && (
         <p
@@ -91,6 +100,6 @@ export function Backups({ enabled, backups, status }: { enabled: boolean; backup
           ))}
         </ul>
       )}
-    </section>
+    </TintedCard>
   );
 }

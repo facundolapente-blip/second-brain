@@ -92,3 +92,36 @@
     from { opacity: 0; }
   }
 }
+
+/* Hoy (diseño 4): tarjeta teñida de arriba con el avance del día, píldoras y la tira
+   de días; debajo, la lista en una tarjeta blanca. Las filas no cambian. */
+.hh-sum .tcard-head { padding: 16px 14px 14px 16px; border-bottom: 0; }
+.hh-sum .tcard-body { display: none; }
+.hh-sum .tcard-ico { width: 42px; height: 42px; border-radius: 13px; }
+.hh-sum .tcard-ico svg { width: 22px; height: 22px; }
+.hh-sum .tcard-title { font-size: 20px; letter-spacing: -0.02em; }
+.hh-sum .tcard-meta { margin-top: 2px; }
+.hh-sum .tcard-bar { margin-top: 14px; height: 8px; }
+.hh-title b { font-size: 26px; font-weight: 700; display: inline-block; }
+.hh-of { margin-left: 5px; font-size: 17px; font-weight: 600; }
+.hh-pct { font-size: 30px; line-height: 1; }
+.hh-pct small { margin-left: 1px; font-size: 13px; font-weight: 600; opacity: 0.75; }
+.hh-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.hh-facts > li { max-width: 100%; border-radius: 999px; padding: 5px 10px; font-size: 12px; background: color-mix(in oklab, var(--surface) 72%, transparent); color: var(--head-fg); }
+.hh-facts b { font-weight: 600; }
+.hh-day { box-shadow: 0 0 0 1px var(--head-line); }
+/* Dentro de la tarjeta la fila es más angosta: la frecuencia no se parte en dos
+   renglones (se acorta "0/5 esta semana", que ya trunca). */
+.hh-list li .rounded-\[3px\] { white-space: nowrap; flex-shrink: 0; }
+
+/* Categorías: celdas con líneas finas dentro de la tarjeta (2, 3 o 4 columnas). */
+.cat-grid > li { border-right-width: 1px; border-bottom-width: 1px; }
+.cat-grid > li:nth-child(2n) { border-right-width: 0; }
+@media (min-width: 40rem) {
+  .cat-grid > li:nth-child(2n) { border-right-width: 1px; }
+  .cat-grid > li:nth-child(3n) { border-right-width: 0; }
+}
+@media (min-width: 64rem) {
+  .cat-grid > li:nth-child(3n) { border-right-width: 1px; }
+  .cat-grid > li:nth-child(4n) { border-right-width: 0; }
+}

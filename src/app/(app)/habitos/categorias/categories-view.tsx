@@ -3,7 +3,7 @@
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { CaretRight, Plus } from "@phosphor-icons/react";
+import { CaretRight, Plus, SquaresFour } from "@phosphor-icons/react";
 import { deleteCategory, saveCategory } from "@/lib/offline/habit";
 import { HABIT_ICONS, HabitAvatar, HabitIcon } from "@/lib/habit-icons";
 import { PALETTE, tone } from "@/lib/palette";
@@ -11,6 +11,8 @@ import type { CategoryDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx, Field, Input, Sheet, type SheetHandle } from "@/components/ui";
 import { HabitsTabs } from "../habits-nav";
+import { TintedCard } from "@/components/tinted-card";
+import "../habits.css";
 
 type Draft = { id?: string; name: string; icon: string; color: string };
 
@@ -31,6 +33,7 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
     sheet.current?.open();
   }
   const create = () => open({ name: "", icon: "Sparkle", color: "blue" });
+  const habitTotal = categories.reduce((a, c) => a + c.habitCount, 0);
   useOnNew(create);
 
   return (
@@ -46,46 +49,57 @@ export function CategoriesView({ categories }: { categories: CategoryDTO[] }) {
         }
       />
 
-      <main className="mx-auto max-w-3xl px-4 pt-4 lg:max-w-6xl lg:px-10 lg:pt-6">
-        <ul className="grid grid-cols-2 border-t border-l border-line sm:grid-cols-3 lg:grid-cols-4 lg:gap-4 lg:border-0">
-          {categories.map((c, i) => (
-            <li
-              key={c.id}
-              className="rise border-r border-b border-line lg:overflow-hidden lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:shadow-[var(--card-shadow)]"
-              style={{ "--i": i } as React.CSSProperties}
-            >
-              <button
-                type="button"
-                onClick={() => open({ id: c.id, name: c.name, icon: c.icon, color: c.color })}
-                style={tone(c.color)}
-                className="group flex h-full w-full flex-col items-start gap-8 p-4 text-left transition-colors hover:bg-surface-2 lg:min-h-44 lg:justify-between lg:p-6"
-              >
-                <HabitAvatar icon={c.icon} color={c.color} size={42} />
-                <span className="flex w-full items-end justify-between gap-2">
-                  <span className="grid gap-0.5">
-                    <span className="display text-[21px]">{c.name}</span>
-                    <span className="kicker">
-                      {c.habitCount === 0 ? "Sin hábitos" : c.habitCount === 1 ? "1 hábito" : `${c.habitCount} hábitos`}
-                    </span>
-                  </span>
-                  <CaretRight size={16} className="text-faint transition-transform group-hover:translate-x-0.5" />
-                </span>
-              </button>
-            </li>
-          ))}
-          <li className="hidden lg:block">
-            <button
-              type="button"
-              onClick={create}
-              className="flex h-full min-h-44 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line-strong text-[14px] text-muted transition-colors hover:border-fg/40 hover:bg-surface-2 hover:text-fg"
-            >
-              <Plus size={20} />
-              Nueva categoría
+      <main className="mx-auto max-w-3xl px-4 pt-3 lg:max-w-6xl lg:px-10 lg:pt-6">
+        <TintedCard
+          icon={SquaresFour}
+          title="Tus categorías"
+          meta={`${categories.length} ${categories.length === 1 ? "categoría" : "categorías"} · ${habitTotal} ${habitTotal === 1 ? "hábito" : "hábitos"}`}
+          action={
+            <button type="button" className="tcard-pill press lg:hidden!" onClick={create}>
+              <Plus size={13} weight="bold" aria-hidden /> Nueva
             </button>
-          </li>
-        </ul>
+          }
+          bodyClassName="p-0!"
+        >
+          {categories.length === 0 ? (
+            <div className="grid justify-items-start gap-3 px-5 py-8">
+              <p className="text-[15px] font-medium">Todavía no hay categorías</p>
+              <p className="max-w-[46ch] text-[14px] leading-relaxed text-muted">
+                Agrupan los hábitos (Salud, Trabajo, Noche...) y les dan el color y el ícono.
+              </p>
+              <Button variant="accent" size="sm" onClick={create}>
+                <Plus size={16} weight="bold" /> Crear categoría
+              </Button>
+            </div>
+          ) : (
+            // Celdas separadas por líneas finas (sin tarjetas dentro de la tarjeta); la última fila
+            // sin línea abajo y la última columna sin línea a la derecha.
+            <ul className="cat-grid -mb-px grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+              {categories.map((c) => (
+                <li key={c.id} className="border-line">
+                  <button
+                    type="button"
+                    onClick={() => open({ id: c.id, name: c.name, icon: c.icon, color: c.color })}
+                    style={tone(c.color)}
+                    className="group flex h-full w-full flex-col items-start gap-7 p-4 text-left transition-colors hover:bg-surface-2 lg:min-h-40 lg:justify-between lg:p-5"
+                  >
+                    <HabitAvatar icon={c.icon} color={c.color} size={42} />
+                    <span className="flex w-full items-end justify-between gap-2">
+                      <span className="grid min-w-0 gap-0.5">
+                        <span className="display text-[19px] break-words lg:text-[21px]">{c.name}</span>
+                        <span className="kicker">
+                          {c.habitCount === 0 ? "Sin hábitos" : c.habitCount === 1 ? "1 hábito" : `${c.habitCount} hábitos`}
+                        </span>
+                      </span>
+                      <CaretRight size={16} className="shrink-0 text-faint transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </TintedCard>
       </main>
-
 
       <Sheet ref={sheet} title={draft.id ? "Editar categoría" : "Nueva categoría"}>
         <form key={formKey} action={action} className="grid gap-5">

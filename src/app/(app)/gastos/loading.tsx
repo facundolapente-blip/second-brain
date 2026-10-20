@@ -21,17 +21,17 @@ export default function Loading() {
               <Bone className="h-10 w-44" />
             </div>
             <div className="grid grid-cols-2 gap-2 lg:max-w-xl">
-              <Bone className="h-[68px] rounded-[8px]" />
-              <Bone className="h-[68px] rounded-[8px]" />
+              <Bone className="h-[68px] rounded-[20px]" />
+              <Bone className="h-[68px] rounded-[20px]" />
             </div>
           </div>
-          <Bone className="mb-5 h-[92px] rounded-[8px] lg:hidden" />
+          <Bone className="mb-5 h-[92px] rounded-[20px] lg:hidden" />
           <TxListSkeleton />
         </div>
         <div className="hidden gap-4 pt-6 lg:grid">
-          <Bone className="h-[92px] rounded-[8px]" />
-          <Bone className="h-[360px] rounded-2xl" />
-          <Bone className="h-[300px] rounded-2xl" />
+          <Bone className="h-[92px] rounded-[20px]" />
+          <Bone className="h-[360px] rounded-[20px]" />
+          <Bone className="h-[300px] rounded-[20px]" />
         </div>
       </LoadingRegion>
     </>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, BellSlash, CheckCircle, DeviceMobile, PaperPlaneTilt, WarningCircle } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
+import { TintedCard } from "@/components/tinted-card";
 import { Button, cx, inputClass } from "@/components/ui";
 import { actionErrorText, useSafeTransition } from "@/components/safe-action";
 import { removePushSubscription, savePushSubscription, saveReminderPrefs, sendTestPush } from "@/lib/offline/push";
@@ -186,20 +187,20 @@ export function RemindersView({
   else if (here) status = "Activados en este aparato.";
   else status = "Este aparato todavía no recibe avisos.";
 
+  const on = REMINDER_KINDS.filter((k) => prefs[k].on).length;
   const canActivate = tableReady && !!publicKey && support === "ok" && permission !== "denied";
 
   return (
     <>
       <PageHeader title="Avisos" kicker="Recordatorios en el celular" wide />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-8 lg:px-10 lg:pt-4">
-        <section className="grid content-start gap-4 self-start rounded-[20px] border border-line bg-surface p-4 lg:col-span-5 lg:p-5">
-          <div className="grid gap-1">
-            <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-              <DeviceMobile size={18} aria-hidden />
-              Este aparato
-            </h2>
-            <p className="text-[13.5px] leading-relaxed text-muted">{status}</p>
-          </div>
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+        <TintedCard
+          icon={DeviceMobile}
+          title="Este aparato"
+          meta={here ? "Recibe avisos" : support === "checking" ? "Revisando…" : "Sin avisos"}
+          className="lg:col-span-5"
+        >
+          <p className="text-[13.5px] leading-relaxed text-muted">{status}</p>
 
           <div className="flex flex-wrap gap-2">
             {here ? (
@@ -262,17 +263,20 @@ export function RemindersView({
               </ul>
             </div>
           )}
-        </section>
+        </TintedCard>
 
-        <section className="grid content-start gap-4 lg:col-span-7">
-          <div className="grid gap-1">
-            <h2 className="text-[15px] font-semibold">Qué avisos y a qué hora</h2>
-            <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-muted">
-              Van a todos los aparatos activados, una vez por día cada uno, y solo si hay algo para avisar. Salen dentro de la hora
-              elegida (con 21:00, entre las 21:00 y las 21:59).
-            </p>
-          </div>
-          <ul className="grid divide-y divide-line overflow-hidden rounded-[20px] border border-line bg-surface">
+        <TintedCard
+          icon={Bell}
+          title="Qué avisos y a qué hora"
+          meta={`${on} de ${REMINDER_KINDS.length} ${on === 1 ? "activo" : "activos"} · ${devices.length} ${devices.length === 1 ? "aparato" : "aparatos"}`}
+          className="lg:col-span-7"
+          bodyClassName="gap-0! p-0!"
+        >
+          <p className="max-w-[62ch] px-[18px] pt-4 pb-3 text-[13.5px] leading-relaxed text-muted lg:px-5">
+            Van a todos los aparatos activados, una vez por día cada uno, y solo si hay algo para avisar. Salen dentro de la hora
+            elegida (con 21:00, entre las 21:00 y las 21:59).
+          </p>
+          <ul className="grid divide-y divide-line border-y border-line">
             {REMINDER_KINDS.map((k) => {
               const p = preview[k];
               const id = `aviso-${k}`;
@@ -319,11 +323,11 @@ export function RemindersView({
               );
             })}
           </ul>
-          <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-muted">
+          <p className="max-w-[62ch] px-[18px] pt-3 pb-4 text-[12.5px] leading-relaxed text-muted lg:px-5">
             ¿Y un aviso justo antes de cada bloque? El plan gratis de Vercel solo corre tareas programadas una vez por día y sin
             minuto exacto, así que no se puede avisar “empieza en 15 minutos”. En su lugar está el Plan del día a la mañana.
           </p>
-        </section>
+        </TintedCard>
       </main>
     </>
   );

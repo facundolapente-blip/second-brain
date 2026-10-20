@@ -9,6 +9,7 @@ import { diffDays, formatLong, formatShort } from "@/lib/dates";
 import { MEMORY_COOKIE, MOODS } from "@/lib/journal-logic";
 import type { MemoryDTO } from "@/lib/journal";
 import { MoodIcon, useWrite } from "./journal-ui";
+import { TintedCard } from "@/components/tinted-card";
 
 // ─── Búsqueda y filtros ─────────────────────────────────────────────────────
 
@@ -219,25 +220,28 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 
   return (
     <div className="fold" data-closed={closing || undefined}>
-    <section
-      aria-label={title}
-      className="rise relative grid grid-cols-[minmax(0,1fr)] gap-4 border-y border-line py-5"
-      style={{ "--i": 1 } as React.CSSProperties}
+    <TintedCard
+      icon={ClockCounterClockwise}
+      title={title}
+      meta={plural(memory.entries.length, "entrada", "entradas")}
+      action={
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Cerrar recuerdo por hoy"
+          title="Cerrar recuerdo por hoy"
+          className="tcard-pill press relative px-2.5! before:absolute before:-inset-1.5"
+        >
+          <X size={15} aria-hidden />
+        </button>
+      }
+      bodyClassName="gap-3.5!"
     >
-      <div className="grid min-w-0 gap-1 pr-12">
-        <h2 className="kicker flex items-center gap-1.5 text-accent-fg!">
-          <ClockCounterClockwise size={14} weight="bold" aria-hidden />
-          {title}
-        </h2>
-        <p className="text-[14px] text-muted">{line}</p>
-      </div>
-      <IconButton label="Cerrar recuerdo por hoy" onClick={dismiss} className="absolute top-3 right-0">
-        <X size={16} />
-      </IconButton>
+      <p className="text-[14px] text-muted">{line}</p>
 
       <Link
         href={`/journal/${first.id}`}
-        className="group grid gap-2 border-l-[1.5px] border-accent/50 py-1 pr-2 pl-5 transition-colors hover:border-accent lg:pl-6"
+        className="group grid gap-2 border-l-[1.5px] border-accent/50 py-1 pr-2 pl-4 transition-colors hover:border-accent lg:pl-5"
       >
         <span className="kicker">
           {memory.kind === "years" ? `${yearsAgo(first.date, today)}, ` : ""}
@@ -251,7 +255,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
       </Link>
 
       {rest.length > 0 && (
-        <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line border-t border-line">
+        <ul className="-mb-2 grid grid-cols-[minmax(0,1fr)] divide-y divide-line border-t border-line">
           {(all ? rest : rest.slice(0, 3)).map((e, i) => (
             <li key={e.id} className={cx(i >= 3 && "reveal")}>
               <Link
@@ -285,7 +289,7 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
           )}
         </ul>
       )}
-    </section>
+    </TintedCard>
     </div>
   );
 }
@@ -295,17 +299,13 @@ export function MemoryCard({ memory, today }: { memory: MemoryDTO; today: string
 export function EmptyJournal() {
   const { pending, write } = useWrite();
   return (
-    <div className="grid justify-items-start gap-3 border-y border-line py-10">
-      <p className="kicker flex items-center gap-1.5">
-        <PenNib size={14} aria-hidden /> Primera página
-      </p>
-      <h2 className="display text-[32px]">Todavía no escribiste nada</h2>
+    <TintedCard icon={PenNib} title="Primera página" meta="Todavía no escribiste nada" bodyClassName="items-start">
       <p className="max-w-[52ch] text-[15px] leading-relaxed text-muted">
         Una entrada por día alcanza. Contá qué pasó, cómo te sentiste y qué te quedó dando vueltas. Se guarda sola mientras escribís.
       </p>
       <Button variant="accent" onClick={() => write()} disabled={pending}>
         <PenNib size={16} weight="bold" /> Escribir la primera
       </Button>
-    </div>
+    </TintedCard>
   );
 }

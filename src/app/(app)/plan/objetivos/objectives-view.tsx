@@ -5,7 +5,7 @@ import { useOnNew } from "@/components/nav-add";
 import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowsClockwise, CalendarPlus, CaretDown, Check, Lightning, Minus, PencilSimple, Plus, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, CalendarPlus, CaretDown, Check, ClipboardText, Lightning, Minus, PencilSimple, Plus, Target, X } from "@phosphor-icons/react";
 import {
   bumpObjective,
   carryOverKrs,
@@ -47,7 +47,8 @@ import { useSlide, useTick } from "@/components/motion";
 import { PillSwitch } from "@/components/pill-switch";
 import { notifyInfo } from "@/components/undo-toast";
 import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { PriorityDots, PriorityPicker, ProgressBar, StatusPill } from "../plan-ui";
+import { HEAD_SWITCH, PriorityDots, PriorityPicker, ProgressBar, StatusPill } from "../plan-ui";
+import { TintedCard } from "@/components/tinted-card";
 import { PlanTabs } from "../plan-nav";
 
 export type ObjectivesLayout = "mapa" | "rol";
@@ -154,6 +155,11 @@ export function ObjectivesView({
     sheet.current?.open(k);
   }
   const detail = groups.find((g) => (g.id || "loose") === detailId) ?? null;
+  // Cabecera de la tarjeta: cuántos objetivos, resultados clave terminados y el avance promedio (barra fina).
+  const allKrs = groups.flatMap((g) => g.keyResults);
+  const doneKrs = allKrs.filter((k) => k.status === "done").length;
+  const pcts = objectives.map(objectivePct).filter((n): n is number => n !== null);
+  const avgObjectives = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
 
   return (
     <>
@@ -163,14 +169,9 @@ export function ObjectivesView({
         wide
         tabs={<PlanTabs />}
         actions={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => openObjective(null)}>
-              <Plus size={16} weight="bold" /> Objetivo
-            </Button>
-            <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
-              <Plus size={16} weight="bold" /> Nuevo resultado
-            </Button>
-          </>
+          <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
+            <Plus size={16} weight="bold" /> Nuevo resultado
+          </Button>
         }
       />
       </div>
@@ -199,8 +200,8 @@ export function ObjectivesView({
               <CalendarPlus size={15} aria-hidden /> Planificar {nextYear}
             </button>
           </nav>
-          <div className="flex items-center gap-2">
-            {canAskReview && (
+          {canAskReview && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -211,17 +212,8 @@ export function ObjectivesView({
               >
                 Revisar el {prevQ.quarter}
               </button>
-            )}
-            <PillSwitch
-              label="Cómo ver los objetivos"
-              value={layout}
-              onChange={setLayout}
-              options={[
-                { value: "mapa", label: "Mapa del año" },
-                { value: "rol", label: "Por rol" },
-              ]}
-            />
-          </div>
+            </div>
+          )}
         </div>
 
         {review && (
@@ -241,33 +233,68 @@ export function ObjectivesView({
           />
         )}
 
-        {groups.length === 0 ? (
-          <div className="mt-4 grid justify-items-start gap-3 border-y border-line py-8">
-            <p className="display text-[20px] text-muted">Todavía no hay objetivos para {year}.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
-                <Plus size={15} /> Nuevo objetivo
-              </Button>
-              {/* "Planificar" copia del año que se mira al siguiente: para traer algo, se va al año anterior. */}
-              {years.some((y) => y < year) && (
-                <Link
-                  href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
-                >
-                  <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
-                </Link>
+        <TintedCard
+          icon={Target}
+          title={`Objetivos ${year}`}
+          className="mt-4"
+          meta={
+            groups.length
+              ? `${objectives.length} ${objectives.length === 1 ? "objetivo" : "objetivos"} · ${doneKrs} de ${allKrs.length} resultados clave terminados`
+              : "Sin objetivos todavía"
+          }
+          progress={avgObjectives !== null ? avgObjectives / 100 : undefined}
+          action={
+            <button type="button" className="tcard-pill press" onClick={() => openObjective(null)}>
+              <Plus size={14} weight="bold" aria-hidden /> Objetivo
+            </button>
+          }
+          headExtra={
+            groups.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <PillSwitch
+                  label="Cómo ver los objetivos"
+                  value={layout}
+                  onChange={setLayout}
+                  options={[
+                    { value: "mapa", label: "Mapa del año" },
+                    { value: "rol", label: "Por rol" },
+                  ]}
+                  {...HEAD_SWITCH}
+                />
+                {layout === "mapa" && <Legend className="max-lg:hidden" />}
+              </div>
+            ) : undefined
+          }
+          bodyClassName={groups.length > 0 && layout === "mapa" ? "lg:p-0!" : undefined}
+        >
+          {groups.length === 0 ? (
+            <div className="grid justify-items-start gap-3 py-4">
+              <p className="text-[15px] text-muted">Todavía no hay objetivos para {year}.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
+                  <Plus size={15} /> Nuevo objetivo
+                </Button>
+                {/* "Planificar" copia del año que se mira al siguiente: para traer algo, se va al año anterior. */}
+                {years.some((y) => y < year) && (
+                  <Link
+                    href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
+                  >
+                    <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div key={layout} className={cx(swapped && "swap")}>
+              {layout === "mapa" ? (
+                <YearMap groups={groups} today={today} year={year} nowQ={nowQ} onOpenObjective={openDetail} onOpenKr={openKr} onPlan={planKr} />
+              ) : (
+                <RoleCards groups={groups} today={today} nowQ={nowQ} onOpenObjective={openDetail} onPlan={planKr} />
               )}
             </div>
-          </div>
-        ) : (
-          <div key={layout} className={cx("pt-4", swapped && "swap")}>
-            {layout === "mapa" ? (
-              <YearMap groups={groups} today={today} year={year} nowQ={nowQ} onOpenObjective={openDetail} onOpenKr={openKr} onPlan={planKr} />
-            ) : (
-              <RoleCards groups={groups} today={today} nowQ={nowQ} onOpenObjective={openDetail} onPlan={planKr} />
-            )}
-          </div>
-        )}
+          )}
+        </TintedCard>
       </main>
 
       <KrSheet ref={sheet} objectives={objectives} links={links} year={year} />
@@ -346,7 +373,7 @@ function KrItem({ kr, today, onOpen }: { kr: KeyResultDTO; today: string; onOpen
   );
 }
 
-function Legend() {
+function Legend({ className }: { className?: string }) {
   const items: [KrStatus, string][] = [
     ["done", "terminado"],
     ["doing", "haciendo"],
@@ -354,7 +381,7 @@ function Legend() {
     ["todo", "sin empezar"],
   ];
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-muted">
+    <ul className={cx("flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--head-fg)]", className)}>
       {items.map(([s, l]) => (
         <li key={s} className="flex items-center gap-1.5">
           <span aria-hidden className={cx("size-2 rounded-full", DOT[s])} />
@@ -422,16 +449,11 @@ function YearMap({
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
-        <h2 className="display text-[26px] lg:text-[30px]">Objetivos {year}</h2>
-        <Legend />
-      </div>
-
-      {/* Compu: la grilla entera. */}
-      <div className="hidden overflow-hidden rounded-2xl border border-line bg-surface lg:block">
+      {/* Compu: la grilla entera, a todo el ancho de la tarjeta. */}
+      <div className="hidden lg:block">
         <div role="table" aria-label={`Objetivos ${year} por trimestre`} className="grid grid-cols-[minmax(15rem,1.15fr)_repeat(4,minmax(0,1fr))]">
           <div role="row" className="contents">
-            <span role="columnheader" className="border-b border-line bg-surface-2 px-4 py-3 font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
+            <span role="columnheader" className="border-b border-line bg-surface-2 py-3 pr-4 pl-5 font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
               Objetivo
             </span>
             {QUARTERS.map((q) => (
@@ -449,7 +471,7 @@ function YearMap({
           </div>
           {groups.map((g) => (
             <div role="row" key={g.id || "loose"} className="contents">
-              <div role="rowheader" className="grid content-start gap-2 border-b border-line px-4 py-3.5">
+              <div role="rowheader" className="grid content-start gap-2 border-b border-line py-3.5 pr-4 pl-5">
                 <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
                 {unplaced(g).length > 0 && (
                   <details className="text-[12.5px] text-muted">
@@ -485,8 +507,7 @@ function YearMap({
         </div>
       </div>
 
-      {/* Celular: el mapa de a un trimestre. */}
-      <div className="grid gap-3 lg:hidden">
+      <div className="grid gap-1 lg:hidden">
         <PillSwitch
           label="Trimestre"
           value={mobileQ}
@@ -494,9 +515,10 @@ function YearMap({
           className="w-full"
           options={QUARTERS.map((q) => ({ value: q, label: q === nowQ ? `${q} · ahora` : q }))}
         />
-        <ul key={mobileQ} className={cx("grid gap-2.5", qSlide)}>
+      {/* Celular: el mapa de a un trimestre, un objetivo por fila. */}
+        <ul key={mobileQ} className={cx("grid", qSlide)}>
           {groups.map((g) => (
-            <li key={g.id || "loose"} className="grid gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3.5">
+            <li key={g.id || "loose"} className="grid gap-2.5 border-b border-line py-3.5 last:border-b-0 last:pb-0">
               <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
               <div className="border-t border-line pt-2.5">
                 {ownGoalOnly(g) ? (
@@ -568,7 +590,6 @@ function RoleCards({
 }) {
   return (
     <>
-      <h2 className="display pb-3 text-[26px] lg:text-[30px]">Objetivos {groups[0]?.year}</h2>
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {groups.map((g) => (
           <li key={g.id || "loose"}>
@@ -601,7 +622,7 @@ function RoleCard({
   const note = late ? `deadline vencido (${shortDate(o.deadline!, today)})` : o.status === "todo" ? "sin empezar" : null;
 
   return (
-    <article className="lift plan-hover relative grid h-full content-start gap-3 rounded-2xl border border-line bg-surface px-5 pt-4 pb-4">
+    <article className="lift plan-hover relative grid h-full content-start gap-3 rounded-2xl border border-line px-5 pt-4 pb-4">
       <div className="grid gap-1">
         <span className="kicker">{o.loose ? "Sueltos" : (o.role ?? o.area ?? "Objetivo")}</span>
         <h3 className="text-[17px] leading-snug font-semibold">
@@ -803,55 +824,51 @@ function QuarterReview({
   return (
     <div className="fold" data-closed={closing || undefined}>
     <div className="plan-fold-shadow">
-    {/* Celular: una línea que la abre. */}
-    <button
-      type="button"
-      onClick={() => setUnfolded((u) => !u)}
-      aria-expanded={unfolded}
-      aria-controls="revision-trimestre"
-      className={cx("tap-tint mt-4 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-line bg-surface px-4 text-left lg:hidden", opened && "reveal")}
+    <TintedCard
+      icon={ClipboardText}
+      title={`Revisión del ${quarter} ${year}`}
+      className={cx("mt-4 max-lg:mt-3", opened && "reveal")}
+      meta={`${ended ? "Cerró" : "Cierra"} el ${formatShort(to)}${all.length > 0 ? ` · ${unfinished.length === 0 ? "todo terminado" : `${unfinished.length} sin terminar`}` : ""}`}
+      progress={all.length > 0 ? avg / 100 : undefined}
+      bodyClassName="p-0! gap-0!"
+      action={
+        <span className="flex items-center gap-1.5">
+          {/* Celular: arranca plegada en la cabecera (ocupaba toda la primera pantalla); abierta a pedido sí se ve. */}
+          <button
+            type="button"
+            onClick={() => setUnfolded((u) => !u)}
+            aria-expanded={unfolded}
+            aria-controls="revision-trimestre"
+            aria-label={unfolded ? "Plegar la revisión" : "Ver la revisión"}
+            className="tcard-pill press size-9 justify-center px-0! lg:hidden!"
+          >
+            <CaretDown size={15} weight="bold" aria-hidden className={cx("transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)]", !unfolded && "-rotate-90")} />
+          </button>
+          <button type="button" onClick={close} aria-label="Cerrar la revisión" className="tcard-pill press size-9 justify-center px-0!">
+            <X size={15} weight="bold" aria-hidden />
+          </button>
+        </span>
+      }
     >
-      <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">
-        Revisión del {quarter}
-        {all.length > 0 && <span className="font-normal text-muted"> · {unfinished.length === 0 ? "todo terminado" : `${unfinished.length} sin terminar`}</span>}
-      </span>
-      <CaretDown size={15} weight="bold" aria-hidden className={cx("shrink-0 text-muted transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)]", !unfolded && "-rotate-90")} />
-    </button>
     <div id="revision-trimestre" className="fold fold-mobile" data-closed={!unfolded || undefined}>
-    <div className="plan-fold-shadow">
-    <section aria-label={`Revisión del ${quarter} ${year}`} className={cx(opened && "reveal", "relative mt-4 grid gap-5 rounded-2xl border border-line bg-surface px-5 pt-5 pb-5 max-lg:mt-2 lg:px-7")}>
-      <button
-        type="button"
-        onClick={close}
-        aria-label="Cerrar la revisión"
-        className="absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-      >
-        <X size={17} />
-      </button>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pr-10">
-        <div className="grid gap-1">
-          <span className="kicker">{ended ? `Cerró el ${formatShort(to)}` : `Cierra el ${formatShort(to)}`}</span>
-          <h2 className="display text-[26px] lg:text-[30px]">
-            Revisión del {quarter} {year}
-          </h2>
-        </div>
-        {all.length > 0 && (
-          <dl className="flex gap-6">
-            <div className="grid">
-              <dd className="figure text-[28px] leading-none">{avg}%</dd>
-              <dt className="text-[12.5px] text-muted">avance promedio</dt>
-            </div>
-            <div className="grid">
-              <dd className="figure text-[28px] leading-none text-[var(--st-done-fg)]">{all.length - unfinished.length}</dd>
-              <dt className="text-[12.5px] text-muted">terminados</dt>
-            </div>
-            <div className="grid">
-              <dd className="figure text-[28px] leading-none text-accent-fg">{unfinished.length}</dd>
-              <dt className="text-[12.5px] text-muted">sin terminar</dt>
-            </div>
-          </dl>
-        )}
-      </div>
+    <div>
+    <div className="grid gap-5 px-[18px] py-[18px] lg:px-7 lg:py-6">
+      {all.length > 0 && (
+        <dl className="flex gap-6">
+          <div className="grid">
+            <dd className="figure text-[28px] leading-none">{avg}%</dd>
+            <dt className="text-[12.5px] text-muted">avance promedio</dt>
+          </div>
+          <div className="grid">
+            <dd className="figure text-[28px] leading-none text-[var(--st-done-fg)]">{all.length - unfinished.length}</dd>
+            <dt className="text-[12.5px] text-muted">terminados</dt>
+          </div>
+          <div className="grid">
+            <dd className="figure text-[28px] leading-none text-accent-fg">{unfinished.length}</dd>
+            <dt className="text-[12.5px] text-muted">sin terminar</dt>
+          </div>
+        </dl>
+      )}
 
       {all.length === 0 ? (
         <p className="text-[13.5px] text-muted">El {quarter} no tuvo resultados clave.</p>
@@ -944,9 +961,10 @@ function QuarterReview({
           </div>
         </div>
       )}
-    </section>
     </div>
     </div>
+    </div>
+    </TintedCard>
     </div>
     </div>
   );

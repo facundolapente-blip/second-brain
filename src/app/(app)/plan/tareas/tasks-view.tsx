@@ -7,11 +7,12 @@ import { SwipeRow } from "@/components/swipe-row";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
-import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots } from "@phosphor-icons/react";
+import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots, ListChecks } from "@phosphor-icons/react";
 import { saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
 import { addDays, formatShort } from "@/lib/dates";
 import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, taskFromForm } from "@/lib/plan-logic";
-import { Button, cx } from "@/components/ui";
+import { cx } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, StepBar } from "../plan-ui";
 import { tone } from "@/lib/palette";
@@ -282,42 +283,48 @@ export function TasksBoard({
 
   return (
     <DeadlineContext value={{ change: changeDeadline, today }}>
-    <section id="tareas" aria-label="Tareas" className="scroll-mt-24 pt-3 lg:pt-5">
-      <div className="flex items-center gap-2">
-        {/* En el celular el título pliega la lista (queda una línea con el resumen). */}
-        <button
-          type="button"
-          onClick={toggleFold}
-          aria-expanded={!folded}
-          aria-controls="tareas-cuerpo"
-          className="-ml-1 flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 text-left lg:pointer-events-none"
-        >
-          <h2 className="display text-[22px] lg:text-[26px]">Tareas</h2>
-          {/* Las vencidas primero: si no entra todo en el celular, lo que se corta es lo menos importante. */}
-          <span className="min-w-0 truncate font-mono text-[12px] text-muted tabular">
-            {overdue > 0 && <span className="text-danger">{overdue === 1 ? "1 vencida" : `${overdue} vencidas`} · </span>}
-            {open.length} abiertas
-          </span>
-          <CaretDown
-            size={14}
-            weight="bold"
-            aria-hidden
-            className={cx("shrink-0 text-muted transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)] lg:hidden", folded && "-rotate-90")}
-          />
-        </button>
-        {/* En el celular solo el +: así entra el resumen completo ("5 vencidas · 19 abiertas"). */}
-        <Button variant="outline" size="sm" className="ml-auto shrink-0 max-sm:size-10 max-sm:px-0" aria-label="Nueva tarea" onClick={() => sheet.current?.open()}>
-          <Plus size={15} weight="bold" /> <span className="max-sm:hidden">Nueva tarea</span>
-        </Button>
-      </div>
+    <TintedCard
+      id="tareas"
+      icon={ListChecks}
+      title="Tareas"
+      className="mt-3 scroll-mt-24 lg:mt-5"
+      bodyClassName="p-0! gap-0!"
+      // Las vencidas primero: si no entra todo en el celular, lo que se corta es lo menos importante.
+      meta={
+        <>
+          {overdue > 0 && <span className="font-semibold text-[var(--st-fail-fg)]">{overdue === 1 ? "1 vencida" : `${overdue} vencidas`} · </span>}
+          {open.length} abiertas
+        </>
+      }
+      action={
+        <span className="flex items-center gap-1.5">
+          {/* En el celular solo el +: así entra el resumen completo ("5 vencidas · 19 abiertas"). */}
+          <button type="button" className="tcard-pill press max-sm:size-9 max-sm:justify-center max-sm:px-0!" aria-label="Nueva tarea" onClick={() => sheet.current?.open()}>
+            <Plus size={14} weight="bold" aria-hidden /> <span className="max-sm:hidden">Nueva tarea</span>
+          </button>
+          {/* En el celular las tareas se pliegan en una línea (la cabecera con el resumen). */}
+          <button
+            type="button"
+            onClick={toggleFold}
+            aria-expanded={!folded}
+            aria-controls="tareas-cuerpo"
+            aria-label={folded ? "Mostrar las tareas" : "Plegar las tareas"}
+            className="tcard-pill press size-9 justify-center px-0! lg:hidden!"
+          >
+            <CaretDown size={15} weight="bold" aria-hidden className={cx("transition-transform duration-[var(--dur-state)] ease-[var(--ease-out)]", folded && "-rotate-90")} />
+          </button>
+        </span>
+      }
+    >
       {/* En el celular se pliega con el alto animado (en la compu siempre se ve). */}
       <div id="tareas-cuerpo" className="fold fold-mobile" data-closed={folded || undefined}>
       <div>
+      <div className="px-[18px] pt-3 pb-[18px] lg:px-0 lg:pb-3">
       <div
         role="tablist"
         aria-label="Vistas"
         // Celular: tira que se corre de costado (llega al borde). Compu: si no entran, bajan de renglón.
-        className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
+        className="-mx-[18px] flex gap-1.5 overflow-x-auto px-[18px] pt-1 pb-3.5 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-5 [&::-webkit-scrollbar]:hidden"
       >
         {TASK_VIEWS.map((v) => {
           const n = board ? boardTasks(ordered, v.id, today).length : applyTaskView(ordered, v.id, manual).length;
@@ -356,19 +363,26 @@ export function TasksBoard({
 
       <div key={`${view}-${layout}`} className={swapped ? "swap" : undefined}>
       {board ? (
-        <TaskKanban
-          tasks={boardTasks(ordered, view, today)}
-          categories={categories}
-          today={today}
-          onOpen={(t) => sheet.current?.open(t)}
-          onNew={(status) => sheet.current?.open(undefined, { status })}
-          onDeadline={changeDeadline}
-        />
+        <div className="lg:px-5 lg:pb-2">
+          <TaskKanban
+            tasks={boardTasks(ordered, view, today)}
+            categories={categories}
+            today={today}
+            onOpen={(t) => sheet.current?.open(t)}
+            onNew={(status) => sheet.current?.open(undefined, { status })}
+            onDeadline={changeDeadline}
+          />
+        </div>
       ) : visible.length === 0 ? (
-        <div className="grid justify-items-start gap-3 border-y border-line py-6">
+        <div className="grid justify-items-start gap-3 rounded-2xl border border-dashed border-line-strong px-5 py-6 lg:mx-5 lg:mb-2">
           <p className="text-[15px] text-muted">
             {view === "done" ? "Todavía no terminaste ninguna tarea." : "No hay tareas en esta vista."}
           </p>
+          {view !== "done" && (
+            <button type="button" onClick={() => sheet.current?.open()} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13.5px] font-medium hover:bg-surface-2">
+              <Plus size={14} weight="bold" aria-hidden /> Nueva tarea
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -404,7 +418,7 @@ export function TasksBoard({
             setJustCreated(null);
             setAll(!showAll);
           }}
-          className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-[13.5px] font-medium text-accent-fg hover:bg-surface-2"
+          className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-[13.5px] font-medium text-accent-fg hover:bg-surface-2 lg:mx-2"
         >
           {showAll ? "Ver menos" : `Ver todas (${hidden} más)`}
         </button>
@@ -412,10 +426,11 @@ export function TasksBoard({
       </div>
       </div>
       </div>
+      </div>
 
       <TaskSheet ref={sheet} categories={categories} onSchedule={schedule} actions={sheetActions} />
       {!week && <BlockSheet ref={blockSheet} categories={categories} tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }))} />}
-    </section>
+    </TintedCard>
     </DeadlineContext>
   );
 }
@@ -448,7 +463,7 @@ function TaskRow({
         left={done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: onDone }}
         right={done ? undefined : { label: "+1 semana", icon: <CalendarDots size={20} weight="bold" />, tone: "accent", onAction: onWeek }}
       >
-      <div className="bg-bg">
+      <div className="bg-surface">
       <div className="tap-tint flex items-start gap-3 px-1 py-3">
         <DeadlinePicker task={t}>
           <DateBlock deadline={t.deadline} left={left} done={done} />
@@ -635,7 +650,7 @@ function TaskTable({
   const [dragging, setDragging] = useState<string | null>(null);
   return (
     // Si los anchos guardados suman más que la pantalla, la tabla se corre de costado.
-    <div className="hidden max-w-full overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block lg:w-fit max-[90rem]:w-auto">
+    <div className="hidden max-w-full overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block lg:w-fit lg:rounded-none lg:border-x-0 max-[90rem]:w-auto">
       <div className="relative w-max max-[90rem]:w-full">
       <table className="table-fixed border-collapse text-left text-[13.5px] max-[90rem]:w-full! max-[90rem]:min-w-0!" style={{ width: total, minWidth: total }}>
         <colgroup>

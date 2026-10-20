@@ -6,7 +6,8 @@ import { PendingFinance, useQueuedTxs } from "./pending-list";
 import Link from "next/link";
 import { useEffect, useMemo, useOptimistic, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, SquaresFour, Tag } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, DotsThree, Handshake, MagnifyingGlass, ArrowUpRight, Bank, CaretRight, Copy, Plus, Receipt, SquaresFour, Tag, Wallet } from "@phosphor-icons/react";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import { Menu } from "@/components/menu";
 import { formatShort } from "@/lib/dates";
 import { moneyCents, moneyWhole } from "@/lib/format";
@@ -31,7 +32,7 @@ import { GastosTabs } from "./gastos-nav";
 import { AccountChips, selectionLabel } from "./account-switcher";
 import { useSelection } from "./selection";
 import { QuickAdd } from "./quick-add";
-import { Balance, EmptyBlock, TotalsInline, TxRow, useLookups } from "./shared";
+import { Balance, CategoryMix, EmptyBlock, MiniBars, TotalsInline, TxRow, useLookups, type Lookups } from "./shared";
 import { PeriodNav } from "./period-nav";
 import { TxSheet, type TxOptimistic, type TxSheetHandle } from "./tx-sheet";
 import { TxGestures, useTxActions } from "./tx-actions";
@@ -169,6 +170,9 @@ export function MovementsView({
   const flows = useMemo(() => {
     const inc: Record<string, number> = {};
     const exp: Record<string, number> = {};
+    // Por moneda y categoría, para la mezcla de las tarjetas de ingresos y gastos.
+    const incCat: Record<string, Record<string, number>> = {};
+    const expCat: Record<string, Record<string, number>> = {};
     for (const t of visible) {
       // Transferencias y ajustes no cuentan; un reintegro resta del gasto.
       const f = flowOf(t, lk.category);
@@ -176,8 +180,11 @@ export function MovementsView({
       const c = lk.currencyOf(t.accountId);
       const target = f.kind === "income" ? inc : exp;
       target[c] = (target[c] ?? 0) + f.cents;
+      const byCat = ((f.kind === "income" ? incCat : expCat)[c] ??= {});
+      const k = t.categoryId ?? "none";
+      byCat[k] = (byCat[k] ?? 0) + f.cents;
     }
-    return { inc, exp };
+    return { inc, exp, incCat, expCat };
   }, [visible, lk]);
   // Neto = ingresos − gastos (como Informes): sin transferencias ni ajustes de saldo.
   const net = useMemo(() => {
@@ -218,7 +225,7 @@ export function MovementsView({
 
       <main {...swipe} className="mx-auto max-w-3xl px-4 lg:max-w-6xl lg:px-10">
         {!hasAccounts ? (
-          <EmptyBlock title="Empezá por tus cuentas" icon={<Bank size={22} aria-hidden />}>
+          <EmptyBlock title="Empezá por tus cuentas" icon={<Bank size={22} weight="fill" />} className="mt-2 lg:mt-6">
             <p className="max-w-[46ch] text-sm leading-relaxed text-muted">
               Cada gasto o ingreso sale de una cuenta: efectivo, el banco, una tarjeta, tus dólares. Creá las que uses y
               después cargá movimientos.
@@ -231,28 +238,23 @@ export function MovementsView({
             </Link>
           </EmptyBlock>
         ) : (
-          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-x-10">
-            <section className="grid gap-5 pt-1 pb-5 lg:col-start-1 lg:row-start-1 lg:pt-6">
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-x-8">
+            <section className="grid gap-4 pt-1 pb-4 lg:col-start-1 lg:row-start-1 lg:pt-6">
               <AccountChips accounts={accounts} selection={selection} onChange={setSelection} />
               <PendingFinance />
               <QuickAdd accounts={accounts.filter((a) => !a.archived).map((a) => ({ id: a.id, name: a.name, currency: a.currency }))} />
               <div className="grid gap-3">
                 <PeriodNav period={period} today={today} />
                 <NavDim>
-                <div key={dataKey} className={cx("grid gap-1", dataMotion)}>
-                  <span className="kicker">Saldo actual · {selectionLabel(accounts, selection)}</span>
-                  <BalanceHero totals={balance} />
-                  {Object.keys(net).length > 0 && (
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted">
-                      {netLabel}
-                      <TotalsInline totals={net} whole className="font-mono text-[13px] font-medium" />
-                    </p>
-                  )}
-                </div>
-                <dl className="mt-3 grid grid-cols-2 divide-x divide-line border-y border-line lg:max-w-xl">
-                  <FlowTile label="Ingresos" totals={flows.inc} kind="in" />
-                  <FlowTile label="Gastos" totals={flows.exp} kind="out" />
-                </dl>
+                  {/* Saldo (lo que queda, protagonista), ingresos y gastos del período: tarjetas de cifra. */}
+                  <div
+                    key={dataKey}
+                    className={cx("grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]", dataMotion)}
+                  >
+                    <BalanceTile totals={balance} label={selectionLabel(accounts, selection)} net={net} netLabel={netLabel} flows={flows} />
+                    <FlowTile label="Ingresos" totals={flows.inc} byCat={flows.incCat} lk={lk} kind="in" />
+                    <FlowTile label="Gastos" totals={flows.exp} byCat={flows.expCat} lk={lk} kind="out" />
+                  </div>
                 </NavDim>
               </div>
             </section>
@@ -275,7 +277,7 @@ export function MovementsView({
                       <button
                         type="button"
                         onClick={toggle}
-                        className="inline-flex h-10 items-center gap-1.5 rounded-[4px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                        className="press inline-flex h-10 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
                       >
                         <DotsThree size={16} weight="bold" aria-hidden /> Más
                       </button>
@@ -296,19 +298,30 @@ export function MovementsView({
               </div>
             </aside>
 
+            <TintedCard
+              icon={Receipt}
+              title="Movimientos"
+              meta={visible.length === 1 ? "1 movimiento" : `${visible.length.toLocaleString("es-UY")} movimientos`}
+              action={{ href: "/gastos/buscar", label: "Buscar" }}
+              className="fin-clip lg:col-start-1 lg:row-start-2"
+              bodyClassName="gap-0! px-4! pt-1! pb-2! lg:px-5!"
+            >
             {groups.length === 0 ? (
-              <NavDim className="grid justify-items-center gap-2 border-t border-line py-16 text-center lg:col-start-1 lg:row-start-2">
-                <span className="inline-flex size-11 items-center justify-center rounded-full border border-line-strong text-muted">
-                  <Receipt size={20} aria-hidden />
-                </span>
-                <p className="display text-[24px]">{period.kind === "month" ? "No hay movimientos este mes" : period.kind === "year" ? "No hay movimientos este año" : "No hay movimientos en este período"}</p>
-                <p className="max-w-[34ch] text-sm text-muted">
-                  {selection ? "En las cuentas elegidas. Probá con todas o con otras fechas." : "Cargá el primero con el botón de más."}
-                </p>
+              <NavDim>
+                <EmptyBlock
+                  inline
+                  className="justify-items-center py-10 text-center"
+                  icon={<Receipt size={18} weight="fill" />}
+                  title={period.kind === "month" ? "No hay movimientos este mes" : period.kind === "year" ? "No hay movimientos este año" : "No hay movimientos en este período"}
+                >
+                  <p className="max-w-[34ch] text-sm text-muted">
+                    {selection ? "En las cuentas elegidas. Probá con todas o con otras fechas." : "Cargá el primero con el botón de más."}
+                  </p>
+                </EmptyBlock>
               </NavDim>
             ) : (
-              <NavDim className="lg:col-start-1 lg:row-start-2">
-              <div key={dataKey} className={cx("grid gap-6 pt-2", dataMotion)}>
+              <NavDim>
+              <div key={dataKey} className={cx("grid gap-4", dataMotion)}>
                 {groups.map((g, gi) => {
                   const { label, relative } = dayLabel(g.date, today);
                   return (
@@ -319,8 +332,8 @@ export function MovementsView({
                       style={{ "--i": Math.min(gi, 8) } as React.CSSProperties}
                     >
                       {/* En el celular el día queda pegado arriba mientras se recorre su lista. */}
-                      <header className="z-10 -mx-4 flex items-baseline justify-between gap-3 border-b border-fg/80 bg-bg/92 px-4 pt-3 pb-2 backdrop-blur-md max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
-                        <h3 className="display text-[19px] first-letter:uppercase">
+                      <header className="z-10 -mx-4 flex items-baseline justify-between gap-3 border-b border-fg/80 bg-surface/92 px-4 pt-3 pb-2 backdrop-blur-md max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
+                        <h3 className="display text-[17px] first-letter:uppercase lg:text-[19px]">
                           {label}
                           {relative && <span className="kicker ml-2.5">{formatShort(g.date)}</span>}
                         </h3>
@@ -364,6 +377,7 @@ export function MovementsView({
               </div>
               </NavDim>
             )}
+            </TintedCard>
           </div>
         )}
       </main>
@@ -380,58 +394,119 @@ export function MovementsView({
   );
 }
 
+/** Cifra que entra en una tarjeta chica: las largas, un poco más chicas (siempre en un renglón). */
+function fit(text: string, big?: boolean) {
+  if (big) return text.length > 12 ? "text-[30px] lg:text-[36px]" : "text-[38px] lg:text-[44px]";
+  return text.length > 8 ? "text-[22px] sm:text-[26px]" : "text-[26px] sm:text-[30px]";
+}
+
 /**
- * La cifra del mes: grande, en tinta (no en verde) y con signo explícito; el
- * color queda para los montos chicos de la lista.
+ * Saldo de las cuentas elegidas: la cifra protagonista (lo que queda), en tinta y sin
+ * "+"; el neto del período chico debajo y lo que entró y salió en barras chicas.
  */
-/** Saldo de las cuentas elegidas: la cifra protagonista (lo que queda). */
-function BalanceHero({ totals }: { totals: Record<string, number> }) {
+function BalanceTile({
+  totals,
+  label,
+  net,
+  netLabel,
+  flows,
+}: {
+  totals: Record<string, number>;
+  label: string;
+  net: Record<string, number>;
+  netLabel: string;
+  flows: { inc: Record<string, number>; exp: Record<string, number> };
+}) {
   const cur = sortedCurrencies(totals);
-  if (cur.length === 0) return <span className="figure text-[52px] lg:text-[64px]">{moneyCents(0)}</span>;
+  const main = cur[0] ?? "UYU";
+  const cents = totals[main] ?? 0;
+  const inc = flows.inc[main] ?? 0;
+  const exp = flows.exp[main] ?? 0;
   return (
-    <span className="grid gap-0.5">
-      {/* Al cargar o borrar un movimiento, el saldo cambia con un tic (no de golpe). */}
-      <Tick value={totals[cur[0]]} className="figure text-[52px] lg:text-[64px]">
-        <Balance cents={totals[cur[0]]} currency={cur[0]} hero />
-      </Tick>
-      {cur.slice(1).map((c) => (
-        <Tick key={c} value={totals[c]} className="figure text-[26px] text-fg">
-          <Balance cents={totals[c]} currency={c} hero />
+    <StatTile
+      icon={Wallet}
+      label={`Saldo actual · ${label}`}
+      className="col-span-2 sm:col-span-1"
+      figure={
+        // Al cargar o borrar un movimiento, el saldo cambia con un tic (no de golpe).
+        <Tick value={cents} className={fit(moneyCents(cents, main), true)}>
+          <Balance cents={cents} currency={main} hero />
         </Tick>
-      ))}
-    </span>
+      }
+      sub={
+        <span className="grid gap-0.5">
+          {cur.slice(1).map((c) => (
+            <Tick key={c} value={totals[c]} className="figure text-[18px] text-fg">
+              <Balance cents={totals[c]} currency={c} hero />
+            </Tick>
+          ))}
+          {Object.keys(net).length > 0 && (
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              {netLabel}
+              <TotalsInline totals={net} whole className="font-mono text-[12.5px] font-medium" />
+            </span>
+          )}
+        </span>
+      }
+    >
+      {(inc > 0 || exp > 0) && (
+        <MiniBars
+          label={`Entró ${moneyWhole(inc, main)} y salió ${moneyWhole(exp, main)}`}
+          rows={[
+            { label: "entró", cents: inc, color: "var(--fin-in)" },
+            { label: "salió", cents: exp, color: "var(--fin-out)" },
+          ]}
+        />
+      )}
+    </StatTile>
   );
 }
 
-/** Ingresos o gastos del mes: flecha que entra o sale, así no depende del color. */
-function FlowTile({ label, totals, kind }: { label: string; totals: Record<string, number>; kind: "in" | "out" }) {
+/** Ingresos o gastos del período: flecha que entra o sale, así no depende del color. */
+function FlowTile({
+  label,
+  totals,
+  byCat,
+  lk,
+  kind,
+}: {
+  label: string;
+  totals: Record<string, number>;
+  byCat: Record<string, Record<string, number>>;
+  lk: Lookups;
+  kind: "in" | "out";
+}) {
   const cur = sortedCurrencies(totals);
+  const main = cur[0];
   return (
-    <div className="grid content-start gap-1.5 px-0 py-3 [&+&]:pl-4">
-      <dt className="kicker flex items-center gap-1.5">
-        <span
-          aria-hidden
-          className={cx(
-            "inline-flex size-5 items-center justify-center rounded-full",
-            kind === "in" ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "bg-surface-2 text-fg",
-          )}
-        >
-          {kind === "in" ? <ArrowDownLeft size={12} weight="bold" /> : <ArrowUpRight size={12} weight="bold" />}
-        </span>
-        {label}
-      </dt>
-      <dd className="tabular grid font-mono text-[15px] font-medium">
-        {cur.length === 0 ? (
-          <span>{moneyCents(0)}</span>
+    <StatTile
+      icon={kind === "in" ? ArrowDownLeft : ArrowUpRight}
+      label={label}
+      figure={
+        main ? (
+          <Tick value={totals[main]} className={fit(moneyWhole(totals[main], main))}>
+            {moneyWhole(totals[main], main)}
+          </Tick>
         ) : (
-          cur.map((c) => (
-            <span key={c}>
-              <Tick value={totals[c]}>{moneyWhole(totals[c], c)}</Tick>
-            </span>
-          ))
-        )}
-      </dd>
-    </div>
+          <span className={fit(moneyCents(0))}>{moneyCents(0)}</span>
+        )
+      }
+      sub={
+        cur.length > 1 ? (
+          <span className="tabular grid font-mono text-[13px] text-fg">
+            {cur.slice(1).map((c) => (
+              <Tick key={c} value={totals[c]}>
+                {moneyWhole(totals[c], c)}
+              </Tick>
+            ))}
+          </span>
+        ) : main ? undefined : (
+          "Nada todavía"
+        )
+      }
+    >
+      {main && byCat[main] && <CategoryMix parts={byCat[main]} lk={lk} what={`${label} por categoría`} />}
+    </StatTile>
   );
 }
 
@@ -439,7 +514,7 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon?: 
   return (
     <Link
       href={href}
-      className="inline-flex h-10 items-center gap-1.5 rounded-[4px] border border-line-strong px-3 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className="press inline-flex h-10 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
     >
       {icon}
       {label}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { CaretDown, Check, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { flowOf, type AccountDTO, type CategoryDTO, type TemplateDTO, type TxDTO } from "@/lib/finance-logic";
 import { formatMonth, formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
@@ -12,7 +13,7 @@ import { Button, cx, Input, inputClass, Sheet, type SheetHandle } from "@/compon
 import { useNewIds } from "@/components/motion";
 import { haptic } from "@/components/haptics";
 import { GastosTabs } from "../gastos-nav";
-import { TxRow, useLookups, type Lookups } from "../shared";
+import { EmptyBlock, TxRow, useLookups, type Lookups } from "../shared";
 import { TxSheet, type TxOptimistic, type TxSheetHandle } from "../tx-sheet";
 import { TxGestures, useTxActions, type TxActions } from "../tx-actions";
 import { useGastosNew } from "../new-action";
@@ -196,23 +197,27 @@ export function HistoryView({
           </div>
         </form>
 
-        <section
-          data-nav-pending={searching || undefined}
-          aria-busy={searching || undefined}
-          className="grid content-start gap-3 transition-opacity duration-150 data-[nav-pending]:opacity-55 data-[nav-pending]:delay-150"
+        <TintedCard
+          icon={MagnifyingGlass}
+          title={filtered ? "Resultados" : "Todos los movimientos"}
+          meta={`${total.toLocaleString("es-UY")} ${total === 1 ? "movimiento" : "movimientos"}`}
+          className="fin-clip"
+          bodyClassName="gap-3! px-4! pt-3! pb-3! lg:px-5!"
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-2xl bg-surface-2 px-4 py-3 text-[13.5px]" aria-live="polite">
-            <span>
-              <strong className="font-semibold">{total.toLocaleString("es-UY")}</strong> {total === 1 ? "movimiento" : "movimientos"}
-            </span>
-            <span className="text-muted">
-              Gastos <span className="tabular font-medium text-fg">{fmt(totals.exp)}</span> · Ingresos{" "}
-              <span className="tabular font-medium text-fg">{fmt(totals.inc)}</span>
-              {hasMore && " (de lo que se ve)"}
-            </span>
-          </div>
+          <div
+            data-nav-pending={searching || undefined}
+            aria-busy={searching || undefined}
+            className="grid content-start gap-3 transition-opacity duration-150 data-[nav-pending]:opacity-55 data-[nav-pending]:delay-150"
+          >
+          <p className="text-[13.5px] text-muted" aria-live="polite">
+            Gastos <span className="tabular font-medium text-fg">{fmt(totals.exp)}</span> · Ingresos{" "}
+            <span className="tabular font-medium text-fg">{fmt(totals.inc)}</span>
+            {hasMore && " (de lo que se ve)"}
+          </p>
           {list.length === 0 ? (
-            <p className="py-10 text-center text-[14px] text-muted">No hay movimientos con esos filtros.</p>
+            <EmptyBlock inline className="justify-items-center py-8 text-center" title="No hay movimientos con esos filtros" icon={<MagnifyingGlass size={18} weight="bold" />}>
+              <p className="text-[13.5px] text-muted">Probá con otra palabra o sacá algún filtro.</p>
+            </EmptyBlock>
           ) : (
             <MonthGroups months={[...months]} lk={lk} onOpen={(t) => form.current?.edit(t)} actions={actions} />
           )}
@@ -225,7 +230,8 @@ export function HistoryView({
               Cargar más
             </Link>
           )}
-        </section>
+          </div>
+        </TintedCard>
       </main>
 
       <Sheet
@@ -406,7 +412,7 @@ function MonthGroups({
   const fresh = useNewIds(months.flatMap(([, list]) => list.map((t) => t.id)));
   return months.map(([m, list]) => (
     <div key={m}>
-      <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-bg/92 px-4 pt-3 pb-2 text-[19px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0">
+      <h2 className="display z-10 -mx-4 border-b border-fg/80 bg-surface/92 px-4 pt-3 pb-2 text-[17px] backdrop-blur-md first-letter:uppercase max-lg:sticky max-lg:top-[calc(4rem+env(safe-area-inset-top))] lg:mx-0 lg:px-0 lg:text-[19px]">
         {formatMonth(m)}
       </h2>
       <ul>

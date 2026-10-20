@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { memo, useState } from "react";
+import { ChartBar, Fire } from "@phosphor-icons/react";
 import { addDays, formatLong, startOfWeek, weekday } from "@/lib/dates";
 import { currentStreak, dayProgress, habitScore, hasScore, WEEKDAY_SHORT, type LogMap } from "@/lib/habit-logic";
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { HabitDTO } from "@/lib/habits";
 import { cx } from "@/components/ui";
 import { useTick } from "@/components/motion";
+import { TintedCard } from "@/components/tinted-card";
 
 export { dayProgress };
 
@@ -31,90 +33,84 @@ function habitStats(h: HabitDTO, logs: LogMap, today: string) {
 
 const NO_LOGS: LogMap = {};
 
-/**
- * Panel lateral de Hoy en la computadora: el avance del día en el bloque
- * destacado, la semana día por día, el puntaje promedio y las rachas más largas.
- * Memorizado: Hoy le pasa las marcas con `useDeferredValue`, así el toque en un
- * círculo se dibuja primero y el panel se pone al día enseguida, sin trabar el toque.
- */
-export const TodayPanel = memo(function TodayPanel({
-  habits,
-  logs,
-  selected,
-  today,
-}: {
-  habits: HabitDTO[];
-  logs: Record<string, LogMap>;
-  selected: string;
-  today: string;
-}) {
-  const { done, total } = dayProgress(habits, logs, selected, today);
-  const pct = total ? Math.round((done / total) * 100) : 0;
-  const doneTick = useTick(done);
-  const pctTick = useTick(pct);
-  const isToday = selected === today;
+export type TodayStats = {
+  streaks: { h: HabitDTO; n: number }[];
+  avgScore: number;
+  week: { d: string; p: { done: number; total: number } | null; pct: number }[];
+  weekPct: number;
+};
 
+/**
+ * Lo que depende de todos los hábitos (rachas, puntaje promedio y la semana día por
+ * día): Hoy lo calcula con las marcas diferidas (`useDeferredValue`), nunca en el
+ * render urgente de un toque. Lo usan las píldoras de la tarjeta de arriba y el panel.
+ */
+export function todayStats(habits: HabitDTO[], logs: Record<string, LogMap>, today: string): TodayStats {
   const stats = habits.map((h) => ({ h, ...habitStats(h, logs[h.id] ?? NO_LOGS, today) }));
   const streaks = stats
     .map(({ h, streak }) => ({ h, n: streak }))
     .filter((s) => s.n > 0)
     .sort((a, b) => b.n - a.n || a.h.name.localeCompare(b.h.name, "es"))
     .slice(0, 5);
-
   // Solo los que ya tienen días (o semanas) que cuenten: uno creado hoy no baja el promedio.
   const scores = stats.flatMap((s) => (s.score === null ? [] : [s.score]));
   const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const monday = startOfWeek(today, 1);
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(monday, i);
+    const p = d > today ? null : dayProgress(habits, logs, d, today);
+    return { d, p, pct: p && p.total ? Math.round((p.done / p.total) * 100) : 0 };
+  });
+  const past = week.filter((r) => r.p && r.p.total);
+  const weekPct = past.length ? Math.round(past.reduce((a, r) => a + r.pct, 0) / past.length) : 0;
+  return { streaks, avgScore, week, weekPct };
+}
 
+/** Píldoras de la tarjeta de arriba de Hoy (celular): la semana, el puntaje y la racha más larga. */
+export const TodayFacts = memo(function TodayFacts({ stats }: { stats: TodayStats }) {
+  const top = stats.streaks[0];
   return (
-    <aside aria-label="Resumen del día" className="grid content-start gap-4">
-      <section className="hero rise overflow-hidden rounded-2xl px-6 pt-5 pb-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="hero-sub font-mono text-[11px] tracking-[0.08em] uppercase">
-            {isToday ? "Hoy" : "Día elegido"}
-          </p>
-          <p className="hero-sub truncate font-mono text-[11px] tracking-[0.04em]">{formatLong(selected)}</p>
-        </div>
-        <p className="mt-4 flex items-baseline gap-2">
-          <span key={`n${doneTick.key}`} className={cx("figure text-[64px]", doneTick.className)}>
-            {done}
+    <ul className="hh-facts" aria-label="Resumen">
+      <li>
+        <b className="font-mono">{stats.weekPct}%</b> esta semana
+      </li>
+      <li>
+        <b className="font-mono">{stats.avgScore}%</b> puntaje promedio
+      </li>
+      <li className="min-w-0">
+        {top ? (
+          <span className="block truncate">
+            Racha: {top.h.name} <b className="font-mono">{top.n}</b> {top.h.frequency === "weekly" ? "sem" : top.n === 1 ? "día" : "días"}
           </span>
-          <span className="figure hero-sub text-[26px]">de {total}</span>
-          <span key={`p${pctTick.key}`} className={cx("ml-auto font-mono text-[13px] tabular", pctTick.className)}>
-            {pct}%
-          </span>
-        </p>
-        <div
-          role="progressbar"
-          aria-label="Hábitos hechos"
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={done}
-          className="mt-4 h-2 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--hero-fg)_18%,transparent)]"
-        >
-          {/* Se anima con transform (no con el ancho) para no recalcular el layout; se corre en vez
-              de estirarse, así la punta redonda no se deforma. */}
-          <span
-            className="block h-full rounded-full bg-[var(--hero-fg)] transition-transform duration-500 ease-[var(--ease-out)] motion-reduce:transition-none"
-            style={{ transform: `translateX(${pct - 100}%)` }}
-          />
-        </div>
-        <p className="hero-sub mt-3 text-[13px]">
-          {total === 0
-            ? "Nada programado para este día."
-            : done === total
-              ? "Completaste todo lo del día."
-              : `${total - done === 1 ? "Falta 1" : `Faltan ${total - done}`} para cerrar el día.`}
-        </p>
-      </section>
-
-      <WeekCard habits={habits} logs={logs} today={today} avgScore={avgScore} />
-
-      <section className="rise rounded-2xl border border-line bg-surface px-5 pt-4 pb-2" style={{ "--i": 2 } as React.CSSProperties}>
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Rachas en curso</h2>
-        {streaks.length === 0 ? (
-          <p className="py-4 text-[14px] text-muted">Ninguna racha abierta todavía. Marcá un hábito hoy para empezar una.</p>
         ) : (
-          <ul className="mt-2">
+          "Sin rachas abiertas"
+        )}
+      </li>
+    </ul>
+  );
+});
+
+/**
+ * Panel lateral de Hoy en la computadora: la semana día por día con el puntaje
+ * promedio y las rachas más largas, en tarjetas con cabecera teñida (el avance del
+ * día está en la tarjeta de arriba de la lista). Memorizado: Hoy le pasa lo calculado
+ * con las marcas diferidas, así el toque en un círculo se dibuja primero.
+ */
+export const TodayPanel = memo(function TodayPanel({ stats, today }: { stats: TodayStats; today: string }) {
+  const { streaks } = stats;
+  return (
+    <aside aria-label="Resumen de la semana" className="grid content-start gap-4">
+      <WeekCard stats={stats} today={today} />
+
+      <TintedCard
+        icon={Fire}
+        title="Rachas en curso"
+        bodyClassName="py-2!"
+      >
+        {streaks.length === 0 ? (
+          <p className="py-3 text-[14px] leading-relaxed text-muted">Ninguna racha abierta todavía. Marcá un hábito hoy para empezar una.</p>
+        ) : (
+          <ul>
             {streaks.map(({ h, n }) => (
               <li key={h.id} className="border-t border-line first:border-t-0">
                 <Link
@@ -131,7 +127,7 @@ export const TodayPanel = memo(function TodayPanel({
             ))}
           </ul>
         )}
-      </section>
+      </TintedCard>
     </aside>
   );
 });
@@ -141,25 +137,9 @@ export const TodayPanel = memo(function TodayPanel({
  * Una sola serie; hoy en el acento y el resto en un tono suave. El valor se lee
  * al pasar o enfocar, y en la tabla.
  */
-function WeekCard({
-  habits,
-  logs,
-  today,
-  avgScore,
-}: {
-  habits: HabitDTO[];
-  logs: Record<string, LogMap>;
-  today: string;
-  avgScore: number;
-}) {
-  const monday = startOfWeek(today, 1);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
-  const rows = days.map((d) => {
-    const p = d > today ? null : dayProgress(habits, logs, d, today);
-    return { d, p, pct: p && p.total ? Math.round((p.done / p.total) * 100) : 0 };
-  });
-  const past = rows.filter((r) => r.p && r.p.total);
-  const weekPct = past.length ? Math.round(past.reduce((a, r) => a + r.pct, 0) / past.length) : 0;
+function WeekCard({ stats, today }: { stats: TodayStats; today: string }) {
+  const { week: rows, weekPct, avgScore } = stats;
+  const days = rows.map((r) => r.d);
   const [hover, setHover] = useState<number | null>(null);
   const shownIdx = hover ?? days.indexOf(today);
   const shown = rows[shownIdx];
@@ -167,12 +147,8 @@ function WeekCard({
   const scoreTick = useTick(avgScore);
 
   return (
-    <section className="rise rounded-2xl border border-line bg-surface px-5 pt-4 pb-3" style={{ "--i": 1 } as React.CSSProperties}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Esta semana</h2>
-        <span className="font-mono text-[12px] text-muted tabular">{weekPct}% cumplido</span>
-      </div>
-      <p className="tabular mt-1 min-h-5 text-[12.5px] text-muted" aria-live="polite">
+    <TintedCard icon={ChartBar} title="Esta semana" meta={`${weekPct}% cumplido`} bodyClassName="gap-0! pb-2!">
+      <p className="tabular min-h-5 text-[12.5px] text-muted" aria-live="polite">
         {shown &&
           (shown.p
             ? `${WEEKDAY_SHORT[weekday(shown.d)]} ${Number(shown.d.slice(8))}: ${shown.p.done} de ${shown.p.total} hechos`
@@ -250,6 +226,6 @@ function WeekCard({
           </tbody>
         </table>
       </details>
-    </section>
+    </TintedCard>
   );
 }

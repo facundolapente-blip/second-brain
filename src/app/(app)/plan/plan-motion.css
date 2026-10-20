@@ -240,3 +240,9 @@
     max-width: 96rem;
   }
 }
+
+/* Tarjetas con cabecera teñida (diseño 4): la de la semana recorta con overflow: clip
+   y no hidden, así la cabecera pegada de Por horas sigue a la página en el celular. */
+.tcard.plan-week-card {
+  overflow: clip;
+}

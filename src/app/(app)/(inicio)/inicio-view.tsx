@@ -8,7 +8,7 @@ import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../h
 import { dayProgress } from "@/lib/habit-logic";
 import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
-import { useEffect, useId, useOptimistic, useRef, useState } from "react";
+import { useEffect, useId, useOptimistic, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -19,6 +19,7 @@ import {
   ClipboardText,
   CreditCard,
   Medal,
+  Note,
   NotePencil,
   Notebook,
   PiggyBank,
@@ -37,11 +38,11 @@ import { dec1, money, moneyCents, shortNumber } from "@/lib/format";
 import { daysLeftLabel, isFreeBlock, timeRange } from "@/lib/plan-logic";
 import { setBlockDone } from "@/lib/offline/plan";
 import { writeOnDay } from "@/lib/offline/journal";
-import { PageHeader } from "@/components/page-header";
 import { MenuButton } from "@/components/shell";
 import "./inicio.css";
 import { cx, ToneSquare } from "@/components/ui";
 import { useTick } from "@/components/motion";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import { CheckinCard } from "./checkin-card";
 import { QuickAdd } from "../gastos/quick-add";
 import { CategoryTag, PriorityTag } from "../plan/plan-ui";
@@ -78,8 +79,45 @@ function pct(a: number, b: number) {
   return b === 0 ? 0 : Math.round((a / b) * 100);
 }
 
+/** "octubre" de "2026-10". */
+function monthName(month: string) {
+  return formatMonth(month).split(" ")[0];
+}
+
+/** "19 al 25 de octubre" (o "29 sep al 5 oct" si cruza de mes). */
+function rangeLabel(from: string, to: string) {
+  if (from.slice(0, 7) === to.slice(0, 7)) return `${Number(from.slice(8))} al ${Number(to.slice(8))} de ${monthName(to.slice(0, 7))}`;
+  return `${formatShort(from)} al ${formatShort(to)}`;
+}
+
 /** Meses de reserva (`getReserve`): saldo personal en pesos / gasto promedio de 3 meses. */
 export type ReserveSummary = { months: number | null; prevMonths: number | null };
+
+// ─── Avance de hábitos de hoy, compartido con la cifra de arriba ────────────
+// La lista de hábitos tiene sus marcas optimistas; la cifra "Hábitos hoy" las sigue por
+// este almacén chico, así un toque vuelve a dibujar la lista y la cifra, no todo Inicio.
+
+type Progress = { done: number; total: number };
+type ProgressStore = { get: () => Progress; set: (p: Progress) => void; subscribe: (f: () => void) => () => void };
+
+function progressStore(initial: Progress): ProgressStore {
+  let value = initial;
+  const subs = new Set<() => void>();
+  return {
+    get: () => value,
+    set: (p) => {
+      if (p.done === value.done && p.total === value.total) return;
+      value = p;
+      subs.forEach((f) => f());
+    },
+    subscribe: (f) => {
+      subs.add(f);
+      return () => {
+        subs.delete(f);
+      };
+    },
+  };
+}
 
 export function InicioView({
   d,
@@ -92,98 +130,79 @@ export function InicioView({
   reserve: ReserveSummary;
   latestNotes: NotesSummary;
 }) {
-  const prevName = formatMonth(shiftMonth(d.gastos.month, -1)).split(" ")[0];
+  const prevName = monthName(shiftMonth(d.gastos.month, -1));
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
+  const [habitProgress] = useState(() => progressStore({ done: d.habits.doneToday, total: d.habits.dueToday }));
 
   const title = `${greeting(d.hour)}, Facu`;
-  const headerActions = (
-    <div className="flex gap-1.5">
-      <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={weekday(d.today) === 0 || weekday(d.today) === 1} />
-      <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
-    </div>
-  );
+  const highlight = weekday(d.today) === 0 || weekday(d.today) === 1;
 
   return (
     <>
-      <CompactBar title={title}>{headerActions}</CompactBar>
-      <div className="inicio-head">
-        <PageHeader title={title} kicker={formatLong(d.today)} wide actions={headerActions} />
-      </div>
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+      <CompactBar title={title}>
+        <div className="flex gap-1.5">
+          <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={highlight} compact />
+          <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} compact />
+        </div>
+      </CompactBar>
+      {/* Bento de 12 columnas (compu) o una columna (celular, con `order` para el orden del diseño). */}
+      <main className="ini-bento mx-auto grid max-w-6xl grid-cols-1 gap-3.5 px-4 pt-[calc(env(safe-area-inset-top)+0.375rem)] pb-14 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-9 lg:pb-18">
         {d.backup && (
           <Link
             href="/datos"
-            className="flex items-center gap-2.5 rounded-2xl bg-[var(--st-fail-bg)] px-4 py-3 text-[13.5px] text-[var(--st-fail-fg)] transition-opacity hover:opacity-85 lg:col-span-12"
+            className="flex items-center gap-2.5 rounded-2xl bg-[var(--st-fail-bg)] px-4 py-3 text-[13.5px] text-[var(--st-fail-fg)] transition-opacity hover:opacity-85 max-lg:order-first lg:col-span-12"
           >
             <WarningCircle size={18} weight="fill" className="shrink-0" aria-hidden />
             <span className="min-w-0 flex-1">{d.backup} Revisalo en Datos.</span>
           </Link>
         )}
-        <QuoteCard day={d.today} hour={d.hour} notes={notes} />
-        {/* Resumen del día */}
-        <section aria-label="Resumen" className="hero rise relative overflow-hidden rounded-[22px] p-5 lg:col-span-12 lg:p-7">
-          <p className="hero-sub max-w-2xl text-[15px] leading-relaxed lg:text-[17px]">
+
+        {/* Fila 1: saludo y nota del día. */}
+        <div className="flex min-w-0 flex-col justify-center gap-1.5 pb-1 max-lg:order-1 lg:col-span-5 lg:gap-2.5 lg:px-1 lg:pt-1.5 lg:pb-2">
+          <div className="flex items-center gap-2 max-lg:-ml-0.5">
+            <MenuButton />
+            <p className="kicker truncate">{formatLong(d.today)}</p>
+          </div>
+          <h1 className="display text-[32px] leading-[1.02] font-[750] tracking-[-0.04em] lg:text-[36px] xl:text-[44px]">{title}</h1>
+          <p className="max-w-[30rem] text-[15px] leading-normal text-pretty text-muted lg:text-[16px]">
             <Summary d={d} />
           </p>
-          <div className="mt-5 grid grid-cols-2 gap-2.5 lg:mt-7 lg:grid-cols-5 lg:gap-3">
-            <Kpi
-              href="/habitos"
-              icon={Medal}
-              color="var(--c-habitos)"
-              label="Hábitos hoy"
-              value={`${d.habits.doneToday}/${d.habits.dueToday}`}
-              sub={d.habits.best ? `Mejor racha: ${d.habits.best.name} (${d.habits.best.streak})` : "Sin rachas en curso"}
-            />
-            <Kpi
-              href="/journal"
-              icon={Notebook}
-              color="var(--c-journal)"
-              label="Racha de journal"
-              value={`${d.journal.streak} ${d.journal.streak === 1 ? "día" : "días"}`}
-              sub={d.journal.wroteToday ? "Hoy ya escribiste" : "Hoy todavía no escribiste"}
-            />
-            <Kpi
-              href="/gastos/informes"
-              icon={Wallet}
-              color="var(--c-gastos)"
-              label={`Gastado en ${formatMonth(d.gastos.month).split(" ")[0]}`}
-              value={moneyCents(d.gastos.spentMonth)}
-              sub={
-                delta === null
-                  ? "Sin datos del mes anterior"
-                  : deltaLabel(delta, `${prevName} a esta altura`)
-              }
-            />
-            <Kpi
-              href="/plan"
-              icon={CalendarCheck}
-              color="var(--c-plan)"
-              label="Plan de la semana"
-              value={d.plan.weekTotal ? `${d.plan.weekDone} de ${d.plan.weekTotal}` : "–"}
-              sub={d.plan.weekTotal ? `${pct(d.plan.weekDone, d.plan.weekTotal)}% de los bloques hechos` : "Sin bloques esta semana"}
-            />
-            <Kpi
-              href="/gastos/cuentas#reserva"
-              icon={PiggyBank}
-              color="var(--c-gastos)"
-              label="Reserva"
-              className="max-lg:col-span-2"
-              value={reserve.months === null ? "–" : `${dec1(reserve.months)} ${reserve.months === 1 ? "mes" : "meses"}`}
-              sub={reserveSub(reserve, prevName)}
-            />
+          <div className="mt-1 flex flex-wrap gap-1.5 lg:mt-2">
+            <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={highlight} />
+            <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
           </div>
+        </div>
+        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-7" />
+
+        {/* Fila 2: las cinco cifras. */}
+        <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-3 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">
+          <HabitStat d={d} store={habitProgress} />
+          <JournalStat d={d} />
+          <GastosStat d={d} delta={delta} prevName={prevName} />
+          <PlanStat d={d} />
+          <ReserveStat reserve={reserve} prevName={prevName} month={d.gastos.month} />
         </section>
 
-        {/* Primero lo que se hace en el día; el check-in, que se completa una vez, después. */}
-        <HabitsToday d={d} />
-        <PlanToday d={d} />
+        {/* Hábitos (7) junto a Plan y Notas (5, la última se estira hasta el alto de Hábitos). */}
+        <HabitsToday d={d} store={habitProgress} />
+        <div className="contents lg:col-span-6 lg:flex xl:col-span-5 lg:min-w-0 lg:flex-col lg:gap-5">
+          <PlanToday d={d} />
+          <NotesCard s={latestNotes} today={d.today} />
+        </div>
+
         {/* key: al cambiar de día (el Shell refresca sin desmontar) arranca de nuevo con
             las fechas nuevas; lo pendiente se manda al desmontar, con su fecha vieja. */}
-        <CheckinCard key={d.today} today={d.checkin.today} yesterday={d.checkin.yesterday} lastWeightG={d.checkin.lastWeightG} watch={d.checkin.watch} />
-        <WeekMix d={d} />
-        <GastosCard d={d} delta={delta} prevName={prevName} />
+        <CheckinCard
+          key={d.today}
+          today={d.checkin.today}
+          yesterday={d.checkin.yesterday}
+          lastWeightG={d.checkin.lastWeightG}
+          watch={d.checkin.watch}
+          className="max-lg:order-6 lg:col-span-6 xl:col-span-7"
+        />
         <JournalCard d={d} />
-        <NotesCard s={latestNotes} today={d.today} />
+        <GastosCard d={d} delta={delta} prevName={prevName} />
+        <WeekMix d={d} />
         <Constancia d={d} />
       </main>
     </>
@@ -191,7 +210,7 @@ export function InicioView({
 }
 
 /**
- * Barra de un renglón que aparece arriba a los 40 px de bajar (el encabezado grande
+ * Barra de un renglón que aparece arriba a los 40 px de bajar (el saludo grande
  * se va con la página). Alto 0 en el flujo: aparecer no corre nada.
  */
 function CompactBar({ title, children }: { title: string; children: React.ReactNode }) {
@@ -230,34 +249,38 @@ function CompactBar({ title, children }: { title: string; children: React.ReactN
   );
 }
 
-/** Acceso en la cabecera; el domingo y el lunes la revisión semanal se destaca. */
-function HeaderLink({ href, label, icon: Ico, highlight }: { href: string; label: string; icon: Icon; highlight?: boolean }) {
+/** Acceso del saludo; el domingo y el lunes la revisión semanal se destaca. En la barra compacta, solo el ícono en el celular. */
+function HeaderLink({ href, label, icon: Ico, highlight, compact }: { href: string; label: string; icon: Icon; highlight?: boolean; compact?: boolean }) {
   return (
     <Link
       href={href}
       aria-label={label}
       title={label}
       className={cx(
-        "inline-flex h-10 items-center gap-2 rounded-full px-3 text-[13px] font-medium transition-colors",
-        highlight ? "bg-ink text-on-ink hover:opacity-90" : "border border-line-strong text-muted hover:bg-surface-2 hover:text-fg",
+        "press inline-flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition-colors",
+        highlight ? "bg-ink text-on-ink hover:opacity-90" : "border border-line-strong bg-surface text-muted hover:bg-surface-2 hover:text-fg",
       )}
     >
       <Ico size={16} aria-hidden />
-      <span className="hidden sm:inline">{label}</span>
+      <span className={compact ? "hidden sm:inline" : undefined}>{label}</span>
     </Link>
   );
 }
 
 function Summary({ d }: { d: Dashboard }) {
-  const parts: string[] = [];
+  const parts: React.ReactNode[] = [];
   const { doneToday, dueToday } = d.habits;
   const skipped = d.habits.skippedToday;
+  const skippedText = skipped ? ` (${skipped} ${skipped === 1 ? "salteado" : "salteados"})` : "";
   if (dueToday) {
     parts.push(
-      (doneToday === dueToday
-        ? `Completaste ${dueToday === 1 ? "el hábito" : `los ${dueToday} hábitos`} de hoy`
-        : `Llevás ${doneToday} de ${dueToday} ${dueToday === 1 ? "hábito" : "hábitos"} de hoy`) +
-        (skipped ? ` (${skipped} ${skipped === 1 ? "salteado" : "salteados"})` : ""),
+      doneToday === dueToday ? (
+        `Completaste ${dueToday === 1 ? "el hábito" : `los ${dueToday} hábitos`} de hoy${skippedText}`
+      ) : (
+        <>
+          Llevás <b className="font-semibold text-fg">{`${doneToday} de ${dueToday}`}</b> {dueToday === 1 ? "hábito" : "hábitos"} de hoy{skippedText}
+        </>
+      ),
     );
   } else if (skipped) {
     parts.push(`Hoy salteaste ${skipped === 1 ? "el único hábito" : `los ${skipped} hábitos`}`);
@@ -274,11 +297,18 @@ function Summary({ d }: { d: Dashboard }) {
         ? `esta semana los reintegros superaron a los gastos por ${moneyCents(weekSpent)}`
         : "esta semana no gastaste nada",
   );
-  const s = parts.join(", ").replace(/, ([^,]*)$/, " y $1");
+  // "A, B y C." con la primera letra en mayúscula.
+  const first = parts[0];
+  if (typeof first === "string") parts[0] = first.charAt(0).toUpperCase() + first.slice(1);
   return (
     <>
-      {s.charAt(0).toUpperCase() + s.slice(1)}.
-      {!d.journal.wroteToday && " Todavía no escribiste en el journal."}
+      {parts.map((p, i) => (
+        <span key={i}>
+          {i === 0 ? "" : i === parts.length - 1 ? " y " : ", "}
+          {p}
+        </span>
+      ))}
+      .{!d.journal.wroteToday && " Todavía no escribiste en el journal."}
     </>
   );
 }
@@ -292,112 +322,203 @@ function reserveSub(r: ReserveSummary, prevName: string): string {
   return `${diff > 0 ? "Sube" : "Baja"} ${dec1(Math.abs(diff))} desde ${prevName}`;
 }
 
-function Kpi({
-  href,
-  icon: Ico,
-  color,
-  label,
-  value,
-  sub,
-  className,
-}: {
-  href: string;
-  icon: Icon;
-  color: string;
-  label: string;
-  value: string;
-  sub: string;
-  className?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cx("group grid content-start gap-2 rounded-2xl bg-white/10 p-3.5 ring-1 ring-white/10 transition-[background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/15 active:scale-[0.98] lg:p-4", className)}
-    >
-      <span className="flex items-center gap-2 text-[12px] font-medium opacity-85">
-        <span className="inline-flex size-6 items-center justify-center rounded-full bg-white/90" style={{ color }}>
-          <Ico size={14} weight="fill" aria-hidden />
-        </span>
-        <span className="truncate">{label}</span>
-        <ArrowUpRight
-          size={14}
-          aria-hidden
-          className="ml-auto shrink-0 opacity-0 transition-[opacity,transform] duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-80"
-        />
+// ─── Las cinco cifras, con su gráfico chico ─────────────────────────────────
+
+/** Segmentos: uno por hábito o bloque (con más de 24, una barra). */
+function MiniSeg({ marks }: { marks: boolean[] }) {
+  if (marks.length > 24) {
+    const on = marks.filter(Boolean).length;
+    return (
+      <span className="ini-bar">
+        <span style={{ width: `${(on / marks.length) * 100}%` }} />
       </span>
-      <span className="figure text-[26px] lg:text-[32px]">{value}</span>
-      <span className="hero-sub line-clamp-2 text-[12px] leading-snug">{sub}</span>
-    </Link>
+    );
+  }
+  return (
+    <span className="tmini-seg" style={{ gridTemplateColumns: `repeat(${marks.length}, minmax(0, 1fr))` }}>
+      {marks.map((m, i) => (
+        <span key={i} data-on={m || undefined} />
+      ))}
+    </span>
   );
 }
 
-function Card({
-  title,
-  href,
-  hrefLabel,
-  color,
-  className,
-  children,
-  i = 0,
-}: {
-  title: string;
-  href?: string;
-  hrefLabel?: string;
-  color: string;
-  className?: string;
-  children: React.ReactNode;
-  i?: number;
-}) {
+/** Dos barras para comparar (este mes contra el anterior). */
+function MiniCmp({ rows }: { rows: { label: string; value: string; n: number; on?: boolean }[] }) {
+  const max = Math.max(...rows.map((r) => Math.max(0, r.n)));
   return (
-    <section
-      aria-label={title}
-      style={{ "--i": i } as React.CSSProperties}
-      className={cx("rise grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5", className)}
+    <span className="ini-cmp">
+      {rows.map((r) => (
+        <span key={r.label} className="ini-cmp-row">
+          <span>{r.label}</span>
+          <span className="ini-track">
+            <span data-on={r.on || undefined} style={{ width: `${max > 0 ? (Math.max(0, r.n) / max) * 100 : 0}%` }} />
+          </span>
+          <span className="ini-cmp-v">{r.value}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function MiniCap({ left, right }: { left: string; right: string }) {
+  return (
+    <span className="tmini-cap">
+      <span>{left}</span>
+      <span>{right}</span>
+    </span>
+  );
+}
+
+function HabitStat({ d, store }: { d: Dashboard; store: ProgressStore }) {
+  const { done, total } = useSyncExternalStore(store.subscribe, store.get, store.get);
+  const tick = useTick(done);
+  return (
+    <StatTile
+      tone="habitos"
+      icon={Medal}
+      label="Hábitos hoy"
+      href="/habitos"
+      className="lg:col-span-2 xl:col-span-1"
+      figure={
+        <span key={tick.key} className={tick.className}>
+          {done}
+        </span>
+      }
+      unit={`/${total}`}
+      sub={d.habits.best ? `Mejor racha: ${d.habits.best.name} (${d.habits.best.streak})` : "Sin rachas en curso"}
     >
-      <header className="flex items-center gap-2">
-        <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
-        <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
-        {href && (
-          <Link
-            href={href}
-            className="ml-auto inline-flex min-h-9 items-center gap-1 rounded-full px-2.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-          >
-            {hrefLabel ?? "Ver todo"}
-            <ArrowRight size={13} aria-hidden />
-          </Link>
-        )}
-      </header>
-      {children}
-    </section>
+      {total > 0 ? (
+        <span aria-hidden className="grid gap-1.5">
+          <MiniSeg marks={Array.from({ length: total }, (_, i) => i < done)} />
+          <MiniCap left={`${done} ${done === 1 ? "hecho" : "hechos"}`} right={done >= total ? "día completo" : `faltan ${total - done}`} />
+        </span>
+      ) : null}
+    </StatTile>
+  );
+}
+
+function JournalStat({ d }: { d: Dashboard }) {
+  const j = d.journal;
+  const wrote = new Set(j.days);
+  const days = Array.from({ length: 14 }, (_, i) => addDays(d.today, i - 13));
+  return (
+    <StatTile
+      tone="journal"
+      icon={Notebook}
+      label="Racha de journal"
+      href="/journal"
+      className="lg:col-span-2 xl:col-span-1"
+      figure={j.streak}
+      unit={j.streak === 1 ? "día" : "días"}
+      sub={j.wroteToday ? "Hoy ya escribiste" : "Hoy todavía no escribiste"}
+    >
+      <span aria-hidden className="grid gap-1.5">
+        <span className="ini-strip">
+          {days.map((iso) => (
+            <span key={iso} data-on={wrote.has(iso) || undefined} data-today={iso === d.today || undefined} />
+          ))}
+        </span>
+        <MiniCap left={formatShort(days[0])} right="hoy" />
+      </span>
+    </StatTile>
+  );
+}
+
+function GastosStat({ d, delta, prevName }: { d: Dashboard; delta: number | null; prevName: string }) {
+  const g = d.gastos;
+  const cur = monthName(g.month);
+  return (
+    <StatTile
+      tone="gastos"
+      icon={Wallet}
+      label={`Gastado en ${cur}`}
+      href="/gastos/informes"
+      className="lg:col-span-2 xl:col-span-1"
+      figure={moneyCents(g.spentMonth)}
+      sub={delta === null ? "Sin datos del mes anterior" : deltaLabel(delta, `${prevName} a esta altura`)}
+    >
+      <span aria-hidden className="grid">
+        <MiniCmp
+          rows={[
+            { label: cur.slice(0, 3), value: shortNumber(g.spentMonth / 100), n: g.spentMonth, on: true },
+            { label: prevName.slice(0, 3), value: shortNumber(g.spentPrevSame / 100), n: g.spentPrevSame },
+          ]}
+        />
+      </span>
+    </StatTile>
+  );
+}
+
+function PlanStat({ d }: { d: Dashboard }) {
+  const p = d.plan;
+  const blocks = p.weekBlocks;
+  const dayLabel = (iso: string) => `${WD[weekday(iso)]} ${Number(iso.slice(8))}`;
+  return (
+    <StatTile
+      tone="plan"
+      icon={CalendarCheck}
+      label="Plan de la semana"
+      href="/plan"
+      className="lg:col-span-3 xl:col-span-1"
+      figure={p.weekTotal ? p.weekDone : "–"}
+      unit={p.weekTotal ? `de ${p.weekTotal}` : undefined}
+      sub={p.weekTotal ? `${pct(p.weekDone, p.weekTotal)}% de los bloques hechos` : "Sin bloques esta semana"}
+    >
+      {blocks.length > 0 ? (
+        <span aria-hidden className="grid gap-1.5">
+          <MiniSeg marks={blocks.map((b) => b.done)} />
+          <MiniCap left={dayLabel(blocks[0].date)} right={dayLabel(blocks[blocks.length - 1].date)} />
+        </span>
+      ) : null}
+    </StatTile>
+  );
+}
+
+function ReserveStat({ reserve, prevName, month }: { reserve: ReserveSummary; prevName: string; month: string }) {
+  const { months, prevMonths } = reserve;
+  const rows = [
+    ...(prevMonths !== null ? [{ label: prevName.slice(0, 3), value: dec1(prevMonths), n: prevMonths }] : []),
+    ...(months !== null ? [{ label: monthName(month).slice(0, 3), value: dec1(months), n: months, on: true }] : []),
+  ];
+  return (
+    <StatTile
+      tone="gastos"
+      icon={PiggyBank}
+      label="Reserva"
+      href="/gastos/cuentas#reserva"
+      className="max-lg:col-span-2 lg:col-span-3 xl:col-span-1"
+      figure={months === null ? "–" : dec1(months)}
+      unit={months === null ? undefined : months === 1 ? "mes" : "meses"}
+      sub={reserveSub(reserve, prevName)}
+    >
+      {rows.length > 0 ? (
+        <span aria-hidden className="grid">
+          <MiniCmp rows={rows} />
+        </span>
+      ) : null}
+    </StatTile>
+  );
+}
+
+/** Cifra chica al pie de una tarjeta (rótulo, número grande y una línea). */
+function FootStat({ label, value, unit, sub, size = "text-[28px]" }: { label: string; value: React.ReactNode; unit?: string; sub: string; size?: string }) {
+  return (
+    <div className="grid min-w-0 content-start gap-1 rounded-[14px] bg-surface-2 px-3.5 py-3 max-sm:px-2.5">
+      <span className="kicker truncate">{label}</span>
+      <span className={cx("figure font-[750] whitespace-nowrap", size)}>
+        {value}
+        {unit && <small className="ml-[3px] text-[0.42em] font-semibold tracking-[-0.01em] text-muted">{unit}</small>}
+      </span>
+      <span className="text-[12px] leading-snug text-muted max-sm:text-[11px]">{sub}</span>
+    </div>
   );
 }
 
 // ─── Hábitos de hoy ─────────────────────────────────────────────────────────
 
-function Ring({ value, total, color }: { value: number; total: number; color: string }) {
-  const r = 26;
-  const c = 2 * Math.PI * r;
-  const p = total ? value / total : 0;
-  return (
-    <svg viewBox="0 0 64 64" className="size-16 -rotate-90" aria-hidden>
-      <circle cx="32" cy="32" r={r} fill="none" stroke="var(--surface-3)" strokeWidth="6" />
-      <circle
-        cx="32"
-        cy="32"
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth="6"
-        strokeLinecap="round"
-        strokeDasharray={`${c * p} ${c}`}
-        className="transition-[stroke-dasharray] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
-      />
-    </svg>
-  );
-}
-
 /** La misma lista que Hoy en Hábitos: filas, orden, toques y hoja del día. */
-function HabitsToday({ d }: { d: Dashboard }) {
+function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
   const { logs, mark } = useHabitLogs(d.habits.packed);
   const { sorted, reorder } = useHabitOrder(d.habits.list, d.habits.manualOrder);
   const sticky = useStickyDay(d.today, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today)).map((h) => h.id));
@@ -405,44 +526,31 @@ function HabitsToday({ d }: { d: Dashboard }) {
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
   const complete = due > 0 && done >= due;
   const celebrate = useJustCompleted(complete, d.today);
-  // El anillo está arriba de la tarjeta: si al completar el día quedó fuera de la
-  // pantalla, se llena (con su brillo) recién cuando vuelve a verse.
-  const ringRef = useRef<HTMLDivElement>(null);
-  const ringSeen = useSeenWhile(ringRef, celebrate);
-  const ringDone = celebrate && !ringSeen ? Math.max(0, done - 1) : done;
-  const ringComplete = due > 0 && ringDone >= due;
+  // La cifra de arriba sigue a las marcas de esta lista.
+  useEffect(() => store.set({ done, total: due }), [store, done, due]);
+  // La barra está en la cabecera: si al completar el día quedó fuera de la pantalla,
+  // se llena (con su brillo) recién cuando vuelve a verse.
+  const barRef = useRef<HTMLSpanElement>(null);
+  const barSeen = useSeenWhile(barRef, celebrate);
+  const barDone = celebrate && !barSeen ? Math.max(0, done - 1) : done;
   const daySheet = useRef<DaySheetHandle>(null);
-  // Las cifras cambian con un corrimiento corto (sube desde abajo, baja desde arriba); al cargar, quietas.
-  const doneTick = useTick(done);
-  const pctTick = useTick(pct(ringDone, due));
+  // Esta semana, hasta hoy (hoy con las marcas de la lista).
+  const week = d.week.filter((w) => w.date <= d.today);
+  const wDone = week.reduce((n, w) => n + (w.date === d.today ? done : w.habitsDone), 0);
+  const wDue = week.reduce((n, w) => n + (w.date === d.today ? due : w.habitsDue), 0);
 
   return (
-    <Card title="Hábitos de hoy" href="/habitos" color="var(--c-habitos)" className="lg:col-span-5" i={1}>
-      <div className="flex items-center gap-4">
-        <div ref={ringRef} className={cx("relative rounded-full", celebrate && ringSeen && "ring-done-glow")}>
-          <Ring value={ringDone} total={due} color="var(--c-habitos)" />
-          <span className="figure absolute inset-0 flex items-center justify-center text-[15px]">
-            {ringComplete ? (
-              <Check size={22} weight="bold" className="text-[var(--c-habitos)]" aria-label="Día completo" />
-            ) : (
-              <span key={`p${pctTick.key}`} className={pctTick.className}>
-                {pct(ringDone, due)}%
-              </span>
-            )}
-          </span>
-        </div>
-        <div className="grid gap-0.5">
-          <p className="figure text-[28px]">
-            <span key={`n${doneTick.key}`} className={doneTick.className}>
-              {done}
-            </span>
-            <span className="text-muted">/{due}</span>
-          </p>
-          <p className="text-[13px] text-muted">
-            {due === 0 ? "Hoy no toca ninguno" : done === due ? "Día completo" : `Faltan ${due - done}`}
-          </p>
-        </div>
-      </div>
+    <TintedCard
+      tone="habitos"
+      icon={Medal}
+      title="Hábitos de hoy"
+      meta={due === 0 ? "Hoy no toca ninguno" : complete ? `Día completo · ${due} de ${due}` : `${done} de ${due} · faltan ${due - done}`}
+      action={{ href: "/habitos", label: "Ver todo" }}
+      progress={due ? barDone / due : null}
+      className={cx("max-lg:order-4 lg:col-span-6 xl:col-span-7", celebrate && barSeen && "ini-glow")}
+      bodyClassName="ini-habits-body"
+    >
+      <span ref={barRef} aria-hidden className="block h-0" />
       {visible.length > 0 ? (
         <HabitDayRows
           habits={visible}
@@ -453,20 +561,20 @@ function HabitsToday({ d }: { d: Dashboard }) {
           onOpen={(h) => daySheet.current?.show(h, d.today)}
           onReorder={reorder}
           celebrate={celebrate}
-          rowClassName="bg-surface py-1.5 lg:py-2.5"
+          rowClassName="bg-surface py-1.5 lg:py-[9px]"
         />
       ) : (
-        <p className="text-[14px] text-muted">No hay hábitos para hoy.</p>
+        <p className="py-3 text-[14px] text-muted">No hay hábitos para hoy.</p>
       )}
       {/* Al pie, donde se tildó el último: "Día completo · N de N". Se abre con el alto
           animado (no empuja de golpe) y el chip entra con fundido y escala; al abrir la
           página ya completa, quieto. */}
-      <div className="fold -mt-4" data-closed={!complete || undefined} aria-live="polite">
+      <div className="fold" data-closed={!complete || undefined} aria-live="polite">
         <div>
           {complete && (
             <p
               className={cx(
-                "mt-4 flex w-fit items-center gap-2 rounded-full bg-[var(--st-done-bg)] py-1.5 pr-3.5 pl-1.5 text-[13.5px] font-medium text-[var(--st-done-fg)]",
+                "mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--st-done-bg)] py-1.5 pr-3.5 pl-1.5 text-[13.5px] font-medium text-[var(--st-done-fg)]",
                 celebrate && "day-chip-in",
               )}
             >
@@ -478,8 +586,22 @@ function HabitsToday({ d }: { d: Dashboard }) {
           )}
         </div>
       </div>
+      <div className="mt-auto grid grid-cols-2 gap-2.5 pt-4">
+        <FootStat
+          label="Esta semana"
+          value={pct(wDone, wDue)}
+          unit="%"
+          sub={`cumplido · ${wDone} de ${wDue} ${week.length === 1 ? "hoy" : "desde el lunes"}`}
+        />
+        <FootStat
+          label="Puntaje promedio"
+          value={d.habits.avgScore ?? "–"}
+          unit={d.habits.avgScore === null ? undefined : "%"}
+          sub={`de tus ${d.habits.scoredCount} ${d.habits.scoredCount === 1 ? "hábito" : "hábitos"}`}
+        />
+      </div>
       <DaySheet ref={daySheet} logs={logs} mark={mark} />
-    </Card>
+    </TintedCard>
   );
 }
 
@@ -515,34 +637,29 @@ function PlanToday({ d }: { d: Dashboard }) {
   const [, start] = useSafeTransition();
   const real = blocks.filter((b) => !isFreeBlock(b));
   const doneN = real.filter((b) => b.done).length;
-  const doneTick = useTick(doneN);
+  const overdue = d.plan.overdue;
+  const meta = [
+    real.length ? `${doneN} de ${real.length} ${real.length === 1 ? "hecho" : "hechos"}` : "Nada para hoy",
+    overdue ? `${overdue} ${overdue === 1 ? "vencido" : "vencidos"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   // La tilde aparece con un golpe, solo tras tocarla.
   const [tappedBlock, setTappedBlock] = useState<string | null>(null);
   return (
-    <Card title="Plan de hoy" href="/plan" hrefLabel="Ver la semana" color="var(--c-plan)" className="lg:col-span-7" i={2}>
-      {real.length > 0 && (
-        <div className="grid gap-1.5">
-          <div className="flex items-baseline justify-between text-[13px] text-muted">
-            <span>
-              <span key={`n${doneTick.key}`} className={cx("figure text-[22px] text-fg", doneTick.className)}>
-                {doneN}
-              </span>{" "}
-              de {real.length} {real.length === 1 ? "bloque hecho" : "bloques hechos"}
-            </span>
-            <span className="tabular">{pct(doneN, real.length)}%</span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
-            {/* Avanza corriéndose (transform), no cambiando el ancho: la punta redonda no se deforma. */}
-            <div
-              className="h-full rounded-full bg-[var(--c-plan)] transition-transform duration-500 ease-[var(--ease-out)] motion-reduce:transition-none"
-              style={{ transform: `translateX(${pct(doneN, real.length) - 100}%)` }}
-            />
-          </div>
-        </div>
-      )}
+    <TintedCard
+      tone="plan"
+      icon={CalendarCheck}
+      title="Plan de hoy"
+      meta={meta}
+      action={{ href: "/plan", label: "Ver la semana" }}
+      progress={real.length ? doneN / real.length : null}
+      className="max-lg:order-5 lg:flex-none"
+      bodyClassName="@container"
+    >
       {blocks.length > 0 ? (
-        <ol className="relative grid gap-1 before:absolute before:top-3 before:bottom-3 before:left-[4.1rem] before:w-px before:bg-line">
+        <ol className="-mx-1 grid gap-0.5">
           {blocks.map((b) => {
             const free = isFreeBlock(b);
             const range = timeRange(b);
@@ -559,17 +676,12 @@ function PlanToday({ d }: { d: Dashboard }) {
                       await setBlockDone(b.id, !b.done);
                     });
                   }}
-                  className={cx(
-                    "tap-tint relative flex min-h-11 w-full items-center gap-3 rounded-xl py-1 pr-2 text-left transition-colors duration-[80ms] hover:bg-surface-2 disabled:hover:bg-transparent",
-                  )}
+                  className="tap-tint relative flex min-h-11 w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors duration-[80ms] hover:bg-surface-2 disabled:hover:bg-transparent"
                 >
-                  <span className="tabular w-14 shrink-0 text-right font-mono text-[11.5px] text-fg/75">
-                    {b.startTime ?? "Todo el día"}
-                  </span>
                   <span
                     aria-hidden
                     className={cx(
-                      "relative z-10 inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                      "inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
                       // El fondo va en cada caso: con bg-surface siempre puesto, el blanco tapaba el color de hecho.
                       b.done ? "border-[var(--c-plan)] bg-[var(--c-plan)] text-white" : "border-line-strong bg-surface",
                     )}
@@ -580,12 +692,10 @@ function PlanToday({ d }: { d: Dashboard }) {
                     <span className={cx("block truncate text-[14px] transition-colors duration-[var(--dur-state)]", b.done && "text-muted line-through decoration-faint")}>
                       {b.title}
                     </span>
-                    {(range || b.category) && (
-                      <span className="flex items-center gap-1.5 text-[12px] text-fg/75">
-                        {range && <span className="tabular">{range}</span>}
-                        <CategoryTag category={b.category} />
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1.5 text-[12px] text-fg/75">
+                      <span className="tabular">{range ?? b.startTime ?? "Todo el día"}</span>
+                      <CategoryTag category={b.category} />
+                    </span>
                   </span>
                   <PriorityTag n={b.priority} />
                 </button>
@@ -594,22 +704,32 @@ function PlanToday({ d }: { d: Dashboard }) {
           })}
         </ol>
       ) : (
-        <p className="text-[14px] text-muted">
-          Nada planificado para hoy.{" "}
-          <Link href="/plan" className="text-fg underline decoration-line-strong underline-offset-4">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border-[1.5px] border-dashed border-line-strong bg-surface-2 py-3 pr-3 pl-3.5 @xs:grid-cols-[auto_minmax(0,1fr)_auto]">
+          <span aria-hidden className="inline-flex size-9 items-center justify-center rounded-[11px] bg-surface text-[var(--head-fg)]">
+            <CalendarCheck size={18} weight="fill" />
+          </span>
+          <span className="grid gap-px text-[14px]">
+            <b className="font-semibold">Nada planificado para hoy.</b>
+            <span className="text-[12.5px] text-muted">Tenés el {formatLong(d.today).split(",")[0]} libre.</span>
+          </span>
+          <Link
+            href="/plan"
+            className="press inline-flex h-[34px] items-center justify-center rounded-full bg-ink px-3.5 text-[13px] font-medium text-on-ink hover:opacity-90 @max-xs:col-span-2"
+          >
             Armar el día
           </Link>
-        </p>
+        </div>
       )}
       {real.length < 3 && d.plan.upcoming.length > 0 && (
-        <div className="grid gap-1.5 border-t border-line pt-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <p className="kicker">Lo que viene esta semana</p>
-          <ul className="grid gap-1">
+          <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line">
             {d.plan.upcoming.map((b) => (
-              <li key={b.id} className="flex min-h-9 items-center gap-2 text-[14px]">
-                <span className="tabular w-20 shrink-0 text-[12px] text-muted">
-                  {WD[weekday(b.date)]} {Number(b.date.slice(8))}
-                  {b.startTime ? ` · ${b.startTime}` : ""}
+              <li key={b.id} className="flex min-h-10 items-center gap-3 text-[14px]">
+                <span className="inline-flex w-[5.75rem] shrink-0 items-baseline gap-1.5 font-mono text-[11.5px] tracking-[0.05em] text-muted uppercase">
+                  <span>{WD[weekday(b.date)]}</span>
+                  <b className="font-sans text-[17px] font-[650] tracking-[-0.02em] text-fg">{Number(b.date.slice(8))}</b>
+                  {b.startTime && <span className="normal-case">{b.startTime}</span>}
                 </span>
                 <Link href={`/plan?semana=${b.date}`} className="min-w-0 truncate hover:underline">
                   {b.title}
@@ -620,14 +740,14 @@ function PlanToday({ d }: { d: Dashboard }) {
         </div>
       )}
       {d.plan.dueTasks.length > 0 && (
-        <div className="grid gap-1.5 border-t border-line pt-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <p className="kicker">Deadlines cerca</p>
-          <ul className="grid gap-1">
+          <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line">
             {d.plan.dueTasks.map((t) => (
-              <li key={t.id} className="flex min-h-9 items-center gap-2 text-[14px]">
+              <li key={t.id} className="flex items-center gap-3 text-[14px]">
                 <span
                   className={cx(
-                    "tabular w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-[11.5px] font-medium",
+                    "tabular w-[5.75rem] shrink-0 rounded-full px-2 py-0.5 text-center text-[11.5px] font-medium",
                     t.left < 0
                       ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]"
                       : t.left <= 1
@@ -637,7 +757,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                 >
                   {daysLeftLabel(t.left)}
                 </span>
-                <Link href="/plan#tareas" className="flex min-h-11 min-w-0 flex-1 items-center truncate hover:underline">
+                <Link href="/plan#tareas" className="flex min-h-10 min-w-0 flex-1 items-center truncate hover:underline">
                   {t.title}
                 </Link>
               </li>
@@ -645,7 +765,7 @@ function PlanToday({ d }: { d: Dashboard }) {
           </ul>
         </div>
       )}
-    </Card>
+    </TintedCard>
   );
 }
 
@@ -733,15 +853,24 @@ function WeekMix({ d }: { d: Dashboard }) {
         ),
     },
   ];
+  const sum = (f: (w: Dashboard["week"][number]) => number) => d.week.filter((w) => w.date <= d.today).reduce((n, w) => n + f(w), 0);
+  const spent = sum((w) => w.spentCents);
 
   return (
-    <Card title="Tu semana" color="var(--mod-inicio)" className="lg:col-span-12" i={3}>
+    <TintedCard
+      tone="inicio"
+      icon={ClipboardText}
+      title="Tu semana"
+      meta={rangeLabel(d.week[0].date, d.week[d.week.length - 1].date)}
+      action={{ href: "/semana", label: "Revisión" }}
+      className="max-lg:order-10 lg:col-span-12 xl:col-span-5"
+    >
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full min-w-[18rem] table-fixed border-separate border-spacing-y-1 text-center">
           <caption className="sr-only">Hábitos, journal, gastos y plan por día de esta semana</caption>
           <thead>
             <tr>
-              <th className="w-[4.25rem] lg:w-28" />
+              <th className="w-[4.6rem]" />
               {d.week.map((w) => {
                 const isToday = w.date === d.today;
                 return (
@@ -783,7 +912,22 @@ function WeekMix({ d }: { d: Dashboard }) {
           </tbody>
         </table>
       </div>
-    </Card>
+      <div className="mt-auto grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        <WeekTotal value={`${sum((w) => w.habitsDone)}/${sum((w) => w.habitsDue)}`} label="hábitos" />
+        <WeekTotal value={`${d.plan.weekDone}/${d.plan.weekTotal}`} label="plan" />
+        <WeekTotal value={String(sum((w) => (w.wrote ? 1 : 0)))} label="días escritos" />
+        <WeekTotal value={`${spent < 0 ? "−" : ""}${moneyCents(spent)}`} label="gastado" />
+      </div>
+    </TintedCard>
+  );
+}
+
+function WeekTotal({ value, label }: { value: string; label: string }) {
+  return (
+    <span className="grid min-w-0 gap-0.5 rounded-xl bg-surface-2 px-2.5 py-2 text-[11.5px] text-muted">
+      <b className="truncate font-mono text-[15px] font-semibold text-fg tabular">{value}</b>
+      {label}
+    </span>
   );
 }
 
@@ -796,120 +940,132 @@ function Dash() {
 function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null; prevName: string }) {
   const g = d.gastos;
   const maxCat = Math.max(1, ...g.topCategories.map((c) => c.cents));
-  const monthName = formatMonth(g.month).split(" ")[0];
+  const month = monthName(g.month);
+  const monthCap = month.charAt(0).toUpperCase() + month.slice(1);
+  const alerts = g.cardAlerts.length > 0 || g.budgetAlerts.length > 0;
   return (
-    <Card title="Gastos del mes" href="/gastos/informes" hrefLabel="Informes" color="var(--c-gastos)" className="lg:col-span-7" i={4}>
-      <QuickAdd accounts={g.quickAccounts} />
-      {g.cardAlerts.length > 0 && (
-        <ul className="grid gap-1.5" aria-label="Tarjetas por vencer">
-          {g.cardAlerts.map((c) => {
-            const late = c.due < d.today;
-            return (
-              <li key={c.accountId}>
-                <Link
-                  href={`/gastos?nuevo=1&pagar=${c.accountId}&monto=${c.leftCents}`}
-                  className={cx(
-                    "tap-tint flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
-                    late ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
-                  )}
-                >
-                  <CreditCard size={15} weight="fill" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">
-                    <strong className="font-semibold">{c.name}</strong>: {late ? "venció" : c.due === d.today ? "vence hoy" : "vence"}{" "}
-                    {c.due === d.today ? "" : `el ${formatShort(c.due)}`}
-                  </span>
-                  <span className="tabular shrink-0 font-medium">{moneyCents(c.leftCents, c.currency)}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {g.budgetAlerts.length > 0 && (
-        <ul className="grid gap-1.5" aria-label="Avisos de presupuesto">
-          {g.budgetAlerts.slice(0, 3).map((a) => (
-            <li key={a.categoryId}>
-              <Link
-                href="/gastos/presupuestos"
-                className={cx(
-                  "tap-tint flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
-                  a.state === "over" ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
-                )}
-              >
-                <FinanceIcon name={a.icon} size={15} weight="fill" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">
-                  <strong className="font-semibold">{a.name}</strong>:{" "}
-                  {a.state === "over"
-                    ? `te pasaste ${moneyCents(a.spentCents - a.amountCents, a.currency)}`
-                    : a.state === "near"
-                      ? `quedan ${moneyCents(a.amountCents - a.spentCents, a.currency)}`
-                      : "vas más rápido que el mes"}
-                </span>
-                <span className="tabular shrink-0 opacity-80">
-                  {Math.round((a.spentCents / a.amountCents) * 100)}%
-                </span>
-              </Link>
+    <TintedCard
+      tone="gastos"
+      icon={Wallet}
+      title="Gastos del mes"
+      meta={`${monthCap} · ${g.hasWork ? "cuentas personales, " : ""}en pesos`}
+      action={{ href: "/gastos/informes", label: "Informes" }}
+      className="ini-gastos max-lg:order-7 lg:col-span-12"
+      bodyClassName="ini-gastos-body"
+    >
+      <div>
+        {alerts && (
+          <div className="grid gap-1.5">
+            {g.cardAlerts.length > 0 && (
+              <ul className="grid gap-1.5" aria-label="Tarjetas por vencer">
+                {g.cardAlerts.map((c) => {
+                  const late = c.due < d.today;
+                  return (
+                    <li key={c.accountId}>
+                      <Link
+                        href={`/gastos?nuevo=1&pagar=${c.accountId}&monto=${c.leftCents}`}
+                        className={cx(
+                          "tap-tint flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
+                          late ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
+                        )}
+                      >
+                        <CreditCard size={15} weight="fill" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate">
+                          <strong className="font-semibold">{c.name}</strong>: {late ? "venció" : c.due === d.today ? "vence hoy" : "vence"}{" "}
+                          {c.due === d.today ? "" : `el ${formatShort(c.due)}`}
+                        </span>
+                        <span className="tabular shrink-0 font-medium">{moneyCents(c.leftCents, c.currency)}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {g.budgetAlerts.length > 0 && (
+              <ul className="grid gap-1.5" aria-label="Avisos de presupuesto">
+                {g.budgetAlerts.slice(0, 3).map((a) => (
+                  <li key={a.categoryId}>
+                    <Link
+                      href="/gastos/presupuestos"
+                      className={cx(
+                        "tap-tint flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-opacity hover:opacity-85",
+                        a.state === "over" ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]" : "bg-[var(--st-skip-bg)] text-[var(--st-skip-fg)]",
+                      )}
+                    >
+                      <FinanceIcon name={a.icon} size={15} weight="fill" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate">
+                        <strong className="font-semibold">{a.name}</strong>:{" "}
+                        {a.state === "over"
+                          ? `te pasaste ${moneyCents(a.spentCents - a.amountCents, a.currency)}`
+                          : a.state === "near"
+                            ? `quedan ${moneyCents(a.amountCents - a.spentCents, a.currency)}`
+                            : "vas más rápido que el mes"}
+                      </span>
+                      <span className="tabular shrink-0 opacity-80">{Math.round((a.spentCents / a.amountCents) * 100)}%</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <p className="kicker">Gastado en {month} (en pesos)</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="figure text-[40px] font-[780] tracking-[-0.045em] lg:text-[48px]">
+            {g.spentMonth < 0 ? "−" : ""}
+            {moneyCents(g.spentMonth)}
+          </p>
+          {delta !== null && (
+            <p
+              className={cx(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-medium",
+                Math.round(delta * 100) === 0
+                  ? "bg-surface-2 text-muted"
+                  : delta > 0
+                    ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]"
+                    : "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
+              )}
+            >
+              {Math.round(delta * 100) === 0 ? null : delta > 0 ? (
+                <ArrowUpRight size={13} weight="bold" aria-hidden />
+              ) : (
+                <ArrowDownRight size={13} weight="bold" aria-hidden />
+              )}
+              {Math.round(delta * 100) === 0 ? `Igual que ${prevName} al mismo día` : `${Math.abs(Math.round(delta * 100))}% vs. ${prevName} al mismo día`}
+            </p>
+          )}
+        </div>
+        <SpendChart cumThis={g.cumThis} cumPrev={g.cumPrev} monthName={month} prevName={prevName} />
+      </div>
+      <div>
+        <p className="kicker">En qué se fue</p>
+        {g.topCategories.length === 0 && <p className="text-[14px] text-muted">Sin gastos este mes.</p>}
+        <ul className="grid gap-3">
+          {g.topCategories.map((c) => (
+            <li key={c.id ?? "none"} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2.5 gap-y-1">
+              <ToneSquare size={26} style={tone(c.color)}>
+                <FinanceIcon name={c.icon} size={14} weight="fill" aria-hidden />
+              </ToneSquare>
+              <span className="truncate text-[13.5px]">{c.name}</span>
+              <span className="tabular text-[13px]">{moneyCents(c.cents)}</span>
+              <span className="col-start-2 col-end-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <span className="block h-full rounded-full" style={{ width: `${(c.cents / maxCat) * 100}%`, background: "var(--c-gastos)" }} />
+              </span>
             </li>
           ))}
         </ul>
-      )}
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-        <div>
-          <p className="kicker">Gastado en {monthName} (en pesos)</p>
-          <p className="figure mt-1 text-[34px]">{moneyCents(g.spentMonth)}</p>
-        </div>
-        {delta !== null && (
-          <p
-            className={cx(
-              "mb-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12.5px] font-medium",
-              Math.round(delta * 100) === 0
-                ? "bg-surface-2 text-muted"
-                : delta > 0
-                  ? "bg-[var(--st-fail-bg)] text-[var(--st-fail-fg)]"
-                  : "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]",
-            )}
-          >
-            {Math.round(delta * 100) === 0 ? null : delta > 0 ? (
-              <ArrowUpRight size={13} weight="bold" aria-hidden />
-            ) : (
-              <ArrowDownRight size={13} weight="bold" aria-hidden />
-            )}
-            {Math.round(delta * 100) === 0 ? `Igual que ${prevName} al mismo día` : `${Math.abs(Math.round(delta * 100))}% vs. ${prevName} al mismo día`}
-          </p>
-        )}
-        <div className="mb-1 ml-auto text-right text-[13px] text-muted">
-          Ingresos <span className="tabular font-medium text-fg">{moneyCents(g.incomeMonth)}</span>
+        <div className="mt-auto flex items-baseline justify-between gap-2 rounded-[14px] bg-[var(--head-bg)] px-3.5 py-3">
+          <span className="kicker text-[var(--head-fg)]!">Ingresos de {month}</span>
+          <span className="figure text-[22px] font-[750]">{moneyCents(g.incomeMonth)}</span>
         </div>
       </div>
-      <SpendChart cumThis={g.cumThis} cumPrev={g.cumPrev} monthName={monthName} prevName={prevName} />
-      <div className="grid gap-5 border-t border-line pt-4 sm:grid-cols-[1.4fr_1fr]">
-        <div className="grid content-start gap-2">
-          <p className="kicker">En qué se fue</p>
-          {g.topCategories.length === 0 && <p className="text-[14px] text-muted">Sin gastos este mes.</p>}
-          <ul className="grid gap-2">
-            {g.topCategories.map((c) => (
-              <li key={c.id ?? "none"} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2.5 gap-y-1">
-                <ToneSquare size={26} style={tone(c.color)}>
-                  <FinanceIcon name={c.icon} size={14} weight="fill" aria-hidden />
-                </ToneSquare>
-                <span className="truncate text-[13.5px]">{c.name}</span>
-                <span className="tabular text-[13px]">{moneyCents(c.cents)}</span>
-                <span className="col-start-2 col-end-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                  <span
-                    className="block h-full rounded-full"
-                    style={{ width: `${(c.cents / maxCat) * 100}%`, background: "var(--c-gastos)" }}
-                  />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="grid content-start gap-2">
+      <div className="justify-between gap-4!">
+        <div className="grid content-start gap-1.5">
           <p className="kicker">{g.hasWork ? "Saldo personal" : "Saldo total"}</p>
           {Object.entries(g.balances)
             .sort(([a], [b]) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)))
-            .map(([cur, cents]) => (
-              <p key={cur} className={cx("figure text-[24px]", cents < 0 && "text-danger")}>
+            .map(([cur, cents], i) => (
+              <p key={cur} className={cx("figure font-[780] tracking-[-0.045em]", i === 0 ? "text-[30px]" : "text-[22px] text-muted", cents < 0 && "text-danger")}>
                 {cents < 0 ? "−" : ""}
                 {money(Math.abs(cents) / 100, cur)}
               </p>
@@ -920,12 +1076,16 @@ function GastosCard({ d, delta, prevName }: { d: Dashboard; delta: number | null
               {g.usdRate ? ` (US$ 1 = ${moneyCents(Math.round(g.usdRate * 100))})` : ""}
             </p>
           )}
-          <Link href="/gastos/cuentas" className="text-[13px] text-muted hover:text-fg hover:underline">
-            Ver cuentas
+          <Link href="/gastos/cuentas" className="mt-0.5 inline-flex min-h-9 w-fit items-center gap-1 text-[13px] font-medium text-[var(--head-fg)] hover:underline">
+            Ver cuentas <ArrowRight size={13} aria-hidden />
           </Link>
         </div>
+        <div className="grid min-w-0 gap-2">
+          <p className="kicker">Cargar un gasto</p>
+          <QuickAdd accounts={g.quickAccounts} />
+        </div>
       </div>
-    </Card>
+    </TintedCard>
   );
 }
 
@@ -1060,25 +1220,32 @@ function SpendChart({
 function JournalCard({ d }: { d: Dashboard }) {
   const j = d.journal;
   return (
-    <Card title="Journal" href="/journal" hrefLabel="Entradas" color="var(--c-journal)" className="lg:col-span-5" i={5}>
-      <div className="grid grid-cols-3 gap-2">
-        <Stat value={j.streak} label={j.streak === 1 ? "día de racha" : "días de racha"} />
-        <Stat value={j.monthWritten} label={j.monthWritten === 1 ? "día este mes" : "días este mes"} />
-        <Stat value={j.total} label={j.total === 1 ? "día escrito" : "días escritos"} />
+    <TintedCard
+      tone="journal"
+      icon={Notebook}
+      title="Journal"
+      meta={j.last ? `Última entrada · ${j.last.date === d.today ? "hoy" : formatShort(j.last.date)}` : "Todavía no hay entradas"}
+      action={{ href: "/journal", label: "Entradas" }}
+      className="max-lg:order-8 lg:col-span-6 xl:col-span-5"
+    >
+      <div className="grid grid-cols-3">
+        <JournalNum value={j.streak} label={j.streak === 1 ? "día de racha" : "días de racha"} />
+        <JournalNum value={j.monthWritten} label={j.monthWritten === 1 ? "día este mes" : "días este mes"} />
+        <JournalNum value={j.total} label={j.total === 1 ? "día escrito" : "días escritos"} />
       </div>
       {j.last && (
         <Link
           href={`/journal/${j.last.id}`}
-          className="group grid gap-1.5 rounded-2xl bg-surface-2 p-4 transition-[background-color,scale] duration-[var(--dur-quick)] hover:bg-surface-3 active:scale-[0.98] motion-reduce:active:scale-100"
+          className="group grid gap-1.5 rounded-[6px_16px_16px_6px] border-l-[3px] border-[var(--head-chip)] bg-[var(--head-bg)] p-4 transition-[filter,scale] duration-[var(--dur-quick)] hover:brightness-[0.98] active:scale-[0.98] motion-reduce:active:scale-100"
         >
-          <span className="kicker">
+          <span className="kicker text-[var(--head-fg)]!">
             Última entrada · {j.last.date === d.today ? "hoy" : formatShort(j.last.date)}
           </span>
           {j.last.title && <span className="font-semibold">{j.last.title}</span>}
-          <span className="line-clamp-4 text-[14px] leading-relaxed text-muted">{j.last.excerpt}</span>
+          <span className="line-clamp-4 text-[14px] leading-relaxed text-fg/85">{j.last.excerpt}</span>
         </Link>
       )}
-      <form action={writeOnDay.bind(null, undefined, false)}>
+      <form action={writeOnDay.bind(null, undefined, false)} className="mt-auto">
         <button
           type="submit"
           className="group inline-flex h-12 w-full items-center justify-between gap-2 rounded-full bg-ink pr-1.5 pl-5 text-[14px] font-medium text-on-ink transition-[opacity,transform] duration-200 hover:opacity-90 active:scale-[0.98]"
@@ -1089,7 +1256,16 @@ function JournalCard({ d }: { d: Dashboard }) {
           </span>
         </button>
       </form>
-    </Card>
+    </TintedCard>
+  );
+}
+
+function JournalNum({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="grid min-w-0 gap-1 border-l border-line px-3.5 first:border-l-0 first:pl-0">
+      <span className="figure text-[32px] font-[780] tracking-[-0.045em]">{value}</span>
+      <span className="text-[12px] leading-tight text-muted">{label}</span>
+    </div>
   );
 }
 
@@ -1097,64 +1273,59 @@ function JournalCard({ d }: { d: Dashboard }) {
 
 function NotesCard({ s, today }: { s: NotesSummary; today: string }) {
   return (
-    <Card title="Notas" href="/notas" hrefLabel="Ver todas" color="var(--c-notas)" className="lg:col-span-12" i={6}>
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-start">
+    <TintedCard
+      tone="notas"
+      icon={Note}
+      title="Notas"
+      meta={`${s.laterVideos} ${s.laterVideos === 1 ? "video" : "videos"} para ver`}
+      action={{ href: "/notas", label: "Ver todas" }}
+      className="max-lg:order-9 lg:flex-1"
+      bodyClassName="gap-2.5!"
+    >
+      <Link
+        href="/notas?seccion=videos&ver=despues"
+        className="press flex items-center gap-3 rounded-2xl px-4 py-3 transition-[filter] hover:brightness-[0.98]"
+        style={{ background: "var(--p-red-bg)" }}
+      >
+        <span style={tone("red")} className="chip-solid inline-flex size-9 shrink-0 items-center justify-center rounded-xl">
+          <PlayCircle size={19} weight="fill" aria-hidden />
+        </span>
+        <span className="grid gap-0.5">
+          <span className="figure text-[26px] leading-none font-[750]">{s.laterVideos}</span>
+          <span className="text-[12.5px] text-fg/80">{s.laterVideos === 1 ? "video para ver" : "videos para ver"}</span>
+        </span>
+      </Link>
+      {s.latest.length ? (
+        <ul className="grid gap-0.5">
+          {s.latest.map((n) => {
+            const sec = sectionOf(n.section);
+            return (
+              <li key={n.id} className="min-w-0">
+                <Link href={`/notas?seccion=${sec.id}`} className="tap-tint flex min-w-0 items-center gap-3 rounded-xl px-1 py-2 hover:bg-surface-2">
+                  <span style={tone(sec.color)} className="chip-solid inline-flex size-8 shrink-0 items-center justify-center rounded-lg">
+                    <sec.icon size={16} weight="fill" aria-hidden />
+                  </span>
+                  <span className="grid min-w-0 gap-0.5">
+                    <span className="truncate text-[14px] font-medium">{noteHeading(n)}</span>
+                    <span className="truncate text-[12px] text-muted">
+                      {n.url ? `${noteDomain(n.url)} · ` : ""}
+                      {relativeDay(dayOfInstant(new Date(n.createdAt)), today)}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
         <Link
-          href="/notas?seccion=videos&ver=despues"
-          className="press flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 transition-colors hover:bg-surface-3"
+          href="/notas?nuevo=1"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong px-4 text-[14px] text-fg transition-colors hover:bg-surface-2"
         >
-          <span style={tone("red")} className="chip-solid inline-flex size-9 shrink-0 items-center justify-center rounded-xl">
-            <PlayCircle size={19} weight="fill" aria-hidden />
-          </span>
-          <span className="grid gap-0.5">
-            <span className="figure text-[22px] leading-none">{s.laterVideos}</span>
-            <span className="text-[12.5px] text-muted">{s.laterVideos === 1 ? "video para ver" : "videos para ver"}</span>
-          </span>
+          <Plus size={15} weight="bold" aria-hidden /> Guardar la primera nota
         </Link>
-        {s.latest.length ? (
-          <ul className="grid gap-1 lg:grid-cols-3 lg:gap-3">
-            {s.latest.map((n) => {
-              const sec = sectionOf(n.section);
-              return (
-                <li key={n.id} className="min-w-0">
-                  <Link
-                    href={`/notas?seccion=${sec.id}`}
-                    className="tap-tint flex min-w-0 items-center gap-3 rounded-xl px-1 py-2 lg:rounded-2xl lg:bg-surface-2 lg:px-3 lg:py-3 lg:hover:bg-surface-3"
-                  >
-                    <span style={tone(sec.color)} className="chip-solid inline-flex size-8 shrink-0 items-center justify-center rounded-lg">
-                      <sec.icon size={16} weight="fill" aria-hidden />
-                    </span>
-                    <span className="grid min-w-0 gap-0.5">
-                      <span className="truncate text-[14px] font-medium">{noteHeading(n)}</span>
-                      <span className="truncate text-[12px] text-muted">
-                        {n.url ? `${noteDomain(n.url)} · ` : ""}
-                        {relativeDay(dayOfInstant(new Date(n.createdAt)), today)}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <Link
-            href="/notas?nuevo=1"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong px-4 text-[14px] text-fg transition-colors hover:bg-surface-2"
-          >
-            <Plus size={15} weight="bold" aria-hidden /> Guardar la primera nota
-          </Link>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="grid gap-0.5 rounded-xl bg-surface-2 px-3 py-2.5">
-      <span className="figure text-[24px]">{value}</span>
-      <span className="text-[11.5px] leading-tight text-muted">{label}</span>
-    </div>
+      )}
+    </TintedCard>
   );
 }
 
@@ -1165,16 +1336,25 @@ const RAMP_STEPS = [0, 22, 45, 70, 100];
 function Constancia({ d }: { d: Dashboard }) {
   const habitByDay = new Map(d.habits.history.map((h) => [h.date, h]));
   const wrote = new Set(d.journal.days);
-  const weeks = Math.ceil((daysBetween(d.heatFrom, d.today) + 1) / 7);
+  const totalDays = daysBetween(d.heatFrom, d.today) + 1;
+  const weeks = Math.ceil(totalDays / 7);
   // Hoy, sin terminar, no baja el promedio: entra solo si ya está completo.
   const habitDays = d.habits.history.filter((h) => h.due > 0 && (h.date < d.today || h.done >= h.due));
   const habitAvg = habitDays.length ? Math.round((habitDays.reduce((n, h) => n + h.done / h.due, 0) / habitDays.length) * 100) : 0;
   const wroteN = d.journal.days.length;
+  const thisWeek = d.week.filter((w) => w.date <= d.today);
+  const wDone = thisWeek.reduce((n, w) => n + w.habitsDone, 0);
+  const wDue = thisWeek.reduce((n, w) => n + w.habitsDue, 0);
 
   return (
-    <Card title="Constancia" color="var(--mod-inicio)" className="lg:col-span-12" i={7}>
-      <p className="-mt-2 text-[13px] text-muted">Últimas {weeks} semanas. Cada cuadrito es un día.</p>
-      <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
+    <TintedCard
+      tone="inicio"
+      icon={CalendarCheck}
+      title="Constancia"
+      meta={`Últimas ${weeks} semanas · cada cuadrito es un día`}
+      className="max-lg:order-11 lg:col-span-12 xl:col-span-7"
+    >
+      <div className="grid gap-6 sm:grid-cols-2 sm:gap-7">
         <Heat
           title="Hábitos"
           summary={`${habitAvg}% de cumplimiento promedio`}
@@ -1195,7 +1375,7 @@ function Constancia({ d }: { d: Dashboard }) {
         />
         <Heat
           title="Journal"
-          summary={`Escribiste ${wroteN} de ${daysBetween(d.heatFrom, d.today) + 1} días`}
+          summary={`Escribiste ${wroteN} de ${totalDays} días`}
           color="var(--c-journal)"
           from={d.heatFrom}
           today={d.today}
@@ -1205,7 +1385,12 @@ function Constancia({ d }: { d: Dashboard }) {
           binary
         />
       </div>
-      <details className="text-sm">
+      <div className="mt-auto grid grid-cols-3 gap-1.5 sm:gap-2.5">
+        <FootStat label="Hábitos" value={habitAvg} unit="%" sub="de cumplimiento promedio" size="text-[22px] sm:text-[26px]" />
+        <FootStat label="Journal" value={wroteN} unit={`de ${totalDays}`} sub="días escritos" size="text-[22px] sm:text-[26px]" />
+        <FootStat label="Esta semana" value={wDone} unit={`de ${wDue}`} sub="hábitos hechos" size="text-[22px] sm:text-[26px]" />
+      </div>
+      <details className="-mt-2 text-sm">
         <summary className="kicker inline-flex min-h-11 cursor-pointer items-center select-none hover:text-fg">Ver como tabla</summary>
         <div className="mt-1 max-h-64 overflow-auto">
           <table className="w-full text-[13px]">
@@ -1242,7 +1427,7 @@ function Constancia({ d }: { d: Dashboard }) {
           </table>
         </div>
       </details>
-    </Card>
+    </TintedCard>
   );
 }
 

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { PencilSimple } from "@phosphor-icons/react";
+import { PencilSimple, PiggyBank } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { useSafeTransition } from "@/components/safe-action";
 import { saveReserveGoal } from "@/lib/offline/finance";
 import { formatMonth } from "@/lib/dates";
 import { dec1, moneyWhole } from "@/lib/format";
-import { Button, cx, Input } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 
 export type ReserveData = {
   balanceCents: number;
@@ -66,9 +67,16 @@ export function ReserveCard({ data }: { data: ReserveData }) {
   }
 
   return (
-    <section id="reserva" aria-label="Meses de reserva" className="grid scroll-mt-24 gap-6 rounded-[20px] border border-line bg-surface p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:p-6">
+    <TintedCard
+      id="reserva"
+      icon={PiggyBank}
+      title="Meses de reserva"
+      meta={`Meta ${dec1(goal)} meses · ${pct}%`}
+      progress={pct / 100}
+      className="scroll-mt-24"
+      bodyClassName="grid! gap-6! lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:p-6!"
+    >
       <div className="grid content-start gap-3">
-        <p className="kicker">Meses de reserva</p>
         <p className="flex items-baseline gap-2">
           <span className="figure text-[48px] leading-none">{months === null ? "–" : dec1(months)}</span>
           <span className="text-[16px] text-muted">{months === 1 ? "mes" : "meses"}</span>
@@ -109,9 +117,6 @@ export function ReserveCard({ data }: { data: ReserveData }) {
             )}
             <span className="font-mono text-muted tabular">{pct}%</span>
           </div>
-          <span className="h-2 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-            <span className={cx("bar-anim block h-full rounded-full", pct >= 100 ? "bg-[var(--st-done-line)]" : "bg-accent")} style={{ width: `${pct}%` }} />
-          </span>
           {error && <p className="reveal text-[13px] text-danger">{error}</p>}
           <p className="text-[12.5px] text-muted">{months !== null && months >= goal ? "Llegaste a la meta." : missing > 0 ? `Te faltan ${moneyWhole(missing)} para llegar.` : ""}</p>
         </div>
@@ -172,6 +177,6 @@ export function ReserveCard({ data }: { data: ReserveData }) {
         </details>
         <p className="text-[11.5px] text-muted">Sin cuentas de trabajo, transferencias ni ajustes; los dólares con la cotización de hoy.</p>
       </div>
-    </section>
+    </TintedCard>
   );
 }

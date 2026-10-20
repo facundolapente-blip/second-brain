@@ -4,7 +4,8 @@ import { useSafeTransition } from "@/components/safe-action";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Archive, CaretLeft, Check, PencilSimple, Plus, X } from "@phosphor-icons/react";
+import { Archive, CaretLeft, ChartPieSlice, Check, PencilSimple, Plus, Receipt, Wallet, X } from "@phosphor-icons/react";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import { archiveProject, deleteProject, setTransactionsProject } from "@/lib/offline/finance";
 import type { AccountDTO, CategoryDTO, TxDTO } from "@/lib/finance-logic";
 import { budgetState, convertCents, type ProjectDTO } from "@/lib/budget-logic";
@@ -112,30 +113,39 @@ export function ProjectView({
             </div>
           </div>
 
-          <div className="hero grid gap-3 rounded-[20px] p-5">
-            <p className="hero-sub text-[12.5px]">Gastado</p>
-            <p className="figure text-[38px]">
-              {moneyCents(p.spentCents, p.currency)} <span className="hero-sub text-[18px]">de {moneyCents(p.amountCents, p.currency)}</span>
-            </p>
-            <span className="block h-2.5 overflow-hidden rounded-full bg-white/20">
-              <span className="bar-anim block h-full rounded-full bg-white" style={{ width: `${pct}%` }} />
+          <StatTile
+            icon={Wallet}
+            label="Gastado"
+            figure={<span className="text-[36px] lg:text-[40px]">{moneyCents(p.spentCents, p.currency)}</span>}
+            unit={`de ${moneyCents(p.amountCents, p.currency)}`}
+            sub={
+              <>
+                <span className={st === "over" ? "text-danger" : undefined}>
+                  {st === "over"
+                    ? `Te pasaste ${moneyCents(p.spentCents - p.amountCents, p.currency)}`
+                    : `Quedan ${moneyCents(p.amountCents - p.spentCents, p.currency)} (${100 - pct}%)`}
+                </span>
+                {foreign && (
+                  <span className="mt-1 block text-[12px]">
+                    Lo que está en otra moneda se pasa a {p.currency === "UYU" ? "pesos" : p.currency === "USD" ? "dólares" : p.currency} con la
+                    cotización de hoy.
+                  </span>
+                )}
+              </>
+            }
+          >
+            <span className="tmini-seg" role="img" aria-label={`Gastaste el ${pct}% del presupuesto`}>
+              <span className="relative overflow-hidden">
+                <span
+                  className="bar-anim absolute inset-y-0 left-0 rounded-full"
+                  style={{ width: `${pct}%`, background: st === "over" ? "var(--st-fail-line)" : "var(--head-chip)" }}
+                />
+              </span>
             </span>
-            <p className="hero-sub text-[13px]">
-              {st === "over"
-                ? `Te pasaste ${moneyCents(p.spentCents - p.amountCents, p.currency)}`
-                : `Quedan ${moneyCents(p.amountCents - p.spentCents, p.currency)} (${100 - pct}%)`}
-            </p>
-            {foreign && (
-              <p className="hero-sub text-[12px]">
-                Lo que está en otra moneda se pasa a {p.currency === "UYU" ? "pesos" : p.currency === "USD" ? "dólares" : p.currency} con la cotización
-                de hoy.
-              </p>
-            )}
-          </div>
+          </StatTile>
 
           {cats.length > 0 && (
-            <div className="grid gap-2.5 rounded-[20px] border border-line bg-surface p-4">
-              <p className="kicker">En qué se fue</p>
+            <TintedCard icon={ChartPieSlice} title="En qué se fue" meta={cats.length === 1 ? "1 categoría" : `${cats.length} categorías`} bodyClassName="gap-2.5!">
               <ul className="grid gap-2.5">
                 {cats.map(([id, cents]) => {
                   const c = lk.category(id);
@@ -151,31 +161,36 @@ export function ProjectView({
                   );
                 })}
               </ul>
-            </div>
+            </TintedCard>
           )}
           {p.note && <p className="text-[14px] leading-relaxed text-muted">{p.note}</p>}
         </section>
 
-        <section className="grid content-start gap-3 lg:col-span-7">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="display text-[22px]">Movimientos</h2>
-            <Button
-              size="sm"
-              variant="outline"
+        <TintedCard
+          icon={Receipt}
+          title="Movimientos"
+          meta={txs.length === 1 ? "1 movimiento" : `${txs.length} movimientos`}
+          action={
+            <button
+              type="button"
+              className="tcard-pill press"
               onClick={() => {
                 setPicked(new Set());
                 addSheet.current?.open();
               }}
             >
-              <Plus size={14} weight="bold" aria-hidden /> Sumar gastos
-            </Button>
-          </div>
+              <Plus size={13} weight="bold" aria-hidden /> Sumar gastos
+            </button>
+          }
+          className="self-start lg:col-span-7"
+          bodyClassName={txs.length ? "gap-0! p-0!" : undefined}
+        >
           {txs.length === 0 ? (
-            <p className="rounded-[20px] border border-dashed border-line-strong p-5 text-[13.5px] leading-relaxed text-muted">
+            <p className="text-[13.5px] leading-relaxed text-muted">
               Todavía no tiene gastos. Sumalos con &ldquo;Sumar gastos&rdquo; o, al cargar uno nuevo, elegí este presupuesto.
             </p>
           ) : (
-            <ul className="grid divide-y divide-line rounded-2xl border border-line bg-surface">
+            <ul className="grid divide-y divide-line">
               {txs.map((t) => (
                 <TxLine key={t.id} t={t} lk={lk} equivalent={lk.currencyOf(t.accountId) !== p.currency ? moneyCents(inProject(t), p.currency) : null}>
                   <IconButton
@@ -189,7 +204,7 @@ export function ProjectView({
               ))}
             </ul>
           )}
-        </section>
+        </TintedCard>
       </main>
 
       <Sheet ref={editSheet} title="Editar presupuesto">

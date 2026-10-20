@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
-import { ArrowClockwise, ArrowSquareOut, CheckCircle, CircleNotch, Heartbeat, Watch, WarningCircle } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowSquareOut, CheckCircle, CircleNotch, Watch, WarningCircle } from "@phosphor-icons/react";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { Button, ConfirmButton, cx, inputClass } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 import { formatShort } from "@/lib/dates";
 import { connectWatch, disconnectWatch, syncWatchNow, type WatchResult } from "@/lib/offline/watch";
 import type { WatchStatus } from "@/lib/watch";
@@ -31,23 +31,21 @@ export function WatchCard({ status }: { status: WatchStatus }) {
   const shown = result ?? state;
 
   return (
-    <div className="grid content-start gap-4 rounded-[20px] border border-line bg-surface p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:p-5">
+    <TintedCard
+      icon={Watch}
+      title="Reloj Huawei"
+      meta={
+        status.connected
+          ? status.lastError
+            ? "Conectado, con un problema"
+            : `Conectado · ${status.lastSync ? `última sincronización ${ago(status.lastSync)}` : "todavía sin sincronizar"}`
+          : "Sin conectar"
+      }
+      action={status.connected ? { href: "/salud", label: "Ver en Salud" } : undefined}
+      className="lg:col-span-12"
+      bodyClassName="grid! content-start gap-4! lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6!"
+    >
       <div className="grid content-start gap-3">
-        <header className="flex items-center gap-2.5">
-          <span className="inline-flex size-9 items-center justify-center rounded-xl bg-[var(--mod-inicio)] text-white">
-            <Watch size={18} weight="fill" aria-hidden />
-          </span>
-          <span className="grid">
-            <span className="text-[15px] font-semibold">Reloj Huawei</span>
-            <span className="text-[12px] text-muted">
-              {status.connected
-                ? status.lastError
-                  ? "Conectado, con un problema"
-                  : `Conectado · ${status.lastSync ? `última sincronización ${ago(status.lastSync)}` : "todavía sin sincronizar"}`
-                : "Sin conectar"}
-            </span>
-          </span>
-        </header>
         <p className="max-w-[60ch] text-[13px] leading-relaxed text-muted">
           Tus pasos, tu sueño y tu peso del Watch Fit 3 llegan solos al check-in de cada día (se revisa cada hora). Pasan por
           intervals.icu, que es gratis y tiene la conexión oficial con Huawei Health: vos seguís usando la app de Huawei como
@@ -105,10 +103,6 @@ export function WatchCard({ status }: { status: WatchStatus }) {
               >
                 Desconectar
               </ConfirmButton>
-              <Link href="/salud" className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-accent-fg hover:bg-surface-2">
-                <Heartbeat size={15} aria-hidden />
-                Ver en Salud
-              </Link>
             </div>
           </>
         ) : (
@@ -167,6 +161,6 @@ export function WatchCard({ status }: { status: WatchStatus }) {
           </p>
         )}
       </div>
-    </div>
+    </TintedCard>
   );
 }

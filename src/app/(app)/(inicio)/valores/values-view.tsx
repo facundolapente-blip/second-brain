@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, CloudArrowUp, WarningCircle } from "@phosphor-icons/react";
+import { Check, CloudArrowUp, Compass, Quotes, WarningCircle } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { PageHeader } from "@/components/page-header";
 import { cx, inputClass } from "@/components/ui";
 import { notifyError } from "@/components/undo-toast";
@@ -59,16 +60,20 @@ export function ValuesView({ initial }: { initial: string }) {
   return (
     <>
       <PageHeader title="Valores" kicker="Lo que querés tener presente" wide />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-8 lg:px-10 lg:pt-4">
-        <section className="grid content-start gap-3 lg:col-span-7">
-          <div className="flex items-center justify-between gap-3">
-            <p className="max-w-[60ch] text-[13.5px] leading-relaxed text-muted">
-              Escribí tus valores, principios o tu manifiesto. Cada renglón con guion o cada párrafo es una nota, y los títulos
-              con # las agrupan. En Inicio sale una nota distinta cada 6 horas. Lo que va bajo un título que empieza con
-              “Referencia” queda acá pero no sale en Inicio.
-            </p>
-            <SaveState status={status} />
-          </div>
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+        <TintedCard
+          icon={Compass}
+          title="Tu manifiesto"
+          meta="Se guarda solo"
+          action={<SaveState status={status} />}
+          className="lg:col-span-7"
+          bodyClassName="gap-3!"
+        >
+          <p className="max-w-[60ch] text-[13.5px] leading-relaxed text-muted">
+            Escribí tus valores, principios o tu manifiesto. Cada renglón con guion o cada párrafo es una nota, y los títulos
+            con # las agrupan. En Inicio sale una nota distinta cada 6 horas. Lo que va bajo un título que empieza con
+            “Referencia” queda acá pero no sale en Inicio.
+          </p>
           <textarea
             spellCheck
             lang="es"
@@ -82,16 +87,25 @@ export function ValuesView({ initial }: { initial: string }) {
             }}
             onBlur={() => void flush()}
             placeholder={"# Disciplina\n- Hago lo difícil primero.\n- La constancia le gana al talento.\n\n# Cómo quiero vivir\nPresente, sin apuro, con la gente que quiero."}
-            className={cx(inputClass, "autogrow min-h-[55dvh] w-full resize-none py-3 text-[15.5px] leading-[1.7]")}
+            className={cx(inputClass, "autogrow min-h-[55dvh] w-full flex-1 resize-none py-3 text-[15.5px] leading-[1.7]")}
           />
-        </section>
+        </TintedCard>
 
-        <aside className="grid content-start gap-3 lg:col-span-5">
-          <h2 className="text-[15px] font-semibold">
-            Así salen en Inicio <span className="font-mono text-[13px] font-normal text-muted">· {notes.length === 1 ? "1 nota" : `${notes.length} notas`}</span>
-          </h2>
+        <TintedCard
+          as="div"
+          icon={Quotes}
+          title="Así salen en Inicio"
+          meta={`${notes.length === 1 ? "1 nota" : `${notes.length} notas`} · una cada 6 h`}
+          action={{ href: "/", label: "Inicio" }}
+          className="lg:col-span-5"
+          bodyClassName="gap-3!"
+        >
           {notes.length === 0 ? (
-            <p className="text-[13.5px] text-muted">Todavía no hay notas. Cuando escribas, acá vas a ver cómo se separan.</p>
+            <div className="grid justify-items-center gap-2 py-10 text-center">
+              <Quotes size={28} weight="fill" className="text-faint" aria-hidden />
+              <p className="text-[14.5px] font-medium">Todavía no hay notas</p>
+              <p className="max-w-[34ch] text-[13px] text-muted">Cuando escribas, acá vas a ver cómo se separan.</p>
+            </div>
           ) : (
             <ol className="grid gap-2">
               {notes.map((n, i) => (
@@ -102,7 +116,7 @@ export function ValuesView({ initial }: { initial: string }) {
               ))}
             </ol>
           )}
-        </aside>
+        </TintedCard>
       </main>
     </>
   );
@@ -118,7 +132,7 @@ function SaveState({ status }: { status: Status }) {
   // Cada estado entra con un fundido corto (nunca al cargar); la tilde se dibuja al terminar de guardar.
   const swap = useSwap(status);
   return (
-    <span role="status" className={cx("inline-flex shrink-0 items-center gap-1.5 font-mono text-[12px]", status === "error" ? "text-danger" : "text-muted")}>
+    <span role="status" className={cx("inline-flex shrink-0 items-center gap-1.5 font-mono text-[12px]", status === "error" ? "text-danger" : "text-[var(--head-fg)]")}>
       <span key={status} className={cx("inline-flex items-center gap-1.5", swap)}>
         <span className={cx("inline-flex", swap && status === "saved" && "check-draw")}>{map.icon}</span>
         {map.text}

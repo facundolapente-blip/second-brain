@@ -21,3 +21,21 @@
 #contenido:has([data-journal-editor]) > .fold:first-child {
   display: none;
 }
+
+/*
+ * Lista (diseño 4): un año por tarjeta con cabecera teñida. En el celular la cabecera
+ * del año queda pegada debajo del encabezado al bajar (como antes el número del año):
+ * overflow: clip en vez de hidden para que la tarjeta no corte el sticky.
+ */
+.jr-year { overflow: clip; }
+.jr-year .tcard-title { font-size: 19px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+/* Dentro de la tarjeta las entradas son filas: la línea de abajo sin esquinas redondas. */
+.jr-year .tcard-body > a:not([aria-current]),
+.jr-rows > a:not([aria-current]) { border-radius: 0; }
+@media (max-width: 63.99rem) {
+  .jr-year > .tcard-head {
+    position: sticky;
+    top: calc(4rem + env(safe-area-inset-top));
+    z-index: 10;
+  }
+}

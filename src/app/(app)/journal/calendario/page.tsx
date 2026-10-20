@@ -10,6 +10,7 @@ import { EntryCard, JournalHeader, WriteDayButton } from "../journal-ui";
 import { JournalTabs, WriteTodayButton } from "../journal-nav";
 import { JournalMonthNav } from "../month-nav";
 import { NavDim, PeriodSwipeMain } from "../../gastos/period-step";
+import { JCard } from "../cards";
 
 export const metadata = { title: "Calendario · Journal" };
 
@@ -17,6 +18,7 @@ export const metadata = { title: "Calendario · Journal" };
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 const WEEK_HEAD = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const field =
   "h-11 rounded-[10px] border border-line-strong bg-surface px-3 text-[14px] text-fg outline-none focus:border-accent";
 const goBtn =
@@ -62,8 +64,8 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
     <>
       <JournalHeader title="Calendario" back="/journal" wide tabs={<JournalTabs />} actions={<WriteTodayButton />} />
 
-      <PeriodSwipeMain className="mx-auto grid max-w-3xl gap-8 px-4 pt-3 lg:max-w-6xl lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-10 lg:px-10 lg:pt-8">
-        <section className="grid content-start gap-4 lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:p-7 lg:shadow-[var(--card-shadow)]">
+      <PeriodSwipeMain className="mx-auto grid max-w-3xl gap-4 px-4 pt-3 lg:max-w-6xl lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-10 lg:pt-8">
+        <JCard icon="calendar" title="Calendario" meta="Tocá un día para leerlo" bodyClassName="gap-4! lg:px-7! lg:pb-7!">
           {/* El mes cambia al toque (o deslizando); los días y las cifras llegan después. */}
           <JournalMonthNav
             month={month}
@@ -152,7 +154,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                         : d > today
                           ? "text-faint"
                           : "text-fg hover:bg-surface-2",
-                    isSel && "ring-[1.5px] ring-fg ring-offset-2 ring-offset-bg lg:ring-offset-surface",
+                    isSel && "ring-[1.5px] ring-fg ring-offset-2 ring-offset-surface",
                   )}
                 >
                   {Number(d.slice(8))}
@@ -174,39 +176,36 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
               </li>
             ))}
           </ul>
-        </section>
+        </JCard>
 
-        <section className="grid content-start gap-3">
-          <SwapOnChange k={`${selected}|${range?.from ?? ""}|${range?.to ?? ""}`} className="grid content-start gap-3">
-          {rangeEntries && (
-            <div className="grid gap-3">
-              <div className="grid gap-1 border-b border-fg/80 pb-3">
-                <span className="kicker">Período</span>
-                <h2 className="display text-[24px]">{rangeLabel}</h2>
-                <span className="text-[13.5px] text-muted tabular">
-                  {rangeEntries.length === 0
-                    ? "No escribiste en esas fechas."
-                    : `${rangeEntries.length === 1 ? "1 entrada" : `${rangeEntries.length} entradas`} en ${new Set(rangeEntries.map((e) => e.date)).size} días, ${nf.format(rangeEntries.reduce((n, e) => n + e.words, 0))} palabras`}
-                </span>
-              </div>
+        <section className="grid content-start">
+          <SwapOnChange k={`${selected}|${range?.from ?? ""}|${range?.to ?? ""}`} className="grid content-start gap-4 lg:gap-6">
+          {rangeEntries && range && (
+            <JCard icon="calendar-check" title="Período" meta={rangeLabel} bodyClassName="jr-rows gap-0! py-1! lg:py-2!">
+              <p className="py-2 text-[13.5px] text-muted tabular">
+                {rangeEntries.length === 0
+                  ? "No escribiste en esas fechas."
+                  : `${rangeEntries.length === 1 ? "1 entrada" : `${rangeEntries.length} entradas`} en ${new Set(rangeEntries.map((e) => e.date)).size} días, ${nf.format(rangeEntries.reduce((n, e) => n + e.words, 0))} palabras`}
+              </p>
               {[...rangeEntries].reverse().map((e, i) => (
                 <EntryCard key={e.id} entry={e} index={i} />
               ))}
-            </div>
+            </JCard>
           )}
           {range ? null : selected ? (
-            <>
-              <div className="flex items-center justify-between gap-3 border-b border-fg/80 pb-3">
-                <h2 className="display text-[24px] first-letter:uppercase">{formatLong(selected)}</h2>
-                {selectedEntries.length > 0 && (
-                  <WriteDayButton date={selected} nueva variant="outline">
-                    <Plus size={16} weight="bold" /> Otra
-                  </WriteDayButton>
-                )}
-              </div>
+            <JCard
+              icon="book"
+              title={capitalize(formatLong(selected))}
+              meta={
+                selectedEntries.length === 0
+                  ? "Sin entrada"
+                  : `${selectedEntries.length === 1 ? "1 entrada" : `${selectedEntries.length} entradas`}, ${nf.format(selectedEntries.reduce((n, e) => n + e.words, 0))} palabras`
+              }
+              bodyClassName="jr-rows gap-0! py-1! lg:py-2!"
+            >
               {selectedEntries.length === 0 ? (
-                <div className="grid justify-items-start gap-4 py-6">
-                  <p className="display text-[20px] text-muted">
+                <div className="grid justify-items-start gap-4 py-4">
+                  <p className="text-[15px] text-muted">
                     {selected > today ? "Este día todavía no llegó." : "Este día no escribiste."}
                   </p>
                   {selected <= today && (
@@ -216,19 +215,33 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                   )}
                 </div>
               ) : (
-                selectedEntries.map((e, i) => <EntryCard key={e.id} entry={e} index={i} />)
+                <>
+                  {selectedEntries.map((e, i) => (
+                    <EntryCard key={e.id} entry={e} index={i} />
+                  ))}
+                  <div className="py-3">
+                    <WriteDayButton date={selected} nueva variant="outline">
+                      <Plus size={16} weight="bold" /> Otra entrada para este día
+                    </WriteDayButton>
+                  </div>
+                </>
               )}
-            </>
+            </JCard>
           ) : (
-            <p className="border-t border-line py-6 font-serif text-[20px] text-muted">
-              Tocá un día para ver lo que escribiste.
-            </p>
+            <JCard icon="book" title="Ningún día elegido" meta="Fuera de este mes">
+              <p className="text-[15px] text-muted">Tocá un día para ver lo que escribiste.</p>
+            </JCard>
           )}
 
           {/* En la computadora sobra lugar: el resto del mes, renglón por renglón. */}
           {!range && entries.length > 0 && (
-            <div className="mt-8 hidden gap-1 lg:grid">
-              <h3 className="kicker border-b border-line pb-2">Todo el mes</h3>
+            <JCard
+              icon="notebook"
+              title="Todo el mes"
+              meta={`${entries.length} ${entries.length === 1 ? "entrada" : "entradas"}`}
+              className="max-lg:hidden!"
+              bodyClassName="py-2!"
+            >
               <ul className="grid">
                 {entries
                   .filter((e) => e.date !== selected)
@@ -247,7 +260,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/journal
                     </li>
                   ))}
               </ul>
-            </div>
+            </JCard>
           )}
           </SwapOnChange>
         </section>

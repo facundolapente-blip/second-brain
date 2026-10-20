@@ -3,10 +3,17 @@
 import Link from "next/link";
 import { PeriodArrow, usePeriodNav } from "../period-nav";
 import {
+  CalendarBlank,
+  CalendarCheck,
   CaretLeft,
   CaretRight,
   CheckCircle,
   FilePdf,
+  Medal,
+  Notebook,
+  Smiley,
+  Table,
+  Wallet,
 } from "@phosphor-icons/react";
 import type { MonthlySummary } from "@/lib/monthly";
 import { formatMonth, formatShort, shiftMonth, todayISO, weekday } from "@/lib/dates";
@@ -19,7 +26,7 @@ import { moneyCents, dec1, moneyWhole } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { cx, ToneSquare } from "@/components/ui";
 import { MoodIcon } from "../../journal/journal-ui";
-import { BodyMinis, Card, Delta, hasWatchData, Kpi, Mini } from "../summary-ui";
+import { BodyMinis, Card, hasWatchData, Mini, ModuleTiles } from "../summary-ui";
 import { YearHeat } from "./year-heat";
 
 const WD = ["L", "M", "X", "J", "V", "S", "D"];
@@ -107,38 +114,21 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         }
       />
       <main {...nav.bodyProps} className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4 print:grid-cols-2 print:gap-3 print:p-0">
-        <section
-          aria-label="El mes en números"
-          className="hero rise rounded-[22px] p-5 lg:col-span-12 lg:p-7 print:col-span-2 print:break-inside-avoid"
-        >
-          <p className="hero-sub text-[13px]">{compare}</p>
-          <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3 print:grid-cols-4">
-            <Kpi
-              label="Hábitos cumplidos"
-              value={now.habitPct === null ? "–" : `${now.habitPct}%`}
-            >
-              <Delta now={now.habitPct} before={before.habitPct} unit="pts" />
-            </Kpi>
-            <Kpi
-              label="Días escritos"
-              value={`${now.wroteDays} de ${totalDays}`}
-            >
-              <Delta now={now.wroteDays} before={before.wroteDays} />
-            </Kpi>
-            <Kpi label="Gastado" value={moneyWhole(now.spentCents)}>
-              <Delta
-                now={now.spentCents}
-                before={before.spentCents}
-                goodUp={false}
-              />
-            </Kpi>
-            <Kpi
-              label="Bloques del plan"
-              value={`${now.blocksDone} de ${now.blocksTotal}`}
-            >
-              <Delta now={now.blocksDone} before={before.blocksDone} />
-            </Kpi>
-          </div>
+        <section aria-label={`El ${word} en números`} className="grid gap-2.5 lg:col-span-12 print:col-span-2 print:break-inside-avoid">
+          <p className="text-[13px] text-muted">{compare}</p>
+          <ModuleTiles
+            days={s.days}
+            now={now}
+            before={before}
+            totalDays={totalDays}
+            vs={`vs. ${isYear ? "año" : "mes"} anterior`}
+            links={{
+              habitos: "/habitos",
+              journal: `/journal/calendario?mes=${lastMonth}`,
+              gastos: isYear ? `/gastos/informes?anio=${key}` : `/gastos/informes?mes=${key}`,
+              plan: "/plan",
+            }}
+          />
         </section>
 
         {isYear && <YearHeat year={key} days={s.days} today={s.today} />}
@@ -148,7 +138,9 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         {!isYear && (
           <Card
             title="El mes de un vistazo"
-            color="var(--mod-inicio)"
+            tone="inicio"
+            icon={CalendarBlank}
+            meta={`${s.perfectDays} ${s.perfectDays === 1 ? "día perfecto" : "días perfectos"} · ${now.wroteDays} escritos`}
             className="lg:col-span-12 print:col-span-2 print:break-inside-avoid"
           >
             <div className="grid grid-cols-7 gap-1.5 lg:gap-2">
@@ -259,8 +251,11 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         {/* Hábitos */}
         <Card
           title="Hábitos"
-          color="var(--c-habitos)"
+          tone="habitos"
+          icon={Medal}
+          meta={s.perHabit.length ? `${s.perHabit.length} ${s.perHabit.length === 1 ? "hábito" : "hábitos"} · ${now.habitPct ?? "–"}% cumplido` : undefined}
           href="/habitos"
+          hrefLabel="Hábitos"
           className="lg:col-span-7 print:col-span-1 print:break-inside-avoid"
         >
           {s.perHabit.length === 0 ? (
@@ -310,8 +305,11 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         {/* Cómo estuviste */}
         <Card
           title="Cómo estuviste"
-          color="var(--mod-inicio)"
+          tone="inicio"
+          icon={Smiley}
+          meta={`${s.checkins} ${s.checkins === 1 ? "check-in" : "check-ins"}`}
           href="/analisis"
+          hrefLabel="Análisis"
           className="lg:col-span-5 print:col-span-1 print:break-inside-avoid"
         >
           {s.checkins === 0 && now.mood === null && now.sleepMin === null && !hasWatchData(now) ? (
@@ -376,8 +374,11 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         {/* Gastos */}
         <Card
           title="Gastos"
-          color="var(--c-gastos)"
-          href={`/gastos/informes?mes=${lastMonth}`}
+          tone="gastos"
+          icon={Wallet}
+          meta={`Neto ${net < 0 ? "−" : "+"}${moneyWhole(Math.abs(net))}`}
+          href={isYear ? `/gastos/informes?anio=${key}` : `/gastos/informes?mes=${lastMonth}`}
+          hrefLabel="Informes"
           className="lg:col-span-7 print:col-span-1 print:break-inside-avoid"
         >
           <dl className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-3 print:grid-cols-3">
@@ -455,8 +456,11 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         {/* Journal */}
         <Card
           title="Journal"
-          color="var(--c-journal)"
+          tone="journal"
+          icon={Notebook}
+          meta={`${nf.format(s.journal.entries)} ${s.journal.entries === 1 ? "entrada" : "entradas"}`}
           href={`/journal/calendario?mes=${lastMonth}`}
+          hrefLabel="Calendario"
           className="lg:col-span-5 print:col-span-1 print:break-inside-avoid"
         >
           <dl className="grid grid-cols-2 gap-2">
@@ -507,11 +511,14 @@ export function SummaryView({ s }: { s: MonthlySummary }) {
         {/* Plan */}
         <Card
           title="Plan"
-          color="var(--c-plan)"
+          tone="plan"
+          icon={CalendarCheck}
+          meta={`${s.tasksDone.length} ${s.tasksDone.length === 1 ? "tarea terminada" : "tareas terminadas"}`}
           href="/plan"
+          hrefLabel="Plan"
           className="lg:col-span-12 print:col-span-2 print:break-inside-avoid"
         >
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-2">
             <Mini
               label="Bloques hechos"
               value={
@@ -556,7 +563,9 @@ function MonthTable({ rows }: { rows: MonthlySummary["byMonth"] }) {
   return (
     <Card
       title="Mes a mes"
-      color="var(--mod-inicio)"
+      tone="inicio"
+      icon={Table}
+      meta={`${rows.length} ${rows.length === 1 ? "mes" : "meses"}`}
       className="lg:col-span-12 print:col-span-2 print:break-inside-avoid"
     >
       <div className="-mx-1 overflow-x-auto px-1">

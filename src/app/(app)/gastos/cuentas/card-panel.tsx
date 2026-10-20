@@ -6,6 +6,7 @@ import type { CardSummary } from "@/lib/card-logic";
 import { diffDays, formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import { cx } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 
 /** Una tarjeta de crédito: deuda, disponible, el resumen a pagar, el que está corriendo y las cuotas. */
 export function CardPanel({ card, today }: { card: CardSummary; today: string }) {
@@ -18,38 +19,26 @@ export function CardPanel({ card, today }: { card: CardSummary; today: string })
   const payHref = `/gastos?nuevo=1&pagar=${card.accountId}${last && last.leftCents > 0 ? `&monto=${last.leftCents}` : ""}`;
 
   return (
-    <section className="grid gap-4 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
-      <header className="flex items-center gap-2.5">
-        <span className="inline-flex size-9 items-center justify-center rounded-xl bg-[var(--c-gastos)] text-white">
-          <CreditCard size={18} weight="fill" aria-hidden />
-        </span>
-        <span className="grid min-w-0 flex-1">
-          <span className="truncate text-[15px] font-semibold">{card.name}</span>
-          <span className="text-[12.5px] text-muted">
-            Debés <span className="font-medium text-fg tabular">{m(card.debtCents)}</span>
-            {card.limitCents !== null && <> · disponible {m(Math.max(0, card.limitCents - card.debtCents))}</>}
-          </span>
-        </span>
-        <Link
-          href={payHref}
-          className="inline-flex h-9 items-center rounded-full bg-ink px-4 text-[13px] font-medium text-on-ink transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]"
-        >
+    <TintedCard
+      icon={CreditCard}
+      title={card.name}
+      meta={
+        <>
+          Debés {m(card.debtCents)}
+          {card.limitCents !== null && <> · disponible {m(Math.max(0, card.limitCents - card.debtCents))}</>}
+        </>
+      }
+      action={
+        <Link href={payHref} className="tcard-pill press">
           Pagar
         </Link>
-      </header>
-
+      }
+      progress={used}
+    >
       {used !== null && (
-        <div className="grid gap-1">
-          <span className="h-2 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={`Usaste el ${Math.round(used * 100)}% del límite`}>
-            <span
-              className={cx("bar-anim block h-full rounded-full", used > 0.9 ? "bg-danger" : "bg-[var(--c-gastos)]")}
-              style={{ width: `${used * 100}%` }}
-            />
-          </span>
-          <span className="text-[11.5px] text-muted">
-            {Math.round(used * 100)}% del límite de {m(card.limitCents!)}
-          </span>
-        </div>
+        <span className={cx("-mt-2 text-[12px]", used > 0.9 ? "text-danger" : "text-muted")}>
+          Usaste el {Math.round(used * 100)}% del límite de {m(card.limitCents!)}
+        </span>
       )}
 
       {last || card.current ? (
@@ -95,6 +84,6 @@ export function CardPanel({ card, today }: { card: CardSummary; today: string })
           {card.pending.lastDate && <> (la última, {formatShort(card.pending.lastDate)})</>}.
         </p>
       )}
-    </section>
+    </TintedCard>
   );
 }

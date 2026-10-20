@@ -7,6 +7,7 @@ import { useOptimistic, useState } from "react";
 import {
   ArrowCounterClockwise,
   CheckCircle,
+  ClockCounterClockwise,
   DownloadSimple,
   PencilSimple,
   Plus,
@@ -17,6 +18,7 @@ import {
 import { emptyTrash, purgeItem, restoreItem } from "@/lib/trash-actions";
 import { PageHeader } from "@/components/page-header";
 import { Button, ConfirmButton, cx } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 
 type TrashRow = { id: string; kind: string; label: string; module: string; deletedAt: string };
 type ActRow = { id: string; action: string; kind: string; label: string; module: string; at: string };
@@ -147,41 +149,49 @@ export function HistoryLog({
         )}
 
         {tab === "papelera" ? (
-          <>
-            <p className="text-[13.5px] leading-relaxed text-muted">
-              Lo que borrás en cualquier parte de la app queda acá 30 días. Restaurarlo lo vuelve a poner donde estaba, con todo
-              lo que tenía (las marcas de un hábito, los movimientos de una categoría…).
-            </p>
-            {items.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {["todo", "gastos", "habitos", "journal", "plan", "notas"].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    aria-pressed={filter === m}
-                    onClick={() => setFilter(m)}
-                    className={cx(
-                      "h-9 rounded-full border px-3 text-[13px] transition-colors",
-                      filter === m ? "border-ink bg-ink text-on-ink" : "border-line-strong text-muted hover:text-fg",
-                    )}
-                  >
-                    {m === "todo" ? "Todo" : MODULE_NAME[m]}
-                  </button>
-                ))}
-                <span className="ml-auto">
-                  <ConfirmButton confirmLabel="Tocá de nuevo: se borra todo para siempre" onConfirm={() => start(() => emptyTrash())}>
-                    Vaciar papelera
-                  </ConfirmButton>
-                </span>
-              </div>
-            )}
+          <TintedCard
+            icon={Trash}
+            title="Papelera"
+            meta={items.length ? `${items.length} ${items.length === 1 ? "cosa" : "cosas"} · se vacía sola a los 30 días` : "Se vacía sola a los 30 días"}
+            bodyClassName="gap-0! p-0!"
+          >
+            <div className="grid gap-3 px-[18px] pt-4 pb-4">
+              <p className="text-[13.5px] leading-relaxed text-muted">
+                Lo que borrás en cualquier parte de la app queda acá 30 días. Restaurarlo lo vuelve a poner donde estaba, con todo
+                lo que tenía (las marcas de un hábito, los movimientos de una categoría…).
+              </p>
+              {items.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {["todo", "gastos", "habitos", "journal", "plan", "notas"].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      aria-pressed={filter === m}
+                      onClick={() => setFilter(m)}
+                      className={cx(
+                        "h-9 rounded-full border px-3 text-[13px] transition-colors",
+                        filter === m ? "border-ink bg-ink text-on-ink" : "border-line-strong text-muted hover:text-fg",
+                      )}
+                    >
+                      {m === "todo" ? "Todo" : MODULE_NAME[m]}
+                    </button>
+                  ))}
+                  <span className="ml-auto">
+                    <ConfirmButton confirmLabel="Tocá de nuevo: se borra todo para siempre" onConfirm={() => start(() => emptyTrash())}>
+                      Vaciar papelera
+                    </ConfirmButton>
+                  </span>
+                </div>
+              )}
+            </div>
             {shown.length === 0 ? (
-              <div className="grid justify-items-center gap-2 rounded-[20px] border border-dashed border-line-strong py-12 text-center">
-                <Trash size={26} className="text-muted" aria-hidden />
-                <p className="text-[15px] font-medium">La papelera está vacía</p>
+              <div className="grid justify-items-center gap-2 border-t border-line px-6 py-12 text-center">
+                <Trash size={28} weight="fill" className="text-faint" aria-hidden />
+                <p className="text-[15px] font-medium">{items.length ? "No hay nada de este módulo" : "La papelera está vacía"}</p>
+                <p className="max-w-[36ch] text-[13px] text-muted">Lo que borres en la app aparece acá y se puede restaurar durante 30 días.</p>
               </div>
             ) : (
-              <ul className="grid divide-y divide-line rounded-[20px] border border-line bg-surface">
+              <ul className="grid divide-y divide-line border-t border-line">
                 {shown.map((t) => (
                   <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
                     <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: MODULE_COLOR[t.module] }} />
@@ -205,15 +215,26 @@ export function HistoryLog({
                 ))}
               </ul>
             )}
-          </>
+          </TintedCard>
         ) : activity.length === 0 ? (
-          <p className="py-10 text-center text-[14px] text-muted">Todavía no hay actividad registrada.</p>
+          <TintedCard icon={ClockCounterClockwise} title="Actividad" meta="Todavía vacía">
+            <div className="grid justify-items-center gap-2 py-10 text-center">
+              <ClockCounterClockwise size={28} weight="fill" className="text-faint" aria-hidden />
+              <p className="text-[15px] font-medium">Todavía no hay actividad registrada</p>
+              <p className="max-w-[36ch] text-[13px] text-muted">Cada cosa que crees, edites, completes o borres queda anotada acá.</p>
+            </div>
+          </TintedCard>
         ) : (
           <>
             {[...days].map(([day, list]) => (
-              <section key={day} className="grid gap-1.5">
-                <h2 className="kicker first-letter:uppercase">{day}</h2>
-                <ul className="grid divide-y divide-line rounded-[20px] border border-line bg-surface">
+              <TintedCard
+                key={day}
+                icon={ClockCounterClockwise}
+                title={day.charAt(0).toUpperCase() + day.slice(1)}
+                meta={`${list.length} ${list.length === 1 ? "cambio" : "cambios"}`}
+                bodyClassName="gap-0! p-0!"
+              >
+                <ul className="grid divide-y divide-line">
                   {list.map((a) => {
                     const act = ACTION[a.action] ?? { label: a.action, icon: PencilSimple };
                     const Ico = act.icon;
@@ -238,7 +259,7 @@ export function HistoryLog({
                     );
                   })}
                 </ul>
-              </section>
+              </TintedCard>
             ))}
             {hasMore && (
               <Link

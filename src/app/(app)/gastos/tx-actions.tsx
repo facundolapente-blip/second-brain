@@ -193,7 +193,7 @@ export function TxGestures({
       disabled={disabled}
       left={right === null ? undefined : (right ?? actions.swipeDuplicate(tx))}
       right={actions.swipeDelete(tx)}
-      surface="bg-bg"
+      surface="bg-surface"
     >
       {children({
         onContextMenu: (e) => {

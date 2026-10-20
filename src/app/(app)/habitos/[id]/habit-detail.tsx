@@ -9,13 +9,17 @@ import {
   Archive,
   ArrowBendUpRight,
   ArrowCounterClockwise,
+  CalendarBlank,
   CaretLeft,
+  ChartBar,
   ChatText,
   Check,
   CheckCircle,
   LinkSimple,
   Lock,
   Medal,
+  PencilSimple,
+  Plus,
   Trash,
   Trophy,
   X,
@@ -36,6 +40,7 @@ import {
 import { HabitAvatar } from "@/lib/habit-icons";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, ConfirmButton, cx, Segmented } from "@/components/ui";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import {
   CalendarMonth,
   DaySheet,
@@ -127,25 +132,31 @@ export function HabitDetail({
         </div>
       </header>
 
-      <main key={tab} className={cx("mx-auto grid max-w-3xl px-4 pt-2 lg:max-w-6xl lg:px-10 lg:pt-6", tabSwap)}>
+      <main key={tab} className={cx("mx-auto grid max-w-3xl gap-3.5 px-4 pt-3 lg:max-w-6xl lg:gap-5 lg:px-10 lg:pt-6", tabSwap)}>
         {tab !== "editar" && habit.tracks.length > 0 && (
           <TrackPicker habit={habit} view={view} onChange={setView} />
         )}
         {tab === "calendario" && (
-          <div className="grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
+          <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-5">
             <CalendarTab habit={habit} logs={logs} stats={stats} today={today} openDay={openDay} />
           </div>
         )}
         {tab === "estadisticas" && (
-          // Dos columnas hasta 1280 px (con tres, la racha y el anillo no entraban).
-          <div className="grid lg:grid-flow-row-dense lg:grid-cols-[repeat(2,minmax(0,1fr))] lg:gap-5 xl:grid-cols-[repeat(3,minmax(0,1fr))]">
+          // Las cifras arriba; después dos columnas hasta 1280 px y tres desde ahí.
+          <div className="grid gap-3.5 lg:grid-flow-row-dense lg:grid-cols-[repeat(2,minmax(0,1fr))] lg:gap-5 xl:grid-cols-[repeat(3,minmax(0,1fr))]">
             <StatsTab habit={habit} stats={stats} view={view} today={today} />
           </div>
         )}
         {tab === "editar" && (
-          <div className="grid lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <EditTab habit={habit} categories={categories} today={today} hasHistory={hasMarks(logs, habit.startDate)} onSaved={() => changeTab("calendario")} />
-            <TracksPanel habit={habit} today={today} />
+          <div className="grid gap-3.5 lg:gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <EditTab
+              habit={habit}
+              categories={categories}
+              today={today}
+              hasHistory={hasMarks(logs, habit.startDate)}
+              onSaved={() => changeTab("calendario")}
+              aside={<TracksPanel habit={habit} today={today} />}
+            />
           </div>
         )}
       </main>
@@ -172,7 +183,7 @@ function TrackPicker({
   onChange: (v: TrackView) => void;
 }) {
   return (
-    <label className="rise flex min-h-12 items-center justify-between gap-3 border-b border-line lg:mb-5 lg:rounded-xl lg:border lg:border-line lg:bg-surface-2 lg:px-4">
+    <label className="flex min-h-12 items-center justify-between gap-3 rounded-full border border-line bg-surface px-4">
       <span className="kicker">Mostrando</span>
       <select
         value={String(view)}
@@ -204,12 +215,12 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useSafeTransition();
   return (
-    <Panel icon={ArrowCounterClockwise} title="Pistas">
+    <Panel icon={ArrowCounterClockwise} title="Pistas" meta={habit.tracks.length ? `${habit.tracks.length + 1} pistas` : "Una sola pista"}>
       <p className="max-w-[60ch] text-[14px] leading-relaxed text-muted">
         Una pista nueva arranca la racha y el puntaje desde cero sin borrar nada. El historial anterior se sigue
         viendo eligiendo &quot;Todas las pistas&quot;.
       </p>
-      <ul className="mt-3 grid gap-1 text-sm">
+      <ul className="grid gap-1 text-sm">
         <li className="flex justify-between gap-3 py-1">
           <span className="font-medium">Actual</span>
           <span className="tabular text-muted">
@@ -226,7 +237,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
             </li>
           ))}
       </ul>
-      <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <input
           type="date"
           value={date}
@@ -252,7 +263,7 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
       </div>
       {habit.tracks.length > 0 && (
         <ConfirmButton
-          className="mt-2 h-9! px-3.5! text-[13px]!"
+          className="h-9! justify-self-start px-3.5! text-[13px]!"
           disabled={pending}
           confirmLabel="Tocá de nuevo para unirlas"
           onConfirm={() => {
@@ -266,56 +277,41 @@ function TracksPanel({ habit, today }: { habit: HabitDTO; today: string }) {
           Unir con la pista anterior
         </ConfirmButton>
       )}
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </Panel>
   );
 }
 
 // ─── Piezas comunes ─────────────────────────────────────────────────────────
 
+/** Sección del detalle: tarjeta con cabecera teñida del verde de Hábitos. */
 function Panel({
-  icon: Ico,
+  icon,
   title,
+  meta,
+  action,
   children,
   className,
+  bodyClassName,
 }: {
-  icon?: Icon;
-  title?: string;
+  icon: Icon;
+  title: string;
+  meta?: React.ReactNode;
+  action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  bodyClassName?: string;
 }) {
   return (
-    <section
-      className={cx(
-        "rise min-w-0 border-b border-line py-7 last:border-b-0",
-        // En la computadora cada panel es una tarjeta con el aro y la sombra del tema.
-        "lg:rounded-2xl lg:border lg:border-[var(--card-ring)] lg:bg-surface lg:px-6 lg:py-6 lg:shadow-[var(--card-shadow)] lg:last:border-b",
-        className,
-      )}
-    >
-      {title && (
-        <h2 className="kicker mb-5 flex items-center gap-2">
-          {Ico && <Ico size={15} weight="bold" className="text-accent" aria-hidden />}
-          {title}
-        </h2>
-      )}
+    <TintedCard icon={icon} title={title} meta={meta} action={action} className={className} bodyClassName={bodyClassName}>
       {children}
-    </section>
+    </TintedCard>
   );
 }
 
 function streakUnit(habit: HabitDTO, n: number) {
   if (habit.frequency === "weekly") return n === 1 ? "semana" : "semanas";
   return n === 1 ? "día" : "días";
-}
-
-function BigNumber({ value, unit }: { value: number | string; unit?: string }) {
-  return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-2">
-      <span className="figure text-[44px] xl:text-[52px]">{value}</span>
-      {unit && <span className="display text-[20px] text-muted">{unit}</span>}
-    </span>
-  );
 }
 
 // ─── Calendario ─────────────────────────────────────────────────────────────
@@ -338,10 +334,18 @@ function CalendarTab({
   const notes = Object.entries(logs)
     .filter(([d, l]) => d.startsWith(month) && l.n)
     .sort(([a], [b]) => b.localeCompare(a));
+  // Cuántas veces se logró en el mes que se mira (para la cabecera).
+  const { from, to } = monthBounds(month);
+  let doneInMonth = 0;
+  for (let d = from; d <= to && d <= today; d = addDays(d, 1)) if (stats.stateOf(d) === "done") doneInMonth++;
 
   return (
     <>
-      <Panel className="xl:row-span-2">
+      <Panel
+        icon={CalendarBlank}
+        title="Calendario"
+        meta={`${doneInMonth} ${doneInMonth === 1 ? "vez logrado" : "veces logrado"} en ${monthName(month).toLowerCase()}`}
+      >
         <CalendarMonth
           habit={habit}
           logs={logs}
@@ -351,38 +355,51 @@ function CalendarTab({
           onMonthChange={setMonth}
           stateOf={stats.stateOf}
         />
-        <p className="mt-5 text-[13px] leading-relaxed text-muted">
+        <p className="text-[13px] leading-relaxed text-muted">
           Tocá un día para marcarlo o dejarle una nota. Los días con nota tienen un puntito.
         </p>
       </Panel>
 
-      <Panel icon={LinkSimple} title="Racha">
-        <BigNumber value={streak} unit={streakUnit(habit, streak)} />
-      </Panel>
+      {/* Columna de al lado: la racha y las notas, que se estiran hasta el pie del calendario. */}
+      <div className="grid content-start gap-3.5 lg:grid-rows-[auto_1fr] lg:content-stretch lg:gap-5">
+        <StatTile
+          icon={LinkSimple}
+          label="Racha actual"
+          figure={streak}
+          unit={streakUnit(habit, streak)}
+          sub={`Mejor: ${stats.best} ${streakUnit(habit, stats.best)}`}
+        />
 
-      <Panel icon={ChatText} title="Notas">
-        {notes.length === 0 ? (
-          <p className="display text-[19px] text-muted">No hay notas para el mes.</p>
-        ) : (
-          <ul className="-mx-2 grid divide-y divide-line">
-            {notes.map(([d, l]) => (
-              <li key={d}>
-                <button
-                  type="button"
-                  onClick={() => openDay(d)}
-                  className="grid w-full gap-1 rounded-[4px] px-2 py-3 text-left transition-colors hover:bg-surface-2"
-                >
-                  <span className="kicker">{formatLong(d)}</span>
-                  <span className="prose-serif text-[17px] leading-relaxed whitespace-pre-wrap">{l.n}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Button variant="outline" size="sm" className="mt-4" onClick={() => openDay(today)}>
-          Nota para hoy
-        </Button>
-      </Panel>
+        <Panel
+          icon={ChatText}
+          title="Notas"
+          meta={notes.length ? `${notes.length} en ${monthName(month).toLowerCase()}` : undefined}
+          action={
+            <button type="button" className="tcard-pill press" onClick={() => openDay(today)}>
+              <Plus size={13} weight="bold" aria-hidden /> Nota para hoy
+            </button>
+          }
+        >
+          {notes.length === 0 ? (
+            <p className="text-[14.5px] leading-relaxed text-muted">No hay notas en {monthName(month).toLowerCase()}. Tocá un día del calendario para dejarle una.</p>
+          ) : (
+            <ul className="-mx-2 -my-2 grid divide-y divide-line">
+              {notes.map(([d, l]) => (
+                <li key={d}>
+                  <button
+                    type="button"
+                    onClick={() => openDay(d)}
+                    className="grid w-full gap-1 rounded-[4px] px-2 py-3 text-left transition-colors hover:bg-surface-2"
+                  >
+                    <span className="kicker">{formatLong(d)}</span>
+                    <span className="prose-serif text-[17px] leading-relaxed whitespace-pre-wrap">{l.n}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
     </>
   );
 }
@@ -401,38 +418,62 @@ function StatsTab({
   today: string;
 }) {
   const { score, streak, best, counts, periods, logs } = stats;
+  const periodsTotal = periods.achieved + periods.missed;
+  // Al cambiar de pista, la cifra se corre hacia donde fue.
+  const scoreTick = useTick(score);
   const periodWords: [string, string] =
     habit.frequency === "weekly" ? ["Semanas logradas", "Semanas incompletas"] : ["Días logrados", "Días incompletos"];
 
   return (
     <>
-      <Panel icon={Trophy} title="Puntaje del hábito">
-        <div className="grid justify-items-center gap-3 py-2">
-          <ScoreRing value={score} />
-          <p className="max-w-[40ch] text-center text-[14px] text-muted">
-            {view === "all"
-              ? "Promedio de todas las pistas."
+      <div className="grid grid-cols-2 gap-3 lg:col-span-2 lg:grid-cols-4 lg:gap-4 xl:col-span-3">
+        <StatTile
+          icon={Trophy}
+          label="Puntaje"
+          figure={
+            <span key={scoreTick.key} className={cx("inline-block", scoreTick.className)}>
+              {score}
+            </span>
+          }
+          unit="%"
+          sub={
+            view === "all"
+              ? "Promedio de todas las pistas"
               : habit.frequency === "weekly"
-                ? "Qué parte de la meta semanal cumpliste, semana a semana."
-                : "Qué parte de los días cumpliste."}
-          </p>
-        </div>
-      </Panel>
+                ? "De la meta semanal, semana a semana"
+                : "De los días que tocaban"
+          }
+        >
+          <MiniBar value={score / 100} label="Puntaje del hábito" />
+        </StatTile>
+        <StatTile
+          icon={LinkSimple}
+          label="Racha actual"
+          figure={streak}
+          unit={streakUnit(habit, streak)}
+          sub={best > streak ? `Faltan ${best - streak} para tu mejor` : streak > 0 ? "Es tu mejor racha" : "Marcá hoy para empezar"}
+        >
+          <MiniBar value={best ? streak / best : 0} label="Racha actual contra la mejor" />
+        </StatTile>
+        <StatTile
+          icon={Medal}
+          label="Mejor racha"
+          figure={best}
+          unit={streakUnit(habit, best)}
+          sub={`${counts.total} ${counts.total === 1 ? "vez logrado" : "veces logrado"} en total`}
+        />
+        <StatTile
+          icon={CheckCircle}
+          label="Logrado"
+          figure={periodsTotal === 0 ? "–" : Math.round((periods.achieved / periodsTotal) * 100)}
+          unit={periodsTotal === 0 ? undefined : "%"}
+          sub={`${periods.achieved} de ${periodsTotal} ${habit.frequency === "weekly" ? "semanas" : "días"}`}
+        >
+          <AchievedBar achieved={periods.achieved} missed={periods.missed} labels={periodWords} />
+        </StatTile>
+      </div>
 
-      <Panel icon={LinkSimple} title="Racha">
-        <div className="grid grid-cols-2 divide-x divide-line">
-          <div className="grid gap-1">
-            <span className="kicker">Actual</span>
-            <BigNumber value={streak} unit={streakUnit(habit, streak)} />
-          </div>
-          <div className="grid gap-1 pl-5">
-            <span className="kicker">Mejor</span>
-            <BigNumber value={best} unit={streakUnit(habit, best)} />
-          </div>
-        </div>
-      </Panel>
-
-      <Panel icon={CheckCircle} title="Veces logrado">
+      <Panel icon={CheckCircle} title="Veces logrado" bodyClassName="py-2!">
         <dl className="divide-y divide-line">
           {[
             ["Esta semana", counts.week],
@@ -448,64 +489,28 @@ function StatsTab({
         </dl>
       </Panel>
 
-      <Panel className="lg:col-span-2 xl:col-span-3">
-        <MonthTimeline stateOf={stats.stateOf} today={today} />
-      </Panel>
-
-      <Panel className="lg:col-span-2 xl:col-span-2">
+      <Panel icon={ChartBar} title="Por período" meta="Veces logrado" className="xl:col-span-2">
         <DoneBars habit={habit} logs={logs} from={stats.from} today={today} />
       </Panel>
 
-      <Panel icon={CheckCircle} title="Logrado / Fallido">
-        <Donut achieved={periods.achieved} missed={periods.missed} labels={periodWords} />
+      <Panel icon={CalendarBlank} title="Línea del mes" meta="Un punto por día" className="lg:col-span-2 xl:col-span-3">
+        <MonthTimeline stateOf={stats.stateOf} today={today} />
       </Panel>
 
-      <Panel icon={Medal} title="Desafío de racha" className="lg:col-span-2 xl:col-span-3">
+      <Panel icon={Medal} title="Desafío de racha" meta={`Mejor racha: ${best} ${streakUnit(habit, best)}`} className="lg:col-span-2 xl:col-span-3">
         <StreakChallenge habit={habit} best={best} />
       </Panel>
     </>
   );
 }
 
-function ScoreRing({ value }: { value: number }) {
-  // Arco de 300°, abierto abajo, como en HabitNow.
-  const r = 70;
-  const c = 2 * Math.PI * r;
-  const arc = c * (300 / 360);
-  // Al cambiar de pista, la cifra se corre hacia donde fue (el arco ya se anima solo).
-  const tick = useTick(value);
+/** Barra fina de las cifras (en lugar del anillo de antes). */
+function MiniBar({ value, label }: { value: number; label: string }) {
+  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
   return (
-    <div className="relative size-48">
-      <svg viewBox="0 0 180 180" className="size-full rotate-[120deg]" aria-hidden>
-        <circle
-          cx="90"
-          cy="90"
-          r={r}
-          fill="none"
-          stroke="var(--border-strong)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeDasharray={`${arc} ${c}`}
-        />
-        <circle
-          cx="90"
-          cy="90"
-          r={r}
-          fill="none"
-          stroke="var(--accent)"
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={`${(arc * value) / 100} ${c}`}
-          className="transition-[stroke-dasharray] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center">
-        <span key={tick.key} className={cx("figure text-[68px]", tick.className)}>
-          {value}
-        </span>
-        <span className="display mt-5 text-[22px] text-muted">%</span>
-      </span>
-    </div>
+    <span className="tcard-bar mt-0!" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+      <span style={{ width: `${pct}%` }} />
+    </span>
   );
 }
 
@@ -692,61 +697,28 @@ function shortDate(iso: string) {
   return `${Number(iso.slice(8))}/${Number(iso.slice(5, 7))}`;
 }
 
-function Donut({ achieved, missed, labels }: { achieved: number; missed: number; labels: [string, string] }) {
+/** Logrado contra incompleto en una barra partida (antes una dona), con los dos colores de siempre. */
+function AchievedBar({ achieved, missed, labels }: { achieved: number; missed: number; labels: [string, string] }) {
   const total = achieved + missed;
-  const r = 60;
-  const c = 2 * Math.PI * r;
-  const part = total === 0 ? 0 : (achieved / total) * c;
-  const gap = 4;
   return (
-    <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr] lg:grid-cols-1">
-      <div className="relative mx-auto size-44">
-        <svg viewBox="0 0 160 160" className="size-full -rotate-90" aria-hidden>
-          {total === 0 && <circle cx="80" cy="80" r={r} fill="none" stroke="var(--border-strong)" strokeWidth="2" />}
-          {/* Dos arcos con un corte de papel entre medio, en lugar de un trazo que los separe. */}
-          {missed > 0 && (
-            <circle
-              cx="80"
-              cy="80"
-              r={r}
-              fill="none"
-              stroke="var(--p-orange-solid)"
-              strokeWidth="14"
-              strokeDasharray={`${Math.max(0, c - part - (achieved > 0 ? gap : 0))} ${c}`}
-              strokeDashoffset={-(part + (achieved > 0 ? gap / 2 : 0))}
-            />
-          )}
-          {achieved > 0 && (
-            <circle
-              cx="80"
-              cy="80"
-              r={r}
-              fill="none"
-              stroke="var(--st-done-line)"
-              strokeWidth="14"
-              strokeDasharray={`${Math.max(0, part - (missed > 0 ? gap : 0))} ${c}`}
-              strokeDashoffset={missed > 0 ? -gap / 2 : 0}
-            />
-          )}
-        </svg>
-        <span className="absolute inset-0 grid place-content-center text-center">
-          <span className="figure text-[34px]">
-            {total === 0 ? "-" : `${Math.round((achieved / total) * 100)}%`}
-          </span>
+    <div className="grid gap-1.5">
+      <div
+        className="flex h-[7px] gap-[3px] overflow-hidden rounded-full bg-surface-3"
+        role="img"
+        aria-label={`${labels[0]}: ${achieved}. ${labels[1]}: ${missed}.`}
+      >
+        {achieved > 0 && <span className="rounded-full bg-[var(--st-done-line)]" style={{ flex: achieved }} />}
+        {missed > 0 && <span className="rounded-full bg-[var(--p-orange-solid)]" style={{ flex: missed }} />}
+        {total === 0 && <span className="flex-1" />}
+      </div>
+      <div className="tmini-cap" aria-hidden>
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-full bg-[var(--st-done-line)]" /> {achieved}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          {missed} <span className="size-2 rounded-full bg-[var(--p-orange-solid)]" />
         </span>
       </div>
-      <ul className="grid divide-y divide-line text-[15px]">
-        <li className="flex items-center gap-2.5 py-2.5">
-          <span className="size-2.5 rounded-full bg-[var(--st-done-line)]" />
-          {labels[0]}
-          <span className="figure ml-auto text-[22px]">{achieved}</span>
-        </li>
-        <li className="flex items-center gap-2.5 py-2.5">
-          <span className="size-2.5 rounded-full bg-[var(--p-orange-solid)]" />
-          {labels[1]}
-          <span className="figure ml-auto text-[22px]">{missed}</span>
-        </li>
-      </ul>
     </div>
   );
 }
@@ -799,48 +771,54 @@ function EditTab({
   today,
   hasHistory,
   onSaved,
+  aside,
 }: {
   habit: HabitDTO;
   categories: CategoryDTO[];
   today: string;
   hasHistory: boolean;
   onSaved: () => void;
+  /** Lo que va debajo de archivar/eliminar (las pistas). */
+  aside?: React.ReactNode;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useSafeTransition();
   return (
     <>
-      <Panel className="lg:row-span-2">
-        <div className="mb-5 flex items-center gap-3">
+      <Panel icon={PencilSimple} title="Editar">
+        <div className="flex items-center gap-3">
           <HabitBadge habit={habit} />
         </div>
         <HabitFormBody initial={fromHabit(habit)} categories={categories} today={today} hasHistory={hasHistory} onSaved={onSaved} />
       </Panel>
-      <Panel>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() => startTransition(() => archiveHabit(habit.id, !habit.archived))}
-          >
-            {habit.archived ? <ArrowCounterClockwise size={16} /> : <Archive size={16} />}
-            {habit.archived ? "Restaurar hábito" : "Archivar hábito"}
-          </Button>
-          <ConfirmButton
-            undo={`"${habit.name}" borrado`}
-            disabled={pending}
-            confirmLabel="Tocá de nuevo: se borra con su historial"
-            onConfirm={() =>
-              startTransition(async () => {
-                await deleteHabit(habit.id);
-                router.push("/habitos/lista");
-              })
-            }
-          >
-            <Trash size={16} /> Eliminar hábito
-          </ConfirmButton>
-        </div>
-      </Panel>
+      <div className="grid content-start gap-3.5 lg:gap-5 xl:grid-rows-[auto_1fr] xl:content-stretch">
+        <Panel icon={Archive} title={habit.archived ? "Restaurar o eliminar" : "Archivar o eliminar"}>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => startTransition(() => archiveHabit(habit.id, !habit.archived))}
+            >
+              {habit.archived ? <ArrowCounterClockwise size={16} /> : <Archive size={16} />}
+              {habit.archived ? "Restaurar hábito" : "Archivar hábito"}
+            </Button>
+            <ConfirmButton
+              undo={`"${habit.name}" borrado`}
+              disabled={pending}
+              confirmLabel="Tocá de nuevo: se borra con su historial"
+              onConfirm={() =>
+                startTransition(async () => {
+                  await deleteHabit(habit.id);
+                  router.push("/habitos/lista");
+                })
+              }
+            >
+              <Trash size={16} /> Eliminar hábito
+            </ConfirmButton>
+          </div>
+        </Panel>
+        {aside}
+      </div>
     </>
   );
 }

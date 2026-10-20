@@ -7,6 +7,7 @@ import { MOODS, moodInfo } from "@/lib/journal-logic";
 import { dec1 } from "@/lib/format";
 import { PillSwitch } from "@/components/pill-switch";
 import { cx } from "@/components/ui";
+import { SquaresFour } from "@phosphor-icons/react";
 import { Card } from "../summary-ui";
 
 type View = "habitos" | "journal" | "animo";
@@ -116,7 +117,7 @@ export function YearHeat({ year, days, today }: { year: string; days: DayMetrics
   }
 
   return (
-    <Card title="Constancia del año" color="var(--mod-inicio)" className="lg:col-span-12 print:col-span-2 print:break-inside-avoid">
+    <Card title="Constancia del año" tone="inicio" icon={SquaresFour} meta={`Cada cuadrito es un día · ${year}`} className="lg:col-span-12 print:col-span-2 print:break-inside-avoid">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <PillSwitch label="Qué mostrar" value={view} options={VIEWS} onChange={setView} item="h-8 px-3 text-[12.5px]" />
         <p className="tabular min-h-5 text-[12.5px] text-muted" aria-live="polite">

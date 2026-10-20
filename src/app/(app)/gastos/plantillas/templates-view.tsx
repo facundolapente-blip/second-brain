@@ -3,6 +3,7 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { useRef, useState } from "react";
 import { Copy, DotsThree } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { moneyCents } from "@/lib/format";
 import { deleteTemplate, renameTemplate } from "@/lib/offline/finance";
 import type { AccountDTO, CategoryDTO, TemplateDTO } from "@/lib/finance-logic";
@@ -46,16 +47,22 @@ export function TemplatesView({
     <>
       <PageHeader title="Plantillas" tabs={<GastosTabs />} />
 
-      <main className="mx-auto max-w-3xl px-4 pt-2 lg:px-10 lg:pt-6">
+      <main className="mx-auto max-w-3xl px-4 pt-2 pb-6 lg:px-10 lg:pt-6">
         {templates.length === 0 ? (
-          <EmptyBlock title="Sin plantillas todavía" icon={<Copy size={22} aria-hidden />}>
+          <EmptyBlock title="Sin plantillas todavía" icon={<Copy size={22} weight="fill" />}>
             <p className="max-w-[48ch] text-sm leading-relaxed text-muted">
               Al cargar un movimiento que repetís seguido (el alquiler, la cuota del gimnasio, el café), marcá
               &ldquo;Guardar también como plantilla&rdquo;. Después lo cargás desde acá o desde los atajos del formulario.
             </p>
           </EmptyBlock>
         ) : (
-          <ul className="grid divide-y divide-line border-y border-line">
+          <TintedCard
+            icon={Copy}
+            title="Plantillas"
+            meta={`${templates.length === 1 ? "1 plantilla" : `${templates.length} plantillas`} · tocá una para cargarla`}
+            bodyClassName="gap-0! px-4! py-1! lg:px-5!"
+          >
+          <ul className="grid divide-y divide-line">
             {templates.map((t, i) => (
               <li key={t.id} className="rise flex items-center gap-1" style={{ "--i": i } as React.CSSProperties}>
                 <button
@@ -83,6 +90,7 @@ export function TemplatesView({
               </li>
             ))}
           </ul>
+          </TintedCard>
         )}
       </main>
 

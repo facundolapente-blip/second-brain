@@ -9,6 +9,7 @@ import { acceptFixed, ignoreFixed } from "@/lib/offline/finance";
 import { formatShort } from "@/lib/dates";
 import { moneyCents } from "@/lib/format";
 import { CategoryAvatar, useLookups } from "../shared";
+import { TintedCard } from "@/components/tinted-card";
 
 /** Gastos que se repiten todos los meses y todavía no son recurrentes. */
 export function FixedSuggestions({
@@ -30,16 +31,15 @@ export function FixedSuggestions({
   const hide = (key: string) => setHidden((h) => new Set(h).add(key));
 
   return (
-    <section className="grid gap-3 rounded-[20px] border border-line bg-surface p-4 lg:p-5">
-      <header className="grid gap-1">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-          <Sparkle size={17} weight="fill" className="text-[var(--c-gastos)]" aria-hidden />
-          Parecen gastos fijos
-        </h2>
-        <p className="text-[13px] text-muted">
-          Se repiten todos los meses con un monto parecido. Pasalos a recurrentes y se cargan solos el día que tocan.
-        </p>
-      </header>
+    <TintedCard
+      icon={Sparkle}
+      title="Parecen gastos fijos"
+      meta={shown.length === 1 ? "1 sugerencia" : `${shown.length} sugerencias`}
+      bodyClassName="gap-3!"
+    >
+      <p className="text-[13px] text-muted">
+        Se repiten todos los meses con un monto parecido. Pasalos a recurrentes y se cargan solos el día que tocan.
+      </p>
       <ul className="grid divide-y divide-line">
         {shown.map((s) => {
           const account = lk.account(s.accountId);
@@ -90,6 +90,6 @@ export function FixedSuggestions({
           {error}
         </p>
       )}
-    </section>
+    </TintedCard>
   );
 }

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PencilSimple, X } from "@phosphor-icons/react";
+import { BookOpen, PencilSimple, X } from "@phosphor-icons/react";
+import { TintedCard } from "@/components/tinted-card";
 import { PhotoStrip } from "@/components/photos";
 import { SwapOnChange } from "@/components/motion-wrap";
 import { Bone } from "@/components/skeleton";
@@ -54,31 +55,55 @@ export function ReaderSlot({ reading, closeHref, children }: { reading: EntryDTO
   );
 }
 
-function ReaderBar({ id, date, title, words, closeHref, onClose }: { id: string; date: string; title: string | null; words: number; closeHref: string; onClose: () => void }) {
+/** La entrada en una tarjeta con cabecera teñida: fecha y palabras, Editar y cerrar. */
+function ReaderCard({
+  id,
+  date,
+  title,
+  words,
+  closeHref,
+  onClose,
+  busy,
+  children,
+}: {
+  id: string;
+  date: string;
+  title: string | null;
+  words: number;
+  closeHref: string;
+  onClose: () => void;
+  busy?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex min-w-0 items-center gap-2 border-b border-line py-2.5 pr-2.5 pl-7">
-      <p className="kicker min-w-0 flex-1 truncate">
-        {title ? formatLong(date) : date.slice(0, 4)}
-        <span aria-hidden> · </span>
-        {words === 1 ? "1 palabra" : `${nf.format(words)} palabras`}
-      </p>
-      <Link
-        href={`/journal/${id}`}
-        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
-      >
-        <PencilSimple size={15} aria-hidden /> Editar
-      </Link>
-      <Link
-        href={closeHref}
-        scroll={false}
-        onClick={onClose}
-        aria-label="Cerrar lectura"
-        title="Cerrar lectura"
-        className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors before:absolute before:-inset-1 hover:bg-surface-2 hover:text-fg"
-      >
-        <X size={17} aria-hidden />
-      </Link>
-    </div>
+    <TintedCard
+      as="article"
+      icon={BookOpen}
+      title={title ? formatLong(date) : date.slice(0, 4)}
+      meta={words === 1 ? "1 palabra" : `${nf.format(words)} palabras`}
+      action={
+        <span className="flex shrink-0 items-center gap-1.5">
+          <Link href={`/journal/${id}`} className="tcard-pill press">
+            <PencilSimple size={14} aria-hidden /> Editar
+          </Link>
+          <Link
+            href={closeHref}
+            scroll={false}
+            onClick={onClose}
+            aria-label="Cerrar lectura"
+            title="Cerrar lectura"
+            className="tcard-pill press relative px-2.5! before:absolute before:-inset-1"
+          >
+            <X size={15} aria-hidden />
+          </Link>
+        </span>
+      }
+      bodyClassName="px-7! pt-7! pb-9! xl:px-10!"
+    >
+      <div aria-busy={busy || undefined} className="mx-auto grid w-full max-w-[64ch] gap-5">
+        {children}
+      </div>
+    </TintedCard>
   );
 }
 
@@ -95,10 +120,7 @@ function Heading({ title, date, mood }: { title: string | null; date: string; mo
 /** Lo que ya se sabe por la tarjeta, mientras llega el resto. */
 function EntryPreview({ entry, closeHref, onClose }: { entry: EntryCardDTO; closeHref: string; onClose: () => void }) {
   return (
-    <article aria-label="Entrada elegida" aria-busy className="min-w-0 rounded-2xl border border-line bg-surface">
-      <ReaderBar id={entry.id} date={entry.date} title={entry.title} words={entry.words} closeHref={closeHref} onClose={onClose} />
-      <div className="px-7 pt-7 pb-9 xl:px-10">
-        <div className="mx-auto grid max-w-[64ch] gap-5">
+    <ReaderCard id={entry.id} date={entry.date} title={entry.title} words={entry.words} closeHref={closeHref} onClose={onClose} busy>
           <Heading title={entry.title} date={entry.date} mood={entry.mood} />
           {entry.excerpt ? (
             <div className="prose-serif grid gap-4 text-[17.5px] leading-[1.75] text-fg/90">
@@ -115,9 +137,7 @@ function EntryPreview({ entry, closeHref, onClose }: { entry: EntryCardDTO; clos
               <Bone className="h-4 w-[70%]" />
             </div>
           )}
-        </div>
-      </div>
-    </article>
+    </ReaderCard>
   );
 }
 
@@ -130,10 +150,7 @@ export function EntryReader({ entry, closeHref, onClose }: { entry: EntryDTO; cl
     .filter(Boolean);
 
   return (
-    <article aria-label="Entrada elegida" className="min-w-0 rounded-2xl border border-line bg-surface">
-      <ReaderBar id={entry.id} date={entry.date} title={entry.title} words={words} closeHref={closeHref} onClose={onClose ?? (() => {})} />
-      <div className="px-7 pt-7 pb-9 xl:px-10">
-        <div className="mx-auto grid max-w-[64ch] gap-5">
+    <ReaderCard id={entry.id} date={entry.date} title={entry.title} words={words} closeHref={closeHref} onClose={onClose ?? (() => {})}>
           <Heading title={entry.title} date={entry.date} mood={entry.mood} />
 
           {paragraphs.length === 0 ? (
@@ -164,8 +181,6 @@ export function EntryReader({ entry, closeHref, onClose }: { entry: EntryDTO; cl
               ))}
             </ul>
           )}
-        </div>
-      </div>
-    </article>
+    </ReaderCard>
   );
 }

@@ -5,7 +5,8 @@ import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { FixedSuggestions } from "./fixed-suggestions";
 import type { FixedSuggestion } from "@/lib/smart-logic";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { ArrowsClockwise, Pause, Play, Plus } from "@phosphor-icons/react";
+import { ArrowDownLeft, ArrowsClockwise, ArrowUpRight, Pause, Play, Plus } from "@phosphor-icons/react";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import { deleteSchedule, saveSchedule, setScheduleActive, type ActionResult } from "@/lib/offline/finance";
 import { centsToInput, type AccountDTO, type CategoryDTO } from "@/lib/finance-logic";
 import { formatShort, monthBounds } from "@/lib/dates";
@@ -74,10 +75,10 @@ export function SchedulesView({
           </Button>
         }
       />
-      <main className="mx-auto grid max-w-3xl gap-5 px-4 pt-2 lg:px-10 lg:pt-6">
+      <main className="mx-auto grid max-w-3xl gap-4 px-4 pt-2 pb-6 lg:px-10 lg:pt-6">
         <FixedSuggestions suggestions={suggestions} accounts={accounts} categories={categories} />
         {schedules.length === 0 ? (
-          <EmptyBlock title="Sin recurrentes todavía" icon={<ArrowsClockwise size={22} aria-hidden />}>
+          <EmptyBlock title="Sin recurrentes todavía" icon={<ArrowsClockwise size={22} weight="fill" />}>
             <p className="max-w-[48ch] text-sm leading-relaxed text-muted">
               El alquiler, el sueldo, Spotify, la cuota del gimnasio: lo que se repite se carga solo el día que toca.
               Arranca desde hoy, así no se duplica lo que ya cargaste.
@@ -88,17 +89,32 @@ export function SchedulesView({
           </EmptyBlock>
         ) : (
           <>
-            <dl className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1 rounded-2xl border border-line bg-surface p-4">
-                <dt className="kicker">Falta pagar este mes</dt>
-                <dd className="figure text-[24px]">{fmt(pending.expense)}</dd>
-              </div>
-              <div className="grid gap-1 rounded-2xl border border-line bg-surface p-4">
-                <dt className="kicker">Falta cobrar este mes</dt>
-                <dd className="figure text-[24px]">{fmt(pending.income)}</dd>
-              </div>
-            </dl>
-            <ul className="grid divide-y divide-line border-y border-line">
+            <div className="grid grid-cols-2 gap-3">
+              <StatTile
+                icon={ArrowUpRight}
+                label="Falta pagar"
+                figure={<span className={fmt(pending.expense).length > 9 ? "text-[20px] sm:text-[26px]" : "text-[24px] sm:text-[30px]"}>{fmt(pending.expense)}</span>}
+                sub="Lo que se carga solo hasta fin de mes"
+              />
+              <StatTile
+                icon={ArrowDownLeft}
+                label="Falta cobrar"
+                figure={<span className={fmt(pending.income).length > 9 ? "text-[20px] sm:text-[26px]" : "text-[24px] sm:text-[30px]"}>{fmt(pending.income)}</span>}
+                sub="Lo que entra solo hasta fin de mes"
+              />
+            </div>
+            <TintedCard
+              icon={ArrowsClockwise}
+              title="Recurrentes"
+              meta={`${schedules.filter((s) => s.active).length} activos${schedules.some((s) => !s.active) ? ` · ${schedules.filter((s) => !s.active).length} en pausa` : ""}`}
+              action={
+                <button type="button" onClick={() => open(null)} className="tcard-pill press">
+                  <Plus size={13} weight="bold" aria-hidden /> Nuevo
+                </button>
+              }
+              bodyClassName="gap-0! px-4! py-1! lg:px-5!"
+            >
+            <ul className="grid divide-y divide-line">
               {schedules.map((s, i) => {
                 const acc = lk.account(s.accountId);
                 const cur = acc?.currency ?? "UYU";
@@ -138,6 +154,7 @@ export function SchedulesView({
                 );
               })}
             </ul>
+            </TintedCard>
           </>
         )}
       </main>
