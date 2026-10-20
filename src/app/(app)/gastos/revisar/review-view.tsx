@@ -19,7 +19,7 @@ import {
   type ReviewItem,
   type ReviewTx,
 } from "@/lib/gastos-review-logic";
-import { applyGastosReview, searchReviewTx, undoGastosReview } from "@/lib/offline/gastos-review";
+import { applyGastosReview, findCounterparts, searchReviewTx, undoGastosReview } from "@/lib/offline/gastos-review";
 import { GastosTabs } from "../gastos-nav";
 import { Amount, EmptyBlock } from "../shared";
 
@@ -55,6 +55,7 @@ export function ReviewView({
   const [added, setAdded] = useState<ReviewItem[]>([]);
   const pairs = data.pairs.filter((p) => !done.has(p.key));
   const trabajo = data.trabajo.filter((i) => !done.has(i.tx.id));
+  const loose = data.loose.filter((t) => !done.has(t.id));
   const mamaItems = useMemo(
     () => [...data.mama, ...added.filter((a) => !data.mama.some((m) => m.tx.id === a.tx.id))].filter((i) => !done.has(i.tx.id)),
     [data.mama, added, done],
@@ -65,7 +66,7 @@ export function ReviewView({
     Object.fromEntries(pairs.map((p) => [p.key, pc(p)])),
     Object.fromEntries([...trabajo, ...mamaItems].map((i) => [i.tx.id, ch(i)])),
   );
-  const nothing = !pairs.length && !data.loose.length && !trabajo.length && !mamaItems.length;
+  const nothing = !pairs.length && !loose.length && !trabajo.length && !mamaItems.length;
 
   const setMany = (items: ReviewItem[], pick: (i: ReviewItem) => ReviewChoice) =>
     setChoice((s) => ({ ...s, ...Object.fromEntries(items.map((i) => [i.tx.id, pick(i)])) }));
@@ -133,7 +134,7 @@ export function ReviewView({
           </EmptyBlock>
         )}
 
-        {(pairs.length > 0 || data.loose.length > 0) && (
+        {(pairs.length > 0 || loose.length > 0) && (
           <TintedCard
             icon={ArrowsLeftRight}
             title="Cambios de dólares"
@@ -178,24 +179,27 @@ export function ReviewView({
                 </div>
               )}
             </Folded>
-            {data.loose.length > 0 && (
-              <details className="rounded-xl border border-line px-3 py-2">
-                <summary className="cursor-pointer py-1 text-[13.5px] font-medium">
-                  {data.loose.length === 1 ? "1 parece un cambio" : `${data.loose.length} parecen cambios`} pero no tienen pareja clara
-                </summary>
-                <p className="pt-1 pb-2 text-[12.5px] text-muted">
-                  No se tocan. Si alguno es un cambio, revisalo a mano en Buscar (la otra mitad puede haber quedado como ajuste de saldo).
+            {loose.length > 0 && (
+              <div className="grid gap-2 border-t border-line pt-3">
+                <span className="kicker">Sin pareja clara · {loose.length}</span>
+                <p className="text-[12.5px] leading-relaxed text-muted">
+                  Dicen &quot;cambio&quot; o &quot;pesos/dólares&quot; pero la otra mitad no apareció sola. Para cada uno:{" "}
+                  <b className="font-semibold text-fg">Buscar la otra mitad</b> (y unirlas),{" "}
+                  <b className="font-semibold text-fg">Sacar de los gastos</b> (era un cambio pero la otra mitad nunca se cargó: pasa a Ajuste de
+                  saldo, el saldo no se mueve) o <b className="font-semibold text-fg">No es un cambio</b>.
                 </p>
-                <ul className="grid gap-1.5 pb-1">
-                  {data.loose.map((t) => (
-                    <li key={t.id}>
-                      <a href={`/gastos/buscar?q=${encodeURIComponent(t.title ?? "")}`} className="block rounded-lg hover:bg-surface-2">
-                        <TxLine t={t} />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </details>
+                {loose.map((t) => (
+                  <LooseRow
+                    key={t.id}
+                    t={t}
+                    pending={pending}
+                    onJoin={(c) =>
+                      run({ pairs: [t.kind === "expense" ? { outId: t.id, inId: c.id, choice: "transfer" } : { outId: c.id, inId: t.id, choice: "transfer" }], items: [] }, [t.id])
+                    }
+                    onPick={(choice) => run({ pairs: [], items: [{ id: t.id, choice }] }, [t.id])}
+                  />
+                ))}
+              </div>
             )}
           </TintedCard>
         )}
@@ -292,6 +296,93 @@ function summaryText(s: ReturnType<typeof summarizeChoices>) {
     s.other && `${s.other} a otra categoría`,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "Todo queda como está";
+}
+
+/**
+ * Un cambio de moneda sin pareja: buscar la otra mitad (de la otra moneda, hasta 10
+ * días) y unirlas, pasarlo a Ajuste de saldo o dejarlo (no era un cambio).
+ */
+function LooseRow({
+  t,
+  pending,
+  onJoin,
+  onPick,
+}: {
+  t: ReviewTx;
+  pending: boolean;
+  onJoin: (c: ReviewTx) => void;
+  onPick: (choice: ReviewChoice) => void;
+}) {
+  const [found, setFound] = useState<{ tx: ReviewTx; rate: number | null; days: number }[] | null>(null);
+  const [searching, startSearch] = useSafeTransition();
+  const search = () => startSearch(async () => setFound(await findCounterparts(t.id)));
+  return (
+    <div className="grid gap-2.5 rounded-xl border border-line p-3">
+      <TxLine t={t} />
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={found ? () => setFound(null) : search}
+          disabled={searching}
+          aria-expanded={!!found}
+          className={cx(
+            "press inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[12.5px]",
+            found ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong bg-surface hover:bg-surface-2",
+          )}
+        >
+          <MagnifyingGlass size={12} weight="bold" aria-hidden /> {searching ? "Buscando…" : found ? "Cerrar la búsqueda" : "Buscar la otra mitad"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick("ajuste")}
+          disabled={pending}
+          className="press inline-flex h-8 items-center rounded-full border border-line-strong bg-surface px-3 text-[12.5px] hover:bg-surface-2 disabled:opacity-50"
+        >
+          Sacar de los gastos
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick("keep")}
+          disabled={pending}
+          className="press inline-flex h-8 items-center rounded-full border border-line-strong bg-surface px-3 text-[12.5px] hover:bg-surface-2 disabled:opacity-50"
+        >
+          No es un cambio
+        </button>
+      </div>
+      {found && (
+        <div className="grid gap-1.5 rounded-lg bg-surface-2 p-2.5">
+          {found.length === 0 ? (
+            <p className="text-[12.5px] text-muted">
+              No hay movimientos de la otra moneda en 10 días. Si fue un cambio, la otra mitad nunca se cargó: usá &quot;Sacar de los gastos&quot;.
+            </p>
+          ) : (
+            <>
+              <span className="text-[12px] text-muted">De la otra moneda, hasta 10 días antes o después. Elegí la otra mitad:</span>
+              {found.map(({ tx, rate, days }) => (
+                <div key={tx.id} className="grid gap-1.5 rounded-lg border border-line bg-surface p-2.5">
+                  <TxLine t={tx} />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-[11.5px] text-muted">
+                      {days === 0 ? "Mismo día" : `${days} ${days === 1 ? "día" : "días"} de diferencia`}
+                      {rate !== null && ` · $ ${rate.toFixed(2).replace(".", ",")} por dólar`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onJoin(tx)}
+                      disabled={pending}
+                      className="press inline-flex h-8 items-center gap-1 rounded-full border border-dashed border-accent-fg/60 bg-accent-soft px-3 text-[12.5px] font-semibold text-accent-fg disabled:opacity-50"
+                    >
+                      Unir con este <ArrowRight size={12} weight="bold" aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Aplica solo esta fila con lo elegido. */

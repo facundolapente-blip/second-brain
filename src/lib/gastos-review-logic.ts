@@ -25,7 +25,8 @@ export type ReviewTx = {
  * personal), a Aporte al negocio (plata tuya puesta en él: cuenta como gasto), a mamá u
  * otra categoría.
  */
-export type ReviewChoice = "keep" | "trabajo" | "aporte" | "mama" | `cat:${string}`;
+/** `ajuste`: un cambio de moneda sin la otra mitad pasa a "Ajuste de saldo" (no es gasto; el saldo no se mueve). */
+export type ReviewChoice = "keep" | "trabajo" | "aporte" | "mama" | "ajuste" | `cat:${string}`;
 export type PairChoice = "transfer" | "keep";
 
 export type ExchangePair = {
@@ -191,6 +192,28 @@ export function buildReview(txs: ReviewTx[]): ReviewData {
   }
   const newest = (a: ReviewItem, b: ReviewItem) => b.tx.date.localeCompare(a.tx.date);
   return { pairs, loose, trabajo: trabajo.sort(newest), mama: mama.sort(newest) };
+}
+
+/**
+ * Posibles "otra mitad" de un cambio de moneda sin pareja: de la otra moneda y el otro
+ * tipo (gasto ↔ ingreso), en otra cuenta, hasta 10 días de diferencia. Primero los de
+ * cotización posible y más cerca en fecha; cada uno con el tipo de cambio que daría.
+ */
+export function counterpartsFor(t: ReviewTx, txs: ReviewTx[]): { tx: ReviewTx; rate: number | null; days: number }[] {
+  const out: { tx: ReviewTx; rate: number | null; days: number; score: number }[] = [];
+  for (const c of txs) {
+    if (c.id === t.id || c.kind === t.kind || c.currency === t.currency || c.accountId === t.accountId) continue;
+    const days = Math.abs(diffDays(t.date, c.date));
+    if (days > 10) continue;
+    const [o, i] = t.kind === "expense" ? [t, c] : [c, t];
+    const rate = pairRate(o, i);
+    const ok = rate !== null && rate >= RATE_RANGE[0] && rate <= RATE_RANGE[1];
+    out.push({ tx: c, rate: rate === null ? null : Math.round(rate * 100) / 100, days, score: (ok ? 0 : 100) + days + (rate ? Math.abs(rate - 40) / 4 : 10) });
+  }
+  return out
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 8)
+    .map(({ tx, rate, days }) => ({ tx, rate, days }));
 }
 
 /** Qué opciones tiene un movimiento en cada grupo. */

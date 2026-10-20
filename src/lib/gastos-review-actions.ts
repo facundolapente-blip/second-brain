@@ -10,6 +10,7 @@ import { logActivity, trashAndDelete } from "./trash";
 import { restoreItem } from "./trash-actions";
 import { parseUndoStack, reviewSelect, toReviewTx, UNDO_KEEP, type ReviewUndo } from "./gastos-review";
 import {
+  counterpartsFor,
   parseReviewed,
   REVIEW_CATEGORIES,
   REVIEW_UNDO_KEY,
@@ -147,6 +148,7 @@ export async function applyGastosReview(input: {
     else if (choice === "aporte" && expense) target = cats.aporte;
     else if (choice === "mama") target = expense ? cats.mamaExpense : cats.mamaIncome;
     else if (choice.startsWith("cat:") && otherCats.get(choice.slice(4)) === t.kind) target = choice.slice(4);
+    else if (choice === "ajuste") target = (await prisma.category.findFirst({ where: { isAdjustment: true, kind: t.kind }, select: { id: true } }))?.id;
     if (target === undefined || target === t.categoryId) continue;
     undo.rows.push({ id, before: { categoryId: t.categoryId } });
     await prisma.transaction.update({ where: { id }, data: { categoryId: target } });
@@ -261,6 +263,24 @@ export async function undoGastosReview(): Promise<ReviewResult> {
   if (undo.count) await logActivity("restored", "transaction", null, `Se deshizo la revisión de movimientos (${undo.count} ${undo.count === 1 ? "cambio" : "cambios"})`);
   refrescar();
   return { ok: true, changed: undo.count };
+}
+
+/** Para un cambio de moneda sin pareja: los movimientos que podrían ser su otra mitad. */
+export async function findCounterparts(id: string): Promise<{ tx: ReviewTx; rate: number | null; days: number }[]> {
+  await exigirSesion();
+  const row = await prisma.transaction.findUnique({ where: { id }, select: reviewSelect });
+  if (!row || (row.kind !== "expense" && row.kind !== "income")) return [];
+  const t = toReviewTx(row);
+  const day = row.date.getTime();
+  const near = await prisma.transaction.findMany({
+    where: {
+      kind: row.kind === "expense" ? "income" : "expense",
+      account: { isBusiness: false },
+      date: { gte: new Date(day - 10 * 86_400_000), lte: new Date(day + 10 * 86_400_000) },
+    },
+    select: reviewSelect,
+  });
+  return counterpartsFor(t, near.map(toReviewTx));
 }
 
 /** Buscar cualquier movimiento personal para sumarlo a "Plata de mamá" (título o nota, sin tildes). */
