@@ -79,7 +79,10 @@ export async function syncWatch({ days = 3, apiKey }: { days?: number; apiKey?: 
   const key = apiKey ?? prev?.apiKey;
   if (!key) return null;
   const today = todayISO();
-  const oldest = addDays(today, -(Math.min(400, Math.max(1, days)) - 1));
+  // Mientras no haya llegado ningún dato (Huawei tarda en mandar lo viejo a intervals.icu),
+  // cada vuelta pide el año entero: así el historial entra solo cuando aparece.
+  const span = prev && prev.apiKey === key && !prev.lastDay ? 365 : days;
+  const oldest = addDays(today, -(Math.min(400, Math.max(1, span)) - 1));
   const state: State = prev && prev.apiKey === key ? { ...prev } : { apiKey: key, connectedAt: new Date().toISOString() };
   const synced: WatchSynced = { sleep: { ...(state.synced?.sleep ?? {}) }, weight: { ...(state.synced?.weight ?? {}) } };
   try {
