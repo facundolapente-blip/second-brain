@@ -35,7 +35,15 @@ export type HabitRule = {
    * la última semana se prorratea con los días que tuvo.
    */
   trackEnd?: string;
+  /**
+   * Hábito atado al Plan (Gym): los días que tienen un bloque con su nombre. Solo esos
+   * días aparece en la lista (o el que ya está marcado); el resto de las reglas no cambia.
+   */
+  planDays?: string[];
 };
+
+/** Clave para atar un hábito al Plan: los ids de los hábitos que aparecen solo con su bloque. */
+export const HABITS_PLAN_LINKED_KEY = "habitos_ligados_plan";
 
 /** `none` = el día solo tiene una nota, sin marca. */
 export type DayLog = { s: LogStatus | "none"; v: number; n?: string };
@@ -158,6 +166,8 @@ function* weeks(h: HabitRule, today: string) {
  * (como en HabitNow). El día en que se marcó sigue apareciendo, como hecho.
  */
 export function showsOn(h: HabitRule, logs: LogMap, iso: string): boolean {
+  // Atado al Plan: aparece si ese día tiene su bloque (o si ya se marcó).
+  if (h.planDays) return !!logs[iso] || h.planDays.includes(iso);
   if (!isScheduled(h, iso)) return false;
   if (h.frequency !== "weekly" || logs[iso]) return true;
   return !weekMet(h, logs, periodStart(h, iso));

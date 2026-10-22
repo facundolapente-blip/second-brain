@@ -408,3 +408,20 @@ describe("marcas compactas (packAll / unpackAll)", () => {
     expect(packLogs({})).toBeNull();
   });
 });
+
+describe("hábito atado al Plan (Gym)", () => {
+  const gym = { frequency: "weekly" as const, weekdays: [], timesPerWeek: 3, target: 1, startDate: "2026-01-01", weekStart: 1, planDays: ["2026-10-21", "2026-10-23"] };
+  it("aparece solo los días con su bloque", () => {
+    expect(showsOn(gym, {}, "2026-10-21")).toBe(true);
+    expect(showsOn(gym, {}, "2026-10-22")).toBe(false);
+    expect(showsOn(gym, {}, "2026-10-23")).toBe(true);
+  });
+  it("un día marcado sin bloque igual aparece (no desaparece lo hecho)", () => {
+    expect(showsOn(gym, { "2026-10-22": { s: "done", v: 1 } }, "2026-10-22")).toBe(true);
+  });
+  it("cuenta en el avance del día solo cuando aparece", () => {
+    const habits = [{ ...gym, id: "gym" }];
+    expect(dayProgress(habits, { gym: {} }, "2026-10-22", "2026-10-22").total).toBe(0);
+    expect(dayProgress(habits, { gym: {} }, "2026-10-21", "2026-10-21").total).toBe(1);
+  });
+});
