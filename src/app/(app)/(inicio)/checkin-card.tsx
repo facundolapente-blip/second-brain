@@ -4,7 +4,7 @@ import { PillSwitch } from "@/components/pill-switch";
 import { usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
 import { useEffect, useRef, useState } from "react";
-import { BatteryHigh, CaretDown, Check, Minus, Moon, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
+import { BatteryHigh, Brain, CaretDown, Check, Fire, Footprints, Heartbeat, Minus, Moon, Path, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
 import { saveCheckin } from "@/lib/offline/checkin";
 import {
   ENERGY_LABELS,
@@ -17,7 +17,9 @@ import {
   type CheckinDTO,
   type CheckinPatch,
   type WatchDay,
+  type WatchSlot,
 } from "@/lib/checkin-logic";
+import { STEPS_GOAL, stressLevel } from "@/lib/health-logic";
 import { MOODS } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -266,24 +268,62 @@ export function CheckinCard({
  */
 function WatchStrip({ slots, watch, swap }: { slots: ReturnType<typeof watchSlotsFor>; watch: WatchDay | null; swap: boolean }) {
   const values = watchValues(watch);
+  const shown = WATCH_SLOTS.filter((s) => slots.includes(s.id));
   return (
-    <div className="grid gap-1.5 border-t border-line pt-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-baseline sm:gap-x-5">
-      <p className="text-[12px] font-medium text-muted">Del reloj</p>
+    <div className="grid gap-2 border-t border-line pt-3" aria-label="Datos del reloj" role="group">
       <div className={cx("relative", swap && "swap")}>
         {/* Un día sin nada del reloj ocupa lo mismo (los casilleros quedan invisibles) y lo dice. */}
-        <dl aria-hidden={!watch || undefined} className={cx("grid grid-cols-3 gap-x-3 gap-y-1.5 sm:flex sm:flex-wrap sm:gap-x-6", !watch && "invisible")}>
-          {WATCH_SLOTS.filter((s) => slots.includes(s.id)).map((s) => (
-            <div key={s.id} className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-              <dt className="text-[11.5px] text-muted">{s.label}</dt>
-              <dd className="truncate font-mono text-[13px] text-fg tabular">{values[s.id] ?? "–"}</dd>
-            </div>
-          ))}
+        <dl
+          aria-hidden={!watch || undefined}
+          className={cx("grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]", !watch && "invisible")}
+        >
+          {shown.map((s) => {
+            // Cada medida con su color, como en Salud (el estrés, el de su nivel).
+            const color = s.id === "stress" && watch?.stressScore != null ? stressLevel(watch.stressScore).tone : WATCH_LOOK[s.id].color;
+            const Ico = WATCH_LOOK[s.id].icon;
+            const steps = s.id === "steps" ? watch?.steps : null;
+            return (
+              <div
+                key={s.id}
+                style={{ ...tone(color), background: `color-mix(in oklab, var(--p-${color}-chip) 12%, var(--surface))` }}
+                className={cx("grid min-w-0 content-start gap-1 rounded-xl px-3 py-2.5", s.id === "steps" && "col-span-2 sm:col-span-1")}
+              >
+                <dt className="flex items-center gap-1.5 text-[12px] font-medium text-fg">
+                  <span className="chip-solid inline-flex size-6 shrink-0 items-center justify-center rounded-full">
+                    <Ico size={13} weight="fill" aria-hidden />
+                  </span>
+                  {s.label}
+                </dt>
+                <dd className="truncate font-mono text-[18px] font-semibold text-fg tabular">{values[s.id] ?? "–"}</dd>
+                {steps != null && (
+                  // Los pasos con su meta del día (8.000, la misma de Salud).
+                  <dd className="grid gap-1">
+                    <span className="block h-1.5 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--p-green-chip)_22%,var(--surface))]">
+                      <span className="block h-full rounded-full bg-[var(--p-green-chip)]" style={{ width: `${Math.min(100, (steps / STEPS_GOAL) * 100)}%` }} />
+                    </span>
+                    <span className="text-[11.5px] text-muted">
+                      {steps >= STEPS_GOAL ? "Meta de 8.000 cumplida" : `Faltan ${(STEPS_GOAL - steps).toLocaleString("es-UY")} para 8.000`}
+                    </span>
+                  </dd>
+                )}
+              </div>
+            );
+          })}
         </dl>
         {!watch && <p className="absolute inset-0 text-[12.5px] text-muted">Todavía no llegó nada del reloj para este día.</p>}
       </div>
     </div>
   );
 }
+
+/** Color e ícono de cada dato del reloj (los mismos que en Salud). */
+const WATCH_LOOK: Record<WatchSlot, { color: string; icon: typeof Footprints }> = {
+  steps: { color: "green", icon: Footprints },
+  stress: { color: "blue", icon: Brain },
+  pulse: { color: "red", icon: Heartbeat },
+  distance: { color: "teal", icon: Path },
+  kcal: { color: "orange", icon: Fire },
+};
 
 /** Un estado del renglón de guardado: todos en la misma celda, visible solo el actual. */
 function StatusLine({ on, children }: { on: boolean; children: React.ReactNode }) {
