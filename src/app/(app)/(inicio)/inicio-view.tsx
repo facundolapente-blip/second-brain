@@ -547,7 +547,8 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       meta={due === 0 ? "Hoy no toca ninguno" : complete ? `Día completo · ${due} de ${due}` : `${done} de ${due} · faltan ${due - done}`}
       action={{ href: "/habitos", label: "Ver todo" }}
       progress={due ? barDone / due : null}
-      className={cx("max-lg:order-4 lg:col-span-6 xl:col-span-7", celebrate && barSeen && "ini-glow")}
+      // Mide lo que tiene adentro (no se estira hasta la columna de al lado: quedaba un hueco grande).
+      className={cx("max-lg:order-4 lg:col-span-6 lg:self-start xl:col-span-7", celebrate && barSeen && "ini-glow")}
       bodyClassName="ini-habits-body"
     >
       <span ref={barRef} aria-hidden className="block h-0" />
@@ -586,7 +587,7 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
           )}
         </div>
       </div>
-      <div className="mt-auto grid grid-cols-2 gap-2.5 pt-4">
+      <div className="grid grid-cols-2 gap-2.5 pt-4">
         <FootStat
           label="Esta semana"
           value={pct(wDone, wDue)}
