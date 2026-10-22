@@ -547,8 +547,7 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       meta={due === 0 ? "Hoy no toca ninguno" : complete ? `Día completo · ${due} de ${due}` : `${done} de ${due} · faltan ${due - done}`}
       action={{ href: "/habitos", label: "Ver todo" }}
       progress={due ? barDone / due : null}
-      // Mide lo que tiene adentro (no se estira hasta la columna de al lado: quedaba un hueco grande).
-      className={cx("max-lg:order-4 lg:col-span-6 lg:self-start xl:col-span-7", celebrate && barSeen && "ini-glow")}
+      className={cx("max-lg:order-4 lg:col-span-6 xl:col-span-7", celebrate && barSeen && "ini-glow")}
       bodyClassName="ini-habits-body"
     >
       <span ref={barRef} aria-hidden className="block h-0" />
@@ -587,6 +586,9 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
           )}
         </div>
       </div>
+      {/* En la compu la tarjeta mide lo mismo que la columna de al lado: lo que sobra lo
+          ocupa la semana día por día (se estira; sin lugar, queda en su alto mínimo). */}
+      <WeekDays week={d.week} today={d.today} todayDone={done} todayDue={due} />
       <div className="grid grid-cols-2 gap-2.5 pt-4">
         <FootStat
           label="Esta semana"
@@ -603,6 +605,45 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       </div>
       <DaySheet ref={daySheet} logs={logs} mark={mark} />
     </TintedCard>
+  );
+}
+
+/** La semana de lunes a domingo: una barra por día con lo hecho de lo que tocaba (solo en la compu). */
+function WeekDays({ week, today, todayDone, todayDue }: { week: Dashboard["week"]; today: string; todayDone: number; todayDue: number }) {
+  const letters = ["L", "M", "M", "J", "V", "S", "D"];
+  return (
+    <div className="mt-4 hidden min-h-[104px] flex-1 flex-col gap-2 rounded-[14px] bg-surface-2/60 p-3 lg:flex">
+      <span className="kicker">Esta semana, día por día</span>
+      <div className="grid min-h-0 flex-1 grid-cols-7 gap-2">
+        {week.map((w, i) => {
+          const isToday = w.date === today;
+          const future = w.date > today;
+          const done = isToday ? todayDone : w.habitsDone;
+          const due = isToday ? todayDue : w.habitsDue;
+          const share = due ? Math.min(1, done / due) : 0;
+          return (
+            <div key={w.date} className="grid min-h-0 grid-rows-[auto_minmax(24px,1fr)_auto] justify-items-center gap-1">
+              <span className="font-mono text-[11px] text-muted tabular">{future || !due ? "" : `${done}/${due}`}</span>
+              <span
+                className={cx(
+                  "relative block w-full max-w-9 overflow-hidden rounded-[8px]",
+                  future ? "border border-dashed border-line-strong" : "bg-[color-mix(in_oklab,var(--c-habitos)_14%,var(--surface))]",
+                )}
+                title={future ? "Todavía no llegó" : due ? `${done} de ${due} hechos` : "No tocaba ninguno"}
+              >
+                {!future && share > 0 && (
+                  <span
+                    className="absolute inset-x-0 bottom-0 rounded-[8px] bg-[var(--c-habitos)]"
+                    style={{ height: `${Math.max(6, share * 100)}%` }}
+                  />
+                )}
+              </span>
+              <span className={cx("text-[11.5px]", isToday ? "font-semibold text-fg" : "text-muted")}>{isToday ? "Hoy" : letters[i]}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
