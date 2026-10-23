@@ -172,8 +172,8 @@ export function ReportsView({
       const cur = lk.currencyOf(r.accountId);
       if (cur === "UYU") return r;
       const per = cur === "USD" ? rate : (todayRates[cur] ?? 0);
-      // Al centavo, como `toUyu` (Inicio, Proyección): así "Todo en pesos" da la misma cifra.
-      return { ...r, cents: Math.round(r.cents * per) };
+      // A pesos enteros cada movimiento, como `toUyu` (Inicio, Proyección): así "Todo en pesos" da la misma cifra.
+      return { ...r, cents: Math.round((r.cents * per) / 100) * 100 };
     });
   }, [rows, scope, selection, lk, currency, allPesos, rate, todayRates]);
   const yearMode = period.kind === "year";
