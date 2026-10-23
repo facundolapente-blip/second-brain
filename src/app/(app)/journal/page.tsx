@@ -28,7 +28,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   const filtering = !!(q || tag || mood);
   const ver = one(sp.ver).slice(0, 64);
 
-  const [home, { entries, hasMore }, tags, jar, reading, quick] = await Promise.all([
+  const [home, { entries, hasMore, total, byYear }, tags, jar, reading, quick] = await Promise.all([
     getHome(),
     getEntries({ q, tag, mood, limit }),
     getAllTags(),
@@ -107,7 +107,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         )}
 
         {filtering && (
-          <FilterSummary count={entries.length} hasMore={hasMore} q={q} tag={tag} mood={mood} />
+          <FilterSummary count={total} q={q} tag={tag} mood={mood} />
         )}
 
         {entries.length === 0 ? (
@@ -123,13 +123,13 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         ) : (
 <SwapOnChange k={`${q}|${tag}|${mood}`}>          <div className="grid gap-5 lg:gap-6">
             {/* Un año por tarjeta; en el celular la cabecera del año queda pegada arriba (journal.css). */}
-            {years.map((g, gi) => (
+            {years.map((g) => (
               <JCard
                 key={g.year}
                 className="jr-year"
                 icon="notebook"
                 title={g.year}
-                meta={`${g.items.length}${hasMore && gi === years.length - 1 ? "+" : ""} ${g.items.length === 1 ? "entrada" : "entradas"}`}
+                meta={`${(byYear[g.year] ?? g.items.length).toLocaleString("es-UY")} ${(byYear[g.year] ?? g.items.length) === 1 ? "entrada" : "entradas"}`}
                 bodyClassName="gap-0! py-1! lg:py-2!"
               >
                   {g.items.map((e) => (
@@ -183,13 +183,11 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
 function FilterSummary({
   count,
-  hasMore,
   q,
   tag,
   mood,
 }: {
   count: number;
-  hasMore: boolean;
   q: string;
   tag: string;
   mood?: number;
@@ -202,8 +200,7 @@ function FilterSummary({
     <div className="reveal flex items-center gap-3 rounded-full border bg-surface py-2 pr-2 pl-5 text-[15px]">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
-          {count}
-          {hasMore ? "+" : ""} {count === 1 ? "entrada" : "entradas"}
+          {count.toLocaleString("es-UY")} {count === 1 ? "entrada" : "entradas"}
         </span>{" "}
         <span className="text-muted">{parts.join(", ")}</span>
       </span>

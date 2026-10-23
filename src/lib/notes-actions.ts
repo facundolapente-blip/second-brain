@@ -20,6 +20,7 @@ import {
   youtubeThumb,
 } from "./notes-logic";
 import { fetchLinkMeta, getNoteCategories } from "./notes";
+import { storeThumbnail } from "./thumbs";
 
 export type NoteResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -63,7 +64,7 @@ export async function saveNote(_prev: NoteResult | null, fd: FormData): Promise<
     if (yt) thumbnail = youtubeThumb(yt);
     // Sin título o sin foto: se buscan en la página (la foto del producto en una tienda).
     if (!title || !thumbnail) {
-      const meta = await fetchLinkMeta(n.url);
+      const meta = await fetchLinkMeta(n.url, undefined, { keep: storeThumbnail });
       title = title ?? meta.title;
       thumbnail = thumbnail ?? meta.thumbnail;
     }

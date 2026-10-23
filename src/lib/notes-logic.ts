@@ -545,11 +545,15 @@ export function noteHeading(n: Pick<NoteDTO, "title" | "body" | "url">): string 
  */
 export function titleFromUrl(url: string): string | null {
   let path: string;
+  let host: string;
   try {
-    path = new URL(url).pathname;
+    ({ pathname: path, hostname: host } = new URL(url));
   } catch {
     return null;
   }
+  // El final de un link de Instagram o TikTok es un código ("Dd9SdJgSpz4"), no un nombre.
+  if (/(^|\.)instagram\.com$/i.test(host)) return /\/reels?\//i.test(path) ? "Reel de Instagram" : "Post de Instagram";
+  if (/(^|\.)tiktok\.com$/i.test(host)) return "Video de TikTok";
   const segs = path.split("/").map((x) => decodeURIComponent(x).trim()).filter(Boolean);
   for (let i = segs.length - 1; i >= 0; i--) {
     const seg = segs[i].replace(/\.(html?|php|aspx?)$/i, "");

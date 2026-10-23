@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { logActivity } from "../trash";
 import { fetchLinkMeta } from "../notes";
+import { storeThumbnail } from "../thumbs";
 import { photosEnabled, storePhoto } from "../photos";
 import {
   bodyWithoutUrl,
@@ -52,7 +53,7 @@ export async function saveTextNote(text: string, msgId: string | null): Promise<
   let title: string | null = null;
   let thumbnail: string | null = null;
   if (url) {
-    const meta = await fetchLinkMeta(url).catch(() => ({ title: null, thumbnail: null }));
+    const meta = await fetchLinkMeta(url, undefined, { keep: storeThumbnail }).catch(() => ({ title: null, thumbnail: null }));
     title = meta.title;
     const yt = youtubeId(url);
     thumbnail = meta.thumbnail ?? (yt ? youtubeThumb(yt) : null);

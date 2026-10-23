@@ -71,11 +71,12 @@ async function fetchRates(savedValue: string | null): Promise<Rates> {
 }
 
 /**
- * Centavos de cualquier moneda a centavos de pesos (moneda desconocida = 0).
- * Lo convertido se redondea a pesos enteros: los centavos de una cotización son ruido.
+ * Centavos de cualquier moneda a centavos de pesos (moneda desconocida = 0). Se redondea al
+ * centavo, no al peso: redondear cada movimiento a pesos sumaba un peso de diferencia con
+ * Informes, que pasa los totales (2026-10-23). Los totales se muestran redondeados igual.
  */
 export function toUyu(cents: number, currency: string, rates: Rates): number {
   if (currency === "UYU") return cents;
   const r = rates.toUyu[currency];
-  return r ? Math.round((cents * r) / 100) * 100 : 0;
+  return r ? Math.round(cents * r) : 0;
 }

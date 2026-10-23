@@ -1,5 +1,5 @@
 import { shiftMonth, todayISO } from "@/lib/dates";
-import { getAccounts, getCategories, getFlowRows, getReportRate } from "@/lib/finance";
+import { DEFAULT_REPORT_RATE, getAccounts, getCategories, getFlowRows, getReportRate } from "@/lib/finance";
 import { getRates } from "@/lib/fx";
 import { periodFromParams } from "@/lib/finance-logic";
 import { ReportsView } from "./reports-view";
@@ -36,7 +36,8 @@ export default async function InformesPage({ searchParams }: PageProps<"/gastos/
       accounts={accounts}
       categories={categories}
       rows={rows}
-      reportRate={reportRate}
+      // Sin una guardada, la de hoy: así "Todo en pesos" da lo mismo que Inicio y Proyección.
+      reportRate={reportRate ?? rates.toUyu.USD ?? DEFAULT_REPORT_RATE}
       todayRates={rates.toUyu}
     />
   );

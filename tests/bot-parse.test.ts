@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayAtEnd, looksLikeExpense, looksLikePrice, parseBlock, parseCommand, parseJournal, parseTask } from "@/lib/bot/parse";
+import { dayAtEnd, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, sleepOf } from "@/lib/bot/parse";
 
 const TODAY = "2026-10-19";
 
@@ -81,5 +81,61 @@ describe("mensajes sin comando (Notas)", () => {
   it("gasto sin GG: un renglón que empieza con el monto y tiene palabras", () => {
     for (const t of ["350 almuerzo itau", "+750 disco prex", "usd 20 nafta", "$ 300 taxi"]) expect(looksLikeExpense(t), t).toBe(true);
     for (const t of ["+49 9286 9555-0", "3 perfumes\n3 libros", "https://youtu.be/abc", "Sauverox", "1500"]) expect(looksLikeExpense(t), t).toBe(false);
+  });
+});
+
+describe("check-in por WhatsApp (CC)", () => {
+  it("CC, checkin, check-in y animo son el check-in", () => {
+    expect(parseCommand("CC animo 4").cmd).toBe("checkin");
+    expect(parseCommand("checkin 4 3 2").cmd).toBe("checkin");
+    expect(parseCommand("check-in 4").cmd).toBe("checkin");
+    expect(parseCommand("Ánimo 4").cmd).toBe("checkin");
+  });
+
+  it("todo junto, con tildes y la nota al final tal cual", () => {
+    expect(parseCheckin("Ánimo 4 energía 3 estrés 2 sueño 7:30 peso 82,4 nota Dormí Poco", TODAY)).toEqual({
+      date: TODAY,
+      fields: { mood: 4, energy: 3, stress: 2, sleepMin: 450, weightG: 82400 },
+      note: "Dormí Poco",
+    });
+  });
+
+  it("4 3 2 es ánimo, energía y estrés; ayer adelante va a ayer", () => {
+    expect(parseCheckin("4 3 2", TODAY)).toEqual({ date: TODAY, fields: { mood: 4, energy: 3, stress: 2 }, note: null });
+    expect(parseCheckin("ayer animo bien", TODAY)).toEqual({ date: "2026-10-18", fields: { mood: 4 }, note: null });
+  });
+
+  it("palabras de las escalas y separadores", () => {
+    expect(parseCheckin("animo: muy bien, energia a full, estres nada", TODAY)).toMatchObject({ fields: { mood: 5, energy: 5, stress: 1 } });
+    expect(parseCheckin("animo 4/5", TODAY)).toMatchObject({ fields: { mood: 4 } });
+  });
+
+  it("el sueño en varias formas", () => {
+    expect(sleepOf("7:30")).toBe(450);
+    expect(sleepOf("7h30")).toBe(450);
+    expect(sleepOf("7 h 30")).toBe(450);
+    expect(sleepOf("7.30")).toBe(450);
+    expect(sleepOf("7,5")).toBe(450);
+    expect(sleepOf("8")).toBe(480);
+    expect(sleepOf("8 horas")).toBe(480);
+    expect(sleepOf("450 min")).toBe(450);
+    expect(sleepOf("7:75")).toBeNull();
+    expect(sleepOf("20")).toBeNull();
+  });
+
+  it("peso con kg y valores fuera de rango", () => {
+    expect(parseCheckin("peso 82.4kg", TODAY)).toMatchObject({ fields: { weightG: 82400 } });
+    expect(parseCheckin("animo 7", TODAY)).toHaveProperty("error");
+    expect(parseCheckin("peso 900", TODAY)).toHaveProperty("error");
+    expect(parseCheckin("hola que tal", TODAY)).toHaveProperty("error");
+  });
+
+  it("sin nada (o solo ayer) muestra cómo va", () => {
+    expect(parseCheckin("", TODAY)).toEqual({ show: TODAY });
+    expect(parseCheckin("ayer", TODAY)).toEqual({ show: "2026-10-18" });
+  });
+
+  it("solo la nota", () => {
+    expect(parseCheckin("nota me dolió la cabeza", TODAY)).toEqual({ date: TODAY, fields: {}, note: "me dolió la cabeza" });
   });
 });

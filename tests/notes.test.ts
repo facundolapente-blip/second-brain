@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeEntities, pickImage, stripSiteSuffix } from "../src/lib/link-meta";
+import { decodeEntities, isExpiringImage, pickImage, socialTitle, stripSiteSuffix } from "../src/lib/link-meta";
 import {
   nextStars,
   normalizeStars,
@@ -362,5 +362,43 @@ describe("estrellas de importancia", () => {
     expect(normalizeStars(7)).toBe(3);
     expect(normalizeStars("x")).toBe(0);
     expect([0, 1, 2, 3].map(nextStars)).toEqual([1, 2, 3, 0]);
+  });
+});
+
+describe("Instagram y TikTok", () => {
+  it("el título es el texto del post, sin los hashtags del final", () => {
+    expect(
+      socialTitle(
+        "Justin Owens on Instagram: &quot;I hate to be the one who says it but at some point you stop chasing closure. Some chapters end without an explanation. #runtheplay&quot;",
+      ),
+    ).toBe("I hate to be the one who says it but at some point you stop chasing closure. Some…");
+    expect(socialTitle('Ana en Instagram: "Receta fácil 🍝 #cocina #pasta"')).toBe("Receta fácil 🍝");
+  });
+
+  it("sin texto: Reel de quien lo subió", () => {
+    expect(socialTitle('Justin Owens (@newageceo) on Instagram: ""')).toBe("Reel de Justin Owens");
+    expect(socialTitle("", "lucas.dj", "Video")).toBe("Video de lucas.dj");
+    expect(socialTitle(null)).toBeNull();
+  });
+
+  it("el primer renglón con texto (no uno de puros hashtags)", () => {
+    expect(socialTitle('X on Instagram: "#fyp #viral\nCómo armar un setlist\nmás texto"')).toBe("Cómo armar un setlist");
+  });
+
+  it("TikTok trae el texto solo", () => {
+    expect(socialTitle("Mi primer set en vivo #dj #techno", "lucas")).toBe("Mi primer set en vivo");
+  });
+
+  it("las fotos de Instagram, Facebook y TikTok vencen", () => {
+    expect(isExpiringImage("https://scontent.cdninstagram.com/v/t51/abc.jpg?oe=1")).toBe(true);
+    expect(isExpiringImage("https://p16-sign-va.tiktokcdn-us.com/x.jpeg")).toBe(true);
+    expect(isExpiringImage("https://i.ytimg.com/vi/x/hqdefault.jpg")).toBe(false);
+    expect(isExpiringImage("http://scontent.cdninstagram.com/a.jpg")).toBe(false);
+  });
+
+  it("sin título, el link de Instagram no muestra su código", () => {
+    expect(titleFromUrl("https://www.instagram.com/reel/Dd9SdJgSpz4/")).toBe("Reel de Instagram");
+    expect(titleFromUrl("https://www.instagram.com/p/Dd9SdJgSpz4/")).toBe("Post de Instagram");
+    expect(titleFromUrl("https://www.tiktok.com/@x/video/123")).toBe("Video de TikTok");
   });
 });

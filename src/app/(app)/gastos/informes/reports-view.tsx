@@ -145,7 +145,8 @@ export function ReportsView({
     const set = new Set(accounts.filter((a) => isSelected(scope, a.id) && !a.archived).map((a) => a.currency));
     return [...set].sort((a, b) => (a === "UYU" ? -1 : b === "UYU" ? 1 : a.localeCompare(b)));
   }, [accounts, scope]);
-  const [pickedCurrency, setCurrency] = useState<string>("UYU");
+  // Arranca en "Todo en pesos": la misma cifra que Inicio y Proyección (con una sola moneda, esa).
+  const [pickedCurrency, setCurrency] = useState<string>(ALL);
   // "ALL" = todo en pesos: cada moneda pasada a pesos (los dólares con `rate`).
   const allPesos = pickedCurrency === ALL && currencies.length > 1;
   const currency = allPesos ? "UYU" : currencies.includes(pickedCurrency) ? pickedCurrency : (currencies[0] ?? "UYU");
@@ -171,6 +172,7 @@ export function ReportsView({
       const cur = lk.currencyOf(r.accountId);
       if (cur === "UYU") return r;
       const per = cur === "USD" ? rate : (todayRates[cur] ?? 0);
+      // Al centavo, como `toUyu` (Inicio, Proyección): así "Todo en pesos" da la misma cifra.
       return { ...r, cents: Math.round(r.cents * per) };
     });
   }, [rows, scope, selection, lk, currency, allPesos, rate, todayRates]);

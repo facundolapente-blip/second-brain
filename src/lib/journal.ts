@@ -89,15 +89,29 @@ export async function getEntries({ q, tag, mood, limit = 60 }: EntryFilters) {
     const hits = rows.filter(
       (r) => fold(r.body).includes(needle) || fold(r.title ?? "").includes(needle) || r.tags.some((t) => fold(t).includes(needle)),
     );
-    return { entries: hits.slice(0, limit).map((r) => toCard(r)), hasMore: hits.length > limit };
+    return { entries: hits.slice(0, limit).map((r) => toCard(r)), hasMore: hits.length > limit, ...countByYear(hits.map((r) => r.date)) };
   }
-  const rows = await prisma.journalEntry.findMany({
-    where: { AND: and },
-    select: CARD_SELECT,
-    orderBy: ORDER,
-    take: limit + 1,
-  });
-  return { entries: rows.slice(0, limit).map((r) => toCard(r)), hasMore: rows.length > limit };
+  const [rows, dates] = await Promise.all([
+    prisma.journalEntry.findMany({
+      where: { AND: and },
+      select: CARD_SELECT,
+      orderBy: ORDER,
+      take: limit + 1,
+    }),
+    // Solo las fechas de todas: para decir cuántas hay en cada año aunque se muestren 60.
+    prisma.journalEntry.findMany({ where: { AND: and }, select: { date: true } }),
+  ]);
+  return { entries: rows.slice(0, limit).map((r) => toCard(r)), hasMore: rows.length > limit, ...countByYear(dates.map((r) => r.date)) };
+}
+
+/** Cuántas entradas hay en total y en cada año (con los mismos filtros de la lista). */
+function countByYear(dates: Date[]): { total: number; byYear: Record<string, number> } {
+  const byYear: Record<string, number> = {};
+  for (const d of dates) {
+    const y = fromDbDate(d).slice(0, 4);
+    byYear[y] = (byYear[y] ?? 0) + 1;
+  }
+  return { total: dates.length, byYear };
 }
 
 export async function getEntry(id: string): Promise<EntryDTO | null> {

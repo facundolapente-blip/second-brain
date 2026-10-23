@@ -8,7 +8,10 @@ import { logActivity } from "../trash";
 import { createQuickTransaction } from "../quick-add";
 import { getDashboard } from "../dashboard";
 import { appendValueNote, VALUES_KEY } from "../values";
-import { looksLikeExpense, looksLikePrice, parseBlock, parseCommand, parseJournal, parseTask } from "./parse";
+import { looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask } from "./parse";
+import { cleanPatch, ENERGY_LABELS, formatSleep, formatWeight, STRESS_LABELS } from "../checkin-logic";
+import { applyCheckin } from "../checkin-save";
+import { MOODS } from "../journal-logic";
 import { looksLikeSecret } from "../notes-logic";
 import { attachPriceToLastShop, saveTextNote } from "./notes";
 import { appendToJournal } from "../journal-append";
@@ -35,6 +38,12 @@ export const HELP = [
   "JJ hoy entrené y me sentí bien",
   "JJ ayer: cena con amigos",
   "",
+  "CC check-in del día (todo opcional; con ayer adelante, el de ayer):",
+  "CC animo 4 energia 3 estres 2 sueño 7:30 peso 82,4",
+  "CC 4 3 2 (ánimo, energía y estrés, del 1 al 5)",
+  "CC animo bien nota dormí poco",
+  "CC solo: cómo va el de hoy",
+  "",
   "Bloque de la semana (día y hora opcionales):",
   "bloque gym mañana 18",
   "bloque ORT jueves 18:30-20:30",
@@ -53,7 +62,7 @@ export const HELP = [
 ].join("\n");
 
 const SHORT_HELP =
-  "No te entendí. Probá con:\nGG 350 almuerzo itau\nGG +2450 sueldo\nTT llamar al banco viernes\nJJ hoy fue un buen día\nbloque gym mañana 18\nnota primero lo importante\nhoy\n\nayuda: todos los ejemplos";
+  "No te entendí. Probá con:\nGG 350 almuerzo itau\nGG +2450 sueldo\nTT llamar al banco viernes\nJJ hoy fue un buen día\nCC animo 4 energia 3 sueño 7:30\nbloque gym mañana 18\nnota primero lo importante\nhoy\n\nayuda: todos los ejemplos";
 
 const MAX_TEXT = 1000;
 /** El journal acepta textos largos (WhatsApp manda hasta 4096 caracteres). */
@@ -88,6 +97,19 @@ export async function handleBotMessage(raw: string, msgId: string | null = null)
     }
     case "nota":
       return await addNote(rest);
+    case "checkin": {
+      // "animo 4" sin CC: la palabra es parte de lo que se carga.
+      const p = parseCheckin(/^\/?[áa]nimo\b/i.test(text) ? `animo ${rest}` : rest, today);
+      if ("error" in p) return p.error;
+      if ("show" in p) return await checkinStatus(p.show, today, false);
+      const patch = cleanPatch(p.fields);
+      if (p.note) {
+        const had = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(p.date) }, select: { note: true } });
+        Object.assign(patch, cleanPatch({ note: had?.note ? `${had.note} · ${p.note}` : p.note }));
+      }
+      await applyCheckin(p.date, patch);
+      return await checkinStatus(p.date, today, true);
+    }
     case "diario": {
       const p = parseJournal(rest, today);
       if ("error" in p) return p.error;
@@ -112,6 +134,30 @@ export async function handleBotMessage(raw: string, msgId: string | null = null)
       return await saveTextNote(text, msgId);
     }
   }
+}
+
+/** Cómo quedó (o cómo va) el check-in de un día, con lo que falta. */
+async function checkinStatus(date: string, today: string, saved: boolean): Promise<string> {
+  const c = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(date) } });
+  const when = date === today ? "de hoy" : "de ayer";
+  const scale = (v: number | null | undefined, labels: string[]) => (v ? `${v} · ${labels[v - 1]}` : null);
+  const rows: [string, string | null][] = [
+    ["Ánimo", scale(c?.mood, MOODS.map((m) => m.label))],
+    ["Energía", scale(c?.energy, ENERGY_LABELS)],
+    ["Estrés", scale(c?.stress, STRESS_LABELS)],
+    ["Sueño", c?.sleepMin ? formatSleep(c.sleepMin) : null],
+    ["Peso", c?.weightG ? formatWeight(c.weightG) : null],
+  ];
+  const have = rows.filter(([, v]) => v);
+  const missing = rows.filter(([, v]) => !v).map(([k]) => k.toLowerCase());
+  if (!have.length && !c?.note)
+    return `Todavía no cargaste el check-in ${when}. Por ejemplo: CC animo 4 energia 3 estres 2 sueño 7:30 peso 82,4`;
+  return [
+    saved ? `Listo, check-in ${when}:` : `Check-in ${when}:`,
+    ...have.map(([k, v]) => `${k}: ${v}`),
+    ...(c?.note ? [`Nota: ${c.note}`] : []),
+    ...(missing.length ? ["", `Falta: ${missing.join(", ")}.`] : []),
+  ].join("\n");
 }
 
 /** Como `saveTask` al crear con lo de fábrica: Sin empezar, prioridad 1, arriba de todo. */

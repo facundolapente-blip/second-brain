@@ -956,8 +956,9 @@ export const FIXED_IGNORED = "fijos_ignorados";
 export const REPORT_RATE = "informes_cotizacion";
 export const DEFAULT_REPORT_RATE = 40.5;
 
-export async function getReportRate(): Promise<number> {
+/** La elegida a mano, o null si nunca se guardó una (Informes usa entonces la de hoy, como Inicio). */
+export async function getReportRate(): Promise<number | null> {
   const row = await prisma.appSetting.findUnique({ where: { key: REPORT_RATE } });
   const n = Number(row?.value);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_REPORT_RATE;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }

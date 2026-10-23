@@ -10,6 +10,7 @@
  */
 import { nuevoPrisma } from "../src/lib/prisma-conexion.ts";
 import { fetchLinkMeta } from "../src/lib/link-meta.ts";
+import { storeThumbnail } from "../src/lib/thumbs.ts";
 import { youtubeId, youtubeThumb } from "../src/lib/notes-logic.ts";
 
 const DRY = process.argv.includes("--simular");
@@ -30,11 +31,12 @@ const missed: Row[] = [];
 
 async function one(n: Row, timeoutMs: number, last: boolean) {
   const yt = youtubeId(n.url!);
-  const meta = yt ? { title: null, thumbnail: youtubeThumb(yt) } : await fetchLinkMeta(n.url!, timeoutMs);
+  const meta = yt ? { title: null, thumbnail: youtubeThumb(yt) } : await fetchLinkMeta(n.url!, timeoutMs, { keep: DRY ? undefined : storeThumbnail });
   const data: { thumbnail?: string; title?: string } = {};
   if (meta.thumbnail) data.thumbnail = meta.thumbnail;
-  // Títulos solo fuera de Videos (los de Instagram y TikTok son "Reel de …").
-  if (!n.title && meta.title && n.section !== "videos") data.title = meta.title;
+  // Títulos fuera de Videos, y los de Instagram y TikTok (el texto del post; su foto se guarda
+  // como copia propia porque la del sitio vence: hace falta BLOB_READ_WRITE_TOKEN).
+  if (!n.title && meta.title && (n.section !== "videos" || /instagram\.com|tiktok\.com/i.test(n.url!))) data.title = meta.title;
   if (!data.thumbnail && !last) {
     missed.push(n);
     return;

@@ -1,16 +1,17 @@
 /**
  * Lectura de los mensajes del bot de WhatsApp (puro: sin base, se puede probar suelto).
  * Comandos: "gg <gasto>" (como la carga rápida; "+" adelante = ingreso), "tt|tarea <título> [fecha]", "bloque <título> [día] [hora]", "nota <texto>",
- * "jj|diario [ayer] <texto>",
+ * "jj|diario [ayer] <texto>", "cc [ayer] animo 4 energia 3 estres 2 sueño 7:30 peso 82,4 [nota …]",
  * "hoy", "ayuda" / "/start". Lo demás se prueba como carga rápida de Gastos.
  */
 import { addDays, isISODate, weekday } from "../dates";
 import { isTime, normalizeTime } from "../plan-logic";
+import { parseWeight } from "../checkin-logic";
 
 // El precio de una compra es una regla de Notas (también la usa el importador del chat).
 export { looksLikePrice } from "../notes-logic";
 
-export type BotCommand = "gasto" | "tarea" | "bloque" | "nota" | "diario" | "hoy" | "ayuda" | null;
+export type BotCommand = "gasto" | "tarea" | "bloque" | "nota" | "diario" | "checkin" | "hoy" | "ayuda" | null;
 
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -25,6 +26,11 @@ const COMMANDS: Record<string, Exclude<BotCommand, null>> = {
   diario: "diario",
   journal: "diario",
   jj: "diario",
+  // CC check-in del día (también "checkin", "check-in" y "animo 4").
+  cc: "checkin",
+  checkin: "checkin",
+  "check-in": "checkin",
+  animo: "checkin",
   hoy: "hoy",
   ayuda: "ayuda",
   help: "ayuda",
@@ -248,4 +254,118 @@ export function looksLikeExpense(text: string): boolean {
   if (!t || /\n/.test(t)) return false;
   // Y después del monto tiene que haber palabras: "+49 9286 9555-0" es un teléfono, no un ingreso.
   return /^[+-]?\s*(?:(?:u\$s|us\$|usd|\$)\s*)?\d/i.test(t) && /[a-záéíóúñ]{2,}/i.test(t.replace(/^[+-]?\s*(?:u\$s|us\$|usd|\$)/i, ""));
+}
+
+// ─── Check-in (CC) ──────────────────────────────────────────────────────────
+
+export type CheckinFields = { mood?: number; energy?: number; stress?: number; sleepMin?: number; weightG?: number };
+
+const CHECKIN_KEYS: [RegExp, keyof CheckinFields][] = [
+  [/^(animo|humor|mood)$/, "mood"],
+  [/^(energia|energ|pilas)$/, "energy"],
+  [/^(estres|stress)$/, "stress"],
+  [/^(sueno|suenio|dormi|durmi|sleep)$/, "sleepMin"],
+  [/^(peso|pese|kilos)$/, "weightG"],
+];
+
+/** Las mismas palabras que la tarjeta de Inicio, de 1 a 5. */
+const SCALE_WORDS: Record<"mood" | "energy" | "stress", [string, number][]> = {
+  mood: [["muy mal", 1], ["muy bien", 5], ["mal", 2], ["normal", 3], ["maso", 3], ["bien", 4]],
+  energy: [["sin pilas", 1], ["a full", 5], ["full", 5], ["baja", 2], ["normal", 3], ["buena", 4]],
+  stress: [["nada", 1], ["poco", 2], ["algo", 3], ["bastante", 4], ["mucho", 5]],
+};
+
+function scaleOf(seg: string, key: "mood" | "energy" | "stress"): number | null {
+  const d = seg.match(/^([1-5])(?:\s*\/\s*5)?\b/);
+  if (d) return Number(d[1]);
+  for (const [w, v] of SCALE_WORDS[key]) if (seg === w || seg.startsWith(w + " ")) return v;
+  return null;
+}
+
+/** "7:30", "7h30", "7 h 30", "7.30" (minutos), "7,5" (horas), "7", "7 horas", "450 min" → minutos. */
+export function sleepOf(seg: string): number | null {
+  const s = seg.replace(/\s+/g, " ").trim();
+  let m = s.match(/^(\d{2,3}) ?(?:min|minutos)$/);
+  if (m) return Number(m[1]) <= 16 * 60 ? Number(m[1]) : null;
+  let h: number;
+  let min = 0;
+  m = s.match(/^(\d{1,2})[.,](\d)(?: ?(?:h|hs|horas?))?$/);
+  if (m) {
+    h = Number(m[1]);
+    min = Number(m[2]) * 6;
+  } else {
+    m = s.match(/^(\d{1,2})(?: ?(?::|\.|h|hs|horas?) ?(\d{1,2})?)?(?: ?(?:min|m))?$/);
+    if (!m) return null;
+    h = Number(m[1]);
+    min = m[2] ? Number(m[2]) : 0;
+    if (min >= 60) return null;
+  }
+  const total = h * 60 + min;
+  return total > 0 && total <= 16 * 60 ? total : null;
+}
+
+/**
+ * "CC animo 4 energia 3 estres 2 sueño 7:30 peso 82,4", "CC 4 3 2" (ánimo, energía, estrés),
+ * "CC ayer animo bien", "CC nota …". Sin nada: muestra cómo va el de hoy.
+ */
+export function parseCheckin(
+  rest: string,
+  today: string,
+): { date: string; fields: CheckinFields; note: string | null } | { show: string } | { error: string } {
+  let t = rest.trim();
+  let date = today;
+  const day = t.match(/^(ayer|hoy)\b\s*[:,.]?\s*/i);
+  if (day) {
+    if (fold(day[1]) === "ayer") date = addDays(today, -1);
+    t = t.slice(day[0].length);
+  }
+  // La nota es lo último y va tal cual (con mayúsculas y tildes).
+  let note: string | null = null;
+  const n = t.match(/(?:^|\s)nota\s*[:=]?\s*([\s\S]+)$/i);
+  if (n) {
+    note = n[1].trim().slice(0, 500) || null;
+    t = t.slice(0, n.index).trim();
+  }
+  if (!t && !note) return { show: date };
+
+  const words = fold(t).replace(/[;=]/g, " ").replace(/:(?!\d)/g, " ").split(/\s+/).filter(Boolean);
+  const fields: CheckinFields = {};
+  const bad: string[] = [];
+  const keyAt = (w: string) => CHECKIN_KEYS.find(([re]) => re.test(w))?.[1] ?? null;
+
+  // Lo de antes de la primera palabra clave: "4 3 2" es ánimo, energía y estrés.
+  let i = 0;
+  const lead: string[] = [];
+  while (i < words.length && !keyAt(words[i])) lead.push(words[i++]);
+  if (lead.length) {
+    if (lead.length <= 3 && lead.every((w) => /^[1-5]$/.test(w))) {
+      const order: ("mood" | "energy" | "stress")[] = ["mood", "energy", "stress"];
+      lead.forEach((w, k) => (fields[order[k]] = Number(w)));
+    } else bad.push(lead.join(" "));
+  }
+  while (i < words.length) {
+    const key = keyAt(words[i++])!;
+    const seg: string[] = [];
+    while (i < words.length && !keyAt(words[i])) seg.push(words[i++]);
+    const s = seg.join(" ").replace(/^[,.]+|[,.]+$/g, "").trim();
+    if (key === "sleepMin") {
+      const v = sleepOf(s);
+      if (v === null) bad.push(`sueño ${s}`.trim());
+      else fields.sleepMin = v;
+    } else if (key === "weightG") {
+      const v = parseWeight(s.replace(/\s*(kg|kilos?)$/, ""));
+      if (v === null) bad.push(`peso ${s}`.trim());
+      else fields.weightG = v;
+    } else {
+      const v = scaleOf(s, key);
+      if (v === null) bad.push(`${key === "mood" ? "ánimo" : key === "energy" ? "energía" : "estrés"} ${s}`.trim());
+      else fields[key] = v;
+    }
+  }
+  if (bad.length)
+    return {
+      error: `No entendí: ${bad.join(", ")}. Ánimo, energía y estrés van del 1 al 5; sueño como 7:30 o 7,5; peso como 82,4. Por ejemplo: CC animo 4 energia 3 sueño 7:30`,
+    };
+  if (!Object.keys(fields).length && !note) return { show: date };
+  return { date, fields, note };
 }

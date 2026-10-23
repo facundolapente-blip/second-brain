@@ -31,7 +31,45 @@ export function pickImage(candidates: (string | null | undefined)[], base: strin
   return null;
 }
 
-const EXPIRING_HOSTS = /(^|\.)(fbcdn\.net|cdninstagram\.com)$/i;
+const EXPIRING_HOSTS = /(^|\.)(fbcdn\.net|cdninstagram\.com|tiktokcdn(-[a-z]+)?\.com)$/i;
+
+/** Foto de Instagram, Facebook o TikTok: su dirección vence (hay que guardar una copia). */
+export function isExpiringImage(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && EXPIRING_HOSTS.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const SOCIAL = { instagram: /(^|\.)instagram\.com$/i, tiktok: /(^|\.)tiktok\.com$/i };
+
+/** Corta en una palabra: "un texto muy largo…" (como mucho `max` caracteres). */
+function cutAt(t: string, max: number): string {
+  if (t.length <= max) return t;
+  const head = t.slice(0, max - 1);
+  const sp = head.lastIndexOf(" ");
+  return `${(sp > max * 0.6 ? head.slice(0, sp) : head).replace(/[\s,.;:–—-]+$/, "")}…`;
+}
+
+/**
+ * Título de un post a partir de su og:title: «Justin Owens on Instagram: "texto #tag"» →
+ * "texto" (primer renglón, sin los hashtags del final, hasta 90 caracteres). Sin texto:
+ * "Reel de Justin Owens". Para TikTok llega el texto solo y el autor aparte.
+ */
+export function socialTitle(raw: string | null | undefined, author?: string | null, kind = "Reel"): string | null {
+  const t = decodeEntities(String(raw ?? "")).trim();
+  const m = t.match(/^(.+?) (?:on|en) Instagram:\s*["“]([\s\S]*)["”]\s*$/i);
+  const who = (m ? m[1] : author ?? "").replace(/\s*\(@[^)]*\)\s*$/, "").trim();
+  const text = (m ? m[2] : t)
+    .split(/\n/)
+    .map((l) => l.trim())
+    .find((l) => l.replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "").trim().length >= 3);
+  const caption = text?.replace(/(\s+#[\p{L}\p{N}_]+)+\s*$/u, "").replace(/\s+/g, " ").trim();
+  if (caption && caption.length >= 3 && !/ • Instagram/.test(caption)) return cutAt(caption, 90);
+  return who ? `${kind} de ${who}` : null;
+}
 
 /**
  * Que la imagen se pueda mostrar desde la app: responde, es una imagen y el sitio no la
@@ -186,7 +224,12 @@ function genericTitle(title: string, host: string): boolean {
  * título. YouTube por oEmbed; el resto, el og:title o el <title> de la página.
  * Tres segundos como mucho y nunca falla: sin datos, devuelve nulls.
  */
-export async function fetchLinkMeta(url: string, timeoutMs = TIMEOUT_MS): Promise<{ title: string | null; thumbnail: string | null }> {
+export async function fetchLinkMeta(
+  url: string,
+  timeoutMs = TIMEOUT_MS,
+  /** Guarda una copia de una foto que vence (Instagram, TikTok) y devuelve su dirección propia. */
+  opts: { keep?: (imageUrl: string) => Promise<string | null> } = {},
+): Promise<{ title: string | null; thumbnail: string | null }> {
   const none = { title: null, thumbnail: null };
   let u: URL;
   try {
@@ -204,13 +247,28 @@ export async function fetchLinkMeta(url: string, timeoutMs = TIMEOUT_MS): Promis
       const j = (await r.json()) as { title?: string };
       return { title: clean(j.title), thumbnail: thumb };
     }
+    // TikTok tiene oEmbed (texto, autor y foto).
+    if (SOCIAL.tiktok.test(u.hostname)) {
+      const r = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
+      if (!r.ok) return none;
+      const j = (await r.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
+      const img = j.thumbnail_url && isExpiringImage(j.thumbnail_url) && opts.keep ? await opts.keep(j.thumbnail_url) : null;
+      // A veces no trae ni texto ni autor: el usuario sale del link (tiktok.com/@usuario/video/…).
+      const handle = u.pathname.match(/^\/(@[\w.]+)/)?.[1] ?? null;
+      return { title: socialTitle(j.title, j.author_name ?? handle, "Video"), thumbnail: img };
+    }
+    const instagram = SOCIAL.instagram.test(u.hostname);
     const started = Date.now();
     const get = () =>
       fetch(u, {
         signal: AbortSignal.timeout(Math.max(500, timeoutMs - (Date.now() - started))),
         redirect: "follow",
         cache: "no-store",
-        headers: { "user-agent": "Mozilla/5.0 (compatible; SecondBrain/1.0)", accept: "text/html,application/xhtml+xml", "accept-language": "es-UY,es;q=0.9,en;q=0.6" },
+        headers: {
+          // Instagram solo muestra el texto y la foto a los que arman vistas previas de links.
+          "user-agent": instagram ? "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" : "Mozilla/5.0 (compatible; SecondBrain/1.0)",
+          accept: "text/html,application/xhtml+xml", "accept-language": "es-UY,es;q=0.9,en;q=0.6",
+        },
       });
     let r = await get();
     // "Demasiados pedidos" (Thomann, por ejemplo): una pausa corta y otra vez, si queda tiempo.
@@ -225,9 +283,15 @@ export async function fetchLinkMeta(url: string, timeoutMs = TIMEOUT_MS): Promis
       return none;
     }
     const html = await readHead(r);
+    const pick = (m: RegExpMatchArray | null) => (m ? (m[1] ?? m[2]) : undefined);
     const meta = (prop: string) =>
-      html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']`, "i"))?.[1] ??
-      html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${prop}["']`, "i"))?.[1];
+      pick(html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=(?:"([^"]*)"|'([^']*)')`, "i"))) ??
+      pick(html.match(new RegExp(`<meta[^>]+content=(?:"([^"]*)"|'([^']*)')[^>]*(?:property|name)=["']${prop}["']`, "i")));
+    if (instagram) {
+      const img = meta("og:image");
+      const kept = img && opts.keep ? await opts.keep(decodeEntities(img)) : null;
+      return { title: socialTitle(meta("og:title"), null, /\/reel\//.test(u.pathname) ? "Reel" : "Post"), thumbnail: kept };
+    }
     let title = clean(meta("og:title")) ?? clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
     // Un título que es solo el nombre del sitio ("Mercado Libre") no dice nada: mejor sin título.
     if (title && genericTitle(title, u.hostname)) title = null;
