@@ -31,6 +31,12 @@ describe("parseJournal", () => {
     expect(parseJournal("ayer fui al cine", TODAY)).toEqual({ date: TODAY, text: "ayer fui al cine" });
   });
 
+  it("ayer solo en el primer renglón y el texto abajo va a ayer", () => {
+    expect(parseJournal("ayer\n\nHoy me sentí más tranquilo", TODAY)).toEqual({ date: "2026-10-18", text: "Hoy me sentí más tranquilo" });
+    expect(parseJournal("Ayer \r\ntexto", TODAY)).toEqual({ date: "2026-10-18", text: "texto" });
+    expect(parseJournal("ayer. cena", TODAY)).toEqual({ date: "2026-10-18", text: "cena" });
+  });
+
   it("con ayer: o ayer, va a ayer", () => {
     expect(parseJournal("ayer: cena con amigos", TODAY)).toEqual({ date: "2026-10-18", text: "cena con amigos" });
     expect(parseJournal("Ayer, cena", TODAY)).toEqual({ date: "2026-10-18", text: "cena" });

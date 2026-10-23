@@ -132,7 +132,20 @@ export function parseQuick(text: string, accounts: QuickAccount[]): QuickParse |
   const named = accounts.map((a) => ({ id: a.id, n: fold(a.name).trim() })).sort((x, y) => y.n.length - x.n.length);
   const full = named.find(({ n }) => found(n));
   const byWord = full ? null : named.find(({ n }) => n.includes(" ") && found(n.split(" ")[0]));
-  const hit = full ? { id: full.id, w: full.n } : byWord ? { id: byWord.id, w: byWord.n.split(" ")[0] } : null;
+  // Si no, cualquier otra palabra del nombre que sea solo de esa cuenta ("prex" por
+  // "Inversiones prex", "pago" no si hay dos cuentas con "pago").
+  const owners = (w: string) => named.filter(({ n }) => n.split(" ").includes(w)).length;
+  const otherWord =
+    full || byWord
+      ? null
+      : named
+          .flatMap(({ id, n }) => (n.includes(" ") ? n.split(" ").slice(1).map((w) => ({ id, w })) : []))
+          .find(({ w }) => w.length >= 4 && owners(w) === 1 && found(w));
+  const hit = full
+    ? { id: full.id, w: full.n }
+    : byWord
+      ? { id: byWord.id, w: byWord.n.split(" ")[0] }
+      : otherWord ?? null;
   const accountId: string | null = hit?.id ?? null;
   if (hit) rest = rest.replace(new RegExp(`\\b${esc(hit.w)}\\b`), " ");
   // La moneda se mira después de la cuenta: "dolares" puede ser el nombre de una.

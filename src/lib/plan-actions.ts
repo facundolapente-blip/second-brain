@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { QUARTER_REVIEW_TAG } from "./review-logic";
 import { prisma } from "./prisma";
+import { syncLinkedHabit } from "./plan-habit-link";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
@@ -144,7 +145,10 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
 
 export async function setBlockDone(id: string, done: boolean) {
   await exigirSesion();
-  await prisma.planBlock.updateMany({ where: { id: await blockId(id) }, data: { done: !!done } });
+  const real = await blockId(id);
+  await prisma.planBlock.updateMany({ where: { id: real }, data: { done: !!done } });
+  // Gym: tildar su bloque marca el hábito (el único atado al Plan).
+  await syncLinkedHabit(real, !!done);
   refrescar();
 }
 

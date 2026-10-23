@@ -229,7 +229,9 @@ export function parseBlock(
  * Los saltos de línea se respetan.
  */
 export function parseJournal(rest: string, today: string): { date: string; text: string } | { error: string } {
-  const m = rest.match(/^(ayer|hoy)\s*[:,]\s*/i);
+  // "ayer:", "ayer," o "ayer" solo en el primer renglón (lo demás abajo) van a ayer;
+  // "ayer fui al cine" no (la palabra es parte del texto).
+  const m = rest.match(/^(ayer|hoy)(?:\s*[:,.]|[ \t]*\r?\n)\s*/i);
   const date = m && fold(m[1]) === "ayer" ? addDays(today, -1) : today;
   const text = (m ? rest.slice(m[0].length) : rest).trim();
   if (!text) return { error: "Falta el texto. Por ejemplo: JJ hoy fue un buen día" };

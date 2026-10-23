@@ -2,7 +2,8 @@
 // en tema claro y oscuro, y falla si encuentra
 //   - desborde horizontal (la página más ancha que la pantalla),
 //   - errores de consola o de la página,
-//   - texto con poco contraste (WCAG: 4,5:1; 3:1 en texto grande).
+//   - texto con poco contraste (WCAG: 4,5:1; 3:1 en texto grande),
+//   - rótulos de un gráfico corridos de sus barras (filas hermanas con columnas distintas).
 // Usa el servidor que ya está corriendo (npm run dev en :3000, o CHEQUEO_URL).
 // Si no hay servidor, avisa y no frena (salvo con CHEQUEO_ESTRICTO=1).
 //
@@ -159,7 +160,36 @@ function inspect() {
       contrast.push(`"${text.slice(0, 40)}" ${ratio.toFixed(2)}:1 (pide ${need}) en ${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).slice(0, 3).join(".")}`);
     }
   }
-  return { overflow, contrast };
+  // Gráficos: una fila de rótulos (meses, días) que no queda debajo de sus barras. Se
+  // comparan dos filas hermanas del mismo ancho con la misma cantidad de piezas en línea.
+  const misaligned = [];
+  const rowKids = (el) => {
+    const k = [...el.children].filter((c) => {
+      const b = c.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && getComputedStyle(c).position !== "absolute";
+    });
+    if (k.length < 4) return null;
+    const bs = k.map((c) => c.getBoundingClientRect());
+    for (let i = 1; i < bs.length; i++) if (bs[i].left < bs[i - 1].right - 1 || Math.abs(bs[i].top - bs[0].top) > 2) return null;
+    return bs;
+  };
+  for (const el of document.querySelectorAll("#contenido *")) {
+    const a = rowKids(el);
+    if (!a) continue;
+    let sib = el.nextElementSibling;
+    for (let s = 0; s < 3 && sib; s++, sib = sib.nextElementSibling) {
+      const b = rowKids(sib);
+      if (!b || b.length !== a.length) continue;
+      const ea = el.getBoundingClientRect();
+      const eb = sib.getBoundingClientRect();
+      if (Math.abs(ea.left - eb.left) > 3 || Math.abs(ea.width - eb.width) > 3) continue;
+      const dev = Math.max(...a.map((r, i) => Math.abs(r.left + r.width / 2 - (b[i].left + b[i].width / 2))));
+      if (dev > 2) misaligned.push(`«${sib.textContent.trim().slice(0, 30)}» corrido ${Math.round(dev)}px de sus columnas`);
+      break;
+    }
+    if (misaligned.length >= 3) break;
+  }
+  return { overflow, contrast, misaligned };
 }
 
 async function main() {
@@ -223,6 +253,7 @@ async function main() {
           const where = `${route} · ${vp.name}px · ${theme}`;
           if (theme === THEMES[0]) for (const o of r.overflow) problems.push(`DESBORDE   ${where}: ${o}`);
           for (const c of r.contrast) problems.push(`CONTRASTE  ${where}: ${c}`);
+          if (theme === THEMES[0]) for (const m of r.misaligned) problems.push(`DESFASAJE  ${where}: ${m}`);
         }
       } catch (e) {
         errors.push("no cargó: " + String(e.message).split("\n")[0]);

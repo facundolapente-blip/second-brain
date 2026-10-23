@@ -640,6 +640,9 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
   }
 
   const max = Math.max(1, ...items.map((i) => i.value ?? 0));
+  // Las barras y los rótulos comparten las mismas columnas (iguales entre sí): con columnas
+  // automáticas cada fila las medía por su contenido y en el celular quedaban corridas.
+  const cols = { gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` };
 
   return (
     <div className="grid gap-5">
@@ -650,7 +653,7 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
         onNext={onNext}
         nextDisabled={nextDisabled}
       />
-      <div className="grid h-44 grid-flow-col items-end gap-1.5 border-b border-line-strong bg-[linear-gradient(to_top,var(--border)_1px,transparent_1px)] bg-[length:100%_33.33%]">
+      <div style={cols} className="grid h-44 items-end gap-1 border-b sm:gap-1.5 border-line-strong bg-[linear-gradient(to_top,var(--border)_1px,transparent_1px)] bg-[length:100%_33.33%]">
         {items.map((it, i) => (
           <div key={i} className="grid h-full grid-rows-[auto_1fr] justify-items-center gap-1">
             <span className={cx("font-mono tabular text-[10.5px]", it.current ? "font-semibold text-fg" : "text-muted")}>
@@ -670,11 +673,11 @@ function DoneBars({ habit, logs, from, today }: { habit: HabitDTO; logs: LogMap;
           </div>
         ))}
       </div>
-      <div className="-mt-3 grid grid-flow-col gap-1.5">
+      <div style={cols} className="-mt-3 grid gap-1 sm:gap-1.5">
         {items.map((it) => (
           <span
             key={it.key}
-            className={cx("text-center font-mono text-[10.5px] uppercase", it.current ? "font-semibold text-fg" : "text-muted")}
+            className={cx("overflow-hidden text-center font-mono text-[10px] uppercase sm:text-[10.5px]", it.current ? "font-semibold text-fg" : "text-muted")}
           >
             {it.label}
           </span>

@@ -218,6 +218,14 @@ describe("carga rápida (parseQuick)", () => {
     expect(parseQuick("350 mercado almuerzo", accounts)).toMatchObject({ accountId: "mp", title: "Almuerzo" });
   });
 
+  it("otra palabra del nombre, si es solo de esa cuenta ('prex' por 'Inversiones prex')", () => {
+    const more = [...accounts, { id: "prex", name: "Inversiones prex", currency: "UYU" }, { id: "inv-usd", name: "Inversiones USD", currency: "USD" }];
+    expect(parseQuick("+2100 prex Disco", more)).toMatchObject({ accountId: "prex", kind: "income", amountCents: 210000, title: "Disco" });
+    expect(parseQuick("2100 disco pago", more)).toMatchObject({ accountId: "mp", title: "Disco" });
+    // "usd" es corta y la tienen dos cuentas: no elige cuenta, solo la moneda.
+    expect(parseQuick("usd 20 nafta", more)).toMatchObject({ accountId: null, currency: "USD" });
+  });
+
   // BUG menor (smart-logic.ts:154): si el número del monto aparece otra vez en el texto, el
   // monto vuelve al título ("20 20 almuerzo" queda con título "20 20 almuerzo").
   it("el monto no vuelve al título aunque el número se repita", () => {
