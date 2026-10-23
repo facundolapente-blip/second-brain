@@ -16,7 +16,7 @@ type Filter = "todo" | "transfer" | "category" | "kept";
 type Tx = NonNullable<Extract<ReviewHistoryItem, { type: "category" }>["tx"]>;
 
 const time = (at: string) =>
-  new Date(at).toLocaleString("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).replace(".", "");
+  new Date(at).toLocaleString("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replace(".", "");
 
 /**
  * Todo lo aplicado en "Revisar movimientos" (lo que no se deshizo), para chequear: los

@@ -6,6 +6,7 @@ import { dec1 } from "./format";
  */
 import type { DayMetrics, HabitRef } from "./daily-metrics";
 import { weekday } from "./dates";
+import { sleepText } from "./health-logic";
 
 export type Insight = {
   id: string;
@@ -24,7 +25,7 @@ function mean(xs: number[]) {
 }
 
 const pesos = (cents: number) =>
-  `$ ${Math.round(cents / 100).toLocaleString("es-UY")}`;
+  `$\u00a0${Math.round(cents / 100).toLocaleString("es-UY")}`;
 
 /** Compara un valor entre dos grupos de días; null si alguno es muy chico. */
 function split<T>(days: T[], inA: (d: T) => boolean | null, value: (d: T) => number | null) {
@@ -122,7 +123,7 @@ export function buildInsights(days: DayMetrics[], habits: HabitRef[]): Insight[]
     out.push({
       id: "pasos-sueno",
       module: "inicio",
-      text: `Los días que caminás 8.000 pasos o más dormís ${Math.round(stepsSleep.a)} min; los otros, ${Math.round(stepsSleep.b)} min`,
+      text: `Los días que caminás 8.000 pasos o más dormís ${sleepText(Math.round(stepsSleep.a))}; los otros, ${sleepText(Math.round(stepsSleep.b))}`,
       detail: `${stepsSleep.na} y ${stepsSleep.nb} días`,
       weight: Math.abs(stepsSleep.a - stepsSleep.b) / 120 + 0.2,
     });

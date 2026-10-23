@@ -45,7 +45,7 @@ export function Delta({
     >
       {diff > 0 ? <ArrowUpRight size={11} weight="bold" aria-hidden /> : <ArrowDownRight size={11} weight="bold" aria-hidden />}
       {Math.abs(diff)}
-      {unit === "%" ? "%" : ` ${unit}`}
+      {unit === "%" ? "%" : ` ${unit === "pts" && Math.abs(diff) === 1 ? "pt" : unit}`}
     </span>
   );
 }

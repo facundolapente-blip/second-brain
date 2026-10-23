@@ -158,7 +158,15 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
       {/* Panel de la computadora: la entrada elegida, o el recuerdo y un resumen. */}
       {/* minmax(0,1fr) y min-w-0: un renglón que no se corta (la fecha del panel) no puede ensanchar la columna. */}
-      <div className="hidden min-w-0 lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:grid-cols-[minmax(0,1fr)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]">
+      {/* Pegado y con su propio scroll solo al leer una entrada; sin entrada elegida (recuerdo y cifras) va con
+          la página: si no, en una pantalla baja las últimas semanas quedaban cortadas sin que se notara el scroll. */}
+      <div
+        className={
+          reading
+            ? "hidden min-w-0 lg:sticky lg:top-36 lg:grid lg:max-h-[calc(100dvh-10rem)] lg:grid-cols-[minmax(0,1fr)] lg:gap-5 lg:overflow-y-auto lg:overscroll-contain lg:rounded-2xl lg:pb-2 lg:[scrollbar-width:thin]"
+            : "hidden min-w-0 lg:grid lg:grid-cols-[minmax(0,1fr)] lg:content-start lg:gap-5 lg:pb-2"
+        }
+      >
         {/* Al abrir otra entrada (o cerrar la lectura) el panel cambia con un fundido corto; al cargar, quieto. */}
         {/* Una entrada elegida se dibuja al toque con lo de la tarjeta y se completa al llegar. */}
         <ReaderSlot reading={reading} closeHref={closeHref}>

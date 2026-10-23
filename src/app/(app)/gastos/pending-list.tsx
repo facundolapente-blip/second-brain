@@ -19,7 +19,7 @@ function describe(op: QueuedOp): string | null {
       const title = queuedField(a[1] ?? a[0], "title");
       const id = queuedField(a[1] ?? a[0], "id");
       const what = kind === "income" ? "Ingreso" : kind === "transfer" ? "Transferencia" : "Gasto";
-      return `${id ? "Cambios en " : ""}${what}${amount ? ` ${moneyCents(amount, "UYU").replace("$", "")}` : ""}${title ? ` · ${title}` : ""}`;
+      return `${id ? "Cambios en " : ""}${what}${amount ? ` ${moneyCents(amount, "UYU").replace("$", "").trim()}` : ""}${title ? ` · ${title}` : ""}`;
     }
     case "finance.deleteTransaction":
       return "Un movimiento borrado";

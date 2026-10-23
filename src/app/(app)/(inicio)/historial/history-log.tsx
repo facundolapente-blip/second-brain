@@ -66,7 +66,7 @@ const ACTION: Record<string, { label: string; icon: Icon }> = {
   done: { label: "Completaste", icon: CheckCircle },
 };
 
-const dateFmt = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dateFmt = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const dayFmt = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", weekday: "long", day: "numeric", month: "long" });
 const when = (iso: string) => dateFmt.format(new Date(iso)).replace(".", "");
 const daysLeft = (iso: string) => Math.max(0, 30 - Math.floor((Date.now() - Date.parse(iso)) / 86_400_000));

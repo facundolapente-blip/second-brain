@@ -529,7 +529,7 @@ function Change({ value, unit, good, vs, digits = 0 }: { value: number | null; u
         <span className="sr-only">{up ? "Subió" : "Bajó"} </span>
         {up ? "+" : "−"}
         {n}
-        {unit}
+        {unit === " pts" && Math.abs(value) === 1 ? " pt" : unit}
       </span>
       {vs}
     </span>

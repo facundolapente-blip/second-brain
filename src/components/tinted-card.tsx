@@ -56,7 +56,7 @@ export function TintedCard({
         </span>
         <span className="grid min-w-0 gap-0.5">
           <h2 className="tcard-title truncate">{title}</h2>
-          {meta && <span className="tcard-meta truncate">{meta}</span>}
+          {meta && <span className="tcard-meta max-sm:line-clamp-2 sm:truncate">{meta}</span>}
         </span>
         {action ? (
           isLinkAction(action) ? (

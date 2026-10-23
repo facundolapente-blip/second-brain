@@ -304,7 +304,7 @@ function TxLine({
           {t.kind === "income" ? "+ " : "− "}
           {moneyCents(t.amountCents, cur)}
         </span>
-        {equivalent && <span className="tabular text-[11.5px] text-muted">≈ {equivalent}</span>}
+        {equivalent && <span className="tabular text-[11.5px] text-muted">{"≈\u00a0"}{equivalent}</span>}
       </span>
       {children}
     </li>

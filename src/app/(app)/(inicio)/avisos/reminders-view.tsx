@@ -14,7 +14,7 @@ export type Device = { id: string; endpoint: string; label: string; createdAt: s
 type Support = "checking" | "ok" | "unsupported" | "ios-install" | "no-sw";
 type Note = { ok: boolean; text: string } | null;
 
-const when = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const when = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const day = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", day: "numeric", month: "short", year: "numeric" });
 
 /** La clave pública VAPID (base64url) como bytes, para `pushManager.subscribe`. */

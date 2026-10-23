@@ -134,7 +134,7 @@ function TaskForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-4">
+      <div className="grid items-end gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
         <div className="grid gap-1.5">
           <span className="kicker">Prioridad</span>
           <PriorityPicker value={priority} onChange={setPriority} name="priority" />

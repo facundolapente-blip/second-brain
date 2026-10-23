@@ -11,7 +11,8 @@ const SYMBOL: Record<string, string> = { UYU: "$", USD: "US$", ARS: "AR$", EUR: 
 export function money(value: number, currency = "UYU"): string {
   const decimals = Math.round(value * 100) % 100 !== 0;
   const n = (decimals ? cents2 : whole).format(Math.abs(value));
-  return `${value < 0 ? "-" : ""}${SYMBOL[currency] ?? currency} ${n}`;
+  // Espacio duro: el símbolo nunca queda en un renglón y el número en el otro.
+  return `${value < 0 ? "-" : ""}${SYMBOL[currency] ?? currency}\u00a0${n}`;
 }
 
 export const CURRENCIES = ["UYU", "USD", "ARS", "EUR", "BRL"] as const;
@@ -27,7 +28,7 @@ export const ACCOUNT_TYPES: Record<string, string> = {
 /** Monto en centavos con signo explícito: "+ $ 2.615", "− US$ 40,50". Cero sin signo. */
 export function moneySigned(cents: number, currency = "UYU"): string {
   if (cents === 0) return money(0, currency);
-  return `${cents > 0 ? "+" : "−"} ${money(Math.abs(cents) / 100, currency)}`;
+  return `${cents > 0 ? "+" : "−"}\u00a0${money(Math.abs(cents) / 100, currency)}`;
 }
 
 /** Monto en centavos, sin signo. */

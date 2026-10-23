@@ -170,7 +170,9 @@ export function WeekCount({ habit, logs, day, today, className }: { habit: Habit
   const thisWeek = periodStart(habit, day) === periodStart(habit, today);
   return (
     <span className={cx("tabular min-w-0 truncate font-mono text-[11.5px] leading-none text-muted lg:text-[12px]", className)}>
-      {wp.done}/{wp.need} {thisWeek ? "esta semana" : "esa semana"}
+      {wp.done}/{wp.need} {/* En el celular no entra entero al lado de la frecuencia: "2/4 sem." */}
+      <span className="sm:hidden" aria-hidden>sem.</span>
+      <span className="max-sm:sr-only">{thisWeek ? "esta semana" : "esa semana"}</span>
     </span>
   );
 }

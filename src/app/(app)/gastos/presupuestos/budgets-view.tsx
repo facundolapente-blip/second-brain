@@ -393,7 +393,7 @@ function Meter({
 
 /** "incluye US$ 40 (≈ $ 1.620)": lo gastado en otra moneda, ya sumado al total. */
 function foreignNote(foreign: ForeignSpend[], to: string): string {
-  return `incluye ${foreign.map((f) => `${moneyCents(f.cents, f.currency)} (≈ ${moneyCents(f.equivCents, to)})`).join(" y ")}`;
+  return `incluye ${foreign.map((f) => `${moneyCents(f.cents, f.currency)} (≈\u00a0${moneyCents(f.equivCents, to)})`).join(" y ")}`;
 }
 
 function BudgetForm({ category, budget, onDone }: { category: CategoryDTO; budget?: CategoryBudgetDTO; onDone: () => void }) {

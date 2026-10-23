@@ -1305,7 +1305,7 @@ function JournalCard({ d }: { d: Dashboard }) {
 function JournalNum({ value, label }: { value: number; label: string }) {
   return (
     <div className="grid min-w-0 gap-1 border-l border-line px-3.5 first:border-l-0 first:pl-0">
-      <span className="figure text-[32px] font-[780] tracking-[-0.045em]">{value}</span>
+      <span className="figure text-[32px] font-[780] tracking-[-0.045em]">{value.toLocaleString("es-UY")}</span>
       <span className="text-[12px] leading-tight text-muted">{label}</span>
     </div>
   );

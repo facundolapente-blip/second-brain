@@ -70,7 +70,7 @@ export function SchedulesView({
         title="Recurrentes"
         tabs={<GastosTabs />}
         actions={
-          <Button size="sm" onClick={() => open(null)} className="hidden lg:inline-flex">
+          <Button size="sm" onClick={() => open(null)} className="max-lg:hidden">
             <Plus size={15} weight="bold" aria-hidden /> Nuevo recurrente
           </Button>
         }
