@@ -720,6 +720,10 @@ function PlanToday({ d }: { d: Dashboard }) {
                   }}
                   className="tap-tint relative flex min-h-11 w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors duration-[80ms] hover:bg-surface-2 disabled:hover:bg-transparent"
                 >
+                  {/* "Libre" no se tilda (igual que en el Plan): sin círculo, con el mismo lugar para que el texto quede alineado. */}
+                  {free ? (
+                    <span aria-hidden className="size-[18px] shrink-0" />
+                  ) : (
                   <span
                     aria-hidden
                     className={cx(
@@ -730,6 +734,7 @@ function PlanToday({ d }: { d: Dashboard }) {
                   >
                     {b.done && <Check size={10} weight="bold" className={tappedBlock === b.id ? "mark-pop" : undefined} />}
                   </span>
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className={cx("block truncate text-[14px] transition-colors duration-[var(--dur-state)]", b.done && "text-muted line-through decoration-faint")}>
                       {b.title}
