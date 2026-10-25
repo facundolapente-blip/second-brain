@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { childrenOf, descendantsOf, nextStep, nodePct, rootsOf, splitPast, stepCount, treeOrder, treePct, whenLabel } from "@/lib/objective-tree";
+import { ancestorsOf, childrenOf, descendantsOf, groupGoals, isAchieved, nextStep, nodePct, quarterPath, rootsOf, stepCount, treeOrder, treePct, whenLabel } from "@/lib/objective-tree";
 import type { KeyResultDTO, ObjectiveDTO, StepDTO } from "@/lib/plan-logic";
 
 let n = 0;
@@ -95,19 +95,46 @@ describe("árbol de objetivos", () => {
     expect(nextStep(objective([kr("w", { steps: [step({ done: true })] })]), T)).toBeNull();
   });
 
-  it("los de trimestres que ya pasaron van aparte", () => {
-    const list = [kr("q1", { quarters: ["Q1"] }), kr("q3q4", { quarters: ["Q3", "Q4"] }), kr("libre"), kr("q2", { quarters: ["Q2", "Q3"] })];
-    const r = splitPast(list, 2026, "2026-10-25");
-    expect(r.now.map((k) => k.id)).toEqual(["q3q4", "libre"]);
-    expect(r.past.map((k) => k.id)).toEqual(["q1", "q2"]);
-    expect(splitPast(list, 2025, "2026-10-25").now).toEqual([]);
-    expect(splitPast(list, 2027, "2026-10-25").past).toEqual([]);
-  });
-
   it("el día de una tarea agendada", () => {
     expect(whenLabel("2026-10-25", null, "2026-10-25")).toBe("hoy");
     expect(whenLabel("2026-10-26", "18:00", "2026-10-25")).toBe("mañana · 18:00");
     expect(whenLabel("2026-10-29", null, "2026-10-25")).toBe("jue 29");
     expect(whenLabel("2026-10-04", "11:00", "2026-10-25")).toBe("4 oct · 11:00");
+  });
+});
+
+describe("columnas y camino de trimestres", () => {
+  const T = "2026-10-25";
+  const list = [
+    kr("cardioQ2", { quarters: ["Q2"], status: "done", progress: 10, goal: 8 }),
+    kr("fumarQ1", { quarters: ["Q1"], status: "closed" }),
+    kr("cardioQ3", { quarters: ["Q3"], status: "doing" }),
+    kr("boxeo"),
+    kr("temas", { quarters: ["Q4"], steps: [step({ done: true }), step({ done: true })] }),
+    kr("hijo", { parentId: "boxeo" }),
+  ];
+  it("agrupa en ahora, logrados y sin terminar (los hijos no se repiten arriba)", () => {
+    const g = groupGoals(list, 2026, T);
+    expect(g.now.map((k) => k.id)).toEqual(["boxeo"]);
+    expect(g.achieved.map((k) => k.id)).toEqual(["cardioQ2", "temas"]);
+    expect(g.unfinished.map((k) => k.id)).toEqual(["fumarQ1", "cardioQ3"]);
+  });
+  it("logrado: completado o tareas al 100 %", () => {
+    expect(isAchieved(list, list[0])).toBe(true);
+    expect(isAchieved(list, list[4])).toBe(true);
+    expect(isAchieved(list, list[3])).toBe(false);
+  });
+  it("la línea de trimestres", () => {
+    expect(quarterPath(list, 2026, T)).toEqual([
+      { q: "Q1", total: 1, done: 0, when: "past" },
+      { q: "Q2", total: 1, done: 1, when: "past" },
+      { q: "Q3", total: 1, done: 0, when: "past" },
+      { q: "Q4", total: 1, done: 1, when: "now" },
+    ]);
+    expect(quarterPath(list, 2027, T)[0].when).toBe("future");
+  });
+  it("los padres de uno, del más grande al más chico", () => {
+    const a = kr("a"), b = kr("b", { parentId: "a" }), c = kr("c", { parentId: "b" });
+    expect(ancestorsOf([a, b, c], c).map((k) => k.id)).toEqual(["a", "b"]);
   });
 });

@@ -5,8 +5,8 @@ import { useOnNew } from "@/components/nav-add";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowsClockwise, CalendarBlank, CalendarPlus, CaretDown, Check, ClipboardText, Minus, Plus, Target, X } from "@phosphor-icons/react";
-import { bumpObjective, carryOverKrs, copyToYear, dismissQuarterReview, writeQuarterReview } from "@/lib/offline/plan";
+import { ArrowsClockwise, CalendarPlus, CaretDown, Check, ClipboardText, Plus, Target, X } from "@phosphor-icons/react";
+import { carryOverKrs, copyToYear, dismissQuarterReview, writeQuarterReview } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
 import {
   avgPct,
@@ -24,25 +24,18 @@ import {
   type ObjectiveDTO,
   type Quarter,
 } from "@/lib/plan-logic";
-import { nextStep, rootsOf, splitPast, treePct, whenLabel } from "@/lib/objective-tree";
+import { treePct } from "@/lib/objective-tree";
 import { PageHeader } from "@/components/page-header";
-import { useTick } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
 import { Button, cx, Sheet, type SheetHandle } from "@/components/ui";
-import { ProgressBar } from "../plan-ui";
 import { TintedCard } from "@/components/tinted-card";
 import { PlanTabs } from "../plan-nav";
 import { KrSheet, ObjectiveForm, type KrSheetHandle } from "./objective-forms";
+import { ObjectivesBoard } from "./objectives-board";
 
 const fmtNum = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
 /** Los objetivos importados de Notion traían un número adelante ("2 Mejorar mi salud"). */
 const cleanTitle = (t: string) => t.replace(/^\d+\s+/, "");
-const DOT: Record<KrStatus, string> = {
-  done: "bg-[var(--st-done-line)]",
-  doing: "bg-[var(--p-blue-chip)]",
-  closed: "bg-[var(--p-yellow-chip)]",
-  todo: "bg-line-strong",
-};
 
 /** "3/10" de un objetivo chico (si se mide solo, el valor del vínculo). */
 function krFigure(raw: KeyResultDTO): string | null {
@@ -180,13 +173,14 @@ export function ObjectivesView({
           className="mt-4"
           meta={objectives.length ? `${objectives.length} ${objectives.length === 1 ? "objetivo" : "objetivos"}${avg !== null ? ` · ${avg}% de avance` : ""}` : "Todavía ninguno"}
           progress={avg !== null ? avg / 100 : undefined}
+          bodyClassName="lg:p-0!"
           action={
             <button type="button" className="tcard-pill press" onClick={openNew}>
               <Plus size={14} weight="bold" aria-hidden /> Objetivo
             </button>
           }
         >
-          {objectives.length === 0 ? (
+          {objectives.length === 0 && loose.length === 0 ? (
             <div className="grid justify-items-start gap-3 py-3">
               <p className="max-w-[48ch] text-[15px] text-muted">
                 Escribí lo que querés lograr en {year}, como te salga. Después lo partís en objetivos más chicos y en tareas simples.
@@ -206,46 +200,7 @@ export function ObjectivesView({
               </div>
             </div>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {objectives.map((o) => (
-                <li key={o.id}>
-                  <ObjectiveCard o={o} today={today} />
-                </li>
-              ))}
-              <li>
-                <button
-                  type="button"
-                  onClick={openNew}
-                  className="press grid h-full min-h-32 w-full content-center justify-items-start gap-1 rounded-2xl border border-dashed border-line-strong px-5 py-4 text-left transition-colors hover:bg-surface-2"
-                >
-                  <span className="inline-flex items-center gap-1.5 text-[15px] font-medium">
-                    <Plus size={16} weight="bold" aria-hidden /> Nuevo objetivo
-                  </span>
-                  <span className="text-[13px] text-muted">Escribilo como quieras</span>
-                </button>
-              </li>
-            </ul>
-          )}
-
-          {loose.length > 0 && (
-            <section className="mt-5 grid gap-1.5 border-t border-line pt-4">
-              <h3 className="kicker">Objetivos chicos sin objetivo grande</h3>
-              <ul className="grid">
-                {loose.map((k) => (
-                  <li key={k.id}>
-                    <button
-                      type="button"
-                      onClick={() => krSheet.current?.open(k)}
-                      className="flex min-h-11 w-full items-center gap-2 rounded-lg px-1 text-left text-[14px] hover:bg-surface-2"
-                    >
-                      <span aria-hidden className={cx("size-2 shrink-0 rounded-full", DOT[k.status])} />
-                      <span className="min-w-0 flex-1 truncate">{k.title}</span>
-                      {krFigure(k) && <span className="font-mono text-[12px] text-muted tabular">{krFigure(k)}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <ObjectivesBoard objectives={objectives} loose={loose} links={links} today={today} year={year} onNew={openNew} />
           )}
         </TintedCard>
       </main>
@@ -258,7 +213,7 @@ export function ObjectivesView({
           roles={roles}
           areas={areas}
           onDone={() => newSheet.current?.close()}
-          onCreated={(id) => router.push(`/plan/objetivos/${id}`)}
+          onCreated={(id) => router.push(`/plan/objetivos?anio=${year}&o=${id}`, { scroll: false })}
         />
       </Sheet>
       <KrSheet ref={krSheet} objectives={objectives} links={links} year={year} />
@@ -266,98 +221,6 @@ export function ObjectivesView({
         <PlanYearForm objectives={objectives} loose={loose} from={year} to={nextYear} onDone={() => planSheet.current?.close()} />
       </Sheet>
     </>
-  );
-}
-
-/** Una tarjeta por objetivo grande: su avance, cuánto falta y la próxima tarea. Tocarla abre su árbol. */
-function ObjectiveCard({ o, today }: { o: ObjectiveDTO; today: string }) {
-  const pct = treePct(o);
-  // Los de trimestres que ya pasaron no cuentan como "por hacer".
-  const roots = splitPast(rootsOf(o.keyResults), o.year, today).now;
-  const steps = o.keyResults.flatMap((k) => k.steps);
-  const doneSteps = steps.filter((s) => s.done).length;
-  const next = nextStep(o, today);
-  const ownGoalOnly = !!o.goal && o.keyResults.length === 0;
-  const late = o.deadline !== null && o.deadline < today && o.status !== "done";
-  return (
-    <article className="lift plan-hover relative grid h-full content-start gap-2.5 rounded-2xl border border-line px-5 py-4">
-      <div className="flex items-center gap-2">
-        <span className="kicker min-w-0 flex-1 truncate">{o.role ?? o.area ?? "Objetivo"}</span>
-        {o.deadline && (
-          <span className={cx("shrink-0 font-mono text-[11px] tabular", late ? "text-danger" : "text-muted")}>hasta {formatShort(o.deadline)}</span>
-        )}
-      </div>
-      <h3 className="line-clamp-3 text-[16px] leading-snug font-semibold">
-        <Link href={`/plan/objetivos/${o.id}`} className="after:absolute after:inset-0 after:rounded-2xl after:content-['']">
-          {cleanTitle(o.title)}
-        </Link>
-      </h3>
-      {pct !== null && <ProgressBar pct={pct} label={`${pct}%`} />}
-      {ownGoalOnly ? (
-        <div className="flex items-center justify-between gap-3 text-[13px] text-muted">
-          <span>
-            {fmtNum(o.progress ?? 0)} de {fmtNum(o.goal ?? 0)}
-          </span>
-          <GoalStepper o={o} />
-        </div>
-      ) : o.keyResults.length === 0 ? (
-        <p className="inline-flex items-center gap-1 text-[13px] font-medium text-accent-fg">
-          Partilo en objetivos más chicos <ArrowRight size={13} aria-hidden />
-        </p>
-      ) : (
-        <p className="text-[13px] text-muted">
-          {roots.length} {roots.length === 1 ? "objetivo chico" : "objetivos chicos"}
-          {steps.length ? ` · ${doneSteps}/${steps.length} tareas` : " · sin tareas todavía"}
-        </p>
-      )}
-      {next && (
-        <p className="flex items-center gap-1.5 border-t border-line pt-2.5 text-[13px]">
-          <span className="shrink-0 text-muted">Próximo:</span>
-          <span className="min-w-0 flex-1 truncate">{next.title}</span>
-          {next.date && (
-            <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[11.5px] text-muted">
-              <CalendarBlank size={12} aria-hidden />
-              {whenLabel(next.date, next.startTime, today)}
-            </span>
-          )}
-        </p>
-      )}
-    </article>
-  );
-}
-
-
-/** −1 / +1 de la meta propia de un objetivo. */
-function GoalStepper({ o }: { o: Group }) {
-  const [, start] = useSafeTransition();
-  const [value, setValue] = useState(o.progress ?? 0);
-  const [from, setFrom] = useState(o.progress);
-  if (from !== o.progress) {
-    setFrom(o.progress);
-    setValue(o.progress ?? 0);
-  }
-  const goal = o.goal ?? 0;
-  const tick = useTick(value);
-  const bump = (d: 1 | -1) => {
-    const next = Math.max(0, Math.min(goal, value + d));
-    if (next === value) return;
-    setValue(next);
-    start(() => bumpObjective(o.id, d));
-  };
-  return (
-    <span className="relative z-10 ml-auto inline-flex shrink-0 items-center rounded-full border border-line-strong">
-      <button type="button" onClick={() => bump(-1)} aria-label={`Restar uno a ${cleanTitle(o.title)}`} className="inline-flex size-11 items-center justify-center rounded-full text-muted hover:text-fg">
-        <Minus size={14} />
-      </button>
-      <span className="min-w-6 overflow-hidden text-center font-mono text-[13px] tabular" aria-live="polite">
-        <span key={tick.key} className={tick.className}>
-          {fmtNum(value)}
-        </span>
-      </span>
-      <button type="button" onClick={() => bump(1)} aria-label={`Sumar uno a ${cleanTitle(o.title)}`} className="inline-flex size-11 items-center justify-center rounded-full text-muted hover:text-fg">
-        <Plus size={14} />
-      </button>
-    </span>
   );
 }
 
