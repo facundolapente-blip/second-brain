@@ -228,6 +228,22 @@ export type KeyResultDTO = {
   link: string | null;
   /** Progreso calculado desde el vínculo (pisa al cargado a mano). */
   auto: { progress: number; goal: number | null; label: string } | null;
+  /** Árbol de objetivos: el objetivo más chico del que sale (null = cuelga del objetivo). */
+  parentId: string | null;
+  /** Tareas simples para cumplirlo. */
+  steps: StepDTO[];
+};
+
+/** Tarea simple de un objetivo más chico; con día tiene su bloque en el Plan (`date`/`startTime` salen del bloque). */
+export type StepDTO = {
+  id: string;
+  keyResultId: string;
+  title: string;
+  done: boolean;
+  order: number;
+  blockId: string | null;
+  date: string | null;
+  startTime: string | null;
 };
 
 /** Opciones para vincular un resultado clave. */
@@ -334,106 +350,7 @@ export function previousQuarter(today: string): { year: number; quarter: Quarter
   return i === 0 ? { year: year - 1, quarter: "Q4" } : { year, quarter: QUARTERS[i - 1] };
 }
 
-export const OBJECTIVES_VIEW_COOKIE = "objetivos_vista";
 
-// ─── Objetivos: año → trimestre → semana ────────────────────────────────────
-
-/** Pestañas de Objetivos (2026-10-25): el año (mapa), el trimestre (13 semanas y metas) y la semana (acciones). */
-export type ObjectivesTab = "anio" | "trimestre" | "semana";
-export function objectivesTab(raw: string | undefined): ObjectivesTab {
-  return raw === "trimestre" || raw === "semana" ? raw : "anio";
-}
-
-/** Sugerencia de cuántos objetivos tener en foco por trimestre (se pueden marcar más). */
-export const FOCUS_SUGGESTED = 3;
-
-export const inFocus = (o: { focus: string[] }, q: Quarter) => o.focus.includes(q);
-
-/**
- * Qué objetivos se miran en un trimestre: los que están en foco y, aparte, los que tienen
- * metas ese trimestre pero quedaron en pausa. Si no se puso ninguno en foco, cuentan todos
- * los que tienen metas ahí (nada queda en pausa).
- */
-export function splitByFocus<T extends Pick<ObjectiveDTO, "focus" | "keyResults">>(objectives: T[], q: Quarter): { active: T[]; paused: T[] } {
-  const hasKrs = (o: T) => o.keyResults.some((k) => krQuarters(k).includes(q));
-  const focused = objectives.filter((o) => inFocus(o, q));
-  if (!focused.length) return { active: objectives.filter(hasKrs), paused: [] };
-  return { active: focused, paused: objectives.filter((o) => !inFocus(o, q) && hasKrs(o)) };
-}
-
-/**
- * Una acción de la semana: un bloque del Plan atado a una meta del trimestre, o el registro
- * que dejó un bloque al pasar a otra semana (así lo hecho en una semana vieja no se pierde).
- */
-export type ObjectiveAction = {
-  id: string;
-  /** El bloque del Plan (null si es un registro de una semana que ya pasó). */
-  blockId: string | null;
-  title: string;
-  date: string;
-  startTime: string | null;
-  done: boolean;
-  keyResultId: string;
-};
-
-/** Una semana del trimestre (lunes a domingo); la primera es la que tiene el primer día. */
-export type QuarterWeek = { from: string; to: string; n: number };
-
-export function quarterWeeks(year: number, q: Quarter): QuarterWeek[] {
-  const { from, to } = quarterRange(year, q);
-  const out: QuarterWeek[] = [];
-  for (let d = startOfWeek(from); d <= to; d = addDays(d, 7)) out.push({ from: d, to: addDays(d, 6), n: out.length + 1 });
-  return out;
-}
-
-/** Cómo salió una semana: todo lo planeado hecho, más de la mitad, menos, sin nada planeado o todavía no llegó. */
-export type WeekMark = "full" | "most" | "few" | "empty" | "future";
-
-export function weekMark(planned: number, done: number, future: boolean): WeekMark {
-  if (future) return "future";
-  if (!planned) return "empty";
-  if (done >= planned) return "full";
-  return done * 2 >= planned ? "most" : "few";
-}
-
-/** Las semanas del trimestre para un grupo de metas: cuántas acciones había y cuántas se hicieron. */
-export function weekMarks(
-  actions: ObjectiveAction[],
-  krIds: ReadonlySet<string>,
-  weeks: QuarterWeek[],
-  today: string,
-): { week: QuarterWeek; planned: number; done: number; mark: WeekMark; current: boolean }[] {
-  return weeks.map((w) => {
-    const mine = actions.filter((a) => krIds.has(a.keyResultId) && a.date >= w.from && a.date <= w.to);
-    const done = mine.filter((a) => a.done).length;
-    return { week: w, planned: mine.length, done, mark: weekMark(mine.length, done, w.from > today), current: w.from <= today && today <= w.to };
-  });
-}
-
-/** Ejecución del trimestre hasta hoy: acciones hechas sobre planeadas (null sin nada planeado). */
-export function executionPct(actions: ObjectiveAction[], krIds: ReadonlySet<string>, from: string, today: string): number | null {
-  const mine = actions.filter((a) => krIds.has(a.keyResultId) && a.date >= from && a.date <= today);
-  return mine.length ? Math.round((mine.filter((a) => a.done).length / mine.length) * 100) : null;
-}
-
-/**
- * Si una meta del trimestre va al día: su avance contra cuánto pasó del trimestre (en la
- * semana 4 de 13 tendría que ir por el 30 %), con 10 puntos de margen. Sin meta medible, null.
- */
-export type KrPace = "done" | "ontrack" | "behind";
-
-export function krPace(k: KeyResultDTO, year: number, q: Quarter, today: string): KrPace | null {
-  if (k.status === "done") return "done";
-  if (k.status === "closed") return null;
-  const pct = krPct(k);
-  if (pct === null) return null;
-  if (pct >= 100) return "done";
-  const { from, to } = quarterRange(year, q);
-  if (today < from) return null;
-  const total = diffDays(to, from) + 1;
-  const elapsed = Math.min(total, diffDays(today, from) + 1);
-  return pct + 10 >= (elapsed / total) * 100 ? "ontrack" : "behind";
-}
 
 /** En el tablero de tareas, "Terminado" muestra lo de las últimas dos semanas (salvo en la vista Terminadas). */
 export const BOARD_DONE_DAYS = 14;

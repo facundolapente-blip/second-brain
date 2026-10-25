@@ -131,6 +131,7 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     if (!before) return { ok: false, error: "Ese bloque ya no existe." };
     const done = +before.date === +data.date ? before.done : await changeWeek(before, data.date);
     await prisma.planBlock.update({ where: { id }, data: { ...data, done } });
+    if (data.title !== before.title) await prisma.planStep.updateMany({ where: { blockId: id }, data: { title: data.title } });
     if (data.taskId && data.taskId !== before.taskId) {
       await prisma.planTask.updateMany({ where: { id: data.taskId }, data: { scheduled: true } });
     }
@@ -149,6 +150,8 @@ export async function setBlockDone(id: string, done: boolean) {
   await exigirSesion();
   const real = await blockId(id);
   await prisma.planBlock.updateMany({ where: { id: real }, data: { done: !!done } });
+  // La tarea de un objetivo agendada en este bloque se tilda igual.
+  await prisma.planStep.updateMany({ where: { blockId: real }, data: { done: !!done, doneAt: done ? new Date() : null } });
   // Gym: tildar su bloque marca el hábito (el único atado al Plan).
   await syncLinkedHabit(real, !!done);
   refrescar();
@@ -197,6 +200,7 @@ export async function renameBlock(id: string, title: string) {
   const t = cleanTitle(title);
   if (!t) return;
   await prisma.planBlock.updateMany({ where: { id: await blockId(id) }, data: { title: t } });
+  await prisma.planStep.updateMany({ where: { blockId: await blockId(id) }, data: { title: t } });
   refrescar();
 }
 
@@ -764,8 +768,9 @@ function linkOf(raw: string): { linkType: string | null; linkId: string | null }
 export async function saveObjective(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   await exigirSesion();
   const id = texto(fd, "id", 40) || null;
-  const title = texto(fd, "title", 120);
-  if (!title) return { ok: false, error: "Ponele un nombre." };
+  // Escrito como venga (una frase o un párrafo): los espacios y renglones de más se juntan.
+  const title = texto(fd, "title", 400).replace(/\s+/g, " ");
+  if (!title) return { ok: false, error: "Escribí qué querés lograr." };
   const year = entero(fd, "year", 2000, 2100) ?? Number(todayISO().slice(0, 4));
   const statusRaw = texto(fd, "status") as KrStatus;
   const deadline = fecha(fd, "deadline");
@@ -789,6 +794,8 @@ export async function saveObjective(_prev: ActionResult | null, fd: FormData): P
     } else {
       const o = await prisma.planObjective.create({ data: { title, year, ...extra, order: await prisma.planObjective.count({ where: { year } }) } });
       await logActivity("created", "objective", o.id, `${title} (${year})`);
+      refrescar();
+      return { ok: true, id: o.id };
     }
   } catch (e) {
     if ((e as { code?: string }).code === "P2002") return { ok: false, error: "Ya hay un objetivo con ese nombre en ese año." };
@@ -941,13 +948,14 @@ export async function copyToYear(input: { to: number; objectiveIds: string[]; kr
     newId.set(o.id, copy.id);
   }
   let copied = 0;
+  const krCopy = new Map<string, string>();
   for (const k of krs) {
     const objectiveId = k.objectiveId ? (newId.get(k.objectiveId) ?? null) : null;
     // Correrlo dos veces no duplica: mismo nombre, mismo objetivo y mismo año ya está.
     const exists = await prisma.planKeyResult.findFirst({ where: { title: k.title, objectiveId, year: to }, select: { id: true } });
     if (exists) continue;
     copied++;
-    await prisma.planKeyResult.create({
+    const made = await prisma.planKeyResult.create({
       data: {
         title: k.title,
         objectiveId,
@@ -962,64 +970,142 @@ export async function copyToYear(input: { to: number; objectiveIds: string[]; kr
         year: to,
       },
     });
+    krCopy.set(k.id, made.id);
+  }
+  // El árbol queda igual: cada copia cuelga de la copia de su padre (si también se copió).
+  for (const k of krs) {
+    const mine = krCopy.get(k.id);
+    const parent = k.parentId ? krCopy.get(k.parentId) : undefined;
+    if (mine && parent) await prisma.planKeyResult.update({ where: { id: mine }, data: { parentId: parent } });
   }
   await logActivity("created", "objective", null, `Plan ${to}: ${objs.length} objetivos y ${copied} resultados clave copiados`);
   refrescar();
   return { ok: true };
 }
 
-// ─── Objetivos: foco del trimestre y acciones de la semana ─────────────────
+// ─── Objetivos: árbol (objetivo → objetivos más chicos → tareas) ────────────
 
-/** Pone o saca un objetivo del foco de un trimestre (los que no están en foco quedan en pausa ese trimestre). */
-export async function setObjectiveFocus(id: string, quarter: string, on: boolean) {
+/** Un objetivo más chico, colgado del objetivo o de otro objetivo chico (para partirlo de nuevo). */
+export async function addSubgoal(input: { objectiveId: string; parentId?: string | null; title: string; clientId?: string }): Promise<ActionResult> {
   await exigirSesion();
-  const q = QUARTERS.find((x) => x === quarter);
-  if (!q) return;
-  const o = await prisma.planObjective.findUnique({ where: { id: String(id) }, select: { focus: true } });
-  if (!o) return;
-  const focus = on ? [...new Set([...o.focus, q])].sort() : o.focus.filter((x) => x !== q);
-  await prisma.planObjective.update({ where: { id: String(id) }, data: { focus } });
+  const title = cleanTitle(input?.title);
+  if (!title) return { ok: false, error: "Ponele un nombre." };
+  const o = await prisma.planObjective.findUnique({ where: { id: String(input.objectiveId) }, select: { id: true, year: true } });
+  if (!o) return { ok: false, error: "Ese objetivo ya no existe." };
+  const parent = input.parentId ? await prisma.planKeyResult.findUnique({ where: { id: String(input.parentId) }, select: { id: true } }) : null;
+  const newId = await freshId(input.clientId, (x) => prisma.planKeyResult.findUnique({ where: { id: x }, select: { id: true } }));
+  const k = await prisma.planKeyResult.create({
+    data: { ...(newId ? { id: newId } : {}), title, objectiveId: o.id, parentId: parent?.id ?? null, year: o.year, status: "todo" },
+  });
+  await logActivity("created", "keyResult", k.id, title);
+  refrescar();
+  return { ok: true, id: k.id };
+}
+
+/** Cambia el nombre de un objetivo chico ahí mismo. */
+export async function renameKeyResult(id: string, title: string) {
+  await exigirSesion();
+  const t = cleanTitle(title);
+  if (!t) return;
+  await prisma.planKeyResult.updateMany({ where: { id: String(id) }, data: { title: t } });
+  refrescar();
+}
+
+/** Una tarea simple de un objetivo chico (al final de su lista). */
+export async function addStep(input: { keyResultId: string; title: string; clientId?: string }): Promise<ActionResult> {
+  await exigirSesion();
+  const title = cleanTitle(input?.title);
+  if (!title) return { ok: false, error: "Ponele un nombre." };
+  const kr = await prisma.planKeyResult.findUnique({ where: { id: String(input.keyResultId) }, select: { id: true } });
+  if (!kr) return { ok: false, error: "Ese objetivo ya no existe." };
+  const last = await prisma.planStep.findFirst({ where: { keyResultId: kr.id }, orderBy: { order: "desc" }, select: { order: true } });
+  const newId = await freshId(input.clientId, (x) => prisma.planStep.findUnique({ where: { id: x }, select: { id: true } }));
+  const st = await prisma.planStep.create({ data: { ...(newId ? { id: newId } : {}), keyResultId: kr.id, title, order: (last?.order ?? 0) + 1 } });
+  refrescar();
+  return { ok: true, id: st.id };
+}
+
+/** Tilda o destilda una tarea; si está agendada, su bloque del Plan también (y Gym, si es Gym). */
+export async function toggleStep(id: string, done: boolean) {
+  await exigirSesion();
+  const st = await prisma.planStep.findUnique({ where: { id: String(id) }, select: { id: true, blockId: true } });
+  if (!st) return;
+  await prisma.planStep.update({ where: { id: st.id }, data: { done: !!done, doneAt: done ? new Date() : null } });
+  if (st.blockId) {
+    await prisma.planBlock.updateMany({ where: { id: st.blockId }, data: { done: !!done } });
+    await syncLinkedHabit(st.blockId, !!done);
+  }
+  refrescar();
+}
+
+/** Cambia el nombre de una tarea (y el de su bloque, si está agendada). */
+export async function renameStep(id: string, title: string) {
+  await exigirSesion();
+  const t = cleanTitle(title);
+  if (!t) return;
+  const st = await prisma.planStep.findUnique({ where: { id: String(id) }, select: { id: true, blockId: true } });
+  if (!st) return;
+  await prisma.planStep.update({ where: { id: st.id }, data: { title: t } });
+  if (st.blockId) await prisma.planBlock.updateMany({ where: { id: st.blockId }, data: { title: t } });
+  refrescar();
+}
+
+/** Borra una tarea (a la papelera; su bloque del Plan, si tenía, queda). */
+export async function deleteStep(id: string) {
+  await exigirSesion();
+  await trashAndDelete("step", String(id));
   refrescar();
 }
 
 /**
- * Una acción de la semana para una meta del trimestre: un bloque del Plan atado a esa meta
- * (con la categoría del área del objetivo si hay una del mismo nombre). Sin hora va arriba del día.
+ * Agenda una tarea en un día (y hora, si se pone): crea su bloque en el Plan, atado a su
+ * objetivo chico y con la categoría del área del objetivo; si ya tenía, lo cambia de día.
  */
-export async function addObjectiveAction(input: { keyResultId: string; title: string; date: string; startTime?: string | null; clientId?: string }): Promise<ActionResult> {
+export async function scheduleStep(input: { stepId: string; date: string; startTime?: string | null; clientId?: string }): Promise<ActionResult> {
   await exigirSesion();
-  const title = cleanTitle(input?.title).slice(0, 120);
-  if (!title) return { ok: false, error: "Ponele un nombre." };
   if (!isISODate(input?.date)) return { ok: false, error: "Elegí el día." };
-  const kr = await prisma.planKeyResult.findUnique({ where: { id: String(input.keyResultId) }, select: { id: true, objective: { select: { area: true } } } });
-  if (!kr) return { ok: false, error: "Esa meta ya no existe." };
+  const st = await prisma.planStep.findUnique({
+    where: { id: String(input.stepId) },
+    select: { id: true, title: true, done: true, blockId: true, keyResultId: true, keyResult: { select: { objective: { select: { area: true } } } } },
+  });
+  if (!st) return { ok: false, error: "Esa tarea ya no existe." };
   const start = input.startTime ? normalizeTime(String(input.startTime)) : null;
   const startTime = start && isTime(start) ? start : null;
-  const area = kr.objective?.area ? fold(kr.objective.area) : null;
-  const category = area ? (await prisma.planCategory.findMany({ select: { id: true, name: true } })).find((c) => fold(c.name) === area) : undefined;
   const date = toDbDate(input.date);
+  if (st.blockId) {
+    const b = await prisma.planBlock.findUnique({ where: { id: st.blockId } });
+    if (b) {
+      const done = +b.date === +date ? b.done : await changeWeek(b, date);
+      await prisma.planBlock.update({ where: { id: b.id }, data: { date, startTime, endTime: startTime && b.endTime && b.endTime > startTime ? b.endTime : null, done } });
+      refrescar();
+      return { ok: true, id: b.id };
+    }
+  }
+  const area = st.keyResult.objective?.area ? fold(st.keyResult.objective.area) : null;
+  const category = area ? (await prisma.planCategory.findMany({ select: { id: true, name: true } })).find((c) => fold(c.name) === area) : undefined;
   const newId = await freshId(input.clientId, (x) => prisma.planBlock.findUnique({ where: { id: x }, select: { id: true } }));
   const block = await prisma.planBlock.create({
     data: {
       ...(newId ? { id: newId } : {}),
-      title,
+      title: st.title,
       date,
       startTime,
-      keyResultId: kr.id,
+      done: st.done,
+      keyResultId: st.keyResultId,
       categoryId: category?.id ?? null,
       sortKey: startTime ? null : await newSortKey(date),
     },
   });
-  await logActivity("created", "block", block.id, `${title} (${input.date})`);
+  await prisma.planStep.update({ where: { id: st.id }, data: { blockId: block.id } });
+  await logActivity("created", "block", block.id, `${st.title} (${input.date})`);
   refrescar();
   return { ok: true, id: block.id };
 }
 
-/** Ata (o desata, con null) un bloque que ya está en el Plan a una meta del trimestre. */
-export async function setBlockKeyResult(id: string, keyResultId: string | null) {
+/** Le saca el día a una tarea: su bloque del Plan va a la papelera y la tarea queda sin día. */
+export async function unscheduleStep(id: string) {
   await exigirSesion();
-  const kr = keyResultId ? await prisma.planKeyResult.findUnique({ where: { id: String(keyResultId) }, select: { id: true } }) : null;
-  if (keyResultId && !kr) return;
-  await prisma.planBlock.updateMany({ where: { id: await blockId(id) }, data: { keyResultId: kr?.id ?? null } });
+  const st = await prisma.planStep.findUnique({ where: { id: String(id) }, select: { blockId: true } });
+  if (st?.blockId) await trashAndDelete("block", st.blockId);
   refrescar();
 }

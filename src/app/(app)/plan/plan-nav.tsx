@@ -22,7 +22,7 @@ export function PlanNav() {
         {TABS.map((t, i) => {
           const link = <BottomTab key={t.href} href={t.href} label={t.label} icon={t.icon} active={isActive(pathname, t.href)} onClick={pick(t.href)} />;
           // El "+" va en el medio, entre las dos pestañas (como en el Journal).
-          return i === 0 ? [link, <NavAddButton key="nuevo" label={pathname.startsWith("/plan/objetivos") ? "Nuevo resultado clave" : "Nuevo bloque"} />] : link;
+          return i === 0 ? [link, <NavAddButton key="nuevo" label={pathname === "/plan/objetivos" ? "Nuevo objetivo" : pathname.startsWith("/plan/objetivos/") ? "Nuevo objetivo chico" : "Nuevo bloque"} />] : link;
         })}
       </div>
     </nav>

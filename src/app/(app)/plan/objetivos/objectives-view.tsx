@@ -1,98 +1,63 @@
 "use client";
 
-import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
-import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useOptimistic, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowsClockwise, CalendarPlus, CaretDown, Check, ClipboardText, Lightning, Minus, PencilSimple, Plus, Target, X } from "@phosphor-icons/react";
-import {
-  addObjectiveAction,
-  bumpObjective,
-  carryOverKrs,
-  copyToYear,
-  deleteKeyResult,
-  deleteObjective,
-  dismissQuarterReview,
-  saveKeyResult,
-  saveObjective,
-  setBlockDone,
-  setBlockKeyResult,
-  writeQuarterReview,
-} from "@/lib/offline/plan";
+import { ArrowRight, ArrowsClockwise, CalendarBlank, CalendarPlus, CaretDown, Check, ClipboardText, Minus, Plus, Target, X } from "@phosphor-icons/react";
+import { bumpObjective, carryOverKrs, copyToYear, dismissQuarterReview, writeQuarterReview } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
 import {
   avgPct,
-  daysLeft,
-  daysLeftLabel,
-  isFinishedKr,
-  KR_STATUS,
   krPct,
   krQuarters,
   effectiveKr,
-  executionPct,
-  inFocus,
-  newClientId,
   nextQuarter,
-  OBJECTIVES_VIEW_COOKIE,
-  objectivePct,
   previousQuarter,
-  QUARTERS,
-  quarterOf,
   quarterRange,
   quarterReviewQuestions,
-  quarterWeeks,
   reviewQuarter,
-  splitByFocus,
-  weekMarks,
   type KeyResultDTO,
-  type ObjectiveAction,
-  type ObjectivesTab,
   type KrLinkOption,
   type KrStatus,
   type ObjectiveDTO,
   type Quarter,
 } from "@/lib/plan-logic";
+import { nextStep, rootsOf, splitPast, treePct, whenLabel } from "@/lib/objective-tree";
 import { PageHeader } from "@/components/page-header";
-import { useSlide, useTick } from "@/components/motion";
-import { PillSwitch } from "@/components/pill-switch";
+import { useTick } from "@/components/motion";
 import { notifyInfo } from "@/components/undo-toast";
-import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { HEAD_SWITCH, PriorityDots, PriorityPicker, ProgressBar, StatusPill } from "../plan-ui";
+import { Button, cx, Sheet, type SheetHandle } from "@/components/ui";
+import { ProgressBar } from "../plan-ui";
 import { TintedCard } from "@/components/tinted-card";
 import { PlanTabs } from "../plan-nav";
-import { AddActionSheet, FocusStar, QuarterTab, quarterKrs, WeekStrip, WeekTab, weekIndexOf, weekRange, type AddActionHandle, type UnlinkedBlock } from "./objectives-tabs";
+import { KrSheet, ObjectiveForm, type KrSheetHandle } from "./objective-forms";
 
 const fmtNum = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
-/** "1 Generar constancia produciendo" → sin el número con el que Notion los ordenaba. */
+/** Los objetivos importados de Notion traían un número adelante ("2 Mejorar mi salud"). */
 const cleanTitle = (t: string) => t.replace(/^\d+\s+/, "");
-const QUARTER_MONTHS: Record<Quarter, string> = { Q1: "ene–mar", Q2: "abr–jun", Q3: "jul–set", Q4: "oct–dic" };
-
-/** Color del punto de un resultado clave según su estado (la palabra va en el título). */
 const DOT: Record<KrStatus, string> = {
-  done: "bg-[var(--p-green-chip)]",
+  done: "bg-[var(--st-done-line)]",
   doing: "bg-[var(--p-blue-chip)]",
   closed: "bg-[var(--p-yellow-chip)]",
-  todo: "bg-[var(--faint)]",
+  todo: "bg-line-strong",
 };
 
-/** Lo que se ve al lado del nombre: "4/4", "15k/120k", "61%". */
+/** "3/10" de un objetivo chico (si se mide solo, el valor del vínculo). */
 function krFigure(raw: KeyResultDTO): string | null {
   const k = effectiveKr(raw);
-  if (raw.auto && raw.kind === "habit") return `${Math.round(k.progress ?? 0)}%`;
-  if (k.goal === null) return null;
-  const short = (n: number) => (n >= 10000 ? `${fmtNum(Math.round(n / 1000))}k` : fmtNum(n));
-  return `${short(k.progress ?? 0)}/${short(k.goal)}`;
+  if (k.goal === null || k.goal === undefined) return null;
+  return `${fmtNum(k.progress ?? 0)}/${fmtNum(k.goal)}`;
 }
 
-/** "31 dic", con el año si no es el de hoy ("31 dic 2025"). */
-const shortDate = (iso: string, today: string) => (iso.slice(0, 4) === today.slice(0, 4) ? formatShort(iso) : `${formatShort(iso)} ${iso.slice(0, 4)}`);
-
-const isLate = (k: KeyResultDTO, today: string) => !isFinishedKr(k) && k.deadline !== null && k.deadline < today;
-
-/** Grupos para dibujar: los objetivos y, si hay, "Sin objetivo" con los sueltos. */
 type Group = ObjectiveDTO & { loose?: boolean };
 
+/**
+ * Objetivos como árbol (2026-10-25): una tarjeta por objetivo grande con su avance y la
+ * próxima tarea; tocarla abre su árbol (`/plan/objetivos/[id]`), donde se parte en objetivos
+ * más chicos y tareas simples. Año y trimestre son datos opcionales, no pestañas.
+ */
 export function ObjectivesView({
   objectives,
   loose,
@@ -100,10 +65,6 @@ export function ObjectivesView({
   today,
   year,
   years,
-  initialTab,
-  quarter,
-  actions,
-  unlinked,
   reviewDismissed,
 }: {
   objectives: ObjectiveDTO[];
@@ -112,68 +73,18 @@ export function ObjectivesView({
   today: string;
   year: number;
   years: number[];
-  initialTab: ObjectivesTab;
-  /** El trimestre que se mira (el de hoy, o el elegido con ?t=). */
-  quarter: Quarter;
-  actions: ObjectiveAction[];
-  unlinked: UnlinkedBlock[];
   reviewDismissed: string | null;
 }) {
-  const [layout, setLayoutState] = useState<ObjectivesTab>(initialTab);
-  const [swapped, setSwapped] = useState(false);
-  const setLayout = (v: ObjectivesTab) => {
-    setSwapped(true);
-    setLayoutState(v);
-    document.cookie = `${OBJECTIVES_VIEW_COOKIE}=${v}; path=/plan; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
-  };
-  // Acciones de la semana: lo que se toca se ve al instante (el servidor lo confirma al volver).
-  type Op =
-    | { type: "add"; action: ObjectiveAction }
-    | { type: "done"; blockId: string; done: boolean }
-    | { type: "link"; action: ObjectiveAction }
-    | { type: "unlink"; blockId: string };
-  const [acts, applyAct] = useOptimistic(actions, (cur: ObjectiveAction[], op: Op) => {
-    if (op.type === "add" || op.type === "link") return [...cur.filter((a) => a.id !== op.action.id), op.action];
-    if (op.type === "done") return cur.map((a) => (a.blockId === op.blockId ? { ...a, done: op.done } : a));
-    return cur.filter((a) => a.blockId !== op.blockId);
-  });
-  const [, startAct] = useSafeTransition();
-  const weeks = quarterWeeks(year, quarter);
-  const [weekIdx, setWeekIdx] = useState(() => weekIndexOf(weeks, today));
-  const addSheet = useRef<AddActionHandle>(null);
-  const openAddAction = (k: KeyResultDTO, weekFrom?: string) => addSheet.current?.open(k, weekFrom ?? weeks[weekIndexOf(weeks, today)].from);
-  const toggleAction = (a: ObjectiveAction) =>
-    a.blockId &&
-    startAct(async () => {
-      applyAct({ type: "done", blockId: a.blockId!, done: !a.done });
-      await setBlockDone(a.blockId!, !a.done);
-    });
-  const unlinkAction = (a: ObjectiveAction) =>
-    a.blockId &&
-    startAct(async () => {
-      applyAct({ type: "unlink", blockId: a.blockId! });
-      await setBlockKeyResult(a.blockId!, null);
-    });
-  const addAction = (k: KeyResultDTO, input: { title: string; date: string; startTime: string | null }) => {
-    const id = newClientId();
-    startAct(async () => {
-      applyAct({ type: "add", action: { id, blockId: id, title: input.title, date: input.date, startTime: input.startTime, done: false, keyResultId: k.id } });
-      await addObjectiveAction({ keyResultId: k.id, ...input, clientId: id });
-    });
-  };
-  const linkBlock = (k: KeyResultDTO, b: UnlinkedBlock) =>
-    startAct(async () => {
-      applyAct({ type: "link", action: { id: b.id, blockId: b.id, title: b.title, date: b.date, startTime: b.startTime, done: b.done, keyResultId: k.id } });
-      await setBlockKeyResult(b.id, k.id);
-    });
-  const sheet = useRef<KrSheetHandle>(null);
-  useOnNew(() => sheet.current?.open(undefined, { quarter }));
-  const objSheet = useRef<SheetHandle>(null);
+  const router = useRouter();
+  const newSheet = useRef<SheetHandle>(null);
   const planSheet = useRef<SheetHandle>(null);
-  const detailSheet = useRef<SheetHandle>(null);
-  const [editingObj, setEditingObj] = useState<ObjectiveDTO | null>(null);
-  const [objKey, setObjKey] = useState(0);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const krSheet = useRef<KrSheetHandle>(null);
+  const [newKey, setNewKey] = useState(0);
+  const openNew = () => {
+    setNewKey((k) => k + 1);
+    newSheet.current?.open();
+  };
+  useOnNew(openNew);
   const nextYear = year + 1;
 
   const groups: Group[] = [
@@ -182,8 +93,6 @@ export function ObjectivesView({
       ? [{ id: "", title: "Sin objetivo", year, role: null, area: null, priority: 0, deadline: null, status: "doing" as KrStatus, progress: null, goal: null, focus: [], keyResults: loose, loose: true }]
       : []),
   ];
-  const currentYear = Number(today.slice(0, 4));
-  const nowQ = year === currentYear ? quarterOf(today) : null;
 
   // Revisión del trimestre: sola en su ventana (fin del trimestre y el mes siguiente) o a pedido.
   const auto = reviewQuarter(today);
@@ -193,42 +102,24 @@ export function ObjectivesView({
   const prevQ = previousQuarter(today);
   const canAskReview = !review && prevQ.year === year;
 
-  function openObjective(o: ObjectiveDTO | null) {
-    detailSheet.current?.close();
-    setEditingObj(o);
-    setObjKey((k) => k + 1);
-    objSheet.current?.open();
-  }
-  function openDetail(id: string) {
-    setDetailId(id);
-    detailSheet.current?.open();
-  }
-  function planKr(objectiveId: string, quarter?: Quarter) {
-    detailSheet.current?.close();
-    sheet.current?.open(undefined, { objectiveId, quarter });
-  }
-  function openKr(k: KeyResultDTO) {
-    detailSheet.current?.close();
-    sheet.current?.open(k);
-  }
-  const detail = groups.find((g) => (g.id || "loose") === detailId) ?? null;
-  // Cabecera del año: el avance promedio de los objetivos (barra fina).
-  const pcts = objectives.map(objectivePct).filter((n): n is number => n !== null);
-  const avgObjectives = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+  const pcts = objectives.map(treePct).filter((n): n is number => n !== null);
+  const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+  const roles = [...new Set(objectives.map((o) => o.role).filter((r): r is string => !!r))];
+  const areas = [...new Set(objectives.map((o) => o.area).filter((r): r is string => !!r))];
 
   return (
     <>
       <div className="plan-head contents" data-w="96">
-      <PageHeader
-        title="Objetivos"
-        wide
-        tabs={<PlanTabs />}
-        actions={
-          <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
-            <Plus size={16} weight="bold" /> Nueva meta
-          </Button>
-        }
-      />
+        <PageHeader
+          title="Objetivos"
+          wide
+          tabs={<PlanTabs />}
+          actions={
+            <Button variant="accent" size="sm" className="max-lg:hidden" onClick={openNew}>
+              <Plus size={16} weight="bold" /> Nuevo objetivo
+            </Button>
+          }
+        />
       </div>
       <main className="mx-auto max-w-3xl px-4 pb-8 lg:max-w-[96rem] lg:px-10">
         {/* Un año por pestaña, como las hojas de Notion. */}
@@ -256,18 +147,13 @@ export function ObjectivesView({
             </button>
           </nav>
           {canAskReview && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSwapped(true);
-                  setForcedReview(prevQ);
-                }}
-                className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-              >
-                Revisar el {prevQ.quarter}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setForcedReview(prevQ)}
+              className="inline-flex h-9 items-center rounded-full px-3.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            >
+              Revisar el {prevQ.quarter}
+            </button>
           )}
         </div>
 
@@ -279,7 +165,7 @@ export function ObjectivesView({
             opened={forcedReview !== null}
             groups={groups}
             today={today}
-            onOpen={openKr}
+            onOpen={(k) => krSheet.current?.open(k)}
             onClose={() => {
               const key = `${review.year}-${review.quarter}`;
               setForcedReview(null);
@@ -288,187 +174,94 @@ export function ObjectivesView({
           />
         )}
 
-        {(() => {
-          // Cabecera según la pestaña: el año (objetivos y foco), el trimestre (semana y
-          // ejecución) o la semana (acciones hechas).
-          const qIds = new Set(splitByFocus(groups, quarter).active.flatMap((g) => quarterKrs(g, quarter).map((k) => k.id)));
-          const nowWeek = weeks[weekIndexOf(weeks, today)];
-          const exec = executionPct(acts, qIds, weeks[0].from, today);
-          const shownWeek = weeks[weekIdx];
-          const inWeek = acts.filter((a) => a.date >= shownWeek.from && a.date <= shownWeek.to);
-          const quarterLabel = `${quarter} ${year}`;
-          const head =
-            layout === "trimestre"
-              ? {
-                  title: quarterLabel,
-                  meta:
-                    today < weeks[0].from
-                      ? `Empieza el ${formatShort(quarterRange(year, quarter).from)}`
-                      : today > weeks[weeks.length - 1].to
-                        ? `Terminó${exec !== null ? ` · ejecución ${exec}%` : ""}`
-                        : `Semana ${nowWeek.n} de ${weeks.length}${exec !== null ? ` · ejecución ${exec}%` : ""}`,
-                  progress: exec !== null ? exec / 100 : undefined,
-                }
-              : layout === "semana"
-                ? {
-                    title: shownWeek.from <= today && today <= shownWeek.to ? "Esta semana" : weekRange(shownWeek),
-                    meta: inWeek.length ? `${inWeek.filter((a) => a.done).length} de ${inWeek.length} acciones hechas` : `${quarterLabel} · semana ${shownWeek.n}`,
-                    progress: inWeek.length ? inWeek.filter((a) => a.done).length / inWeek.length : undefined,
-                  }
-                : {
-                    title: `Objetivos ${year}`,
-                    meta: groups.length
-                      ? `${objectives.length} ${objectives.length === 1 ? "objetivo" : "objetivos"} · ${objectives.filter((o) => inFocus(o, quarter)).length} en foco el ${quarter}`
-                      : "Sin objetivos todavía",
-                    progress: avgObjectives !== null ? avgObjectives / 100 : undefined,
-                  };
-          return (
-            <TintedCard
-              icon={Target}
-              title={head.title}
-              className="mt-4"
-              meta={head.meta}
-              progress={head.progress}
-              action={
-                layout === "anio" ? (
-                  <button type="button" className="tcard-pill press" onClick={() => openObjective(null)}>
-                    <Plus size={14} weight="bold" aria-hidden /> Objetivo
-                  </button>
-                ) : (
-                  <button type="button" className="tcard-pill press" onClick={() => sheet.current?.open(undefined, { quarter })}>
-                    <Plus size={14} weight="bold" aria-hidden /> Meta
-                  </button>
-                )
-              }
-              headExtra={
-                groups.length > 0 ? (
-                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                    <PillSwitch
-                      label="Año, trimestre o semana"
-                      value={layout}
-                      onChange={setLayout}
-                      options={[
-                        { value: "anio", label: "Año" },
-                        { value: "trimestre", label: quarter },
-                        { value: "semana", label: "Semana" },
-                      ]}
-                      {...HEAD_SWITCH}
-                    />
-                    {layout === "anio" && <Legend className="max-lg:hidden" />}
-                    {layout === "trimestre" && (
-                      <nav aria-label="Trimestre" className="flex items-center gap-1">
-                        {QUARTERS.map((q) => (
-                          <Link
-                            key={q}
-                            href={`/plan/objetivos?anio=${year}&t=${q}`}
-                            scroll={false}
-                            aria-current={q === quarter ? "page" : undefined}
-                            className={cx(
-                              "inline-flex h-8 items-center rounded-full px-3 font-mono text-[12px] transition-colors",
-                              q === quarter ? "bg-surface text-fg shadow-[0_1px_2px_rgba(0,0,0,0.12)]" : "text-[var(--head-fg)] hover:text-fg",
-                            )}
-                          >
-                            {q}
-                          </Link>
-                        ))}
-                      </nav>
-                    )}
-                  </div>
-                ) : undefined
-              }
-              bodyClassName={groups.length > 0 && layout === "anio" ? "lg:p-0!" : undefined}
-            >
-              {groups.length === 0 ? (
-                <div className="grid justify-items-start gap-3 py-4">
-                  <p className="text-[15px] text-muted">Todavía no hay objetivos para {year}.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
-                      <Plus size={15} /> Nuevo objetivo
-                    </Button>
-                    {/* "Planificar" copia del año que se mira al siguiente: para traer algo, se va al año anterior. */}
-                    {years.some((y) => y < year) && (
-                      <Link
-                        href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
-                      >
-                        <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div key={layout} className={cx(swapped && "swap")}>
-                  {layout === "anio" ? (
-                    <YearMap
-                      groups={groups}
-                      today={today}
-                      year={year}
-                      nowQ={nowQ}
-                      quarter={quarter}
-                      actions={acts}
-                      onOpenObjective={openDetail}
-                      onOpenKr={openKr}
-                      onPlan={planKr}
-                      onGoWeek={() => setLayout("semana")}
-                    />
-                  ) : layout === "trimestre" ? (
-                    <QuarterTab
-                      groups={groups}
-                      actions={acts}
-                      year={year}
-                      quarter={quarter}
-                      today={today}
-                      onOpenKr={openKr}
-                      onAddAction={(k) => openAddAction(k)}
-                      onPlan={() => sheet.current?.open(undefined, { quarter })}
-                    />
-                  ) : (
-                    <WeekTab
-                      groups={groups}
-                      actions={acts}
-                      year={year}
-                      quarter={quarter}
-                      today={today}
-                      week={weekIdx}
-                      onWeek={(i) => setWeekIdx(Math.max(0, Math.min(weeks.length - 1, i)))}
-                      onToggle={toggleAction}
-                      onUnlink={unlinkAction}
-                      onAddAction={openAddAction}
-                    />
-                  )}
-                </div>
-              )}
-            </TintedCard>
-          );
-        })()}
+        <TintedCard
+          icon={Target}
+          title={`Objetivos ${year}`}
+          className="mt-4"
+          meta={objectives.length ? `${objectives.length} ${objectives.length === 1 ? "objetivo" : "objetivos"}${avg !== null ? ` · ${avg}% de avance` : ""}` : "Todavía ninguno"}
+          progress={avg !== null ? avg / 100 : undefined}
+          action={
+            <button type="button" className="tcard-pill press" onClick={openNew}>
+              <Plus size={14} weight="bold" aria-hidden /> Objetivo
+            </button>
+          }
+        >
+          {objectives.length === 0 ? (
+            <div className="grid justify-items-start gap-3 py-3">
+              <p className="max-w-[48ch] text-[15px] text-muted">
+                Escribí lo que querés lograr en {year}, como te salga. Después lo partís en objetivos más chicos y en tareas simples.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="accent" size="sm" onClick={openNew}>
+                  <Plus size={15} /> Nuevo objetivo
+                </Button>
+                {years.some((y) => y < year) && (
+                  <Link
+                    href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
+                  >
+                    <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {objectives.map((o) => (
+                <li key={o.id}>
+                  <ObjectiveCard o={o} today={today} />
+                </li>
+              ))}
+              <li>
+                <button
+                  type="button"
+                  onClick={openNew}
+                  className="press grid h-full min-h-32 w-full content-center justify-items-start gap-1 rounded-2xl border border-dashed border-line-strong px-5 py-4 text-left transition-colors hover:bg-surface-2"
+                >
+                  <span className="inline-flex items-center gap-1.5 text-[15px] font-medium">
+                    <Plus size={16} weight="bold" aria-hidden /> Nuevo objetivo
+                  </span>
+                  <span className="text-[13px] text-muted">Escribilo como quieras</span>
+                </button>
+              </li>
+            </ul>
+          )}
+
+          {loose.length > 0 && (
+            <section className="mt-5 grid gap-1.5 border-t border-line pt-4">
+              <h3 className="kicker">Objetivos chicos sin objetivo grande</h3>
+              <ul className="grid">
+                {loose.map((k) => (
+                  <li key={k.id}>
+                    <button
+                      type="button"
+                      onClick={() => krSheet.current?.open(k)}
+                      className="flex min-h-11 w-full items-center gap-2 rounded-lg px-1 text-left text-[14px] hover:bg-surface-2"
+                    >
+                      <span aria-hidden className={cx("size-2 shrink-0 rounded-full", DOT[k.status])} />
+                      <span className="min-w-0 flex-1 truncate">{k.title}</span>
+                      {krFigure(k) && <span className="font-mono text-[12px] text-muted tabular">{krFigure(k)}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </TintedCard>
       </main>
 
-      <KrSheet ref={sheet} objectives={objectives} links={links} year={year} />
-      <AddActionSheet ref={addSheet} today={today} unlinked={unlinked.filter((b) => !acts.some((x) => x.blockId === b.id))} onAdd={addAction} onLink={linkBlock} />
-
-      <Sheet ref={detailSheet} title={detail ? cleanTitle(detail.title) : "Objetivo"} wide>
-        {detail && (
-          <ObjectiveDetail
-            objective={detail}
-            today={today}
-            onOpenKr={openKr}
-            onEdit={() => !detail.loose && openObjective(objectives.find((o) => o.id === detail.id) ?? null)}
-            onAdd={() => planKr(detail.id, nowQ ?? undefined)}
-          />
-        )}
-      </Sheet>
-
-      <Sheet ref={objSheet} title={editingObj ? "Editar objetivo" : `Nuevo objetivo ${year}`}>
+      <Sheet ref={newSheet} title={`Nuevo objetivo ${year}`}>
         <ObjectiveForm
-          key={objKey}
-          objective={editingObj}
+          key={newKey}
+          objective={null}
           year={year}
-          roles={[...new Set(objectives.map((o) => o.role).filter((r): r is string => !!r))]}
-          areas={[...new Set(objectives.map((o) => o.area).filter((r): r is string => !!r))]}
-          onDone={() => objSheet.current?.close()}
+          roles={roles}
+          areas={areas}
+          onDone={() => newSheet.current?.close()}
+          onCreated={(id) => router.push(`/plan/objetivos/${id}`)}
         />
       </Sheet>
-
+      <KrSheet ref={krSheet} objectives={objectives} links={links} year={year} />
       <Sheet ref={planSheet} title={`Planificar ${nextYear}`}>
         <PlanYearForm objectives={objectives} loose={loose} from={year} to={nextYear} onDone={() => planSheet.current?.close()} />
       </Sheet>
@@ -476,253 +269,63 @@ export function ObjectivesView({
   );
 }
 
-// ─── Encabezado de un objetivo (rol, nombre, avance) ────────────────────────
-
-function ObjectiveHead({ o, onOpen }: { o: Group; onOpen: () => void }) {
-  const pct = objectivePct(o);
-  const label = o.goal ? `${fmtNum(o.progress ?? 0)}/${fmtNum(o.goal)}` : pct !== null ? `${pct}%` : null;
+/** Una tarjeta por objetivo grande: su avance, cuánto falta y la próxima tarea. Tocarla abre su árbol. */
+function ObjectiveCard({ o, today }: { o: ObjectiveDTO; today: string }) {
+  const pct = treePct(o);
+  // Los de trimestres que ya pasaron no cuentan como "por hacer".
+  const roots = splitPast(rootsOf(o.keyResults), o.year, today).now;
+  const steps = o.keyResults.flatMap((k) => k.steps);
+  const doneSteps = steps.filter((s) => s.done).length;
+  const next = nextStep(o, today);
+  const ownGoalOnly = !!o.goal && o.keyResults.length === 0;
+  const late = o.deadline !== null && o.deadline < today && o.status !== "done";
   return (
-    <button type="button" onClick={onOpen} className="grid w-full min-w-0 gap-1 text-left">
-      <span className="kicker truncate">{o.loose ? "Sueltos" : (o.role ?? o.area ?? "Objetivo")}</span>
-      <span className="text-[15px] leading-snug font-semibold text-fg">{cleanTitle(o.title)}</span>
-      {pct !== null && (
-        <span className="flex items-center gap-2 pt-1.5">
-          <ProgressBar pct={pct} />
-          <span className="shrink-0 font-mono text-[11.5px] text-muted tabular">{label}</span>
-        </span>
-      )}
-    </button>
-  );
-}
-
-/** Un resultado clave en una celda: punto de estado, nombre y cifra. */
-function KrItem({ kr, today, onOpen }: { kr: KeyResultDTO; today: string; onOpen: () => void }) {
-  const fig = krFigure(kr);
-  const late = isLate(kr, today);
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onOpen}
-        title={`${KR_STATUS[kr.status].label}${kr.auto ? ` · se mide solo: ${kr.auto.label}` : ""}`}
-        className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-start gap-2 rounded-md px-1.5 py-1 text-left text-[13.5px] leading-snug transition-colors hover:bg-surface-2"
-      >
-        <span aria-hidden className={cx("mt-[0.4em] size-2 shrink-0 rounded-full", DOT[kr.status])} />
-        <span className="min-w-0">
-          <span className={cx(kr.status === "done" && "text-muted")}>{kr.title}</span>
-          <span className="sr-only">, {KR_STATUS[kr.status].label}</span>
-          {fig && <span className="ml-1.5 font-mono text-[12px] text-muted tabular">{fig}</span>}
-          {late && <span className="ml-1.5 text-[12px] text-danger">vencido</span>}
-          {kr.auto && <ArrowsClockwise size={12} aria-hidden className="ml-1 inline text-muted" />}
-        </span>
-      </button>
-    </li>
-  );
-}
-
-function Legend({ className }: { className?: string }) {
-  const items: [KrStatus, string][] = [
-    ["done", "terminado"],
-    ["doing", "haciendo"],
-    ["closed", "sin completar"],
-    ["todo", "sin empezar"],
-  ];
-  return (
-    <ul className={cx("flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--head-fg)]", className)}>
-      {items.map(([s, l]) => (
-        <li key={s} className="flex items-center gap-1.5">
-          <span aria-hidden className={cx("size-2 rounded-full", DOT[s])} />
-          {l}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// ─── B · Mapa del año ───────────────────────────────────────────────────────
-
-/**
- * Una grilla: cada fila un objetivo y cada columna un trimestre, con sus
- * resultados clave. La columna del trimestre en curso va resaltada. En el
- * celular, el mismo mapa de a un trimestre (se elige arriba).
- */
-function YearMap({
-  groups,
-  today,
-  year,
-  nowQ,
-  quarter,
-  actions,
-  onOpenObjective,
-  onOpenKr,
-  onPlan,
-  onGoWeek,
-}: {
-  groups: Group[];
-  today: string;
-  year: number;
-  nowQ: Quarter | null;
-  /** El trimestre de las acciones cargadas (el de la estrella de foco). */
-  quarter: Quarter;
-  actions: ObjectiveAction[];
-  onOpenObjective: (id: string) => void;
-  onOpenKr: (k: KeyResultDTO) => void;
-  onPlan: (objectiveId: string, quarter: Quarter) => void;
-  onGoWeek: () => void;
-}) {
-  const [mobileQ, setMobileQ] = useState<Quarter>(nowQ ?? quarter);
-  // Foco del trimestre: la estrella; los que no están en foco quedan "en pausa" (si hay alguno en foco).
-  const focusCount = groups.filter((g) => !g.loose && inFocus(g, quarter)).length;
-  const weeks = quarterWeeks(year, quarter);
-  const thisWeek = weeks[weekIndexOf(weeks, today)];
-  const extra = (g: Group, q: Quarter) => {
-    if (q !== quarter || g.loose) return null;
-    const ids = new Set(inQ(g, q).map((k) => k.id));
-    if (!ids.size) return null;
-    if (focusCount > 0 && !inFocus(g, q)) return <p className="mt-1.5 text-[12px] text-muted">En pausa este trimestre</p>;
-    const week = q === nowQ ? actions.filter((a) => ids.has(a.keyResultId) && a.date >= thisWeek.from && a.date <= thisWeek.to) : [];
-    return (
-      <div className="mt-2 grid gap-1.5">
-        <WeekStrip marks={weekMarks(actions, ids, weeks, today)} />
-        {q === nowQ && (
-          <button type="button" onClick={onGoWeek} className="text-left text-[12px] leading-snug text-muted hover:text-fg">
-            {week.length ? `Esta semana: ${week.map((a) => a.title).join(" · ")}` : "Nada planeado esta semana · planificar"}
-          </button>
+    <article className="lift plan-hover relative grid h-full content-start gap-2.5 rounded-2xl border border-line px-5 py-4">
+      <div className="flex items-center gap-2">
+        <span className="kicker min-w-0 flex-1 truncate">{o.role ?? o.area ?? "Objetivo"}</span>
+        {o.deadline && (
+          <span className={cx("shrink-0 font-mono text-[11px] tabular", late ? "text-danger" : "text-muted")}>hasta {formatShort(o.deadline)}</span>
         )}
       </div>
-    );
-  };
-  const head = (g: Group) => (
-    <div className="flex items-start gap-1">
-      <div className="min-w-0 flex-1">
-        <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
-      </div>
-      <FocusStar objective={g} quarter={quarter} count={focusCount} />
-    </div>
-  );
-  // Otro trimestre en el celular: entra desde ese lado (Q1 → Q2 desde la derecha).
-  const qSlide = useSlide(mobileQ);
-  const currentYear = Number(today.slice(0, 4));
-  // Se planifica en el trimestre en curso y los que vienen (o todo un año futuro).
-  const plannable = (q: Quarter) => year > currentYear || (year === currentYear && nowQ !== null && QUARTERS.indexOf(q) >= QUARTERS.indexOf(nowQ));
-  const inQ = (g: Group, q: Quarter) => g.keyResults.filter((k) => krQuarters(k).includes(q));
-  const unplaced = (g: Group) => g.keyResults.filter((k) => krQuarters(k).length === 0);
-  const ownGoalOnly = (g: Group) => !!g.goal && g.keyResults.length === 0;
-
-  const cell = (g: Group, q: Quarter) => {
-    const krs = inQ(g, q);
-    if (krs.length)
-      return (
-        <>
-          <ul className="grid gap-0.5">
-            {krs.map((k) => (
-              <KrItem key={k.id} kr={k} today={today} onOpen={() => onOpenKr(k)} />
-            ))}
-          </ul>
-          {extra(g, q)}
-        </>
-      );
-    if (g.loose || !plannable(q)) return null;
-    return (
-      <p className="text-[13px] text-muted">
-        Vacío ·{" "}
-        <button type="button" onClick={() => onPlan(g.id, q)} className="underline decoration-line-strong underline-offset-2 hover:text-fg">
-          planificar
-        </button>
-      </p>
-    );
-  };
-
-  return (
-    <>
-      {/* Compu: la grilla entera, a todo el ancho de la tarjeta. */}
-      <div className="hidden lg:block">
-        <div role="table" aria-label={`Objetivos ${year} por trimestre`} className="grid grid-cols-[minmax(15rem,1.15fr)_repeat(4,minmax(0,1fr))]">
-          <div role="row" className="contents">
-            <span role="columnheader" className="border-b border-line bg-surface-2 py-3 pr-4 pl-5 font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
-              Objetivo
-            </span>
-            {QUARTERS.map((q) => (
-              <span
-                key={q}
-                role="columnheader"
-                className={cx(
-                  "border-b border-l border-line px-4 py-3 font-mono text-[11px] tracking-[0.08em] uppercase",
-                  q === nowQ ? "bg-[color-mix(in_oklab,var(--accent)_14%,var(--surface))] text-fg" : "bg-surface-2 text-muted",
-                )}
-              >
-                {q} · {q === nowQ ? "ahora" : QUARTER_MONTHS[q]}
-              </span>
-            ))}
-          </div>
-          {groups.map((g) => (
-            <div role="row" key={g.id || "loose"} className="contents">
-              <div role="rowheader" className="grid content-start gap-2 border-b border-line py-3.5 pr-4 pl-5">
-                {head(g)}
-                {unplaced(g).length > 0 && (
-                  <details className="text-[12.5px] text-muted">
-                    <summary className="cursor-pointer select-none hover:text-fg">{unplaced(g).length} sin trimestre</summary>
-                    <ul className="grid gap-0.5 pt-1">
-                      {unplaced(g).map((k) => (
-                        <KrItem key={k.id} kr={k} today={today} onOpen={() => onOpenKr(k)} />
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-              {ownGoalOnly(g) ? (
-                <div role="cell" className="col-span-4 flex items-center gap-4 border-b border-l border-line px-4 py-3.5 text-[13px] text-muted">
-                  <span>
-                    Se mide con su propia meta ({fmtNum(g.progress ?? 0)} de {fmtNum(g.goal ?? 0)}), sin resultados clave por trimestre.
-                  </span>
-                  <GoalStepper o={g} />
-                </div>
-              ) : (
-                QUARTERS.map((q) => (
-                  <div
-                    role="cell"
-                    key={q}
-                    className={cx("min-w-0 border-b border-l border-line px-4 py-3", q === nowQ && "bg-[color-mix(in_oklab,var(--accent)_6%,var(--surface))]")}
-                  >
-                    {cell(g, q)}
-                  </div>
-                ))
-              )}
-            </div>
-          ))}
+      <h3 className="line-clamp-3 text-[16px] leading-snug font-semibold">
+        <Link href={`/plan/objetivos/${o.id}`} className="after:absolute after:inset-0 after:rounded-2xl after:content-['']">
+          {cleanTitle(o.title)}
+        </Link>
+      </h3>
+      {pct !== null && <ProgressBar pct={pct} label={`${pct}%`} />}
+      {ownGoalOnly ? (
+        <div className="flex items-center justify-between gap-3 text-[13px] text-muted">
+          <span>
+            {fmtNum(o.progress ?? 0)} de {fmtNum(o.goal ?? 0)}
+          </span>
+          <GoalStepper o={o} />
         </div>
-      </div>
-
-      <div className="grid gap-1 lg:hidden">
-        <PillSwitch
-          label="Trimestre"
-          value={mobileQ}
-          onChange={setMobileQ}
-          className="w-full"
-          options={QUARTERS.map((q) => ({ value: q, label: q === nowQ ? `${q} · ahora` : q }))}
-        />
-      {/* Celular: el mapa de a un trimestre, un objetivo por fila. */}
-        <ul key={mobileQ} className={cx("grid", qSlide)}>
-          {groups.map((g) => (
-            <li key={g.id || "loose"} className="grid gap-2.5 border-b border-line py-3.5 last:border-b-0 last:pb-0">
-              {head(g)}
-              <div className="border-t border-line pt-2.5">
-                {ownGoalOnly(g) ? (
-                  <div className="flex items-center justify-between gap-3 text-[13px] text-muted">
-                    <span>Se mide con su propia meta.</span>
-                    <GoalStepper o={g} />
-                  </div>
-                ) : (
-                  (cell(g, mobileQ) ?? <p className="text-[13px] text-muted">Nada en el {mobileQ}.</p>)
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </>
+      ) : o.keyResults.length === 0 ? (
+        <p className="inline-flex items-center gap-1 text-[13px] font-medium text-accent-fg">
+          Partilo en objetivos más chicos <ArrowRight size={13} aria-hidden />
+        </p>
+      ) : (
+        <p className="text-[13px] text-muted">
+          {roots.length} {roots.length === 1 ? "objetivo chico" : "objetivos chicos"}
+          {steps.length ? ` · ${doneSteps}/${steps.length} tareas` : " · sin tareas todavía"}
+        </p>
+      )}
+      {next && (
+        <p className="flex items-center gap-1.5 border-t border-line pt-2.5 text-[13px]">
+          <span className="shrink-0 text-muted">Próximo:</span>
+          <span className="min-w-0 flex-1 truncate">{next.title}</span>
+          {next.date && (
+            <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[11.5px] text-muted">
+              <CalendarBlank size={12} aria-hidden />
+              {whenLabel(next.date, next.startTime, today)}
+            </span>
+          )}
+        </p>
+      )}
+    </article>
   );
 }
+
 
 /** −1 / +1 de la meta propia de un objetivo. */
 function GoalStepper({ o }: { o: Group }) {
@@ -755,68 +358,6 @@ function GoalStepper({ o }: { o: Group }) {
         <Plus size={14} />
       </button>
     </span>
-  );
-}
-
-// ─── Detalle de un objetivo ─────────────────────────────────────────────────
-
-function ObjectiveDetail({
-  objective: o,
-  today,
-  onOpenKr,
-  onEdit,
-  onAdd,
-}: {
-  objective: Group;
-  today: string;
-  onOpenKr: (k: KeyResultDTO) => void;
-  onEdit: () => void;
-  onAdd: () => void;
-}) {
-  const pct = objectivePct(o);
-  const sections = [
-    ...QUARTERS.map((q) => ({ label: q, krs: o.keyResults.filter((k) => krQuarters(k).includes(q)) })),
-    { label: "Sin trimestre", krs: o.keyResults.filter((k) => krQuarters(k).length === 0) },
-  ].filter((s) => s.krs.length);
-  return (
-    <div className="grid gap-5">
-      {!o.loose && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted">
-          {o.role && <span className="kicker">{o.role}</span>}
-          {o.area && <span>{o.area}</span>}
-          {o.priority > 0 && <PriorityDots n={o.priority} />}
-          {o.deadline && <span className="font-mono text-[12px] tabular">vence {shortDate(o.deadline, today)}</span>}
-          <StatusPill label={KR_STATUS[o.status].label} toneKey={KR_STATUS[o.status].tone} />
-        </div>
-      )}
-      {pct !== null && <ProgressBar pct={pct} label={o.goal ? `${fmtNum(o.progress ?? 0)} de ${fmtNum(o.goal)}` : `${pct}%`} />}
-      {sections.length === 0 ? (
-        <p className="text-[13.5px] text-muted">{o.goal ? "Se mide con su propia meta, sin resultados clave." : "Todavía no tiene resultados clave."}</p>
-      ) : (
-        sections.map((s) => (
-          <section key={s.label} className="grid gap-1">
-            <h3 className="kicker">{s.label}</h3>
-            <ul className="grid border-t border-line">
-              {s.krs.map((k) => (
-                <KrRow key={`${s.label}-${k.id}`} kr={k} today={today} onOpen={() => onOpenKr(k)} />
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
-      <div className="flex flex-wrap gap-2">
-        {!o.loose && (
-          <Button variant="accent" size="sm" onClick={onAdd}>
-            <Plus size={15} weight="bold" /> Resultado clave
-          </Button>
-        )}
-        {!o.loose && (
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <PencilSimple size={15} /> Editar objetivo
-          </Button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -1040,99 +581,6 @@ function ReviewIcon({ kr }: { kr: KeyResultDTO }) {
   );
 }
 
-// ─── Formularios ────────────────────────────────────────────────────────────
-
-/** Crear o editar un objetivo; borrarlo manda también sus resultados clave a la papelera. */
-function ObjectiveForm({
-  objective,
-  year,
-  roles,
-  areas,
-  onDone,
-}: {
-  objective: ObjectiveDTO | null;
-  year: number;
-  roles: string[];
-  areas: string[];
-  onDone: () => void;
-}) {
-  const [state, action, pending] = useActionState(safeForm(saveObjective), null);
-  const [, startDelete] = useSafeTransition();
-  const [priority, setPriority] = useState(objective?.priority ?? 0);
-  const [status, setStatus] = useState<KrStatus>(objective?.status ?? "doing");
-  const notify = useEffectEvent(onDone);
-  useEffect(() => {
-    if (state?.ok) notify();
-  }, [state]);
-  return (
-    <form action={action} className="grid gap-5">
-      {objective && <input type="hidden" name="id" value={objective.id} />}
-      <input type="hidden" name="year" value={objective?.year ?? year} />
-      <Field label="Objetivo">
-        <Input name="title" defaultValue={objective?.title} required maxLength={120} autoFocus={!objective} placeholder="Mejorar mi salud, Cursar 7 materias…" />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Rol">
-          <Input name="role" defaultValue={objective?.role ?? ""} maxLength={60} list="obj-roles" placeholder="Deportista" />
-        </Field>
-        <Field label="Categoría">
-          <Input name="area" defaultValue={objective?.area ?? ""} maxLength={60} list="obj-areas" placeholder="Salud" />
-        </Field>
-      </div>
-      <datalist id="obj-roles">
-        {roles.map((r) => (
-          <option key={r} value={r} />
-        ))}
-      </datalist>
-      <datalist id="obj-areas">
-        {areas.map((r) => (
-          <option key={r} value={r} />
-        ))}
-      </datalist>
-      <div className="grid gap-1.5">
-        <span className="kicker">Prioridad</span>
-        <PriorityPicker value={priority} onChange={setPriority} name="priority" />
-      </div>
-      <div className="grid gap-1.5">
-        <span className="kicker">Estado</span>
-        <Segmented
-          name="status"
-          value={status}
-          onChange={setStatus}
-          options={(["todo", "doing", "done", "closed"] as KrStatus[]).map((s) => ({ value: s, label: KR_STATUS[s].label }))}
-        />
-      </div>
-      <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3">
-        <Field label="Meta propia" hint="Opcional" className="min-w-0">
-          <Input name="goal" inputMode="decimal" defaultValue={objective?.goal ?? ""} placeholder="4" className="min-w-0" />
-        </Field>
-        <Field label="Llevo" className="min-w-0">
-          <Input name="progress" inputMode="decimal" defaultValue={objective?.progress ?? ""} className="min-w-0" />
-        </Field>
-        <Field label="Deadline" className="col-span-2 min-w-0 sm:col-span-1">
-          <Input type="date" name="deadline" defaultValue={objective?.deadline ?? ""} className="min-w-0" />
-        </Field>
-      </div>
-      <p className="-mt-2 text-[12.5px] text-muted">Con meta propia el avance es lo que llevás sobre la meta; sin meta, el promedio de sus resultados clave.</p>
-      {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
-      <Button type="submit" variant="accent" disabled={pending} className="h-11">
-        {pending ? "Guardando…" : objective ? "Guardar" : "Crear objetivo"}
-      </Button>
-      {objective && (
-        <ConfirmButton
-          undo="Objetivo borrado"
-          onConfirm={() => {
-            startDelete(() => deleteObjective(objective.id));
-            onDone();
-          }}
-        >
-          Borrar el objetivo{objective.keyResults.length ? ` y sus ${objective.keyResults.length} resultados clave` : ""}
-        </ConfirmButton>
-      )}
-    </form>
-  );
-}
-
 /**
  * "Planificar el año que viene": se eligen los objetivos y resultados clave que se
  * repiten y se copian sin empezar, con la fecha corrida un año. Después se editan.
@@ -1244,206 +692,5 @@ function PlanYearForm({
         </Button>
       </div>
     </div>
-  );
-}
-
-function KrRow({ kr: raw, today, onOpen }: { kr: KeyResultDTO; today: string; onOpen: () => void }) {
-  // Si se mide solo, el progreso sale del vínculo.
-  const k = effectiveKr(raw);
-  const pct = krPct(raw);
-  const st = KR_STATUS[k.status];
-  const left = k.status === "todo" || k.status === "doing" ? daysLeft(k.deadline, today) : null;
-  return (
-    <li>
-      <button type="button" onClick={onOpen} className="grid w-full gap-2 border-b border-line px-1 py-3.5 text-left transition-colors hover:bg-surface-2/50">
-        <span className="flex items-start gap-3">
-          <span className={cx("min-w-0 flex-1 text-[15px] leading-snug font-medium", isFinishedKr(k) && "text-muted")}>{k.title}</span>
-          {left !== null && (
-            <span className={cx("shrink-0 font-mono text-[11px] font-medium tabular", left < 0 ? "text-danger" : "text-muted")}>{daysLeftLabel(left)}</span>
-          )}
-        </span>
-        <span className="flex flex-wrap items-center gap-1.5">
-          <StatusPill label={st.label} toneKey={st.tone} />
-          <span className="inline-flex items-center gap-1 text-[12px] text-muted">
-            {k.kind === "habit" ? <ArrowsClockwise size={13} aria-hidden /> : <Lightning size={13} aria-hidden />}
-            {k.kind === "habit" ? "Hábito" : "Actividad"}
-          </span>
-          {k.deadline && <span className="font-mono text-[11px] text-muted tabular">{formatShort(k.deadline)}</span>}
-          {raw.auto && <span className="text-[12px] text-accent-fg">· se mide solo: {raw.auto.label}</span>}
-        </span>
-        {pct !== null && <ProgressBar pct={pct} label={k.goal ? `${fmtNum(k.progress ?? 0)} de ${fmtNum(k.goal)}` : undefined} />}
-      </button>
-    </li>
-  );
-}
-
-type KrPreset = { objectiveId?: string; quarter?: Quarter };
-type KrSheetHandle = { open: (kr?: KeyResultDTO, preset?: KrPreset) => void };
-
-const KrSheet = forwardRef<KrSheetHandle, { objectives: ObjectiveDTO[]; links: KrLinkOption[]; year: number }>(function KrSheet({ objectives, links, year }, ref) {
-  const sheet = useRef<SheetHandle>(null);
-  const [kr, setKr] = useState<KeyResultDTO | undefined>();
-  const [preset, setPreset] = useState<KrPreset>({});
-  const [key, setKey] = useState(0);
-  useImperativeHandle(ref, () => ({
-    open(k, p) {
-      setKr(k);
-      setPreset(p ?? {});
-      setKey((n) => n + 1);
-      sheet.current?.open();
-    },
-  }));
-  return (
-    <Sheet ref={sheet} title={kr ? "Editar resultado clave" : "Nuevo resultado clave"}>
-      <KrForm key={key} kr={kr} preset={preset} objectives={objectives} links={links} year={year} onDone={() => sheet.current?.close()} />
-    </Sheet>
-  );
-});
-
-function KrForm({
-  kr,
-  preset,
-  objectives,
-  links,
-  year,
-  onDone,
-}: {
-  kr?: KeyResultDTO;
-  preset: KrPreset;
-  objectives: ObjectiveDTO[];
-  links: KrLinkOption[];
-  year: number;
-  onDone: () => void;
-}) {
-  const [state, action, pending] = useActionState(safeForm(saveKeyResult), null);
-  const [kind, setKind] = useState<"activity" | "habit">(kr?.kind ?? "activity");
-  const [status, setStatus] = useState<KrStatus>(kr?.status ?? "todo");
-  const [objectiveId, setObjectiveId] = useState(kr?.objectiveId ?? preset.objectiveId ?? objectives[0]?.id ?? "");
-  const [deleting, startDelete] = useSafeTransition();
-  const notify = useEffectEvent(onDone);
-  useEffect(() => {
-    if (state?.ok) notify();
-  }, [state]);
-  const quarters = kr?.quarters ?? (preset.quarter ? [preset.quarter] : []);
-
-  return (
-    <form action={action} className="grid gap-5">
-      {kr && <input type="hidden" name="id" value={kr.id} />}
-      <input type="hidden" name="year" value={year} />
-      <Field label="Nombre">
-        <Input name="title" defaultValue={kr?.title} required maxLength={160} autoFocus={!kr} placeholder="Producir 3 tracks, Leer 3 por semana..." />
-      </Field>
-
-      <Field label="Objetivo">
-        <select name="objectiveId" value={objectiveId} onChange={(e) => setObjectiveId(e.target.value)} className={cx(inputClass, "pr-8")}>
-          {objectives.map((o) => (
-            <option key={o.id} value={o.id}>
-              {cleanTitle(o.title)}
-            </option>
-          ))}
-          <option value="">Sin objetivo</option>
-          <option value="__new">Nuevo objetivo...</option>
-        </select>
-      </Field>
-      {objectiveId === "__new" && (
-        <Field label="Nombre del objetivo nuevo">
-          <Input name="newObjective" required maxLength={120} placeholder="Aprender de inversiones" />
-        </Field>
-      )}
-
-      <div className="grid gap-1.5">
-        <span className="kicker">Tipo</span>
-        <Segmented
-          name="kind"
-          value={kind}
-          onChange={setKind}
-          options={[
-            { value: "activity", label: "Actividad" },
-            { value: "habit", label: "Hábito" },
-          ]}
-        />
-      </div>
-
-      <div className="grid gap-1.5">
-        <span className="kicker">Estado</span>
-        <Segmented
-          name="status"
-          value={status}
-          onChange={setStatus}
-          options={(["todo", "doing", "done", "closed"] as KrStatus[]).map((s) => ({ value: s, label: KR_STATUS[s].label }))}
-        />
-      </div>
-
-      <div className="grid gap-1.5">
-        <span className="kicker">Trimestres</span>
-        <div className="grid grid-cols-4 gap-1.5">
-          {QUARTERS.map((q) => (
-            <label
-              key={q}
-              className="flex h-11 cursor-pointer items-center justify-center rounded-[4px] border border-line text-[13px] font-medium text-muted transition-colors select-none has-checked:border-accent has-checked:bg-accent-soft has-checked:text-accent-fg"
-            >
-              <input type="checkbox" name="quarters" value={q} defaultChecked={quarters.includes(q)} className="sr-only" />
-              {q}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <Field label="Se mide solo con (opcional)" hint="Vinculado, el progreso se calcula solo: el % de un hábito, el saldo de una cuenta o lo juntado en una meta.">
-        <select name="link" defaultValue={kr?.link ?? ""} className={inputClass}>
-          <option value="">A mano</option>
-          {(["Hábitos", "Cuentas", "Metas de ahorro"] as const).map((g) => {
-            const opts = links.filter((l) => l.group === g);
-            return opts.length ? (
-              <optgroup key={g} label={g}>
-                {opts.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null;
-          })}
-        </select>
-      </Field>
-
-      {/* En el celular la fecha va en su propio renglón (en tres columnas se cortaba). */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Field label="Progreso" className="min-w-0">
-          <Input name="progress" inputMode="decimal" defaultValue={kr?.progress ?? ""} className="min-w-0" />
-        </Field>
-        <Field label="Meta" className="min-w-0">
-          <Input name="goal" inputMode="decimal" defaultValue={kr?.goal ?? ""} className="min-w-0" />
-        </Field>
-        <Field label="Deadline" className="col-span-2 min-w-0 sm:col-span-1">
-          <Input type="date" name="deadline" defaultValue={kr?.deadline ?? ""} className="min-w-0" />
-        </Field>
-      </div>
-
-      {state && !state.ok && (
-        <p role="alert" className="reveal text-sm text-danger">
-          {state.error}
-        </p>
-      )}
-      <div className="grid gap-2">
-        <Button type="submit" variant="accent" disabled={pending}>
-          {pending ? "Guardando..." : kr ? "Guardar cambios" : "Crear resultado"}
-        </Button>
-        {kr && (
-          <ConfirmButton
-            undo="Resultado clave borrado"
-            disabled={deleting}
-            onConfirm={() =>
-              startDelete(async () => {
-                await deleteKeyResult(kr.id);
-                onDone();
-              })
-            }
-          >
-            Borrar resultado
-          </ConfirmButton>
-        )}
-      </div>
-    </form>
   );
 }

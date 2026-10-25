@@ -15,15 +15,7 @@ import {
   reviewQuarter,
   type KeyResultDTO,
   type ObjectiveDTO,
-  type ObjectiveAction,
   boardTasks,
-  executionPct,
-  krPace,
-  objectivesTab,
-  quarterWeeks,
-  splitByFocus,
-  weekMark,
-  weekMarks,
 } from "@/lib/plan-logic";
 import type { TaskDTO } from "@/lib/plan-logic";
 
@@ -42,6 +34,8 @@ const kr = (over: Partial<KeyResultDTO> = {}): KeyResultDTO => ({
   goal: null,
   link: null,
   auto: null,
+  parentId: null,
+  steps: [],
   ...over,
 });
 
@@ -275,64 +269,5 @@ describe("boardTasks (tablero de tareas)", () => {
 
   it("Terminadas: todas las terminadas, sin tope de días", () => {
     expect(boardTasks(all, "done", TODAY)).toEqual([hechaReciente, hechaVieja]);
-  });
-});
-
-describe("objetivos: año → trimestre → semana", () => {
-  const act = (over: Partial<ObjectiveAction>): ObjectiveAction => ({ id: `a${++n}`, blockId: `a${n}`, title: "x", date: "2026-10-01", startTime: null, done: false, keyResultId: "k1", ...over });
-
-  it("las semanas del Q4 2026 van de lunes a domingo y la primera tiene el 1 de octubre", () => {
-    const w = quarterWeeks(2026, "Q4");
-    expect(w[0]).toEqual({ from: "2026-09-28", to: "2026-10-04", n: 1 });
-    expect(w.at(-1)!.to >= "2026-12-31").toBe(true);
-    expect(w.length).toBe(14);
-  });
-
-  it("cada semana: todo hecho, más de la mitad, menos, nada o todavía no", () => {
-    expect(weekMark(3, 3, false)).toBe("full");
-    expect(weekMark(4, 2, false)).toBe("most");
-    expect(weekMark(3, 1, false)).toBe("few");
-    expect(weekMark(0, 0, false)).toBe("empty");
-    expect(weekMark(2, 0, true)).toBe("future");
-  });
-
-  it("las casillas cuentan solo las acciones de esas metas y marcan la semana de hoy", () => {
-    const weeks = quarterWeeks(2026, "Q4");
-    const actions = [act({ date: "2026-10-20", done: true }), act({ date: "2026-10-22" }), act({ date: "2026-10-21", keyResultId: "otra", done: true })];
-    const marks = weekMarks(actions, new Set(["k1"]), weeks, TODAY);
-    const now = marks.find((m) => m.current)!;
-    expect(now.week.from).toBe("2026-10-19");
-    expect([now.planned, now.done, now.mark]).toEqual([2, 1, "most"]);
-    expect(marks.at(-1)!.mark).toBe("future");
-  });
-
-  it("la ejecución es hecho sobre planeado hasta hoy", () => {
-    const actions = [act({ date: "2026-10-02", done: true }), act({ date: "2026-10-05" }), act({ date: "2026-11-30", done: true })];
-    expect(executionPct(actions, new Set(["k1"]), "2026-09-28", TODAY)).toBe(50);
-    expect(executionPct([], new Set(["k1"]), "2026-09-28", TODAY)).toBeNull();
-  });
-
-  it("al día o atrasada según cuánto pasó del trimestre (10 puntos de margen)", () => {
-    // 19 de octubre: pasaron 19 de 92 días (~21 %).
-    expect(krPace(kr({ progress: 2, goal: 10 }), 2026, "Q4", TODAY)).toBe("ontrack");
-    expect(krPace(kr({ progress: 0, goal: 10 }), 2026, "Q4", "2026-11-15")).toBe("behind");
-    expect(krPace(kr({ status: "done" }), 2026, "Q4", TODAY)).toBe("done");
-    expect(krPace(kr({ progress: 10, goal: 10 }), 2026, "Q4", TODAY)).toBe("done");
-    expect(krPace(kr({}), 2026, "Q4", TODAY)).toBeNull();
-    expect(krPace(kr({ progress: 0, goal: 10 }), 2027, "Q1", TODAY)).toBeNull();
-  });
-
-  it("los que no están en foco quedan en pausa; sin foco, cuentan todos los que tienen metas", () => {
-    const a = objective({ focus: ["Q4"], keyResults: [kr({ quarters: ["Q4"] })] });
-    const b = objective({ keyResults: [kr({ quarters: ["Q4"] })] });
-    const c = objective({ keyResults: [kr({ quarters: ["Q1"] })] });
-    expect(splitByFocus([a, b, c], "Q4")).toEqual({ active: [a], paused: [b] });
-    expect(splitByFocus([b, c], "Q4")).toEqual({ active: [b], paused: [] });
-  });
-
-  it("la pestaña guardada: año, trimestre o semana (lo viejo vuelve al año)", () => {
-    expect(objectivesTab("semana")).toBe("semana");
-    expect(objectivesTab("rol")).toBe("anio");
-    expect(objectivesTab(undefined)).toBe("anio");
   });
 });

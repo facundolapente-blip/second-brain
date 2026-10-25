@@ -621,6 +621,8 @@ model PlanBlock {
   /// Meta del trimestre a la que empuja (acción de la semana de un objetivo).
   keyResultId String?
   keyResult   PlanKeyResult? @relation(fields: [keyResultId], references: [id], onDelete: SetNull)
+  /// La tarea de un objetivo que se agendó con este bloque (tildar uno tilda el otro).
+  step        PlanStep?
   source     String?
   externalId String?
   createdAt  DateTime      @default(now())
@@ -684,6 +686,12 @@ model PlanKeyResult {
   updatedAt   DateTime       @updatedAt
   /// Acciones de la semana (bloques del Plan) que empujan esta meta.
   blocks      PlanBlock[]
+  /// Árbol de objetivos (2026-10-25): el objetivo más chico del que sale; null = cuelga del objetivo.
+  parentId    String?
+  parent      PlanKeyResult?  @relation("KrTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    PlanKeyResult[] @relation("KrTree")
+  /// Las tareas simples para cumplirlo.
+  steps       PlanStep[]
 
   @@unique([source, externalId])
 }
@@ -787,4 +795,22 @@ model Note {
   @@index([createdAt])
   @@index([pinned, sortKey])
   @@index([section, category])
+}
+
+/// Tarea simple de un objetivo más chico (árbol de objetivos, 2026-10-25). Con día, tiene su bloque en el Plan.
+model PlanStep {
+  id          String        @id @default(cuid())
+  keyResultId String
+  keyResult   PlanKeyResult @relation(fields: [keyResultId], references: [id], onDelete: Cascade)
+  title       String
+  done        Boolean       @default(false)
+  doneAt      DateTime?
+  order       Float         @default(0)
+  /// El bloque del Plan cuando se agenda (borrar el bloque deja la tarea sin día).
+  blockId     String?       @unique
+  block       PlanBlock?    @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([keyResultId])
 }

@@ -29,6 +29,7 @@ export type TrashKind =
   | "block"
   | "task"
   | "keyResult"
+  | "step"
   | "objective"
   | "photo"
   | "note";
@@ -50,6 +51,7 @@ const MODULE: Record<TrashKind, Module> = {
   block: "plan",
   task: "plan",
   keyResult: "plan",
+  step: "plan",
   objective: "plan",
   photo: "journal",
   note: "notas",
@@ -69,7 +71,8 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   journal: "Entrada del journal",
   block: "Bloque del plan",
   task: "Tarea",
-  keyResult: "Resultado clave",
+  keyResult: "Objetivo chico",
+  step: "Tarea de un objetivo",
   objective: "Objetivo",
   photo: "Foto",
   note: "Nota",
@@ -221,9 +224,17 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
     case "keyResult": {
       const k = await db.planKeyResult.findUnique({ where: { id } });
       if (!k) return null;
-      // Las acciones de la semana (bloques) que empujaban esta meta vuelven a atarse al restaurarla.
-      const blockIds = await db.planBlock.findMany({ where: { keyResultId: id }, select: { id: true } });
-      return { label: k.title, data: { row: k, blockIds: blockIds.map((x) => x.id) } };
+      // Lo que sale de él (objetivos más chicos, en orden: cada padre antes que sus hijos) y todas sus tareas.
+      const below = await subtreeOf(db, id);
+      const krIds = [id, ...below.map((x) => x.id)];
+      const steps = await db.planStep.findMany({ where: { keyResultId: { in: krIds } } });
+      const blockIds = await db.planBlock.findMany({ where: { keyResultId: { in: krIds } }, select: { id: true, keyResultId: true } });
+      const extra = below.length ? ` y ${below.length} más chicos` : "";
+      return { label: `${k.title}${extra}`, data: { row: k, below, steps, blockLinks: blockIds } };
+    }
+    case "step": {
+      const st = await db.planStep.findUnique({ where: { id } });
+      return st ? { label: st.title, data: { row: st } } : null;
     }
     case "note": {
       const n = await db.note.findUnique({ where: { id }, include: { attachments: true } });
@@ -235,8 +246,12 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
       const o = await db.planObjective.findUnique({ where: { id }, include: { keyResults: true } });
       if (!o) return null;
       const { keyResults, ...row } = o;
-      const blockLinks = await db.planBlock.findMany({ where: { keyResultId: { in: keyResults.map((k) => k.id) } }, select: { id: true, keyResultId: true } });
-      return { label: `${o.title} (${o.year}, ${keyResults.length} resultados clave)`, data: { row, keyResults, blockLinks } };
+      const krIds = keyResults.map((k) => k.id);
+      const blockLinks = await db.planBlock.findMany({ where: { keyResultId: { in: krIds } }, select: { id: true, keyResultId: true } });
+      const steps = await db.planStep.findMany({ where: { keyResultId: { in: krIds } } });
+      // Padres antes que hijos, así se pueden volver a crear en orden.
+      const ordered = parentsFirst(keyResults);
+      return { label: `${o.title} (${o.year}, ${keyResults.length} objetivos chicos)`, data: { row, keyResults: ordered, blockLinks, steps } };
     }
   }
 }
@@ -256,7 +271,12 @@ async function remove(kind: TrashKind, id: string, db: Db) {
     journal: () => db.journalEntry.deleteMany({ where: { id } }),
     block: () => db.planBlock.deleteMany({ where: { id } }),
     task: () => db.planTask.deleteMany({ where: { id } }),
-    keyResult: () => db.planKeyResult.deleteMany({ where: { id } }),
+    keyResult: async () => {
+      // Se va con todo lo que sale de él (sus tareas se borran en cascada).
+      const below = await subtreeOf(db, id);
+      await db.planKeyResult.deleteMany({ where: { id: { in: [...below.map((x) => x.id).reverse(), id] } } });
+    },
+    step: () => db.planStep.deleteMany({ where: { id } }),
     photo: () => db.attachment.deleteMany({ where: { id } }),
     note: () => db.note.deleteMany({ where: { id } }),
     objective: async () => {
@@ -302,7 +322,57 @@ const existsIn = (db: Db) => ({
   habit: async (id: unknown) => typeof id === "string" && !!(await db.habit.findUnique({ where: { id }, select: { id: true } })),
   objective: async (id: unknown) => typeof id === "string" && !!(await db.planObjective.findUnique({ where: { id }, select: { id: true } })),
   keyResult: async (id: unknown) => typeof id === "string" && !!(await db.planKeyResult.findUnique({ where: { id }, select: { id: true } })),
+  block: async (id: unknown) => typeof id === "string" && !!(await db.planBlock.findUnique({ where: { id }, select: { id: true } })),
 });
+
+/** Lo que sale de un objetivo chico (hijos, nietos…), cada padre antes que sus hijos. */
+async function subtreeOf(db: Db, id: string) {
+  const out: { id: string }[] = [];
+  const seen = new Set([id]);
+  let level = [id];
+  while (level.length) {
+    const next = await db.planKeyResult.findMany({ where: { parentId: { in: level } } });
+    const fresh = next.filter((k) => !seen.has(k.id));
+    for (const k of fresh) seen.add(k.id);
+    out.push(...fresh);
+    level = fresh.map((k) => k.id);
+  }
+  return out as Awaited<ReturnType<typeof db.planKeyResult.findMany>>;
+}
+
+/** Ordena para crear: cada objetivo chico después de su padre. */
+function parentsFirst<T extends { id: string; parentId: string | null }>(list: T[]): T[] {
+  const ids = new Set(list.map((k) => k.id));
+  const out: T[] = [];
+  const placed = new Set<string>();
+  let rest = [...list];
+  while (rest.length) {
+    const ready = rest.filter((k) => !k.parentId || !ids.has(k.parentId) || placed.has(k.parentId));
+    if (!ready.length) {
+      out.push(...rest.map((k) => ({ ...k, parentId: null })));
+      break;
+    }
+    for (const k of ready) placed.add(k.id);
+    out.push(...ready);
+    rest = rest.filter((k) => !placed.has(k.id));
+  }
+  return out;
+}
+
+/** Las tareas vuelven con su objetivo chico (agendadas solo si su bloque sigue y está libre). */
+async function restoreSteps(data: Snap, db: Db) {
+  const steps = Array.isArray(data.steps) ? (data.steps as { blockId?: string | null }[]) : [];
+  for (const st of steps) {
+    const blockId = st.blockId && !(await db.planStep.findFirst({ where: { blockId: st.blockId } })) && (await db.planBlock.findUnique({ where: { id: st.blockId }, select: { id: true } })) ? st.blockId : null;
+    await db.planStep.create({ data: { ...(st as Record<string, unknown>), blockId } as never });
+  }
+}
+
+/** Los bloques del Plan que estaban atados vuelven a atarse (si nadie los ató a otra cosa). */
+async function relinkBlocks(data: Snap, db: Db) {
+  const links = Array.isArray(data.blockLinks) ? (data.blockLinks as { id: string; keyResultId: string | null }[]) : [];
+  for (const l of links) if (l.keyResultId) await db.planBlock.updateMany({ where: { id: l.id, keyResultId: null }, data: { keyResultId: l.keyResultId } });
+}
 
 const ids = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 /** Si lo que apuntaba ya no existe, queda en null (en vez de fallar). */
@@ -437,10 +507,22 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       if (subtasks.length) await db.planSubtask.createMany({ data: subtasks });
       await db.planBlock.updateMany({ where: { id: { in: ids(data.blockIds) } }, data: { taskId: row.id } });
       return null;
-    case "keyResult":
-      await db.planKeyResult.create({ data: { ...row, objectiveId: await orNull(exists.objective, row.objectiveId) } });
-      await db.planBlock.updateMany({ where: { id: { in: ids(data.blockIds) }, keyResultId: null }, data: { keyResultId: row.id } });
+    case "keyResult": {
+      await db.planKeyResult.create({
+        data: { ...row, objectiveId: await orNull(exists.objective, row.objectiveId), parentId: await orNull(exists.keyResult, row.parentId) },
+      });
+      const below = Array.isArray(data.below) ? (data.below as never[]) : [];
+      for (const b of below) await db.planKeyResult.create({ data: b });
+      await restoreSteps(data, db);
+      await relinkBlocks(data, db);
       return null;
+    }
+    case "step": {
+      if (!(await exists.keyResult(row.keyResultId))) return "El objetivo de esa tarea ya no existe: restauralo primero.";
+      const blockId = row.blockId && !(await db.planStep.findFirst({ where: { blockId: row.blockId } })) ? await orNull(exists.block, row.blockId) : null;
+      await db.planStep.create({ data: { ...row, blockId } });
+      return null;
+    }
     case "note":
       await db.note.create({ data: row });
       await restoreAttachments(data, db);
@@ -448,9 +530,9 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
     case "objective": {
       await db.planObjective.create({ data: row });
       const krs = (data.keyResults as never[]) ?? [];
-      if (krs.length) await db.planKeyResult.createMany({ data: krs, skipDuplicates: true });
-      const links = Array.isArray(data.blockLinks) ? (data.blockLinks as { id: string; keyResultId: string }[]) : [];
-      for (const l of links) await db.planBlock.updateMany({ where: { id: l.id, keyResultId: null }, data: { keyResultId: l.keyResultId } });
+      for (const k of krs) await db.planKeyResult.create({ data: k });
+      await restoreSteps(data, db);
+      await relinkBlocks(data, db);
       return null;
     }
   }
