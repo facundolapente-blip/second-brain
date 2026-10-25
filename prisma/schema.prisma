@@ -828,3 +828,24 @@ model PlanMinorGoal {
 
   @@index([year])
 }
+
+/// Gastos fijos y planes de Presupuestos (2026-10-25, importados de su página "Presupuesto" de Notion):
+/// list = "mine" (lo pago yo), "paid" (me lo pagan) o "solo" (plan "Si vivo solo").
+model BudgetLine {
+  id         String   @id @default(cuid())
+  list       String
+  name       String
+  amount     Decimal? @db.Decimal(14, 2)
+  currency   String   @default("UYU")
+  category   String?
+  variable   Boolean  @default(false)
+  wouldCut   Boolean  @default(false)
+  note       String?
+  order      Float    @default(0)
+  source     String?
+  externalId String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([list])
+}

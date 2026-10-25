@@ -31,6 +31,7 @@ export type TrashKind =
   | "keyResult"
   | "step"
   | "minorGoal"
+  | "budgetLine"
   | "objective"
   | "photo"
   | "note";
@@ -54,6 +55,7 @@ const MODULE: Record<TrashKind, Module> = {
   keyResult: "plan",
   step: "plan",
   minorGoal: "plan",
+  budgetLine: "gastos",
   objective: "plan",
   photo: "journal",
   note: "notas",
@@ -76,6 +78,7 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   keyResult: "Objetivo chico",
   step: "Tarea de un objetivo",
   minorGoal: "Otro objetivo",
+  budgetLine: "Gasto fijo",
   objective: "Objetivo",
   photo: "Foto",
   note: "Nota",
@@ -243,6 +246,10 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
       const g = await db.planMinorGoal.findUnique({ where: { id } });
       return g ? { label: g.title, data: { row: g } } : null;
     }
+    case "budgetLine": {
+      const l = await db.budgetLine.findUnique({ where: { id } });
+      return l ? { label: l.name, data: { row: l } } : null;
+    }
     case "note": {
       const n = await db.note.findUnique({ where: { id }, include: { attachments: true } });
       if (!n) return null;
@@ -285,6 +292,7 @@ async function remove(kind: TrashKind, id: string, db: Db) {
     },
     step: () => db.planStep.deleteMany({ where: { id } }),
     minorGoal: () => db.planMinorGoal.deleteMany({ where: { id } }),
+    budgetLine: () => db.budgetLine.deleteMany({ where: { id } }),
     photo: () => db.attachment.deleteMany({ where: { id } }),
     note: () => db.note.deleteMany({ where: { id } }),
     objective: async () => {
@@ -533,6 +541,9 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
     }
     case "minorGoal":
       await db.planMinorGoal.create({ data: row });
+      return null;
+    case "budgetLine":
+      await db.budgetLine.create({ data: row });
       return null;
     case "note":
       await db.note.create({ data: row });

@@ -14,6 +14,7 @@ import { dayIn, installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
+import { isBudgetList } from "./budget-lines";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -958,4 +959,56 @@ export async function ignoreFixed(key: string) {
   const value = JSON.stringify(list.slice(-300));
   await prisma.appSetting.upsert({ where: { key: FIXED_IGNORED }, create: { key: FIXED_IGNORED, value }, update: { value } });
   revalidatePath("/gastos/recurrentes");
+}
+
+// ─── Gastos fijos (Presupuestos) ────────────────────────────────────────────
+
+/** Crea o edita un gasto fijo (o un rubro del plan "Si vivo solo"). Sin monto se puede guardar. */
+export async function saveBudgetLine(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  await exigirSesion();
+  const id = texto(fd, "id", 40) || null;
+  const name = texto(fd, "name", 80).replace(/\s+/g, " ");
+  if (!name) return { ok: false, error: "Ponele un nombre." };
+  const list = texto(fd, "list");
+  if (!isBudgetList(list)) return { ok: false, error: "Elegí en qué lista va." };
+  const rawAmount = texto(fd, "amount", 30);
+  const cents = rawAmount ? parseAmount(rawAmount) : null;
+  if (rawAmount && cents === null) return { ok: false, error: "El monto no se entiende." };
+  const currency = (CURRENCIES as readonly string[]).includes(texto(fd, "currency")) ? texto(fd, "currency") : "UYU";
+  const data = {
+    name,
+    list,
+    amount: cents === null ? null : centsToDecimalString(cents),
+    currency,
+    category: texto(fd, "category", 40).replace(/\s+/g, " ") || null,
+    variable: fd.get("variable") === "on",
+    wouldCut: fd.get("wouldCut") === "on",
+    note: texto(fd, "note", 500) || null,
+  };
+  if (id) {
+    const saved = await prisma.budgetLine.update({ where: { id }, data });
+    await logActivity("updated", "budgetLine", saved.id, name);
+    refrescar();
+    return { ok: true, id: saved.id };
+  }
+  const last = await prisma.budgetLine.findFirst({ where: { list }, orderBy: { order: "desc" }, select: { order: true } });
+  const saved = await prisma.budgetLine.create({ data: { ...data, order: (last?.order ?? 0) + 1 } });
+  await logActivity("created", "budgetLine", saved.id, name);
+  refrescar();
+  return { ok: true, id: saved.id };
+}
+
+/** A la papelera (con Deshacer). */
+export async function deleteBudgetLine(id: string) {
+  await exigirSesion();
+  await trashAndDelete("budgetLine", String(id));
+  refrescar();
+}
+
+/** Cambia quién paga un gasto fijo (la etiqueta de la tabla: lo pago yo / me lo pagan). */
+export async function setBudgetLinePayer(id: string, list: string) {
+  await exigirSesion();
+  if (list !== "mine" && list !== "paid") return;
+  await prisma.budgetLine.updateMany({ where: { id: String(id), list: { in: ["mine", "paid"] } }, data: { list } });
+  refrescar();
 }

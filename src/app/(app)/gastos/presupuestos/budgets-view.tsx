@@ -27,6 +27,8 @@ import { CategoryAvatar, EmptyBlock, MonthNav } from "../shared";
 import { Tick } from "../motion";
 import { useGastosNew } from "../new-action";
 import { NavDim, usePeriodSwipe } from "../period-step";
+import { FixedCosts } from "./fixed-costs";
+import type { BudgetLineDTO } from "@/lib/budget-lines";
 
 const STATE_TONE: Record<BudgetState, { bar: string; text: string }> = {
   ok: { bar: "var(--st-done-line)", text: "text-[var(--st-done-fg)]" },
@@ -42,6 +44,9 @@ export function BudgetsView({
   budgets,
   unbudgeted,
   projects,
+  lines,
+  toUyu,
+  avgSpendCents,
 }: {
   month: string;
   today: string;
@@ -49,6 +54,9 @@ export function BudgetsView({
   budgets: CategoryBudgetDTO[];
   unbudgeted: { categoryId: string | null; spentCents: number; foreign: ForeignSpend[] }[];
   projects: ProjectDTO[];
+  lines: BudgetLineDTO[];
+  toUyu: Record<string, number>;
+  avgSpendCents: number | null;
 }) {
   const catById = new Map(categories.map((c) => [c.id, c]));
   const share = monthShare(month, today);
@@ -294,6 +302,8 @@ export function BudgetsView({
             Metas de ahorro <ArrowRight size={13} aria-hidden />
           </Link>
         </TintedCard>
+
+        <FixedCosts lines={lines} toUyu={toUyu} avgSpendCents={avgSpendCents} />
 
         {without.length > 0 && (
           <TintedCard

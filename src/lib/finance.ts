@@ -14,6 +14,7 @@ import {
   type ScheduleFrequency,
 } from "./schedule-logic";
 import { convertCents, rolloverCarry, type CategoryBudgetDTO, type ForeignSpend, type ProjectDTO } from "./budget-logic";
+import { isBudgetList, type BudgetLineDTO } from "./budget-lines";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { getRates, toUyu } from "./fx";
 import {
@@ -961,4 +962,23 @@ export async function getReportRate(): Promise<number | null> {
   const row = await prisma.appSetting.findUnique({ where: { key: REPORT_RATE } });
   const n = Number(row?.value);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// ─── Gastos fijos (Presupuestos) ────────────────────────────────────────────
+
+/** Los gastos fijos (lo pago yo / me lo pagan) y el plan "Si vivo solo". */
+export async function getBudgetLines(): Promise<BudgetLineDTO[]> {
+  const rows = await prisma.budgetLine.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] });
+  return rows.map((l) => ({
+    id: l.id,
+    list: isBudgetList(l.list) ? l.list : "mine",
+    name: l.name,
+    amountCents: l.amount === null ? null : toCents(l.amount),
+    currency: l.currency,
+    category: l.category,
+    variable: l.variable,
+    wouldCut: l.wouldCut,
+    note: l.note,
+    order: l.order,
+  }));
 }
