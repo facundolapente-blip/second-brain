@@ -216,14 +216,17 @@ export function ObjectivesBoard({
                 </div>
               )}
 
-              <GoalGroup
-                title={shown.year === Number(today.slice(0, 4)) ? `Ahora · Q${Math.floor((Number(today.slice(5, 7)) - 1) / 3) + 1}` : "Por hacer"}
-                list={grouped.now}
-                all={krs}
-                selected={kr?.id ?? null}
-                onPick={(k) => go(shown.id, k.id)}
-                empty={krs.length === 0 ? "¿Qué tiene que pasar para lograrlo? Partilo en objetivos más chicos." : "Nada pendiente ahora."}
-              />
+              {/* En un año que ya pasó, sin nada pendiente, el grupo vacío no dice nada. */}
+              {(shown.year >= Number(today.slice(0, 4)) || grouped.now.length > 0 || krs.length === 0) && (
+                <GoalGroup
+                  title={shown.year === Number(today.slice(0, 4)) ? `Ahora · Q${Math.floor((Number(today.slice(5, 7)) - 1) / 3) + 1}` : "Por hacer"}
+                  list={grouped.now}
+                  all={krs}
+                  selected={kr?.id ?? null}
+                  onPick={(k) => go(shown.id, k.id)}
+                  empty={krs.length === 0 ? "¿Qué tiene que pasar para lograrlo? Partilo en objetivos más chicos." : "Nada pendiente ahora."}
+                />
+              )}
               {shown.id !== LOOSE && <AddGoal ctx={ctx} parentId={null} label="Objetivo más chico" placeholder="Un objetivo más chico: terminar 4 temas…" open={krs.length === 0} />}
 
               {grouped.achieved.length > 0 && (
