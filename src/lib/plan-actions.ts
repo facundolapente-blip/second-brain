@@ -1109,3 +1109,61 @@ export async function unscheduleStep(id: string) {
   if (st?.blockId) await trashAndDelete("block", st.blockId);
   refrescar();
 }
+
+// ─── Otros objetivos (los que no se parten en tareas) ───────────────────────
+
+/** Anota un objetivo de un renglón al final de la lista del año. */
+export async function addMinorGoal(input: { year: number; title: string; clientId?: string }): Promise<ActionResult> {
+  await exigirSesion();
+  const title = cleanTitle(input?.title);
+  if (!title) return { ok: false, error: "Escribí el objetivo." };
+  const year = Number(input?.year);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return { ok: false, error: "Año inválido." };
+  const last = await prisma.planMinorGoal.findFirst({ where: { year }, orderBy: { order: "desc" }, select: { order: true } });
+  const newId = await freshId(input.clientId, (x) => prisma.planMinorGoal.findUnique({ where: { id: x }, select: { id: true } }));
+  const g = await prisma.planMinorGoal.create({ data: { ...(newId ? { id: newId } : {}), year, title, order: (last?.order ?? 0) + 1 } });
+  await logActivity("created", "minorGoal", g.id, title);
+  refrescar();
+  return { ok: true, id: g.id };
+}
+
+/** Lo tilda (logrado) o lo destilda. */
+export async function toggleMinorGoal(id: string, done: boolean) {
+  await exigirSesion();
+  await prisma.planMinorGoal.updateMany({ where: { id: String(id) }, data: { done: !!done, doneAt: done ? new Date() : null } });
+  refrescar();
+}
+
+export async function renameMinorGoal(id: string, title: string) {
+  await exigirSesion();
+  const t = cleanTitle(title);
+  if (!t) return;
+  await prisma.planMinorGoal.updateMany({ where: { id: String(id) }, data: { title: t } });
+  refrescar();
+}
+
+/** A la papelera (con Deshacer). */
+export async function deleteMinorGoal(id: string) {
+  await exigirSesion();
+  await trashAndDelete("minorGoal", String(id));
+  refrescar();
+}
+
+/** Lo pasa a objetivo grande (para partirlo en objetivos chicos y tareas); sale de la lista. */
+export async function promoteMinorGoal(input: { id: string }): Promise<ActionResult> {
+  await exigirSesion();
+  const g = await prisma.planMinorGoal.findUnique({ where: { id: String(input?.id) } });
+  if (!g) return { ok: false, error: "Ese objetivo ya no está en la lista." };
+  const taken = await prisma.planObjective.findFirst({ where: { year: g.year, title: g.title }, select: { id: true } });
+  if (taken) return { ok: false, error: "Ya hay un objetivo grande con ese nombre." };
+  const o = await prisma.$transaction(async (tx) => {
+    const created = await tx.planObjective.create({
+      data: { title: g.title, year: g.year, status: g.done ? "done" : "doing", order: await tx.planObjective.count({ where: { year: g.year } }) },
+    });
+    await tx.planMinorGoal.delete({ where: { id: g.id } });
+    return created;
+  });
+  await logActivity("created", "objective", o.id, `${g.title} (${g.year}, era de "Otros objetivos")`);
+  refrescar();
+  return { ok: true, id: o.id };
+}

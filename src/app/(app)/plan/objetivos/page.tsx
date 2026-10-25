@@ -1,6 +1,6 @@
 import { todayISO } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
-import { getKrLinkOptions, getObjectives } from "@/lib/plan";
+import { getKrLinkOptions, getMinorGoals, getObjectives } from "@/lib/plan";
 import { REVIEW_DISMISSED_KEY } from "@/lib/plan-logic";
 import { ObjectivesView } from "./objectives-view";
 
@@ -10,16 +10,18 @@ export default async function ObjetivosPage({ searchParams }: PageProps<"/plan/o
   const { anio } = await searchParams;
   const today = todayISO();
   const year = typeof anio === "string" && /^\d{4}$/.test(anio) ? Number(anio) : Number(today.slice(0, 4));
-  const [{ objectives, loose, years }, links, dismissed] = await Promise.all([
+  const [{ objectives, loose, years }, links, dismissed, minor] = await Promise.all([
     getObjectives(year),
     getKrLinkOptions(),
     prisma.appSetting.findUnique({ where: { key: REVIEW_DISMISSED_KEY } }),
+    getMinorGoals(year),
   ]);
   return (
     <ObjectivesView
       key={year}
       objectives={objectives}
       loose={loose}
+      minor={minor}
       links={links}
       today={today}
       year={year}

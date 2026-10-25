@@ -814,3 +814,17 @@ model PlanStep {
 
   @@index([keyResultId])
 }
+
+/// "Otros objetivos" de un año (2026-10-25): los que no se parten en tareas, anotados en un renglón.
+model PlanMinorGoal {
+  id        String    @id @default(cuid())
+  year      Int
+  title     String
+  done      Boolean   @default(false)
+  doneAt    DateTime?
+  order     Float     @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([year])
+}

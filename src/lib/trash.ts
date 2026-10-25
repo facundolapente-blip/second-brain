@@ -30,6 +30,7 @@ export type TrashKind =
   | "task"
   | "keyResult"
   | "step"
+  | "minorGoal"
   | "objective"
   | "photo"
   | "note";
@@ -52,6 +53,7 @@ const MODULE: Record<TrashKind, Module> = {
   task: "plan",
   keyResult: "plan",
   step: "plan",
+  minorGoal: "plan",
   objective: "plan",
   photo: "journal",
   note: "notas",
@@ -73,6 +75,7 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   task: "Tarea",
   keyResult: "Objetivo chico",
   step: "Tarea de un objetivo",
+  minorGoal: "Otro objetivo",
   objective: "Objetivo",
   photo: "Foto",
   note: "Nota",
@@ -236,6 +239,10 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
       const st = await db.planStep.findUnique({ where: { id } });
       return st ? { label: st.title, data: { row: st } } : null;
     }
+    case "minorGoal": {
+      const g = await db.planMinorGoal.findUnique({ where: { id } });
+      return g ? { label: g.title, data: { row: g } } : null;
+    }
     case "note": {
       const n = await db.note.findUnique({ where: { id }, include: { attachments: true } });
       if (!n) return null;
@@ -277,6 +284,7 @@ async function remove(kind: TrashKind, id: string, db: Db) {
       await db.planKeyResult.deleteMany({ where: { id: { in: [...below.map((x) => x.id).reverse(), id] } } });
     },
     step: () => db.planStep.deleteMany({ where: { id } }),
+    minorGoal: () => db.planMinorGoal.deleteMany({ where: { id } }),
     photo: () => db.attachment.deleteMany({ where: { id } }),
     note: () => db.note.deleteMany({ where: { id } }),
     objective: async () => {
@@ -523,6 +531,9 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       await db.planStep.create({ data: { ...row, blockId } });
       return null;
     }
+    case "minorGoal":
+      await db.planMinorGoal.create({ data: row });
+      return null;
     case "note":
       await db.note.create({ data: row });
       await restoreAttachments(data, db);

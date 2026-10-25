@@ -21,6 +21,7 @@ import {
   type KeyResultDTO,
   type KrLinkOption,
   type KrStatus,
+  type MinorGoalDTO,
   type ObjectiveDTO,
   type Quarter,
 } from "@/lib/plan-logic";
@@ -32,6 +33,7 @@ import { TintedCard } from "@/components/tinted-card";
 import { PlanTabs } from "../plan-nav";
 import { KrSheet, ObjectiveForm, type KrSheetHandle } from "./objective-forms";
 import { ObjectivesBoard } from "./objectives-board";
+import { MinorGoals } from "./minor-goals";
 
 const fmtNum = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
 /** Los objetivos importados de Notion traían un número adelante ("2 Mejorar mi salud"). */
@@ -47,13 +49,13 @@ function krFigure(raw: KeyResultDTO): string | null {
 type Group = ObjectiveDTO & { loose?: boolean };
 
 /**
- * Objetivos como árbol (2026-10-25): una tarjeta por objetivo grande con su avance y la
- * próxima tarea; tocarla abre su árbol (`/plan/objetivos/[id]`), donde se parte en objetivos
- * más chicos y tareas simples. Año y trimestre son datos opcionales, no pestañas.
+ * Objetivos (2026-10-25): el tablero de columnas (objetivos | el elegido con su camino de
+ * trimestres | tareas del objetivo chico elegido) y, debajo, "Otros objetivos" de un renglón.
  */
 export function ObjectivesView({
   objectives,
   loose,
+  minor,
   links,
   today,
   year,
@@ -62,6 +64,7 @@ export function ObjectivesView({
 }: {
   objectives: ObjectiveDTO[];
   loose: KeyResultDTO[];
+  minor: MinorGoalDTO[];
   links: KrLinkOption[];
   today: string;
   year: number;
@@ -203,6 +206,8 @@ export function ObjectivesView({
             <ObjectivesBoard objectives={objectives} loose={loose} links={links} today={today} year={year} onNew={openNew} />
           )}
         </TintedCard>
+
+        <MinorGoals goals={minor} year={year} />
       </main>
 
       <Sheet ref={newSheet} title={`Nuevo objetivo ${year}`}>

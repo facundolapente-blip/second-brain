@@ -4,7 +4,7 @@ import { getHabitsWithLogs } from "./habits";
 import { habitScore } from "./habit-logic";
 import { getAccounts, getGoals } from "./finance";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
-import { parseTaskLinks } from "./plan-logic";
+import { parseTaskLinks, type MinorGoalDTO } from "./plan-logic";
 import type {
   BlockDTO,
   CategoryDTO,
@@ -195,4 +195,10 @@ export async function getKrLinkOptions(): Promise<KrLinkOption[]> {
     ...accounts.map((a) => ({ value: `account:${a.id}`, label: `${a.name} (${a.currency})`, group: "Cuentas" as const })),
     ...goals.map((g) => ({ value: `goal:${g.id}`, label: g.name, group: "Metas de ahorro" as const })),
   ];
+}
+
+/** "Otros objetivos" del año, en el orden en que se anotaron. */
+export async function getMinorGoals(year: number): Promise<MinorGoalDTO[]> {
+  const rows = await prisma.planMinorGoal.findMany({ where: { year }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
+  return rows.map((g) => ({ id: g.id, title: g.title, done: g.done, order: g.order }));
 }

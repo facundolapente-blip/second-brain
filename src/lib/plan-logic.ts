@@ -771,3 +771,6 @@ export function monthGrid(month: string): string[][] {
   }
   return weeks;
 }
+
+/** Un objetivo de "Otros objetivos": un renglón, sin tareas ni objetivos chicos. */
+export type MinorGoalDTO = { id: string; title: string; done: boolean; order: number };
