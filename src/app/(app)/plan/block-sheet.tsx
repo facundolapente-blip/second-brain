@@ -29,8 +29,14 @@ export type BlockSheetActions = {
 /** Hoja para crear o editar un bloque de la semana. */
 export const BlockSheet = forwardRef<
   BlockSheetHandle,
-  { categories: CategoryDTO[]; tasks: Pick<TaskDTO, "id" | "title" | "status">[]; actions?: BlockSheetActions }
->(function BlockSheet({ categories, tasks, actions }, ref) {
+  {
+    categories: CategoryDTO[];
+    tasks: Pick<TaskDTO, "id" | "title" | "status">[];
+    actions?: BlockSheetActions;
+    /** Metas del trimestre en curso (Objetivos): el bloque puede empujar una. */
+    goals?: { id: string; label: string }[];
+  }
+>(function BlockSheet({ categories, tasks, actions, goals = [] }, ref) {
   const sheet = useRef<SheetHandle>(null);
   const [draft, setDraft] = useState<BlockDraft>({ date: "" });
   const [key, setKey] = useState(0);
@@ -55,6 +61,7 @@ export const BlockSheet = forwardRef<
         initial={draft}
         categories={categories}
         tasks={tasks}
+        goals={goals}
         actions={actions}
         onDone={() => sheet.current?.close()}
       />
@@ -66,6 +73,7 @@ function BlockForm({
   initial,
   categories,
   tasks,
+  goals,
   onDone,
   registerDismiss,
   actions,
@@ -73,6 +81,7 @@ function BlockForm({
   initial: BlockDraft;
   categories: CategoryDTO[];
   tasks: Pick<TaskDTO, "id" | "title" | "status">[];
+  goals: { id: string; label: string }[];
   onDone: () => void;
   registerDismiss: (fn: () => void) => void;
   actions?: BlockSheetActions;
@@ -168,6 +177,21 @@ function BlockForm({
         <PriorityPicker value={priority} onChange={setPriority} name="priority" />
       </div>
 
+
+      {/* Si ya empuja una meta que no es de este trimestre, se muestra igual (y se puede sacar). */}
+      {(goals.length > 0 || initial.keyResultId) && (
+        <Field label="Meta del trimestre (opcional)" hint="Aparece en Objetivos como acción de la semana.">
+          <select name="keyResultId" defaultValue={initial.keyResultId ?? ""} className={cx(inputClass, "pr-8")}>
+            <option value="">Ninguna</option>
+            {initial.keyResultId && !goals.some((g) => g.id === initial.keyResultId) && <option value={initial.keyResultId}>La meta de antes</option>}
+            {goals.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       {openTasks.length > 0 && (
         <Field label="Tarea (opcional)">

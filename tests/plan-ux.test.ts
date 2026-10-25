@@ -20,6 +20,7 @@ const fd = (o: Record<string, string>) => {
 };
 const block = (p: Partial<BlockDTO>): BlockDTO => ({
   id: "b1",
+  keyResultId: null,
   title: "Gym",
   categoryId: null,
   date: "2026-10-19",

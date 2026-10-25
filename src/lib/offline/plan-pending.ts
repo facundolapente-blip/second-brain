@@ -88,6 +88,7 @@ export function applyPendingBlocks(blocks: BlockDTO[], ops: QueuedOp[]): BlockDT
         const t = op.args;
         // Sin los datos de la tarea a mano: se ve con su nombre al subir; mientras, "Tarea agendada".
         list.push({
+          keyResultId: null,
           id: pendingId(op),
           title: "Tarea agendada (sin subir)",
           categoryId: null,

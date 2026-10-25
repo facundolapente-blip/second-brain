@@ -79,7 +79,7 @@ async function newSortKey(date: Date): Promise<number> {
  * esa semana no se pierden; y si va a una semana posterior, llega sin tildar.
  * Devuelve el "hecho" con el que queda.
  */
-async function changeWeek(b: { id: string; date: Date; title: string; categoryId: string | null; done: boolean }, to: Date) {
+async function changeWeek(b: { id: string; date: Date; title: string; categoryId: string | null; done: boolean; keyResultId?: string | null }, to: Date) {
   const from = fromDbDate(b.date);
   const dest = fromDbDate(to);
   const destMonday = startOfWeek(dest);
@@ -92,7 +92,7 @@ async function changeWeek(b: { id: string; date: Date; title: string; categoryId
   if (logs.length) await prisma.planBlockLog.deleteMany({ where: { id: { in: logs.map((l) => l.id) } } });
   if (startOfWeek(from) === destMonday) return b.done;
   if (from <= todayISO()) {
-    await prisma.planBlockLog.create({ data: { blockId: b.id, date: b.date, title: b.title, categoryId: b.categoryId, done: b.done } });
+    await prisma.planBlockLog.create({ data: { blockId: b.id, date: b.date, title: b.title, categoryId: b.categoryId, done: b.done, keyResultId: b.keyResultId ?? null } });
   }
   if (logs.length) return logs.some((l) => l.done);
   return destMonday > startOfWeek(from) ? false : b.done;
@@ -122,6 +122,8 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     place: texto(fd, "place", 120) || null,
     notes: texto(fd, "notes", 2000) || null,
     taskId: texto(fd, "taskId", 40) || null,
+    // La meta del trimestre solo si el formulario la manda (la hoja del bloque sí; otros no la pisan).
+    ...(fd.has("keyResultId") ? { keyResultId: texto(fd, "keyResultId", 40) || null } : {}),
   };
 
   if (id) {
@@ -153,6 +155,7 @@ export async function setBlockDone(id: string, done: boolean) {
 }
 
 const cleanTitle = (t: unknown) => String(t ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
+const fold = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
 /**
  * Arrastrar una tarea a un día de la semana: crea el bloque vinculado (nombre,
@@ -217,6 +220,7 @@ export async function duplicateBlock(id: string, clientId?: string): Promise<Act
       place: b.place,
       notes: b.notes,
       taskId: b.taskId,
+      keyResultId: b.keyResultId,
     },
   });
   await logActivity("created", "block", copy.id, `${b.title} (copia)`);
@@ -298,6 +302,7 @@ export async function copyWeekToNext(day: string): Promise<ActionResult> {
       // El lugar de los sin hora y la tarea vinculada también pasan a la copia.
       sortKey: b.sortKey,
       taskId: b.taskId,
+      keyResultId: b.keyResultId,
       priority: b.priority,
       place: b.place,
       notes: b.notes,
@@ -961,4 +966,60 @@ export async function copyToYear(input: { to: number; objectiveIds: string[]; kr
   await logActivity("created", "objective", null, `Plan ${to}: ${objs.length} objetivos y ${copied} resultados clave copiados`);
   refrescar();
   return { ok: true };
+}
+
+// ─── Objetivos: foco del trimestre y acciones de la semana ─────────────────
+
+/** Pone o saca un objetivo del foco de un trimestre (los que no están en foco quedan en pausa ese trimestre). */
+export async function setObjectiveFocus(id: string, quarter: string, on: boolean) {
+  await exigirSesion();
+  const q = QUARTERS.find((x) => x === quarter);
+  if (!q) return;
+  const o = await prisma.planObjective.findUnique({ where: { id: String(id) }, select: { focus: true } });
+  if (!o) return;
+  const focus = on ? [...new Set([...o.focus, q])].sort() : o.focus.filter((x) => x !== q);
+  await prisma.planObjective.update({ where: { id: String(id) }, data: { focus } });
+  refrescar();
+}
+
+/**
+ * Una acción de la semana para una meta del trimestre: un bloque del Plan atado a esa meta
+ * (con la categoría del área del objetivo si hay una del mismo nombre). Sin hora va arriba del día.
+ */
+export async function addObjectiveAction(input: { keyResultId: string; title: string; date: string; startTime?: string | null; clientId?: string }): Promise<ActionResult> {
+  await exigirSesion();
+  const title = cleanTitle(input?.title).slice(0, 120);
+  if (!title) return { ok: false, error: "Ponele un nombre." };
+  if (!isISODate(input?.date)) return { ok: false, error: "Elegí el día." };
+  const kr = await prisma.planKeyResult.findUnique({ where: { id: String(input.keyResultId) }, select: { id: true, objective: { select: { area: true } } } });
+  if (!kr) return { ok: false, error: "Esa meta ya no existe." };
+  const start = input.startTime ? normalizeTime(String(input.startTime)) : null;
+  const startTime = start && isTime(start) ? start : null;
+  const area = kr.objective?.area ? fold(kr.objective.area) : null;
+  const category = area ? (await prisma.planCategory.findMany({ select: { id: true, name: true } })).find((c) => fold(c.name) === area) : undefined;
+  const date = toDbDate(input.date);
+  const newId = await freshId(input.clientId, (x) => prisma.planBlock.findUnique({ where: { id: x }, select: { id: true } }));
+  const block = await prisma.planBlock.create({
+    data: {
+      ...(newId ? { id: newId } : {}),
+      title,
+      date,
+      startTime,
+      keyResultId: kr.id,
+      categoryId: category?.id ?? null,
+      sortKey: startTime ? null : await newSortKey(date),
+    },
+  });
+  await logActivity("created", "block", block.id, `${title} (${input.date})`);
+  refrescar();
+  return { ok: true, id: block.id };
+}
+
+/** Ata (o desata, con null) un bloque que ya está en el Plan a una meta del trimestre. */
+export async function setBlockKeyResult(id: string, keyResultId: string | null) {
+  await exigirSesion();
+  const kr = keyResultId ? await prisma.planKeyResult.findUnique({ where: { id: String(keyResultId) }, select: { id: true } }) : null;
+  if (keyResultId && !kr) return;
+  await prisma.planBlock.updateMany({ where: { id: await blockId(id) }, data: { keyResultId: kr?.id ?? null } });
+  refrescar();
 }

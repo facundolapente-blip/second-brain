@@ -4,7 +4,7 @@ import { getHabitsWithLogs } from "./habits";
 import { habitScore } from "./habit-logic";
 import { getAccounts, getGoals } from "./finance";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
-import { parseTaskLinks } from "./plan-logic";
+import { krQuarters, parseTaskLinks, quarterOf, quarterWeeks, type ObjectiveAction, type Quarter } from "./plan-logic";
 import type {
   BlockDTO,
   CategoryDTO,
@@ -58,6 +58,7 @@ function blockDTO(b: BlockRow): BlockDTO {
     place: b.place,
     notes: b.notes,
     taskId: b.taskId,
+    keyResultId: b.keyResultId,
   };
 }
 
@@ -159,6 +160,7 @@ export async function getObjectives(
       status: (["todo", "doing", "done", "closed"].includes(o.status) ? o.status : "doing") as KrStatus,
       progress: o.progress,
       goal: o.goal,
+      focus: o.focus,
       keyResults: krs.filter((k) => k.objectiveId === o.id).map(dto),
     })),
     loose: krs.filter((k) => !k.objectiveId).map(dto),
@@ -178,4 +180,48 @@ export async function getKrLinkOptions(): Promise<KrLinkOption[]> {
     ...accounts.map((a) => ({ value: `account:${a.id}`, label: `${a.name} (${a.currency})`, group: "Cuentas" as const })),
     ...goals.map((g) => ({ value: `goal:${g.id}`, label: g.name, group: "Metas de ahorro" as const })),
   ];
+}
+
+/**
+ * Lo del trimestre para Objetivos: las acciones (bloques atados a una meta y los registros
+ * que dejaron al pasar de semana) y los bloques sin meta, para poder atarlos.
+ */
+export async function getQuarterActions(
+  year: number,
+  q: Quarter,
+): Promise<{ actions: ObjectiveAction[]; unlinked: { id: string; title: string; date: string; startTime: string | null; done: boolean }[] }> {
+  const weeks = quarterWeeks(year, q);
+  const range = { gte: toDbDate(weeks[0].from), lte: toDbDate(weeks[weeks.length - 1].to) };
+  const [blocks, logs, loose] = await Promise.all([
+    prisma.planBlock.findMany({ where: { keyResultId: { not: null }, date: range }, select: { id: true, title: true, date: true, startTime: true, done: true, keyResultId: true } }),
+    prisma.planBlockLog.findMany({ where: { keyResultId: { not: null }, date: range }, select: { id: true, title: true, date: true, done: true, keyResultId: true } }),
+    prisma.planBlock.findMany({
+      where: { keyResultId: null, date: range },
+      select: { id: true, title: true, date: true, startTime: true, done: true },
+      orderBy: [{ date: "asc" }, { startTime: "asc" }],
+    }),
+  ]);
+  const order = (a: ObjectiveAction, b: ObjectiveAction) => a.date.localeCompare(b.date) || (a.startTime ?? "").localeCompare(b.startTime ?? "");
+  return {
+    actions: [
+      ...blocks.map((b) => ({ id: b.id, blockId: b.id, title: b.title, date: fromDbDate(b.date), startTime: b.startTime, done: b.done, keyResultId: b.keyResultId! })),
+      ...logs.map((l) => ({ id: `registro-${l.id}`, blockId: null, title: l.title, date: fromDbDate(l.date), startTime: null, done: l.done, keyResultId: l.keyResultId! })),
+    ].sort(order),
+    // "Libre" no empuja nada: no se ofrece.
+    unlinked: loose.filter((b) => b.title.trim().toLowerCase() !== "libre").map((b) => ({ id: b.id, title: b.title, date: fromDbDate(b.date), startTime: b.startTime, done: b.done })),
+  };
+}
+
+/** Las metas del trimestre en curso, para atar un bloque desde su hoja en el Plan ("Cardio 1 por semana · Mejorar mi salud"). */
+export async function getQuarterGoalOptions(): Promise<{ id: string; label: string }[]> {
+  const today = todayISO();
+  const q = quarterOf(today);
+  const krs = await prisma.planKeyResult.findMany({
+    where: { year: Number(today.slice(0, 4)), status: { notIn: ["closed"] } },
+    select: { id: true, title: true, quarters: true, deadline: true, objective: { select: { title: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return krs
+    .filter((k) => krQuarters({ quarters: k.quarters, deadline: k.deadline ? fromDbDate(k.deadline) : null }).includes(q))
+    .map((k) => ({ id: k.id, label: k.objective ? `${k.title} · ${k.objective.title.replace(/^\d+\s+/, "")}` : k.title }));
 }

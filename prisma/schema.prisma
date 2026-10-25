@@ -588,6 +588,8 @@ model PlanBlockLog {
   title      String
   categoryId String?
   done       Boolean  @default(false)
+  /// La meta del trimestre del bloque (para la tarjeta de semanas de Objetivos).
+  keyResultId String?
   createdAt  DateTime @default(now())
 
   @@index([date])
@@ -616,6 +618,9 @@ model PlanBlock {
   /// Hábito vinculado: marcar el bloque como hecho marca el hábito ese día.
   habitId    String?
   habit      Habit?        @relation(fields: [habitId], references: [id], onDelete: SetNull)
+  /// Meta del trimestre a la que empuja (acción de la semana de un objetivo).
+  keyResultId String?
+  keyResult   PlanKeyResult? @relation(fields: [keyResultId], references: [id], onDelete: SetNull)
   source     String?
   externalId String?
   createdAt  DateTime      @default(now())
@@ -623,6 +628,7 @@ model PlanBlock {
 
   @@unique([source, externalId])
   @@index([date])
+  @@index([keyResultId])
 }
 
 /// Un objetivo grande ("Mejorar mi salud", "Cursar 7 materias").
@@ -644,6 +650,8 @@ model PlanObjective {
   /// Meta propia ("1 de 4"): si tiene meta, su avance es progreso / meta; si no, el promedio de sus resultados clave.
   progress   Float?
   goal       Float?
+  /// Trimestres en los que está en foco ("Q4"): los demás objetivos quedan en pausa ese trimestre.
+  focus      String[]        @default([])
   keyResults PlanKeyResult[]
 
   @@unique([title, year])
@@ -674,6 +682,8 @@ model PlanKeyResult {
   year        Int            @default(2026)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  /// Acciones de la semana (bloques del Plan) que empujan esta meta.
+  blocks      PlanBlock[]
 
   @@unique([source, externalId])
 }

@@ -2,11 +2,12 @@
 
 import { safeForm, useSafeTransition } from "@/components/safe-action";
 import { useOnNew } from "@/components/nav-add";
-import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useActionState, useEffect, useEffectEvent, useImperativeHandle, useOptimistic, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowsClockwise, CalendarPlus, CaretDown, Check, ClipboardText, Lightning, Minus, PencilSimple, Plus, Target, X } from "@phosphor-icons/react";
 import {
+  addObjectiveAction,
   bumpObjective,
   carryOverKrs,
   copyToYear,
@@ -15,6 +16,8 @@ import {
   dismissQuarterReview,
   saveKeyResult,
   saveObjective,
+  setBlockDone,
+  setBlockKeyResult,
   writeQuarterReview,
 } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
@@ -27,6 +30,9 @@ import {
   krPct,
   krQuarters,
   effectiveKr,
+  executionPct,
+  inFocus,
+  newClientId,
   nextQuarter,
   OBJECTIVES_VIEW_COOKIE,
   objectivePct,
@@ -35,8 +41,13 @@ import {
   quarterOf,
   quarterRange,
   quarterReviewQuestions,
+  quarterWeeks,
   reviewQuarter,
+  splitByFocus,
+  weekMarks,
   type KeyResultDTO,
+  type ObjectiveAction,
+  type ObjectivesTab,
   type KrLinkOption,
   type KrStatus,
   type ObjectiveDTO,
@@ -50,8 +61,7 @@ import { Button, ConfirmButton, cx, Field, Input, inputClass, Segmented, Sheet, 
 import { HEAD_SWITCH, PriorityDots, PriorityPicker, ProgressBar, StatusPill } from "../plan-ui";
 import { TintedCard } from "@/components/tinted-card";
 import { PlanTabs } from "../plan-nav";
-
-export type ObjectivesLayout = "mapa" | "rol";
+import { AddActionSheet, FocusStar, QuarterTab, quarterKrs, WeekStrip, WeekTab, weekIndexOf, weekRange, type AddActionHandle, type UnlinkedBlock } from "./objectives-tabs";
 
 const fmtNum = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
 /** "1 Generar constancia produciendo" → sin el número con el que Notion los ordenaba. */
@@ -90,7 +100,10 @@ export function ObjectivesView({
   today,
   year,
   years,
-  initialLayout,
+  initialTab,
+  quarter,
+  actions,
+  unlinked,
   reviewDismissed,
 }: {
   objectives: ObjectiveDTO[];
@@ -99,18 +112,62 @@ export function ObjectivesView({
   today: string;
   year: number;
   years: number[];
-  initialLayout: ObjectivesLayout;
+  initialTab: ObjectivesTab;
+  /** El trimestre que se mira (el de hoy, o el elegido con ?t=). */
+  quarter: Quarter;
+  actions: ObjectiveAction[];
+  unlinked: UnlinkedBlock[];
   reviewDismissed: string | null;
 }) {
-  const [layout, setLayoutState] = useState<ObjectivesLayout>(initialLayout);
+  const [layout, setLayoutState] = useState<ObjectivesTab>(initialTab);
   const [swapped, setSwapped] = useState(false);
-  const setLayout = (v: ObjectivesLayout) => {
+  const setLayout = (v: ObjectivesTab) => {
     setSwapped(true);
     setLayoutState(v);
     document.cookie = `${OBJECTIVES_VIEW_COOKIE}=${v}; path=/plan; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
   };
+  // Acciones de la semana: lo que se toca se ve al instante (el servidor lo confirma al volver).
+  type Op =
+    | { type: "add"; action: ObjectiveAction }
+    | { type: "done"; blockId: string; done: boolean }
+    | { type: "link"; action: ObjectiveAction }
+    | { type: "unlink"; blockId: string };
+  const [acts, applyAct] = useOptimistic(actions, (cur: ObjectiveAction[], op: Op) => {
+    if (op.type === "add" || op.type === "link") return [...cur.filter((a) => a.id !== op.action.id), op.action];
+    if (op.type === "done") return cur.map((a) => (a.blockId === op.blockId ? { ...a, done: op.done } : a));
+    return cur.filter((a) => a.blockId !== op.blockId);
+  });
+  const [, startAct] = useSafeTransition();
+  const weeks = quarterWeeks(year, quarter);
+  const [weekIdx, setWeekIdx] = useState(() => weekIndexOf(weeks, today));
+  const addSheet = useRef<AddActionHandle>(null);
+  const openAddAction = (k: KeyResultDTO, weekFrom?: string) => addSheet.current?.open(k, weekFrom ?? weeks[weekIndexOf(weeks, today)].from);
+  const toggleAction = (a: ObjectiveAction) =>
+    a.blockId &&
+    startAct(async () => {
+      applyAct({ type: "done", blockId: a.blockId!, done: !a.done });
+      await setBlockDone(a.blockId!, !a.done);
+    });
+  const unlinkAction = (a: ObjectiveAction) =>
+    a.blockId &&
+    startAct(async () => {
+      applyAct({ type: "unlink", blockId: a.blockId! });
+      await setBlockKeyResult(a.blockId!, null);
+    });
+  const addAction = (k: KeyResultDTO, input: { title: string; date: string; startTime: string | null }) => {
+    const id = newClientId();
+    startAct(async () => {
+      applyAct({ type: "add", action: { id, blockId: id, title: input.title, date: input.date, startTime: input.startTime, done: false, keyResultId: k.id } });
+      await addObjectiveAction({ keyResultId: k.id, ...input, clientId: id });
+    });
+  };
+  const linkBlock = (k: KeyResultDTO, b: UnlinkedBlock) =>
+    startAct(async () => {
+      applyAct({ type: "link", action: { id: b.id, blockId: b.id, title: b.title, date: b.date, startTime: b.startTime, done: b.done, keyResultId: k.id } });
+      await setBlockKeyResult(b.id, k.id);
+    });
   const sheet = useRef<KrSheetHandle>(null);
-  useOnNew(() => sheet.current?.open());
+  useOnNew(() => sheet.current?.open(undefined, { quarter }));
   const objSheet = useRef<SheetHandle>(null);
   const planSheet = useRef<SheetHandle>(null);
   const detailSheet = useRef<SheetHandle>(null);
@@ -122,7 +179,7 @@ export function ObjectivesView({
   const groups: Group[] = [
     ...objectives,
     ...(loose.length
-      ? [{ id: "", title: "Sin objetivo", year, role: null, area: null, priority: 0, deadline: null, status: "doing" as KrStatus, progress: null, goal: null, keyResults: loose, loose: true }]
+      ? [{ id: "", title: "Sin objetivo", year, role: null, area: null, priority: 0, deadline: null, status: "doing" as KrStatus, progress: null, goal: null, focus: [], keyResults: loose, loose: true }]
       : []),
   ];
   const currentYear = Number(today.slice(0, 4));
@@ -155,9 +212,7 @@ export function ObjectivesView({
     sheet.current?.open(k);
   }
   const detail = groups.find((g) => (g.id || "loose") === detailId) ?? null;
-  // Cabecera de la tarjeta: cuántos objetivos, resultados clave terminados y el avance promedio (barra fina).
-  const allKrs = groups.flatMap((g) => g.keyResults);
-  const doneKrs = allKrs.filter((k) => k.status === "done").length;
+  // Cabecera del año: el avance promedio de los objetivos (barra fina).
   const pcts = objectives.map(objectivePct).filter((n): n is number => n !== null);
   const avgObjectives = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
 
@@ -170,7 +225,7 @@ export function ObjectivesView({
         tabs={<PlanTabs />}
         actions={
           <Button variant="accent" size="sm" className="max-lg:hidden" onClick={() => sheet.current?.open()}>
-            <Plus size={16} weight="bold" /> Nuevo resultado
+            <Plus size={16} weight="bold" /> Nueva meta
           </Button>
         }
       />
@@ -233,71 +288,163 @@ export function ObjectivesView({
           />
         )}
 
-        <TintedCard
-          icon={Target}
-          title={`Objetivos ${year}`}
-          className="mt-4"
-          meta={
-            groups.length
-              ? `${objectives.length} ${objectives.length === 1 ? "objetivo" : "objetivos"} · ${doneKrs} de ${allKrs.length} resultados clave terminados`
-              : "Sin objetivos todavía"
-          }
-          progress={avgObjectives !== null ? avgObjectives / 100 : undefined}
-          action={
-            <button type="button" className="tcard-pill press" onClick={() => openObjective(null)}>
-              <Plus size={14} weight="bold" aria-hidden /> Objetivo
-            </button>
-          }
-          headExtra={
-            groups.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <PillSwitch
-                  label="Cómo ver los objetivos"
-                  value={layout}
-                  onChange={setLayout}
-                  options={[
-                    { value: "mapa", label: "Mapa del año" },
-                    { value: "rol", label: "Por rol" },
-                  ]}
-                  {...HEAD_SWITCH}
-                />
-                {layout === "mapa" && <Legend className="max-lg:hidden" />}
-              </div>
-            ) : undefined
-          }
-          bodyClassName={groups.length > 0 && layout === "mapa" ? "lg:p-0!" : undefined}
-        >
-          {groups.length === 0 ? (
-            <div className="grid justify-items-start gap-3 py-4">
-              <p className="text-[15px] text-muted">Todavía no hay objetivos para {year}.</p>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
-                  <Plus size={15} /> Nuevo objetivo
-                </Button>
-                {/* "Planificar" copia del año que se mira al siguiente: para traer algo, se va al año anterior. */}
-                {years.some((y) => y < year) && (
-                  <Link
-                    href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
-                  >
-                    <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
-                  </Link>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div key={layout} className={cx(swapped && "swap")}>
-              {layout === "mapa" ? (
-                <YearMap groups={groups} today={today} year={year} nowQ={nowQ} onOpenObjective={openDetail} onOpenKr={openKr} onPlan={planKr} />
+        {(() => {
+          // Cabecera según la pestaña: el año (objetivos y foco), el trimestre (semana y
+          // ejecución) o la semana (acciones hechas).
+          const qIds = new Set(splitByFocus(groups, quarter).active.flatMap((g) => quarterKrs(g, quarter).map((k) => k.id)));
+          const nowWeek = weeks[weekIndexOf(weeks, today)];
+          const exec = executionPct(acts, qIds, weeks[0].from, today);
+          const shownWeek = weeks[weekIdx];
+          const inWeek = acts.filter((a) => a.date >= shownWeek.from && a.date <= shownWeek.to);
+          const quarterLabel = `${quarter} ${year}`;
+          const head =
+            layout === "trimestre"
+              ? {
+                  title: quarterLabel,
+                  meta:
+                    today < weeks[0].from
+                      ? `Empieza el ${formatShort(quarterRange(year, quarter).from)}`
+                      : today > weeks[weeks.length - 1].to
+                        ? `Terminó${exec !== null ? ` · ejecución ${exec}%` : ""}`
+                        : `Semana ${nowWeek.n} de ${weeks.length}${exec !== null ? ` · ejecución ${exec}%` : ""}`,
+                  progress: exec !== null ? exec / 100 : undefined,
+                }
+              : layout === "semana"
+                ? {
+                    title: shownWeek.from <= today && today <= shownWeek.to ? "Esta semana" : weekRange(shownWeek),
+                    meta: inWeek.length ? `${inWeek.filter((a) => a.done).length} de ${inWeek.length} acciones hechas` : `${quarterLabel} · semana ${shownWeek.n}`,
+                    progress: inWeek.length ? inWeek.filter((a) => a.done).length / inWeek.length : undefined,
+                  }
+                : {
+                    title: `Objetivos ${year}`,
+                    meta: groups.length
+                      ? `${objectives.length} ${objectives.length === 1 ? "objetivo" : "objetivos"} · ${objectives.filter((o) => inFocus(o, quarter)).length} en foco el ${quarter}`
+                      : "Sin objetivos todavía",
+                    progress: avgObjectives !== null ? avgObjectives / 100 : undefined,
+                  };
+          return (
+            <TintedCard
+              icon={Target}
+              title={head.title}
+              className="mt-4"
+              meta={head.meta}
+              progress={head.progress}
+              action={
+                layout === "anio" ? (
+                  <button type="button" className="tcard-pill press" onClick={() => openObjective(null)}>
+                    <Plus size={14} weight="bold" aria-hidden /> Objetivo
+                  </button>
+                ) : (
+                  <button type="button" className="tcard-pill press" onClick={() => sheet.current?.open(undefined, { quarter })}>
+                    <Plus size={14} weight="bold" aria-hidden /> Meta
+                  </button>
+                )
+              }
+              headExtra={
+                groups.length > 0 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <PillSwitch
+                      label="Año, trimestre o semana"
+                      value={layout}
+                      onChange={setLayout}
+                      options={[
+                        { value: "anio", label: "Año" },
+                        { value: "trimestre", label: quarter },
+                        { value: "semana", label: "Semana" },
+                      ]}
+                      {...HEAD_SWITCH}
+                    />
+                    {layout === "anio" && <Legend className="max-lg:hidden" />}
+                    {layout === "trimestre" && (
+                      <nav aria-label="Trimestre" className="flex items-center gap-1">
+                        {QUARTERS.map((q) => (
+                          <Link
+                            key={q}
+                            href={`/plan/objetivos?anio=${year}&t=${q}`}
+                            scroll={false}
+                            aria-current={q === quarter ? "page" : undefined}
+                            className={cx(
+                              "inline-flex h-8 items-center rounded-full px-3 font-mono text-[12px] transition-colors",
+                              q === quarter ? "bg-surface text-fg shadow-[0_1px_2px_rgba(0,0,0,0.12)]" : "text-[var(--head-fg)] hover:text-fg",
+                            )}
+                          >
+                            {q}
+                          </Link>
+                        ))}
+                      </nav>
+                    )}
+                  </div>
+                ) : undefined
+              }
+              bodyClassName={groups.length > 0 && layout === "anio" ? "lg:p-0!" : undefined}
+            >
+              {groups.length === 0 ? (
+                <div className="grid justify-items-start gap-3 py-4">
+                  <p className="text-[15px] text-muted">Todavía no hay objetivos para {year}.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openObjective(null)}>
+                      <Plus size={15} /> Nuevo objetivo
+                    </Button>
+                    {/* "Planificar" copia del año que se mira al siguiente: para traer algo, se va al año anterior. */}
+                    {years.some((y) => y < year) && (
+                      <Link
+                        href={`/plan/objetivos?anio=${Math.max(...years.filter((y) => y < year))}`}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-surface-2"
+                      >
+                        <CalendarPlus size={15} aria-hidden /> Traer de {Math.max(...years.filter((y) => y < year))}
+                      </Link>
+                    )}
+                  </div>
+                </div>
               ) : (
-                <RoleCards groups={groups} today={today} nowQ={nowQ} onOpenObjective={openDetail} onPlan={planKr} />
+                <div key={layout} className={cx(swapped && "swap")}>
+                  {layout === "anio" ? (
+                    <YearMap
+                      groups={groups}
+                      today={today}
+                      year={year}
+                      nowQ={nowQ}
+                      quarter={quarter}
+                      actions={acts}
+                      onOpenObjective={openDetail}
+                      onOpenKr={openKr}
+                      onPlan={planKr}
+                      onGoWeek={() => setLayout("semana")}
+                    />
+                  ) : layout === "trimestre" ? (
+                    <QuarterTab
+                      groups={groups}
+                      actions={acts}
+                      year={year}
+                      quarter={quarter}
+                      today={today}
+                      onOpenKr={openKr}
+                      onAddAction={(k) => openAddAction(k)}
+                      onPlan={() => sheet.current?.open(undefined, { quarter })}
+                    />
+                  ) : (
+                    <WeekTab
+                      groups={groups}
+                      actions={acts}
+                      year={year}
+                      quarter={quarter}
+                      today={today}
+                      week={weekIdx}
+                      onWeek={(i) => setWeekIdx(Math.max(0, Math.min(weeks.length - 1, i)))}
+                      onToggle={toggleAction}
+                      onUnlink={unlinkAction}
+                      onAddAction={openAddAction}
+                    />
+                  )}
+                </div>
               )}
-            </div>
-          )}
-        </TintedCard>
+            </TintedCard>
+          );
+        })()}
       </main>
 
       <KrSheet ref={sheet} objectives={objectives} links={links} year={year} />
+      <AddActionSheet ref={addSheet} today={today} unlinked={unlinked.filter((b) => !acts.some((x) => x.blockId === b.id))} onAdd={addAction} onLink={linkBlock} />
 
       <Sheet ref={detailSheet} title={detail ? cleanTitle(detail.title) : "Objetivo"} wide>
         {detail && (
@@ -404,19 +551,55 @@ function YearMap({
   today,
   year,
   nowQ,
+  quarter,
+  actions,
   onOpenObjective,
   onOpenKr,
   onPlan,
+  onGoWeek,
 }: {
   groups: Group[];
   today: string;
   year: number;
   nowQ: Quarter | null;
+  /** El trimestre de las acciones cargadas (el de la estrella de foco). */
+  quarter: Quarter;
+  actions: ObjectiveAction[];
   onOpenObjective: (id: string) => void;
   onOpenKr: (k: KeyResultDTO) => void;
   onPlan: (objectiveId: string, quarter: Quarter) => void;
+  onGoWeek: () => void;
 }) {
-  const [mobileQ, setMobileQ] = useState<Quarter>(nowQ ?? "Q1");
+  const [mobileQ, setMobileQ] = useState<Quarter>(nowQ ?? quarter);
+  // Foco del trimestre: la estrella; los que no están en foco quedan "en pausa" (si hay alguno en foco).
+  const focusCount = groups.filter((g) => !g.loose && inFocus(g, quarter)).length;
+  const weeks = quarterWeeks(year, quarter);
+  const thisWeek = weeks[weekIndexOf(weeks, today)];
+  const extra = (g: Group, q: Quarter) => {
+    if (q !== quarter || g.loose) return null;
+    const ids = new Set(inQ(g, q).map((k) => k.id));
+    if (!ids.size) return null;
+    if (focusCount > 0 && !inFocus(g, q)) return <p className="mt-1.5 text-[12px] text-muted">En pausa este trimestre</p>;
+    const week = q === nowQ ? actions.filter((a) => ids.has(a.keyResultId) && a.date >= thisWeek.from && a.date <= thisWeek.to) : [];
+    return (
+      <div className="mt-2 grid gap-1.5">
+        <WeekStrip marks={weekMarks(actions, ids, weeks, today)} />
+        {q === nowQ && (
+          <button type="button" onClick={onGoWeek} className="text-left text-[12px] leading-snug text-muted hover:text-fg">
+            {week.length ? `Esta semana: ${week.map((a) => a.title).join(" · ")}` : "Nada planeado esta semana · planificar"}
+          </button>
+        )}
+      </div>
+    );
+  };
+  const head = (g: Group) => (
+    <div className="flex items-start gap-1">
+      <div className="min-w-0 flex-1">
+        <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
+      </div>
+      <FocusStar objective={g} quarter={quarter} count={focusCount} />
+    </div>
+  );
   // Otro trimestre en el celular: entra desde ese lado (Q1 → Q2 desde la derecha).
   const qSlide = useSlide(mobileQ);
   const currentYear = Number(today.slice(0, 4));
@@ -430,11 +613,14 @@ function YearMap({
     const krs = inQ(g, q);
     if (krs.length)
       return (
-        <ul className="grid gap-0.5">
-          {krs.map((k) => (
-            <KrItem key={k.id} kr={k} today={today} onOpen={() => onOpenKr(k)} />
-          ))}
-        </ul>
+        <>
+          <ul className="grid gap-0.5">
+            {krs.map((k) => (
+              <KrItem key={k.id} kr={k} today={today} onOpen={() => onOpenKr(k)} />
+            ))}
+          </ul>
+          {extra(g, q)}
+        </>
       );
     if (g.loose || !plannable(q)) return null;
     return (
@@ -472,7 +658,7 @@ function YearMap({
           {groups.map((g) => (
             <div role="row" key={g.id || "loose"} className="contents">
               <div role="rowheader" className="grid content-start gap-2 border-b border-line py-3.5 pr-4 pl-5">
-                <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
+                {head(g)}
                 {unplaced(g).length > 0 && (
                   <details className="text-[12.5px] text-muted">
                     <summary className="cursor-pointer select-none hover:text-fg">{unplaced(g).length} sin trimestre</summary>
@@ -519,7 +705,7 @@ function YearMap({
         <ul key={mobileQ} className={cx("grid", qSlide)}>
           {groups.map((g) => (
             <li key={g.id || "loose"} className="grid gap-2.5 border-b border-line py-3.5 last:border-b-0 last:pb-0">
-              <ObjectiveHead o={g} onOpen={() => onOpenObjective(g.id || "loose")} />
+              {head(g)}
               <div className="border-t border-line pt-2.5">
                 {ownGoalOnly(g) ? (
                   <div className="flex items-center justify-between gap-3 text-[13px] text-muted">
@@ -569,146 +755,6 @@ function GoalStepper({ o }: { o: Group }) {
         <Plus size={14} />
       </button>
     </span>
-  );
-}
-
-// ─── C · Por rol ────────────────────────────────────────────────────────────
-
-/** Tarjeta por rol: el avance grande, una tira de 4 trimestres y lo que toca este trimestre. */
-function RoleCards({
-  groups,
-  today,
-  nowQ,
-  onOpenObjective,
-  onPlan,
-}: {
-  groups: Group[];
-  today: string;
-  nowQ: Quarter | null;
-  onOpenObjective: (id: string) => void;
-  onPlan: (objectiveId: string, quarter: Quarter) => void;
-}) {
-  return (
-    <>
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {groups.map((g) => (
-          <li key={g.id || "loose"}>
-            <RoleCard o={g} today={today} nowQ={nowQ} onOpen={() => onOpenObjective(g.id || "loose")} onPlan={onPlan} />
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
-function RoleCard({
-  o,
-  today,
-  nowQ,
-  onOpen,
-  onPlan,
-}: {
-  o: Group;
-  today: string;
-  nowQ: Quarter | null;
-  onOpen: () => void;
-  onPlan: (objectiveId: string, quarter: Quarter) => void;
-}) {
-  const pct = objectivePct(o);
-  const own = !!o.goal;
-  const late = o.deadline !== null && o.deadline < today && o.status !== "done";
-  const nowKrs = nowQ ? o.keyResults.filter((k) => krQuarters(k).includes(nowQ)) : [];
-  const allDone = o.keyResults.length > 0 && o.keyResults.every((k) => k.status === "done");
-  const note = late ? `deadline vencido (${shortDate(o.deadline!, today)})` : o.status === "todo" ? "sin empezar" : null;
-
-  return (
-    <article className="lift plan-hover relative grid h-full content-start gap-3 rounded-2xl border border-line px-5 pt-4 pb-4">
-      <div className="grid gap-1">
-        <span className="kicker">{o.loose ? "Sueltos" : (o.role ?? o.area ?? "Objetivo")}</span>
-        <h3 className="text-[17px] leading-snug font-semibold">
-          <button type="button" onClick={onOpen} className="text-left after:absolute after:inset-0 after:rounded-2xl after:content-['']">
-            {cleanTitle(o.title)}
-          </button>
-        </h3>
-      </div>
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        {own ? (
-          <>
-            <span className="figure text-[40px] leading-none">{fmtNum(o.progress ?? 0)}</span>
-            <span className="text-[13px] text-muted">
-              de {fmtNum(o.goal ?? 0)}
-              {o.deadline && ` · ${shortDate(o.deadline, today)}`}
-            </span>
-          </>
-        ) : (
-          <span className={cx("figure text-[40px] leading-none", pct === 100 && "text-[var(--st-done-fg)]")}>{pct ?? 0}%</span>
-        )}
-        {note && <span className={cx("text-[13px]", late ? "text-danger" : "text-muted")}>{note}</span>}
-      </p>
-
-      {own && o.keyResults.length === 0 ? (
-        <div className="flex items-center gap-3">
-          <ProgressBar pct={pct} />
-          <GoalStepper o={o} />
-        </div>
-      ) : (
-        <QuarterStrip krs={o.keyResults} nowQ={nowQ} />
-      )}
-
-      <p className="text-[13px] text-muted">
-        {own && o.keyResults.length === 0 ? (
-          "Se mide con su propia meta"
-        ) : nowQ && nowKrs.length ? (
-          <>
-            Este trimestre: <span className="text-fg">{nowKrs.map((k) => k.title).join(", ")}</span> · {nowKrs.filter((k) => k.status === "done").length} de {nowKrs.length}
-          </>
-        ) : allDone ? (
-          "Todo hecho"
-        ) : nowQ && !o.loose ? (
-          <>
-            Nada para este trimestre ·{" "}
-            <button type="button" onClick={() => onPlan(o.id, nowQ)} className="relative z-10 underline decoration-line-strong underline-offset-2 hover:text-fg">
-              planificar
-            </button>
-          </>
-        ) : (
-          `${o.keyResults.length} resultados clave · ${o.keyResults.filter((k) => k.status === "done").length} terminados`
-        )}
-      </p>
-    </article>
-  );
-}
-
-/** Cuatro segmentos: el relleno es el avance de ese trimestre; verde si se terminó todo. */
-function QuarterStrip({ krs, nowQ }: { krs: KeyResultDTO[]; nowQ: Quarter | null }) {
-  return (
-    <div className="grid gap-1.5">
-      <div className="grid grid-cols-4 gap-1.5" aria-hidden>
-        {QUARTERS.map((q) => {
-          const list = krs.filter((k) => krQuarters(k).includes(q));
-          const pct = list.length ? (avgPct(list) ?? (list.every((k) => k.status === "done") ? 100 : 0)) : 0;
-          const done = list.length > 0 && list.every((k) => k.status === "done");
-          const past = nowQ !== null && QUARTERS.indexOf(q) < QUARTERS.indexOf(nowQ);
-          const color = done ? "bg-[var(--st-done-line)]" : past ? "bg-[var(--p-yellow-chip)]" : "bg-accent";
-          return (
-            <span key={q} className={cx("h-2 overflow-hidden rounded-full bg-surface-3", q === nowQ && "ring-1 ring-accent ring-offset-1 ring-offset-surface")}>
-              <span className={cx("bar-anim block h-full rounded-full", color)} style={{ width: `${pct}%` }} />
-            </span>
-          );
-        })}
-      </div>
-      <div className="grid grid-cols-4 gap-1.5 font-mono text-[11px] text-muted">
-        {QUARTERS.map((q) => {
-          const list = krs.filter((k) => krQuarters(k).includes(q));
-          return (
-            <span key={q} className={cx(q === nowQ && "text-fg")}>
-              {q}
-              <span className="sr-only">: {list.length ? `${list.filter((k) => k.status === "done").length} de ${list.length} terminados` : "nada"}</span>
-            </span>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 

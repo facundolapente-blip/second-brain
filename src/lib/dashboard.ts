@@ -216,6 +216,7 @@ export async function getDashboard() {
     place: b.place,
     notes: b.notes,
     taskId: b.taskId,
+    keyResultId: b.keyResultId,
   }));
   const pastLogs = blockLogs.map((l) => ({ date: fromDbDate(l.date), title: l.title, done: l.done }));
   const todayBlocks = sortBlocks(blockDTOs.filter((b) => b.date === today));

@@ -88,7 +88,10 @@ export function WeekView({
   top,
   todoFolded = false,
   initialView = "lista",
+  goals = [],
 }: {
+  /** Metas del trimestre en curso, para la hoja del bloque. */
+  goals?: { id: string; label: string }[];
   /** Lista o Por horas, como quedó la última vez (cookie). */
   initialView?: "lista" | "horas";
   /** Lo que va arriba del calendario: las tareas. */
@@ -337,6 +340,7 @@ export function WeekView({
             categoryId: t.categoryId,
             priority: t.priority,
             taskId,
+            keyResultId: null,
             date,
             startTime,
             endTime: startTime ? plusHour(startTime) : null,
@@ -628,7 +632,7 @@ export function WeekView({
         </TintedCard>
       </main>
 
-      <BlockSheet ref={sheet} categories={categories} tasks={tasks} actions={sheetActions} />
+      <BlockSheet ref={sheet} categories={categories} tasks={tasks} actions={sheetActions} goals={goals} />
     </PlanWeekContext>
   );
 }
