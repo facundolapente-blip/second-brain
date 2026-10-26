@@ -9,6 +9,7 @@ import {
 } from "react";
 import { House, Plus, Receipt } from "@phosphor-icons/react";
 import { safeForm, useSafeTransition } from "@/components/safe-action";
+import { Sortable, SortableItem } from "@/components/sortable";
 import { TintedCard } from "@/components/tinted-card";
 import {
   Button,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui";
 import {
   deleteBudgetLine,
+  reorderBudgetLines,
   saveBudgetLine,
   setBudgetLinePayer,
   type ActionResult,
@@ -45,8 +47,13 @@ const PAYER: Record<Payer, { label: string; color: string }> = {
   paused: { label: "Pausado", color: "stone" },
 };
 /** Tocar la etiqueta la pasa a la siguiente: lo pago yo → me lo pagan → pausado → lo pago yo. */
-const NEXT: Record<Payer, Payer> = { mine: "paid", paid: "paused", paused: "mine" };
-const payerOf = (l: BudgetLineDTO): Payer => (l.list === "paid" || l.list === "paused" ? l.list : "mine");
+const NEXT: Record<Payer, Payer> = {
+  mine: "paid",
+  paid: "paused",
+  paused: "mine",
+};
+const payerOf = (l: BudgetLineDTO): Payer =>
+  l.list === "paid" || l.list === "paused" ? l.list : "mine";
 
 const fmtRate = (n: number) =>
   n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
@@ -75,11 +82,27 @@ export function FixedCosts({
   toUyu: Record<string, number>;
   avgSpendCents: number | null;
 }) {
-  const [list, setPayer] = useOptimistic(
+  // Lo optimista: cambiar la etiqueta y el orden arrastrando se ven al toque.
+  const [list, apply] = useOptimistic(
     lines,
-    (ls: BudgetLineDTO[], p: { id: string; list: BudgetList }) =>
-      ls.map((l) => (l.id === p.id ? { ...l, list: p.list } : l)),
+    (
+      ls: BudgetLineDTO[],
+      op: { id: string; list: BudgetList } | { order: string[] },
+    ) => {
+      if ("order" in op) {
+        const pos = new Map(op.order.map((id, i) => [id, i + 1]));
+        return ls.map((l) =>
+          pos.has(l.id) ? { ...l, order: pos.get(l.id)! } : l,
+        );
+      }
+      return ls.map((l) => (l.id === op.id ? { ...l, list: op.list } : l));
+    },
   );
+  const reorder = (group: "fixed" | "solo", ids: string[]) =>
+    start(async () => {
+      apply({ order: ids });
+      await reorderBudgetLines(group, ids);
+    });
   const [, start] = useSafeTransition();
   const sheet = useRef<SheetHandle>(null);
   const [editing, setEditing] = useState<{
@@ -104,7 +127,9 @@ export function FixedCosts({
   );
   const plan = lineTotal(solo, toUyu);
   const usd = toUyu.USD;
-  const hasUsd = fixed.some((l) => l.list !== "paused" && l.currency !== "UYU" && l.amountCents);
+  const hasUsd = fixed.some(
+    (l) => l.list !== "paused" && l.currency !== "UYU" && l.amountCents,
+  );
   const pausedCount = fixed.filter((l) => l.list === "paused").length;
   const categories = [
     ...new Set(list.map((l) => l.category).filter((c): c is string => !!c)),
@@ -113,7 +138,7 @@ export function FixedCosts({
   const toggle = (l: BudgetLineDTO) => {
     const next: BudgetList = NEXT[payerOf(l)];
     start(async () => {
-      setPayer({ id: l.id, list: next });
+      apply({ id: l.id, list: next });
       await setBudgetLinePayer(l.id, next);
     });
   };
@@ -158,79 +183,90 @@ export function FixedCosts({
               </span>
               <span role="columnheader">Quién paga</span>
             </div>
-            {fixed.map((l) => {
-              const p = PAYER[payerOf(l)];
-              return (
-                <div
-                  key={l.id}
-                  role="row"
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line py-2 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_7.5rem_8.5rem] sm:py-1.5"
-                >
-                  <span role="cell" className="min-w-0 max-sm:row-span-2">
-                    <button
-                      type="button"
-                      onClick={() => open(l, l.list)}
-                      className="grid min-h-10 w-full min-w-0 content-center text-left hover:text-accent-fg"
-                    >
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14.5px] leading-snug">
-                        <span className="break-words">{l.name}</span>
-                        {l.wouldCut && (
-                          <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
-                            Lo sacaría
-                          </span>
-                        )}
-                        {l.variable && (
-                          <span className="text-[11.5px] text-muted">
-                            variable
-                          </span>
-                        )}
-                      </span>
-                      {(l.note || l.category) && (
-                        <span className="text-[12px] text-muted">
-                          <span className="sm:hidden">
-                            {[l.category, l.note].filter(Boolean).join(" · ")}
-                          </span>
-                          <span className="max-sm:hidden">{l.note}</span>
+            {/* Arrastrar ordena (compu: clic y arrastrar; celular: mantener apretado). */}
+            <Sortable
+              ids={fixed.map((l) => l.id)}
+              onReorder={(ids) => reorder("fixed", ids)}
+              disabled={fixed.length < 2}
+            >
+              {fixed.map((l) => {
+                const p = PAYER[payerOf(l)];
+                return (
+                  <SortableItem
+                    key={l.id}
+                    id={l.id}
+                    as="div"
+                    role="row"
+                    draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_7.5rem_8.5rem] sm:py-1.5 lg:cursor-grab lg:active:cursor-grabbing"
+                  >
+                    <span role="cell" className="min-w-0 max-sm:row-span-2">
+                      <button
+                        type="button"
+                        onClick={() => open(l, l.list)}
+                        className="grid min-h-10 w-full min-w-0 content-center text-left hover:text-accent-fg"
+                      >
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14.5px] leading-snug">
+                          <span className="break-words">{l.name}</span>
+                          {l.wouldCut && (
+                            <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
+                              Lo sacaría
+                            </span>
+                          )}
+                          {l.variable && (
+                            <span className="text-[11.5px] text-muted">
+                              variable
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </button>
-                  </span>
-                  <span
-                    role="cell"
-                    className="truncate text-[13px] text-muted max-sm:hidden"
-                  >
-                    {l.category ?? ""}
-                  </span>
-                  <span
-                    role="cell"
-                    className={cx(
-                      "text-right tabular text-[14px] max-sm:col-start-2 max-sm:row-start-1",
-                      l.amountCents === null && "text-faint",
-                      l.list === "paused" && "text-muted line-through decoration-faint",
-                    )}
-                  >
-                    {l.amountCents === null
-                      ? "—"
-                      : moneyCents(l.amountCents, l.currency)}
-                  </span>
-                  <span
-                    role="cell"
-                    className="max-sm:col-start-2 max-sm:row-start-2 max-sm:justify-self-end"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggle(l)}
-                      title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
-                      aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
-                      style={tone(p.color)}
-                      className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
+                        {(l.note || l.category) && (
+                          <span className="text-[12px] text-muted">
+                            <span className="sm:hidden">
+                              {[l.category, l.note].filter(Boolean).join(" · ")}
+                            </span>
+                            <span className="max-sm:hidden">{l.note}</span>
+                          </span>
+                        )}
+                      </button>
+                    </span>
+                    <span
+                      role="cell"
+                      className="truncate text-[13px] text-muted max-sm:hidden"
                     >
-                      {p.label}
-                    </button>
-                  </span>
-                </div>
-              );
-            })}
+                      {l.category ?? ""}
+                    </span>
+                    <span
+                      role="cell"
+                      className={cx(
+                        "text-right tabular text-[14px] max-sm:col-start-2 max-sm:row-start-1",
+                        l.amountCents === null && "text-faint",
+                        l.list === "paused" &&
+                          "text-muted line-through decoration-faint",
+                      )}
+                    >
+                      {l.amountCents === null
+                        ? "—"
+                        : moneyCents(l.amountCents, l.currency)}
+                    </span>
+                    <span
+                      role="cell"
+                      className="max-sm:col-start-2 max-sm:row-start-2 max-sm:justify-self-end"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggle(l)}
+                        title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
+                        aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
+                        style={tone(p.color)}
+                        className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
+                      >
+                        {p.label}
+                      </button>
+                    </span>
+                  </SortableItem>
+                );
+              })}
+            </Sortable>
           </div>
         )}
         {fixed.length > 0 && (
@@ -273,38 +309,49 @@ export function FixedCosts({
             lo de hoy.
           </p>
         ) : (
-          <ul className="grid">
-            {solo.map((l) => (
-              <li key={l.id} className="border-b border-line last:border-b-0">
-                <button
-                  type="button"
-                  onClick={() => open(l, "solo")}
-                  className="flex min-h-10 w-full items-center gap-3 py-1 text-left hover:text-accent-fg"
+          <Sortable
+            ids={solo.map((l) => l.id)}
+            onReorder={(ids) => reorder("solo", ids)}
+            disabled={solo.length < 2}
+          >
+            <ul className="grid">
+              {solo.map((l) => (
+                <SortableItem
+                  key={l.id}
+                  id={l.id}
+                  draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+                  className="border-b border-line bg-surface last:border-b-0 lg:cursor-grab lg:active:cursor-grabbing"
                 >
-                  <span className="grid min-w-0 flex-1">
-                    <span className="text-[14px] break-words">{l.name}</span>
-                    {l.note && (
-                      <span className="text-[12px] text-muted">{l.note}</span>
-                    )}
-                  </span>
-                  <span
-                    className={cx(
-                      "tabular text-[14px]",
-                      l.amountCents === null && "text-faint",
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => open(l, "solo")}
+                    className="flex min-h-10 w-full items-center gap-3 py-1 text-left hover:text-accent-fg"
                   >
-                    {l.amountCents === null
-                      ? "—"
-                      : moneyCents(l.amountCents, l.currency)}
-                  </span>
-                </button>
+                    <span className="grid min-w-0 flex-1">
+                      <span className="text-[14px] break-words">{l.name}</span>
+                      {l.note && (
+                        <span className="text-[12px] text-muted">{l.note}</span>
+                      )}
+                    </span>
+                    <span
+                      className={cx(
+                        "tabular text-[14px]",
+                        l.amountCents === null && "text-faint",
+                      )}
+                    >
+                      {l.amountCents === null
+                        ? "—"
+                        : moneyCents(l.amountCents, l.currency)}
+                    </span>
+                  </button>
+                </SortableItem>
+              ))}
+              <li className="flex items-center justify-between gap-3 pt-2 text-[14px] font-semibold">
+                <span>Total</span>
+                <span className="tabular">{moneyWhole(plan.uyuCents)}</span>
               </li>
-            ))}
-            <li className="flex items-center justify-between gap-3 pt-2 text-[14px] font-semibold">
-              <span>Total</span>
-              <span className="tabular">{moneyWhole(plan.uyuCents)}</span>
-            </li>
-          </ul>
+            </ul>
+          </Sortable>
         )}
         {solo.length > 0 && (
           <dl className="grid gap-1.5 rounded-xl bg-surface-2 p-3.5 text-[13px]">

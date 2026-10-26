@@ -105,9 +105,12 @@ export function SortableItem({
   draggingClass = "rounded-xl bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]",
   disabled,
   onContextMenu,
+  role,
   children,
 }: {
   id: string;
+  /** Rol de accesibilidad de la fila (por ejemplo "row" dentro de una tabla hecha con div). */
+  role?: string;
   onContextMenu?: (e: React.MouseEvent) => void;
   as?: "li" | "tr" | "div" | "article";
   className?: string;
@@ -132,6 +135,7 @@ export function SortableItem({
       }}
       className={[className, disabled ? "" : DRAG_CLASS, isDragging ? draggingClass : ""].filter(Boolean).join(" ")}
       {...(disabled ? {} : { ...attrs, ...listeners })}
+      role={role}
       onContextMenu={onContextMenu}
     >
       {children}

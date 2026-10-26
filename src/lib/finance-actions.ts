@@ -1014,3 +1014,14 @@ export async function setBudgetLinePayer(id: string, list: string) {
   await prisma.budgetLine.updateMany({ where: { id: String(id), list: { in: PAYERS } }, data: { list } });
   refrescar();
 }
+
+/** Orden propio de los gastos fijos (o de los rubros de "Si vivo solo"): los ids en el orden nuevo. */
+export async function reorderBudgetLines(group: string, ids: string[]) {
+  await exigirSesion();
+  if (!Array.isArray(ids) || ids.length > 500) return;
+  const lists = group === "solo" ? ["solo"] : PAYERS;
+  await prisma.$transaction(
+    ids.map((id, i) => prisma.budgetLine.updateMany({ where: { id: String(id), list: { in: lists } }, data: { order: i + 1 } })),
+  );
+  refrescar();
+}
