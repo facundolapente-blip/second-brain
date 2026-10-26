@@ -45,6 +45,7 @@ export function BudgetsView({
   unbudgeted,
   projects,
   lines,
+  categoryColors,
   toUyu,
   avgSpendCents,
 }: {
@@ -55,6 +56,7 @@ export function BudgetsView({
   unbudgeted: { categoryId: string | null; spentCents: number; foreign: ForeignSpend[] }[];
   projects: ProjectDTO[];
   lines: BudgetLineDTO[];
+  categoryColors: Record<string, string>;
   toUyu: Record<string, number>;
   avgSpendCents: number | null;
 }) {
@@ -303,7 +305,7 @@ export function BudgetsView({
           </Link>
         </TintedCard>
 
-        <FixedCosts lines={lines} toUyu={toUyu} avgSpendCents={avgSpendCents} />
+        <FixedCosts lines={lines} categoryColors={categoryColors} toUyu={toUyu} avgSpendCents={avgSpendCents} />
 
         {without.length > 0 && (
           <TintedCard

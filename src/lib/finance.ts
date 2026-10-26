@@ -14,7 +14,7 @@ import {
   type ScheduleFrequency,
 } from "./schedule-logic";
 import { convertCents, rolloverCarry, type CategoryBudgetDTO, type ForeignSpend, type ProjectDTO } from "./budget-logic";
-import { isBudgetList, type BudgetLineDTO } from "./budget-lines";
+import { assignCategoryColors, CATEGORY_COLORS_KEY, isBudgetList, isFreq, parseColorMap, type BudgetLineDTO } from "./budget-lines";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { getRates, toUyu } from "./fx";
 import {
@@ -980,5 +980,21 @@ export async function getBudgetLines(): Promise<BudgetLineDTO[]> {
     wouldCut: l.wouldCut,
     note: l.note,
     order: l.order,
+    freq: isFreq(l.freq) ? l.freq : "month",
+    times: Math.max(1, l.times),
   }));
+}
+
+/** El color de cada categoría de los gastos fijos (las nuevas toman uno libre y queda guardado). */
+export async function getBudgetCategoryColors(lines: BudgetLineDTO[]): Promise<Record<string, string>> {
+  const row = await prisma.appSetting.findUnique({ where: { key: CATEGORY_COLORS_KEY } });
+  const { colors, changed } = assignCategoryColors(
+    lines.map((l) => l.category).filter((c): c is string => !!c),
+    parseColorMap(row?.value),
+  );
+  if (changed) {
+    const value = JSON.stringify(colors);
+    await prisma.appSetting.upsert({ where: { key: CATEGORY_COLORS_KEY }, create: { key: CATEGORY_COLORS_KEY, value }, update: { value } });
+  }
+  return colors;
 }

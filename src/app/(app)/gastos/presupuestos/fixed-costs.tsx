@@ -30,12 +30,20 @@ import {
 } from "@/lib/offline/finance";
 import {
   byLineOrder,
+  CATEGORY_COLORS,
+  FREQ_LABEL,
+  FREQS,
+  freqText,
+  isPlainMonthly,
   lineTotal,
+  MAX_TIMES,
+  monthlyCents,
+  type Freq,
   type BudgetLineDTO,
   type BudgetList,
   type LineTotal,
 } from "@/lib/budget-lines";
-import { centsToInput } from "@/lib/finance-logic";
+import { centsToInput, parseAmount } from "@/lib/finance-logic";
 import { CURRENCIES, moneyCents, moneyWhole } from "@/lib/format";
 import { tone } from "@/lib/palette";
 
@@ -58,6 +66,15 @@ const payerOf = (l: BudgetLineDTO): Payer =>
 const fmtRate = (n: number) =>
   n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
 
+/** Debajo del nombre cuando no es "mensual, una vez": "$ 12.000 anual", "$ 1.500 · 4× por mes". */
+function unitText(l: BudgetLineDTO): string | null {
+  if (isPlainMonthly(l)) return null;
+  const f = freqText(l);
+  return l.amountCents === null
+    ? f
+    : `${moneyCents(l.amountCents, l.currency)} ${l.times > 1 ? `· ${f}` : f.toLowerCase()}`;
+}
+
 /** "$ 44.750 + US$ 115" (cada moneda tal cual; sin nada, "$ 0"). */
 function currencies(t: LineTotal): string {
   const parts = Object.entries(t.byCurrency)
@@ -73,12 +90,37 @@ function currencies(t: LineTotal): string {
  * paga todos los meses y una etiqueta de quién lo paga; al lado, el plan "Si vivo solo"
  * comparado con lo de hoy y con lo que gasta en promedio.
  */
+/** La categoría como etiqueta llena de su color. */
+function CategoryTag({
+  name,
+  color,
+  small,
+}: {
+  name: string;
+  color?: string;
+  small?: boolean;
+}) {
+  return (
+    <span
+      style={tone(color ?? "stone")}
+      className={cx(
+        "chip-solid inline-flex max-w-full items-center truncate rounded-full font-medium",
+        small ? "h-5 px-2 text-[11px]" : "h-6 px-2.5 text-[12px]",
+      )}
+    >
+      {name}
+    </span>
+  );
+}
+
 export function FixedCosts({
   lines,
+  categoryColors,
   toUyu,
   avgSpendCents,
 }: {
   lines: BudgetLineDTO[];
+  categoryColors: Record<string, string>;
   toUyu: Record<string, number>;
   avgSpendCents: number | null;
 }) {
@@ -148,7 +190,7 @@ export function FixedCosts({
       <TintedCard
         icon={Receipt}
         title="Gastos fijos"
-        className="lg:col-span-7"
+        className="lg:col-span-12"
         meta={
           fixed.length
             ? `${currencies(mine)} vos · ${currencies(paid)} te pagan${pausedCount ? ` · ${pausedCount} ${pausedCount === 1 ? "pausado" : "pausados"}` : ""}`
@@ -174,10 +216,14 @@ export function FixedCosts({
           <div role="table" aria-label="Gastos fijos" className="grid">
             <div
               role="row"
-              className="hidden border-b border-line pb-1.5 font-mono text-[11px] tracking-wide text-muted uppercase sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_7.5rem_8.5rem] sm:gap-3"
+              className="hidden border-b border-line pb-1.5 font-mono text-[11px] tracking-wide text-muted uppercase lg:grid lg:grid-cols-[minmax(0,1fr)_8rem_7.5rem_8rem_7.5rem_8.5rem] lg:gap-3"
             >
               <span role="columnheader">Gasto</span>
               <span role="columnheader">Categoría</span>
+              <span role="columnheader" className="text-right">
+                Monto
+              </span>
+              <span role="columnheader">Frecuencia</span>
               <span role="columnheader" className="text-right">
                 Por mes
               </span>
@@ -198,9 +244,9 @@ export function FixedCosts({
                     as="div"
                     role="row"
                     draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_7.5rem_8.5rem] sm:py-1.5 lg:cursor-grab lg:active:cursor-grabbing"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_8rem_7.5rem_8rem_7.5rem_8.5rem] lg:cursor-grab lg:py-1.5 lg:active:cursor-grabbing"
                   >
-                    <span role="cell" className="min-w-0 max-sm:row-span-2">
+                    <span role="cell" className="min-w-0 max-lg:row-span-2">
                       <button
                         type="button"
                         onClick={() => open(l, l.list)}
@@ -219,29 +265,40 @@ export function FixedCosts({
                             </span>
                           )}
                         </span>
-                        {(l.note || l.category) && (
+                        {(l.note || l.category || !isPlainMonthly(l)) && (
                           <span className="text-[12px] text-muted">
-                            <span className="sm:hidden">
-                              {[l.category, l.note].filter(Boolean).join(" · ")}
+                            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5 lg:hidden">
+                              {l.category && (
+                                <CategoryTag
+                                  name={l.category}
+                                  color={categoryColors[l.category]}
+                                  small
+                                />
+                              )}
+                              <span>
+                                {[unitText(l), l.note]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
                             </span>
-                            <span className="max-sm:hidden">{l.note}</span>
+                            <span className="max-lg:hidden">{l.note}</span>
                           </span>
                         )}
                       </button>
                     </span>
-                    <span
-                      role="cell"
-                      className="truncate text-[13px] text-muted max-sm:hidden"
-                    >
-                      {l.category ?? ""}
+                    <span role="cell" className="min-w-0 max-lg:hidden">
+                      {l.category && (
+                        <CategoryTag
+                          name={l.category}
+                          color={categoryColors[l.category]}
+                        />
+                      )}
                     </span>
                     <span
                       role="cell"
                       className={cx(
-                        "text-right tabular text-[14px] max-sm:col-start-2 max-sm:row-start-1",
-                        l.amountCents === null && "text-faint",
-                        l.list === "paused" &&
-                          "text-muted line-through decoration-faint",
+                        "text-right tabular text-[13.5px] text-muted max-lg:hidden",
+                        l.list === "paused" && "line-through decoration-faint",
                       )}
                     >
                       {l.amountCents === null
@@ -250,7 +307,26 @@ export function FixedCosts({
                     </span>
                     <span
                       role="cell"
-                      className="max-sm:col-start-2 max-sm:row-start-2 max-sm:justify-self-end"
+                      className="truncate text-[13px] text-muted max-lg:hidden"
+                    >
+                      {freqText(l)}
+                    </span>
+                    <span
+                      role="cell"
+                      className={cx(
+                        "text-right tabular text-[14px] font-medium max-lg:col-start-2 max-lg:row-start-1",
+                        l.amountCents === null && "font-normal text-faint",
+                        l.list === "paused" &&
+                          "font-normal text-muted line-through decoration-faint",
+                      )}
+                    >
+                      {l.amountCents === null
+                        ? "—"
+                        : moneyCents(monthlyCents(l)!, l.currency)}
+                    </span>
+                    <span
+                      role="cell"
+                      className="max-lg:col-start-2 max-lg:row-start-2 max-lg:justify-self-end"
                     >
                       <button
                         type="button"
@@ -286,13 +362,13 @@ export function FixedCosts({
       <TintedCard
         icon={House}
         title="Si vivo solo"
-        className="lg:col-span-5 lg:self-start"
+        className="lg:col-span-12"
         meta={
           solo.length
             ? `${moneyWhole(plan.uyuCents)} por mes`
             : "Un plan para comparar"
         }
-        bodyClassName="gap-3!"
+        bodyClassName="gap-4! lg:grid! lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-x-8!"
         action={
           <button
             type="button"
@@ -329,8 +405,10 @@ export function FixedCosts({
                   >
                     <span className="grid min-w-0 flex-1">
                       <span className="text-[14px] break-words">{l.name}</span>
-                      {l.note && (
-                        <span className="text-[12px] text-muted">{l.note}</span>
+                      {(l.note || !isPlainMonthly(l)) && (
+                        <span className="text-[12px] text-muted">
+                          {[unitText(l), l.note].filter(Boolean).join(" · ")}
+                        </span>
                       )}
                     </span>
                     <span
@@ -341,7 +419,7 @@ export function FixedCosts({
                     >
                       {l.amountCents === null
                         ? "—"
-                        : moneyCents(l.amountCents, l.currency)}
+                        : moneyCents(monthlyCents(l)!, l.currency)}
                     </span>
                   </button>
                 </SortableItem>
@@ -391,6 +469,7 @@ export function FixedCosts({
           line={editing.line}
           list={editing.list}
           categories={categories}
+          categoryColors={categoryColors}
           onDone={() => sheet.current?.close()}
         />
       </Sheet>
@@ -430,11 +509,13 @@ function LineForm({
   line,
   list,
   categories,
+  categoryColors,
   onDone,
 }: {
   line?: BudgetLineDTO;
   list: BudgetList;
   categories: string[];
+  categoryColors: Record<string, string>;
   onDone: () => void;
 }) {
   const [state, action, pending] = useActionState<
@@ -442,7 +523,25 @@ function LineForm({
     FormData
   >(safeForm(saveBudgetLine), null);
   const [payer, setPayer] = useState<BudgetList>(line?.list ?? list);
+  const [amount, setAmount] = useState(
+    centsToInput(line?.amountCents ?? undefined),
+  );
+  const [currency, setCurrency] = useState(line?.currency ?? "UYU");
+  const [freq, setFreq] = useState<Freq>(line?.freq ?? "month");
+  const [category, setCategory] = useState(line?.category ?? "");
+  // El color se elige a mano; si no, el que ya tiene la categoría (una nueva toma uno libre al guardar).
+  const [pickedColor, setPickedColor] = useState<string | null>(null);
+  const catName = category.trim().replace(/\s+/g, " ");
+  const color = pickedColor ?? categoryColors[catName] ?? null;
+  const [times, setTimes] = useState(String(line?.times ?? 1));
   const [, start] = useSafeTransition();
+  // "≈ $ 6.000 por mes": lo que va a contar en los totales con esta frecuencia.
+  const cents = amount.trim() ? parseAmount(amount) : null;
+  const n = Math.min(MAX_TIMES, Math.max(1, Math.round(Number(times) || 1)));
+  const perMonth =
+    cents === null
+      ? null
+      : monthlyCents({ amountCents: cents, freq, times: n });
   useEffect(() => {
     if (state?.ok) onDone();
   }, [state, onDone]);
@@ -462,18 +561,20 @@ function LineForm({
         />
       </Field>
       <div className="grid grid-cols-[1fr_6.5rem] gap-3">
-        <Field label="Por mes (opcional)">
+        <Field label="Monto (opcional)">
           <Input
             name="amount"
             inputMode="decimal"
-            defaultValue={centsToInput(line?.amountCents ?? undefined)}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             placeholder="Sin monto"
           />
         </Field>
         <Field label="Moneda">
           <select
             name="currency"
-            defaultValue={line?.currency ?? "UYU"}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
             className={inputClass}
           >
             {CURRENCIES.map((c) => (
@@ -483,6 +584,45 @@ function LineForm({
             ))}
           </select>
         </Field>
+      </div>
+      <div className="grid gap-1.5">
+        <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+          <Field label="Cada cuánto">
+            <select
+              name="freq"
+              value={freq}
+              onChange={(e) => setFreq(e.target.value as Freq)}
+              className={inputClass}
+            >
+              {FREQS.map((f) => (
+                <option key={f} value={f}>
+                  {FREQ_LABEL[f]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Veces">
+            <Input
+              name="times"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_TIMES}
+              value={times}
+              onChange={(e) => setTimes(e.target.value)}
+              onBlur={() => setTimes(String(n))}
+            />
+          </Field>
+        </div>
+        <p className="text-[12.5px] text-muted" aria-live="polite">
+          {perMonth === null
+            ? n > 1
+              ? `${n} veces ${freq === "month" ? "por mes" : freq === "week" ? "por semana" : freq === "quarter" ? "por trimestre" : "por año"}`
+              : "Sin monto todavía: no suma en los totales."
+            : isPlainMonthly({ freq, times: n })
+              ? `Cuenta ${moneyCents(perMonth, currency)} por mes.`
+              : `Por mes son ${moneyCents(perMonth, currency)}.`}
+        </p>
       </div>
       {!isPlan && (
         <div className="grid gap-1.5">
@@ -513,7 +653,11 @@ function LineForm({
           <Input
             name="category"
             maxLength={40}
-            defaultValue={line?.category ?? ""}
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setPickedColor(null);
+            }}
             list="gastos-fijos-categorias"
             placeholder="Casa, Salud…"
           />
@@ -523,6 +667,37 @@ function LineForm({
             ))}
           </datalist>
         </Field>
+      )}
+      {!isPlan && catName && (
+        <div className="grid gap-1.5">
+          <span className="kicker">Color de {catName}</span>
+          {pickedColor && (
+            <input type="hidden" name="categoryColor" value={pickedColor} />
+          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {CATEGORY_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={color === c}
+                aria-label={c}
+                onClick={() => setPickedColor(c)}
+                style={tone(c)}
+                className={cx(
+                  "chip-solid size-8 rounded-full",
+                  color === c &&
+                    "ring-2 ring-fg ring-offset-2 ring-offset-[var(--surface)]",
+                )}
+              />
+            ))}
+            <span className="ml-1">
+              <CategoryTag name={catName} color={color ?? undefined} />
+            </span>
+          </div>
+          <span className="text-[12px] text-muted">
+            Vale para todos los gastos de esta categoría.
+          </span>
+        </div>
       )}
       <Field label="Nota (opcional)">
         <Input

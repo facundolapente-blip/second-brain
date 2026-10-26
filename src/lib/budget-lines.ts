@@ -15,6 +15,16 @@ export const LIST_LABEL: Record<BudgetList, string> = {
 
 export const isBudgetList = (v: unknown): v is BudgetList => (BUDGET_LISTS as readonly string[]).includes(String(v));
 
+/** Cada cuánto se paga (con `times`: cuántas veces en ese período). */
+export const FREQS = ["month", "week", "quarter", "year"] as const;
+export type Freq = (typeof FREQS)[number];
+export const FREQ_LABEL: Record<Freq, string> = { month: "Mensual", week: "Semanal", quarter: "Trimestral", year: "Anual" };
+const FREQ_PER: Record<Freq, string> = { month: "por mes", week: "por semana", quarter: "por trimestre", year: "por año" };
+/** Cuántas veces entra el período en un mes (una semana: 52 / 12). */
+const PER_MONTH: Record<Freq, number> = { month: 1, week: 52 / 12, quarter: 1 / 3, year: 1 / 12 };
+export const isFreq = (v: unknown): v is Freq => (FREQS as readonly string[]).includes(String(v));
+export const MAX_TIMES = 31;
+
 export type BudgetLineDTO = {
   id: string;
   list: BudgetList;
@@ -27,7 +37,24 @@ export type BudgetLineDTO = {
   wouldCut: boolean;
   note: string | null;
   order: number;
+  freq: Freq;
+  /** Veces en cada período (1 = una vez). */
+  times: number;
 };
+
+/** Lo que sale por mes: monto × veces × (períodos por mes), en centavos. Sin monto, null. */
+export function monthlyCents(l: Pick<BudgetLineDTO, "amountCents" | "freq" | "times">): number | null {
+  if (l.amountCents === null) return null;
+  return Math.round(l.amountCents * Math.max(1, l.times) * PER_MONTH[l.freq]);
+}
+
+/** "Mensual", "Anual", "4× por mes", "2× por semana". */
+export function freqText(l: Pick<BudgetLineDTO, "freq" | "times">): string {
+  return l.times > 1 ? `${l.times}× ${FREQ_PER[l.freq]}` : FREQ_LABEL[l.freq];
+}
+
+/** Mensual una vez = nada que aclarar. */
+export const isPlainMonthly = (l: Pick<BudgetLineDTO, "freq" | "times">) => l.freq === "month" && l.times <= 1;
 
 export type LineTotal = {
   /** Lo de cada moneda, tal cual. */
@@ -37,12 +64,13 @@ export type LineTotal = {
   count: number;
 };
 
-/** Suma de una lista (sin las que no tienen monto). `toUyu` = pesos por 1 de cada moneda. */
+/** Suma por mes de una lista (cada renglón con su frecuencia; sin las que no tienen monto). `toUyu` = pesos por 1 de cada moneda. */
 export function lineTotal(lines: BudgetLineDTO[], toUyu: Record<string, number>): LineTotal {
   const byCurrency: Record<string, number> = {};
   for (const l of lines) {
-    if (l.amountCents === null) continue;
-    byCurrency[l.currency] = (byCurrency[l.currency] ?? 0) + l.amountCents;
+    const m = monthlyCents(l);
+    if (m === null) continue;
+    byCurrency[l.currency] = (byCurrency[l.currency] ?? 0) + m;
   }
   let uyuCents = 0;
   for (const [cur, cents] of Object.entries(byCurrency)) {
@@ -63,4 +91,34 @@ export function parseNotionMoney(raw: string): { cents: number; currency: string
   const num = s.replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
   if (!num || isNaN(Number(num))) return null;
   return { cents: Math.round(Number(num) * 100), currency };
+}
+
+/** Colores de las etiquetas de categoría (sin los de "Quién paga": petróleo, violeta y gris). */
+export const CATEGORY_COLORS = ["blue", "orange", "green", "pink", "yellow", "red", "brown"] as const;
+export const CATEGORY_COLORS_KEY = "gastos_fijos_categoria_colores";
+
+/**
+ * Le da color a las categorías que no tienen: el primero que no usa otra (si se acaban, vuelve
+ * a empezar). Las que ya tenían no cambian. Devuelve el mapa completo y si hubo algo nuevo.
+ */
+export function assignCategoryColors(categories: string[], saved: Record<string, string>): { colors: Record<string, string>; changed: boolean } {
+  const colors = { ...saved };
+  let changed = false;
+  for (const c of [...new Set(categories)].sort((a, b) => a.localeCompare(b, "es"))) {
+    if (colors[c]) continue;
+    const used = new Set(Object.values(colors));
+    const free = CATEGORY_COLORS.find((k) => !used.has(k));
+    colors[c] = free ?? CATEGORY_COLORS[Object.keys(colors).length % CATEGORY_COLORS.length];
+    changed = true;
+  }
+  return { colors, changed };
+}
+
+export function parseColorMap(raw: string | null | undefined): Record<string, string> {
+  try {
+    const v = JSON.parse(raw ?? "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, c]) => typeof c === "string")) as Record<string, string> : {};
+  } catch {
+    return {};
+  }
 }

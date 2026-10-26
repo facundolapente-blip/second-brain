@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineTotal, parseNotionMoney, type BudgetLineDTO } from "@/lib/budget-lines";
+import { freqText, lineTotal, monthlyCents, parseNotionMoney, type BudgetLineDTO } from "@/lib/budget-lines";
 
 let n = 0;
 const line = (amountCents: number | null, currency = "UYU"): BudgetLineDTO => ({
@@ -13,6 +13,8 @@ const line = (amountCents: number | null, currency = "UYU"): BudgetLineDTO => ({
   wouldCut: false,
   note: null,
   order: n,
+  freq: "month",
+  times: 1,
 });
 
 describe("gastos fijos", () => {
@@ -29,5 +31,32 @@ describe("gastos fijos", () => {
     // US$ 46,39 × 40,5 = 1878,795 → $ 1.879
     expect(t.uyuCents).toBe(2775000 + 187900);
     expect(t.count).toBe(5);
+  });
+
+  it("frecuencia: lo que sale por mes", () => {
+    expect(monthlyCents({ amountCents: 150000, freq: "month", times: 4 })).toBe(600000);
+    expect(monthlyCents({ amountCents: 1200000, freq: "year", times: 1 })).toBe(100000);
+    expect(monthlyCents({ amountCents: 120000, freq: "week", times: 1 })).toBe(520000);
+    expect(monthlyCents({ amountCents: 300000, freq: "quarter", times: 1 })).toBe(100000);
+    expect(monthlyCents({ amountCents: null, freq: "month", times: 1 })).toBeNull();
+    expect(freqText({ freq: "year", times: 1 })).toBe("Anual");
+    expect(freqText({ freq: "month", times: 4 })).toBe("4× por mes");
+  });
+
+  it("los totales usan lo que sale por mes", () => {
+    const uber = { ...line(150000), times: 4 };
+    const seguro = { ...line(1200000), freq: "year" as const };
+    expect(lineTotal([uber, seguro], { UYU: 1 }).uyuCents).toBe(700000);
+  });
+});
+
+describe("colores de las categorías", () => {
+  it("cada una toma el primero libre y las que tenían no cambian", async () => {
+    const { assignCategoryColors } = await import("@/lib/budget-lines");
+    const a = assignCategoryColors(["Salud", "Casa"], {});
+    expect(a.colors).toEqual({ Casa: "blue", Salud: "orange" });
+    const b = assignCategoryColors(["Salud", "Casa", "DJ"], { Casa: "green" });
+    expect(b.colors).toEqual({ Casa: "green", DJ: "blue", Salud: "orange" });
+    expect(assignCategoryColors(["Casa"], { Casa: "green" }).changed).toBe(false);
   });
 });

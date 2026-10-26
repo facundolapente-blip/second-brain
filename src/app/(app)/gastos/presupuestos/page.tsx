@@ -1,4 +1,4 @@
-import { getBudgetLines, getCategories, getCategoryBudgets, getProjects, getReserve, parseMonth } from "@/lib/finance";
+import { getBudgetCategoryColors, getBudgetLines, getCategories, getCategoryBudgets, getProjects, getReserve, parseMonth } from "@/lib/finance";
 import { getRates } from "@/lib/fx";
 import { todayISO } from "@/lib/dates";
 import { BudgetsView } from "./budgets-view";
@@ -15,6 +15,7 @@ export default async function PresupuestosPage({ searchParams }: PageProps<"/gas
     getRates(),
     getReserve(),
   ]);
+  const categoryColors = await getBudgetCategoryColors(lines);
   return (
     <BudgetsView
       month={month}
@@ -24,6 +25,7 @@ export default async function PresupuestosPage({ searchParams }: PageProps<"/gas
       unbudgeted={unbudgeted}
       projects={projects}
       lines={lines}
+      categoryColors={categoryColors}
       toUyu={rates.toUyu}
       avgSpendCents={reserve.spendCents}
     />

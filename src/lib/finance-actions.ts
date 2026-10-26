@@ -14,7 +14,7 @@ import { dayIn, installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
-import { isBudgetList } from "./budget-lines";
+import { CATEGORY_COLORS, CATEGORY_COLORS_KEY, isBudgetList, isFreq, MAX_TIMES, parseColorMap } from "./budget-lines";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -984,7 +984,23 @@ export async function saveBudgetLine(_prev: ActionResult | null, fd: FormData): 
     variable: fd.get("variable") === "on",
     wouldCut: fd.get("wouldCut") === "on",
     note: texto(fd, "note", 500) || null,
+    ...(fd.has("freq")
+      ? {
+          freq: isFreq(texto(fd, "freq")) ? texto(fd, "freq") : "month",
+          times: Math.min(MAX_TIMES, Math.max(1, Math.round(Number(texto(fd, "times", 4)) || 1))),
+        }
+      : {}),
   };
+  // El color elegido para la categoría (vale para todos los gastos de esa categoría).
+  const color = texto(fd, "categoryColor", 20);
+  if (data.category && (CATEGORY_COLORS as readonly string[]).includes(color)) {
+    const row = await prisma.appSetting.findUnique({ where: { key: CATEGORY_COLORS_KEY } });
+    const map = parseColorMap(row?.value);
+    if (map[data.category] !== color) {
+      const value = JSON.stringify({ ...map, [data.category]: color });
+      await prisma.appSetting.upsert({ where: { key: CATEGORY_COLORS_KEY }, create: { key: CATEGORY_COLORS_KEY, value }, update: { value } });
+    }
+  }
   if (id) {
     const saved = await prisma.budgetLine.update({ where: { id }, data });
     await logActivity("updated", "budgetLine", saved.id, name);

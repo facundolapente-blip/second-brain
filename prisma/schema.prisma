@@ -842,6 +842,9 @@ model BudgetLine {
   wouldCut   Boolean  @default(false)
   note       String?
   order      Float    @default(0)
+  /// Cada cuánto se paga (month | week | quarter | year) y cuántas veces en ese período.
+  freq       String   @default("month")
+  times      Int      @default(1)
   source     String?
   externalId String?  @unique
   createdAt  DateTime @default(now())
