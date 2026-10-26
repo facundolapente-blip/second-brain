@@ -202,20 +202,36 @@ export function FixedCosts({
       await reorderBudgetLines(group, ids);
     });
 
-  // Anchos de las columnas (compu), igual que la tabla de Tareas: cada columna tiene su ancho y la
-  // tabla mide la suma; arrastrar un borde cambia solo esa columna y lo de la derecha se corre.
+  // Anchos de las columnas (compu). Arrastrar un borde mueve SOLO esa línea (pedido de Facu,
+  // 2026-10-26): lo que gana la columna de la izquierda lo pierde la de la derecha y todas las
+  // demás líneas quedan quietas. El último borde (el de afuera) cambia solo la última columna.
   const [widths, setWidths] = useState<FixedColumnWidths>(columns);
   const widthOf = (k: FixedColumnKey) =>
     widths[k] ?? FIXED_COLUMNS.find((c) => c.key === k)!.width;
+  const dragStart = useRef<Record<FixedColumnKey, number> | null>(null);
   const resize = (k: FixedColumnKey, w: number, save: boolean) => {
-    const next = {
-      ...widths,
-      [k]: Math.round(
-        Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)),
-      ),
-    };
+    const base =
+      dragStart.current ??
+      (dragStart.current = Object.fromEntries(
+        FIXED_COLUMNS.map((c) => [c.key, widthOf(c.key)]),
+      ) as Record<FixedColumnKey, number>);
+    const i = FIXED_COLUMNS.findIndex((c) => c.key === k);
+    const nb = FIXED_COLUMNS[i + 1]?.key;
+    const next: Record<FixedColumnKey, number> = { ...base };
+    if (nb) {
+      const lo = Math.max(FIXED_COLUMN_MIN - base[k], base[nb] - FIXED_COLUMN_MAX);
+      const hi = Math.min(FIXED_COLUMN_MAX - base[k], base[nb] - FIXED_COLUMN_MIN);
+      const delta = Math.round(Math.min(hi, Math.max(lo, w - base[k])));
+      next[k] = base[k] + delta;
+      next[nb] = base[nb] - delta;
+    } else {
+      next[k] = Math.round(Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)));
+    }
     setWidths(next);
-    if (save) quiet(saveBudgetColumns(next));
+    if (save) {
+      dragStart.current = null;
+      quiet(saveBudgetColumns(next));
+    }
   };
   const total = FIXED_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0);
 
