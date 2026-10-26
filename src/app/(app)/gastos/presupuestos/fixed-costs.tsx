@@ -452,12 +452,9 @@ export function FixedCosts({
                         {FIXED_COLUMNS.map((c) => (
                           <th
                             key={c.key}
-                            className={cx(
-                              CELL,
-                              "px-3 py-2.5 font-medium",
-                              (c.key === "amount" || c.key === "monthly") &&
-                                "text-right",
-                            )}
+                            // Todo alineado a la izquierda, como Notion: cada texto pegado a su
+                            // propio borde, así mover una línea no arrastra el de la otra columna.
+                            className={cx(CELL, "px-3 py-2.5 font-medium")}
                           >
                             <span className="block truncate">{c.label}</span>
                           </th>
@@ -536,7 +533,7 @@ export function FixedCosts({
                             <td
                               className={cx(
                                 CELL,
-                                "px-3 text-right tabular text-muted",
+                                "px-3 tabular text-muted",
                                 paused && "line-through decoration-faint",
                               )}
                             >
@@ -557,7 +554,7 @@ export function FixedCosts({
                             <td
                               className={cx(
                                 CELL,
-                                "px-3 text-right tabular font-medium",
+                                "px-3 tabular font-medium",
                                 l.amountCents === null &&
                                   "font-normal text-faint",
                                 paused &&

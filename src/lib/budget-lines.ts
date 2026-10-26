@@ -125,7 +125,7 @@ export function parseColorMap(raw: string | null | undefined): Record<string, st
 
 /** Columnas de la tabla de gastos fijos (compu), con su ancho de entrada en px. */
 export const FIXED_COLUMNS = [
-  { key: "name", label: "Gasto", width: 280 },
+  { key: "name", label: "Gasto", width: 250 },
   { key: "category", label: "Categoría", width: 170 },
   { key: "amount", label: "Monto", width: 120 },
   { key: "freq", label: "Frecuencia", width: 140 },
