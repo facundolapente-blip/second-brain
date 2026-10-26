@@ -203,15 +203,32 @@ export function FixedCosts({
   const [widths, setWidths] = useState<FixedColumnWidths>(columns);
   const widthOf = (k: FixedColumnKey) =>
     widths[k] ?? FIXED_COLUMNS.find((c) => c.key === k)!.width;
+  // Mover un borde cambia solo las dos columnas que lo tocan: lo que gana una lo pierde la de al
+  // lado y el resto de la tabla no se mueve (pedido de Facu). El último borde agranda la última.
+  const dragStart = useRef<Record<FixedColumnKey, number> | null>(null);
   const resize = (k: FixedColumnKey, w: number, save: boolean) => {
-    const next = {
-      ...widths,
-      [k]: Math.round(
-        Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)),
-      ),
-    };
+    const base =
+      dragStart.current ??
+      (dragStart.current = Object.fromEntries(
+        FIXED_COLUMNS.map((c) => [c.key, widthOf(c.key)]),
+      ) as Record<FixedColumnKey, number>);
+    const i = FIXED_COLUMNS.findIndex((c) => c.key === k);
+    const nb = FIXED_COLUMNS[i + 1]?.key;
+    const next: Record<FixedColumnKey, number> = { ...base };
+    if (nb) {
+      const lo = Math.max(FIXED_COLUMN_MIN - base[k], base[nb] - FIXED_COLUMN_MAX);
+      const hi = Math.min(FIXED_COLUMN_MAX - base[k], base[nb] - FIXED_COLUMN_MIN);
+      const delta = Math.round(Math.min(hi, Math.max(lo, w - base[k])));
+      next[k] = base[k] + delta;
+      next[nb] = base[nb] - delta;
+    } else {
+      next[k] = Math.round(Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)));
+    }
     setWidths(next);
-    if (save) quiet(saveBudgetColumns(next));
+    if (save) {
+      dragStart.current = null;
+      quiet(saveBudgetColumns(next));
+    }
   };
   const colsVar = FIXED_COLUMNS.map((c) => `${widthOf(c.key)}px`).join(" ");
 
@@ -622,7 +639,7 @@ export function FixedCosts({
       <TintedCard
         icon={House}
         title="Si vivo solo"
-        className="lg:col-span-12"
+        className="lg:col-span-6 lg:self-start"
         meta={
           solo.length
             ? `${moneyWhole(plan.uyuCents)} por mes`
@@ -645,7 +662,7 @@ export function FixedCosts({
             lo de hoy.
           </p>
         ) : (
-          <div className="lg:max-w-2xl">
+          <div>
             <Sortable
               ids={solo.map((l) => l.id)}
               onReorder={(ids) => reorder("solo", ids)}
