@@ -612,6 +612,7 @@ export function WeekView({
                   onNew={() => openNew(selected)}
                   onMove={move}
                   onTomorrow={toTomorrow}
+                  onMenu={blockMenu}
                 />
               ) : (
                 // Por horas en el celular: el calendario del día elegido en la tira.
@@ -634,6 +635,9 @@ export function WeekView({
   );
 }
 
+/** Reloj para los gestos (fuera del componente: solo se usa en manejadores de eventos). */
+const clock = () => Date.now();
+
 function DayList({
   day,
   today,
@@ -645,6 +649,7 @@ function DayList({
   onNew,
   onMove,
   onTomorrow,
+  onMenu,
 }: {
   day: string;
   today: string;
@@ -656,6 +661,8 @@ function DayList({
   onNew: () => void;
   onMove: (id: string, date: string, startTime?: string | null, sortKey?: number, others?: SortKeyPatch[]) => void;
   onTomorrow: (b: BlockDTO) => void;
+  /** El menú del bloque (el mismo del clic derecho): se abre manteniendo apretado. */
+  onMenu: (e: React.MouseEvent, b: BlockDTO) => void;
 }) {
   // Mantener apretado un bloque sin hora y moverlo: queda en ese lugar del día
   // (entre los vecinos, como en la columna de la compu). Los que tienen hora van por horario.
@@ -666,28 +673,83 @@ function DayList({
   const [held, setHeld] = useState<string | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const holdStart = useRef<{ x: number; y: number } | null>(null);
-  const holdProps = (id: string) => ({
+  // Mantener apretado ~0,45 s sin mover abre el menú del bloque (Duplicar, Borrar…; pedido de
+  // Facu, 2026-10-26). Un bloque con hora no se ordena, así que el menú sale enseguida; uno sin
+  // hora se puede arrastrar, así que el menú sale al soltar si el dedo no se movió.
+  const menuTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const menuPending = useRef<{ b: BlockDTO; el: HTMLElement } | null>(null);
+  const menuFiredAt = useRef(0);
+  const openMenuAt = (b: BlockDTO, el: HTMLElement) => {
+    const s = holdStart.current;
+    if (!s) return;
+    menuFiredAt.current = clock();
+    haptic("threshold");
+    // El menú compartido espera un evento de mouse: alcanza con la posición y el elemento.
+    onMenu({ target: el, currentTarget: el, clientX: s.x, clientY: s.y, preventDefault() {}, stopPropagation() {} } as unknown as React.MouseEvent, b);
+  };
+  const cancelMenu = () => {
+    clearTimeout(menuTimer.current);
+    menuPending.current = null;
+  };
+  const holdProps = (b: BlockDTO) => ({
     onTouchStartCapture: (e: React.TouchEvent) => {
+      if (e.touches.length !== 1) return cancelMenu();
       const t = e.touches[0];
+      const el = e.currentTarget as HTMLElement;
       holdStart.current = { x: t.clientX, y: t.clientY };
       clearTimeout(holdTimer.current);
-      holdTimer.current = setTimeout(() => setHeld(id), 250);
+      holdTimer.current = setTimeout(() => setHeld(b.id), 250);
+      cancelMenu();
+      menuTimer.current = setTimeout(() => {
+        if (b.startTime) openMenuAt(b, el);
+        else menuPending.current = { b, el };
+      }, 450);
     },
     onTouchMoveCapture: (e: React.TouchEvent) => {
       const s = holdStart.current;
       const t = e.touches[0];
-      if (s && Math.hypot(t.clientX - s.x, t.clientY - s.y) > 8) clearTimeout(holdTimer.current);
+      if (s && Math.hypot(t.clientX - s.x, t.clientY - s.y) > 8) {
+        clearTimeout(holdTimer.current);
+        cancelMenu();
+      }
     },
-    onTouchEndCapture: () => {
+    onTouchEndCapture: (e: React.TouchEvent) => {
       clearTimeout(holdTimer.current);
       setHeld(null);
+      const pending = menuPending.current;
+      cancelMenu();
+      if (pending) openMenuAt(pending.b, pending.el);
+      // Ya se abrió el menú: el dedo que se levanta no es un toque en el bloque.
+      if (clock() - menuFiredAt.current < 1500) e.preventDefault();
     },
     onTouchCancelCapture: () => {
       clearTimeout(holdTimer.current);
       setHeld(null);
+      cancelMenu();
+    },
+    // El toque que sigue al menú no abre la hoja del bloque.
+    onClickCapture: (e: React.MouseEvent) => {
+      if (clock() - menuFiredAt.current < 800) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    // Android manda un `contextmenu` después del mismo gesto: no abrir el menú dos veces.
+    onContextMenu: (e: React.MouseEvent) => {
+      if (clock() - menuFiredAt.current < 1500) {
+        e.preventDefault();
+        return;
+      }
+      onMenu(e, b);
     },
   });
-  useEffect(() => () => clearTimeout(holdTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(holdTimer.current);
+      clearTimeout(menuTimer.current);
+    },
+    [],
+  );
   function reorder(_ids: string[], moved: { id: string; to: number }) {
     const b = blocks.find((x) => x.id === moved.id);
     if (!b || b.startTime) return;
@@ -727,7 +789,7 @@ function DayList({
                     left={held === b.id || isFreeBlock(b) || b.done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: () => onToggle(b) }}
                     right={held === b.id ? undefined : { label: "Mañana", icon: <ArrowRight size={20} weight="bold" />, tone: "accent", onAction: () => onTomorrow(b) }}
                   >
-                    <div {...holdProps(b.id)} className={cx("tap-tint grid grid-cols-[60px_1fr] items-start gap-3 bg-surface", isFreeBlock(b) && "free-row")}>
+                    <div {...holdProps(b)} className={cx("tap-tint grid grid-cols-[60px_1fr] items-start gap-3 bg-surface", isFreeBlock(b) && "free-row")}>
                       <span className={cx("pt-3 text-right font-mono text-[13px] leading-tight font-medium tabular", live ? "text-accent-fg" : "text-fg/80")}>
                         {b.startTime ? (
                           <span className="inline-flex items-center justify-end gap-1.5">
