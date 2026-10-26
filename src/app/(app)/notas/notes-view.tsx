@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import {
   ArrowSquareOut,
   Check,
@@ -28,11 +35,21 @@ import { showContextMenu } from "@/components/context-menu";
 import { leaveThen, useNewIds } from "@/components/motion";
 import { useOnNew } from "@/components/nav-add";
 import { useSafeTransition } from "@/components/safe-action";
-import { notifyDeleted, notifyError, notifyInfo } from "@/components/undo-toast";
+import {
+  notifyDeleted,
+  notifyError,
+  notifyInfo,
+} from "@/components/undo-toast";
 import { haptic } from "@/components/haptics";
 import { sendPhoto } from "@/components/photos";
 import { plainClick } from "@/components/tab-nav";
-import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
+import {
+  Button,
+  cx,
+  inputClass,
+  Sheet,
+  type SheetHandle,
+} from "@/components/ui";
 import { tone } from "@/lib/palette";
 import { newClientId } from "@/lib/plan-logic";
 import {
@@ -52,15 +69,43 @@ import {
   type NoteDTO,
   type NoteSectionId,
 } from "@/lib/notes-logic";
-import { deleteNote, moveNote, moveNoteSection, setNoteStars, saveNote, setNoteCategory, setNoteCategoryColor, setNoteDone, setNotePinned } from "@/lib/offline/notes";
+import {
+  deleteNote,
+  moveNote,
+  moveNoteSection,
+  setNoteStars,
+  saveNote,
+  setNoteCategory,
+  setNoteCategoryColor,
+  setNoteDone,
+  setNotePinned,
+} from "@/lib/offline/notes";
 import { usePendingActions, type QueuedOp } from "@/lib/offline/queue";
 import { doneLabel, NoteCard } from "./note-card";
-import { NoteSheet, type NoteCategory, type NoteSheetActions, type NoteSheetHandle } from "./note-sheet";
+import {
+  NoteSheet,
+  type NoteCategory,
+  type NoteSheetActions,
+  type NoteSheetHandle,
+} from "./note-sheet";
 
 /** `category`: una categoría de la sección, `NO_CATEGORY` (las que no tienen) o "" (todas). */
-type Filters = { section: NoteSectionId | null; q: string; tag: string; category: string; important: boolean; later: boolean; limit: number };
-type Counts = { all: number; bySection: Record<string, number>; laterVideos: number };
-type Change = { add: NoteDTO } | { remove: string } | (Partial<NoteDTO> & { id: string });
+type Filters = {
+  section: NoteSectionId | null;
+  q: string;
+  tag: string;
+  category: string;
+  important: boolean;
+  later: boolean;
+  limit: number;
+};
+type Counts = {
+  all: number;
+  bySection: Record<string, number>;
+  laterVideos: number;
+};
+type Change =
+  { add: NoteDTO } | { remove: string } | (Partial<NoteDTO> & { id: string });
 
 const PAGE = 60;
 
@@ -91,7 +136,10 @@ function hrefOf(f: Partial<Filters>, extra?: Record<string, string>) {
 }
 
 function applyChange(list: NoteDTO[], c: Change): NoteDTO[] {
-  if ("add" in c) return list.some((n) => n.id === c.add.id) ? list.map((n) => (n.id === c.add.id ? c.add : n)) : [c.add, ...list];
+  if ("add" in c)
+    return list.some((n) => n.id === c.add.id)
+      ? list.map((n) => (n.id === c.add.id ? c.add : n))
+      : [c.add, ...list];
   if ("remove" in c) return list.filter((n) => n.id !== c.remove);
   return list.map((n) => (n.id === c.id ? { ...n, ...c } : n));
 }
@@ -104,19 +152,32 @@ function pendingNotes(ops: QueuedOp[]): NoteDTO[] {
   const out: NoteDTO[] = [];
   for (const op of ops) {
     if (op.name !== "notes.saveNote") continue;
-    const pairs = (op.args[1] as { __fd?: [string, string][] } | undefined)?.__fd;
+    const pairs = (op.args[1] as { __fd?: [string, string][] } | undefined)
+      ?.__fd;
     if (!pairs) continue;
-    const fd = { get: (k: string) => pairs.find(([x]) => x === k)?.[1] ?? null };
+    const fd = {
+      get: (k: string) => pairs.find(([x]) => x === k)?.[1] ?? null,
+    };
     const id = fd.get("clientId");
     if (fd.get("id") || !id) continue;
     const parsed = noteFromForm(fd);
     if (!parsed.ok) continue;
     const yt = youtubeId(parsed.note.url);
-    out.push({ id, source: "app", createdAt: new Date(op.at).toISOString(), sortKey: op.at, photos: [], pinned: false, done: false, ...parsed.note, stars: parsed.note.stars ?? 0, thumbnail: yt ? youtubeThumb(yt) : null });
+    out.push({
+      id,
+      source: "app",
+      createdAt: new Date(op.at).toISOString(),
+      sortKey: op.at,
+      photos: [],
+      pinned: false,
+      done: false,
+      ...parsed.note,
+      stars: parsed.note.stars ?? 0,
+      thumbnail: yt ? youtubeThumb(yt) : null,
+    });
   }
   return out;
 }
-
 
 export function NotesView({
   notes,
@@ -147,34 +208,56 @@ export function NotesView({
   const [categorizing, setCategorizing] = useState<NoteDTO | null>(null);
   // Color elegido recién (se ve al instante; después llega igual del servidor).
   const [colorPicks, setColorPicks] = useState<Record<string, string>>({});
-  const cats = categories.map((c) => ({ ...c, color: colorPicks[`${c.section}/${c.name}`] ?? c.color }));
-  const colorOf = (section: string, name: string | null) => (name ? cats.find((c) => c.section === section && c.name === name)?.color : undefined);
+  const cats = categories.map((c) => ({
+    ...c,
+    color: colorPicks[`${c.section}/${c.name}`] ?? c.color,
+  }));
+  const colorOf = (section: string, name: string | null) =>
+    name
+      ? cats.find((c) => c.section === section && c.name === name)?.color
+      : undefined;
   const [list, apply] = useOptimistic(notes, applyChange);
   const [, start] = useSafeTransition();
 
   const pendingOps = usePendingActions();
   const pending = useMemo(() => pendingNotes(pendingOps), [pendingOps]);
   const pendingIds = new Set(pending.map((n) => n.id));
-  const visible = [...pending.filter((p) => !list.some((n) => n.id === p.id)), ...list]
+  const visible = [
+    ...pending.filter((p) => !list.some((n) => n.id === p.id)),
+    ...list,
+  ]
     .filter(
       (n) =>
         (!filters.section || sectionOf(n.section).id === filters.section) &&
         (!filters.later || !n.done) &&
-        (!filters.category || (filters.category === NO_CATEGORY ? !n.category : n.category === filters.category)) &&
+        (!filters.category ||
+          (filters.category === NO_CATEGORY
+            ? !n.category
+            : n.category === filters.category)) &&
         (!filters.important || n.stars > 0),
     )
     .sort(byNoteOrder);
   const fresh = useNewIds(visible.map((n) => n.id));
 
-  const presetCategory = filters.category && filters.category !== NO_CATEGORY ? filters.category : null;
-  const newNote = () => sheet.current?.open(undefined, { section: filters.section, category: presetCategory });
+  const presetCategory =
+    filters.category && filters.category !== NO_CATEGORY
+      ? filters.category
+      : null;
+  const newNote = () =>
+    sheet.current?.open(undefined, {
+      section: filters.section,
+      category: presetCategory,
+    });
   useOnNew(newNote);
   // Atajo del ícono de la app (/notas?nuevo=1): abre la hoja y saca el parámetro.
   const opened = useRef(false);
   useEffect(() => {
     if (!openNew || opened.current) return;
     opened.current = true;
-    sheet.current?.open(undefined, { section: filters.section, category: presetCategory });
+    sheet.current?.open(undefined, {
+      section: filters.section,
+      category: presetCategory,
+    });
     router.replace(hrefOf(filters), { scroll: false });
   }, [openNew, filters, router, presetCategory]);
 
@@ -196,7 +279,11 @@ export function NotesView({
         photos: note?.photos ?? [],
         ...p,
         stars: p.stars ?? note?.stars ?? 0,
-        thumbnail: yt ? youtubeThumb(yt) : note && note.url === p.url ? note.thumbnail : null,
+        thumbnail: yt
+          ? youtubeThumb(yt)
+          : note && note.url === p.url
+            ? note.thumbnail
+            : null,
         pinned: note ? fd.get("pinned") === "on" : false,
         done: note ? fd.get("done") === "on" : false,
       };
@@ -209,7 +296,9 @@ export function NotesView({
         }
         if (!files.length) return;
         if (r && "queued" in r) {
-          notifyError("Sin señal: la nota quedó guardada en el aparato, las fotos no. Agregalas cuando vuelva la conexión.");
+          notifyError(
+            "Sin señal: la nota quedó guardada en el aparato, las fotos no. Agregalas cuando vuelva la conexión.",
+          );
           return;
         }
         const noteId = r && "id" in r ? r.id : id;
@@ -221,7 +310,12 @@ export function NotesView({
             failed++;
           }
         }
-        if (failed) notifyError(failed === 1 ? "Una foto no se pudo subir." : `${failed} fotos no se pudieron subir.`);
+        if (failed)
+          notifyError(
+            failed === 1
+              ? "Una foto no se pudo subir."
+              : `${failed} fotos no se pudieron subir.`,
+          );
         router.refresh();
       });
     },
@@ -247,7 +341,9 @@ export function NotesView({
     // En "Ver después", lo visto se va de la lista con una salida corta.
     if (done && filters.later) {
       leaveThen(`[data-note="${n.id}"]`, run);
-      notifyInfo(`"${noteHeading(n)}" ${n.section === "videos" ? "visto" : "hecho"}`);
+      notifyInfo(
+        `"${noteHeading(n)}" ${n.section === "videos" ? "visto" : "hecho"}`,
+      );
     } else run();
   }
   function togglePin(n: NoteDTO) {
@@ -285,7 +381,8 @@ export function NotesView({
     onTouchMoveCapture: (e: React.TouchEvent) => {
       const st = holdStart.current;
       const t = e.touches[0];
-      if (st && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 8) clearTimeout(holdTimer.current);
+      if (st && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 8)
+        clearTimeout(holdTimer.current);
     },
     onTouchEndCapture: () => {
       clearTimeout(holdTimer.current);
@@ -298,7 +395,9 @@ export function NotesView({
   });
   function reorder(ids: string[], moved: { id: string; to: number }) {
     const byId = new Map(visible.map((n) => [n.id, n]));
-    const order = ids.map((id) => byId.get(id)).filter((n): n is NoteDTO => !!n);
+    const order = ids
+      .map((id) => byId.get(id))
+      .filter((n): n is NoteDTO => !!n);
     if (order.length !== ids.length || pendingIds.has(moved.id)) return;
     const sortKey = sortKeyAfterMove(order, moved.to);
     haptic("select");
@@ -317,7 +416,8 @@ export function NotesView({
         await setNoteStars(n.id, value);
       });
     // En "Importantes", sacarle las estrellas la saca de la lista con una salida corta.
-    if (filters.important && value === 0) leaveThen(`[data-note="${n.id}"]`, run);
+    if (filters.important && value === 0)
+      leaveThen(`[data-note="${n.id}"]`, run);
     else run();
   }
 
@@ -334,10 +434,20 @@ export function NotesView({
         apply({ id: n.id, category });
         await setNoteCategory(n.id, category);
         // Una categoría nueva aparece en los filtros y en la hoja.
-        if (category && !categories.some((c) => c.section === n.section && c.name === category)) router.refresh();
+        if (
+          category &&
+          !categories.some(
+            (c) => c.section === n.section && c.name === category,
+          )
+        )
+          router.refresh();
       });
     // Si la lista está filtrada por otra categoría, la nota se va con una salida corta.
-    const stays = !filters.category || (filters.category === NO_CATEGORY ? !category : filters.category === category);
+    const stays =
+      !filters.category ||
+      (filters.category === NO_CATEGORY
+        ? !category
+        : filters.category === category);
     if (stays) run();
     else leaveThen(`[data-note="${n.id}"]`, run);
     notifyInfo(category ? `En ${category}` : "Sin categoría");
@@ -355,9 +465,26 @@ export function NotesView({
     showContextMenu(
       e,
       [
-        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => sheet.current?.open(n) },
-        ...(n.url ? [{ label: "Abrir link", icon: <ArrowSquareOut size={15} />, onSelect: () => window.open(n.url!, "_blank", "noopener,noreferrer") }] : []),
-        { label: n.pinned ? "Desfijar" : "Fijar arriba", icon: <PushPin size={15} />, onSelect: () => togglePin(n) },
+        {
+          label: "Editar",
+          icon: <NotePencil size={15} />,
+          onSelect: () => sheet.current?.open(n),
+        },
+        ...(n.url
+          ? [
+              {
+                label: "Abrir link",
+                icon: <ArrowSquareOut size={15} />,
+                onSelect: () =>
+                  window.open(n.url!, "_blank", "noopener,noreferrer"),
+              },
+            ]
+          : []),
+        {
+          label: n.pinned ? "Desfijar" : "Fijar arriba",
+          icon: <PushPin size={15} />,
+          onSelect: () => togglePin(n),
+        },
         ...[3, 2, 1, 0]
           .filter((k) => k !== n.stars)
           .map((k) => ({
@@ -366,11 +493,19 @@ export function NotesView({
             onSelect: () => stars(n, k),
           })),
         {
-          label: n.done ? `Marcar como no ${doneLabel(n).toLowerCase()}` : `Marcar como ${doneLabel(n).toLowerCase()}`,
+          label: n.done
+            ? `Marcar como no ${doneLabel(n).toLowerCase()}`
+            : `Marcar como ${doneLabel(n).toLowerCase()}`,
           icon: <CheckCircle size={15} />,
           onSelect: () => toggleDone(n),
         },
-        { label: n.category ? `Categoría: ${n.category}…` : "Ponerle categoría…", icon: <Tag size={15} />, onSelect: () => openCategory(n) },
+        {
+          label: n.category
+            ? `Categoría: ${n.category}…`
+            : "Ponerle categoría…",
+          icon: <Tag size={15} />,
+          onSelect: () => openCategory(n),
+        },
         {
           label: "Mover a…",
           icon: <FolderSimple size={15} />,
@@ -379,7 +514,12 @@ export function NotesView({
             moveSheet.current?.open();
           },
         },
-        { label: "Borrar", icon: <Trash size={15} />, danger: true, onSelect: () => sheetActions.remove(n) },
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => sheetActions.remove(n),
+        },
       ],
       noteHeading(n),
     );
@@ -389,11 +529,86 @@ export function NotesView({
   const searching = !!(filters.q || filters.tag);
   // Dato de la cabecera: cuántas hay en la sección (o en total) y, si hay filtros, cuántas se ven.
   const total = section ? (counts.bySection[section.id] ?? 0) : counts.all;
-  const filtered = searching || filters.important || !!filters.category || filters.later;
+  const filtered =
+    searching || filters.important || !!filters.category || filters.later;
   const plural = (n: number) => `${n} ${n === 1 ? "nota" : "notas"}`;
   const meta = filtered
     ? `${visible.length}${hasMore ? "+" : ""} de ${plural(total)}`
     : `${plural(total)}${section?.id === "videos" && counts.laterVideos ? ` · ${counts.laterVideos} por ver` : ""}`;
+
+  const pinnedNotes = visible.filter((n) => n.pinned);
+  const otherNotes = visible.filter((n) => !n.pinned);
+  const wall = (notes: NoteDTO[]) => (
+    <Sortable
+      ids={notes.map((n) => n.id)}
+      onReorder={reorder}
+      grid
+      disabled={notes.length < 2}
+    >
+      <div className="grid gap-3 lg:block lg:columns-2 lg:gap-4 xl:columns-3">
+        {notes.map((n) => (
+          <SortableItem
+            key={n.id}
+            id={n.id}
+            as="div"
+            disabled={pendingIds.has(n.id)}
+            className={cx(
+              "min-w-0 rounded-[18px] lg:mb-4 lg:break-inside-avoid [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]",
+              fresh.has(n.id) && "reveal",
+            )}
+            draggingClass="rounded-[18px] shadow-[0_18px_40px_-16px_rgba(0,0,0,0.4)] scale-[1.02]"
+          >
+            <div {...holdProps(n.id)}>
+              <SwipeRow
+                className="rounded-[18px] lg:overflow-visible"
+                left={
+                  held === n.id
+                    ? undefined
+                    : {
+                        label: doneLabel(n),
+                        icon: <CheckCircle size={20} weight="bold" />,
+                        tone: "done",
+                        onAction: () => toggleDone(n),
+                      }
+                }
+                right={
+                  held === n.id
+                    ? undefined
+                    : {
+                        label: "Borrar",
+                        icon: <Trash size={20} weight="bold" />,
+                        tone: "danger",
+                        onAction: () => sheetActions.remove(n),
+                      }
+                }
+              >
+                <NoteCard
+                  note={n}
+                  today={today}
+                  showSection={!filters.section}
+                  categoryColor={colorOf(sectionOf(n.section).id, n.category)}
+                  pending={pendingIds.has(n.id)}
+                  handlers={{
+                    onOpen: () => sheet.current?.open(n),
+                    onToggleDone: () => toggleDone(n),
+                    onTag: (t) =>
+                      router.push(hrefOf({ ...filters, tag: t }), {
+                        scroll: false,
+                      }),
+                    onCategory: () => openCategory(n),
+                    onContextMenu: (e) => contextMenu(e, n),
+                    onMore: (e) => contextMenu(e, n),
+                    onStars: () => stars(n, nextStars(n.stars)),
+                    onPin: () => togglePin(n),
+                  }}
+                />
+              </SwipeRow>
+            </div>
+          </SortableItem>
+        ))}
+      </div>
+    </Sortable>
+  );
 
   return (
     <>
@@ -405,25 +620,31 @@ export function NotesView({
           title={section ? section.name : "Todas las notas"}
           meta={meta}
           action={
-            <button type="button" className="tcard-pill press" onClick={newNote} title="Nueva nota">
-              <Plus size={14} weight="bold" aria-hidden /> <span className="max-sm:hidden">Nueva nota</span>
+            <button
+              type="button"
+              className="tcard-pill press"
+              onClick={newNote}
+              title="Nueva nota"
+            >
+              <Plus size={14} weight="bold" aria-hidden />{" "}
+              <span className="max-sm:hidden">Nueva nota</span>
               <span className="sm:hidden">Nueva</span>
             </button>
           }
           bodyClassName="gap-3! lg:gap-3.5!"
         >
-        <SearchBox filters={filters} />
-        <SectionPills filters={filters} counts={counts} />
-        {section && (
-          <CategoryPills
-            filters={filters}
-            categories={cats.filter((c) => c.section === section.id)}
-            uncategorized={uncategorized}
-            total={counts.bySection[section.id] ?? 0}
-          />
-        )}
+          <SearchBox filters={filters} />
+          <SectionPills filters={filters} counts={counts} />
+          {section && (
+            <CategoryPills
+              filters={filters}
+              categories={cats.filter((c) => c.section === section.id)}
+              uncategorized={uncategorized}
+              total={counts.bySection[section.id] ?? 0}
+            />
+          )}
 
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Solo las importantes (con estrellas), sin cambiar el orden propio. */}
             <Link
               href={hrefOf({ ...filters, important: !filters.important })}
@@ -431,10 +652,17 @@ export function NotesView({
               aria-pressed={filters.important}
               className={cx(
                 "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors",
-                filters.important ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
+                filters.important
+                  ? "border-ink bg-ink font-medium text-on-ink"
+                  : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
               )}
             >
-              <Star size={14} weight="fill" className="text-[var(--p-yellow-chip)]" aria-hidden />
+              <Star
+                size={14}
+                weight="fill"
+                className="text-[var(--p-yellow-chip)]"
+                aria-hidden
+              />
               Importantes
               {filters.important && <X size={13} weight="bold" aria-hidden />}
             </Link>
@@ -443,7 +671,10 @@ export function NotesView({
                 label="Qué videos"
                 value={filters.later ? "despues" : "todos"}
                 options={[
-                  { value: "despues", label: `Ver después · ${counts.laterVideos}` },
+                  {
+                    value: "despues",
+                    label: `Ver después · ${counts.laterVideos}`,
+                  },
                   { value: "todos", label: "Todos" },
                 ]}
                 hrefOf={(v) => hrefOf({ ...filters, later: v === "despues" })}
@@ -459,52 +690,41 @@ export function NotesView({
                 #{filters.tag} <X size={13} weight="bold" aria-hidden />
               </Link>
             )}
-        </div>
+          </div>
         </TintedCard>
 
         {visible.length === 0 ? (
-          <Empty section={section} searching={searching} later={filters.later} onNew={newNote} />
+          <Empty
+            section={section}
+            searching={searching}
+            later={filters.later}
+            onNew={newNote}
+          />
         ) : (
-          // Columnas tipo muro (cada nota con su alto, sin huecos): el orden propio se lee de arriba abajo, columna por columna.
-          <Sortable ids={visible.map((n) => n.id)} onReorder={reorder} grid disabled={visible.length < 2}>
-          <div className="grid gap-3 lg:block lg:columns-2 lg:gap-4 xl:columns-3">
-            {visible.map((n) => (
-              <SortableItem
-                key={n.id}
-                id={n.id}
-                as="div"
-                disabled={pendingIds.has(n.id)}
-                className={cx("min-w-0 rounded-[18px] lg:mb-4 lg:break-inside-avoid [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]", fresh.has(n.id) && "reveal")}
-                draggingClass="rounded-[18px] shadow-[0_18px_40px_-16px_rgba(0,0,0,0.4)] scale-[1.02]"
+          // Las fijadas van arriba de todo, en su propio grupo; después el resto. Cada grupo es un
+          // muro (cada nota con su alto, sin huecos): el orden propio se lee de arriba abajo, columna por columna.
+          <>
+            {pinnedNotes.length > 0 && (
+              <section aria-label="Notas fijadas" className="grid gap-2.5">
+                <h2 className="kicker inline-flex items-center gap-1.5 text-accent-fg!">
+                  <PushPin size={13} weight="fill" aria-hidden /> Fijadas ·{" "}
+                  {pinnedNotes.length}
+                </h2>
+                {wall(pinnedNotes)}
+              </section>
+            )}
+            {otherNotes.length > 0 && (
+              <section
+                aria-label={pinnedNotes.length ? "Otras notas" : "Notas"}
+                className="grid gap-2.5"
               >
-                <div {...holdProps(n.id)}>
-                <SwipeRow
-                  className="rounded-[18px] lg:overflow-visible"
-                  left={held === n.id ? undefined : { label: doneLabel(n), icon: <CheckCircle size={20} weight="bold" />, tone: "done", onAction: () => toggleDone(n) }}
-                  right={held === n.id ? undefined : { label: "Borrar", icon: <Trash size={20} weight="bold" />, tone: "danger", onAction: () => sheetActions.remove(n) }}
-                >
-                  <NoteCard
-                    note={n}
-                    today={today}
-                    showSection={!filters.section}
-                    categoryColor={colorOf(sectionOf(n.section).id, n.category)}
-                    pending={pendingIds.has(n.id)}
-                    handlers={{
-                      onOpen: () => sheet.current?.open(n),
-                      onToggleDone: () => toggleDone(n),
-                      onTag: (t) => router.push(hrefOf({ ...filters, tag: t }), { scroll: false }),
-                      onCategory: () => openCategory(n),
-                      onContextMenu: (e) => contextMenu(e, n),
-                      onMore: (e) => contextMenu(e, n),
-                      onStars: () => stars(n, nextStars(n.stars)),
-                    }}
-                  />
-                </SwipeRow>
-                </div>
-              </SortableItem>
-            ))}
-          </div>
-          </Sortable>
+                {pinnedNotes.length > 0 && (
+                  <h2 className="kicker">Otras notas</h2>
+                )}
+                {wall(otherNotes)}
+              </section>
+            )}
+          </>
         )}
 
         {hasMore && (
@@ -518,19 +738,28 @@ export function NotesView({
         )}
       </main>
 
-      <NoteSheet ref={sheet} actions={sheetActions} tags={tags} categories={cats} />
+      <NoteSheet
+        ref={sheet}
+        actions={sheetActions}
+        tags={tags}
+        categories={cats}
+      />
 
       <Sheet ref={categorySheet} title="Categoría">
         {categorizing && (
           <CategoryPicker
             key={categorizing.id}
             note={categorizing}
-            options={cats.filter((c) => c.section === sectionOf(categorizing.section).id)}
+            options={cats.filter(
+              (c) => c.section === sectionOf(categorizing.section).id,
+            )}
             onPick={(c) => {
               categorySheet.current?.close();
               categorize(categorizing, c);
             }}
-            onColor={(name, color) => recolor(sectionOf(categorizing.section).id, name, color)}
+            onColor={(name, color) =>
+              recolor(sectionOf(categorizing.section).id, name, color)
+            }
           />
         )}
       </Sheet>
@@ -551,11 +780,18 @@ export function NotesView({
                   }}
                   className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px] disabled:opacity-60"
                 >
-                  <span style={tone(s.color)} className="chip-solid inline-flex size-8 items-center justify-center rounded-lg">
+                  <span
+                    style={tone(s.color)}
+                    className="chip-solid inline-flex size-8 items-center justify-center rounded-lg"
+                  >
                     <s.icon size={17} weight="fill" aria-hidden />
                   </span>
                   {s.name}
-                  {current && <span className="ml-auto text-[12.5px] text-muted">Está acá</span>}
+                  {current && (
+                    <span className="ml-auto text-[12.5px] text-muted">
+                      Está acá
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -583,7 +819,9 @@ function SearchBox({ filters }: { filters: Filters }) {
   useEffect(() => {
     go.current = (value: string) => {
       setSent(value);
-      startSearch(() => router.replace(hrefOf({ ...filters, q: value }), { scroll: false }));
+      startSearch(() =>
+        router.replace(hrefOf({ ...filters, q: value }), { scroll: false }),
+      );
     };
   });
   useEffect(() => {
@@ -601,9 +839,19 @@ function SearchBox({ filters }: { filters: Filters }) {
       }}
       className="relative"
     >
-      {filters.section && <input type="hidden" name="seccion" value={filters.section} />}
+      {filters.section && (
+        <input type="hidden" name="seccion" value={filters.section} />
+      )}
       <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint">
-        {pending ? <CircleNotch size={17} className="motion-safe:animate-spin" aria-hidden /> : <MagnifyingGlass size={17} aria-hidden />}
+        {pending ? (
+          <CircleNotch
+            size={17}
+            className="motion-safe:animate-spin"
+            aria-hidden
+          />
+        ) : (
+          <MagnifyingGlass size={17} aria-hidden />
+        )}
       </span>
       <input
         type="search"
@@ -634,7 +882,13 @@ function SearchBox({ filters }: { filters: Filters }) {
 }
 
 /** Fila de secciones con su conteo (se desliza de costado en el celular). */
-function SectionPills({ filters, counts }: { filters: Filters; counts: Counts }) {
+function SectionPills({
+  filters,
+  counts,
+}: {
+  filters: Filters;
+  counts: Counts;
+}) {
   // La píldora tocada se marca enseguida, sin esperar a que llegue la lista.
   const [clicked, setClicked] = useState<string | null>(null);
   const current = filters.section ?? "";
@@ -655,10 +909,20 @@ function SectionPills({ filters, counts }: { filters: Filters; counts: Counts })
   }, [current]);
   const items = [
     { id: "", name: "Todas", count: counts.all, icon: null, color: null },
-    ...NOTE_SECTIONS.map((s) => ({ id: s.id as string, name: s.short ?? s.name, count: counts.bySection[s.id] ?? 0, icon: s.icon, color: s.color })),
+    ...NOTE_SECTIONS.map((s) => ({
+      id: s.id as string,
+      name: s.short ?? s.name,
+      count: counts.bySection[s.id] ?? 0,
+      icon: s.icon,
+      color: s.color,
+    })),
   ];
   return (
-    <nav ref={nav} aria-label="Secciones" className="relative -mx-[18px] min-w-0 overflow-x-auto px-[18px] [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <nav
+      ref={nav}
+      aria-label="Secciones"
+      className="relative -mx-[18px] min-w-0 overflow-x-auto px-[18px] [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
+    >
       <ul className="flex w-max gap-1.5 pb-1 lg:w-auto lg:flex-wrap">
         {items.map((s) => {
           const on = shown === s.id;
@@ -666,7 +930,10 @@ function SectionPills({ filters, counts }: { filters: Filters; counts: Counts })
           return (
             <li key={s.id || "todas"}>
               <Link
-                href={hrefOf({ section: (s.id || null) as NoteSectionId | null, q: filters.q })}
+                href={hrefOf({
+                  section: (s.id || null) as NoteSectionId | null,
+                  q: filters.q,
+                })}
                 scroll={false}
                 aria-current={on ? "page" : undefined}
                 onClick={(e) => {
@@ -678,12 +945,28 @@ function SectionPills({ filters, counts }: { filters: Filters; counts: Counts })
                 style={s.color ? tone(s.color) : undefined}
                 className={cx(
                   "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] whitespace-nowrap transition-colors duration-[var(--dur-quick)]",
-                  on ? "border-ink bg-ink font-medium text-on-ink" : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
+                  on
+                    ? "border-ink bg-ink font-medium text-on-ink"
+                    : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
                 )}
               >
-                {Ico && <Ico size={15} weight={on ? "fill" : "regular"} className={on ? undefined : "text-tone-fg"} aria-hidden />}
+                {Ico && (
+                  <Ico
+                    size={15}
+                    weight={on ? "fill" : "regular"}
+                    className={on ? undefined : "text-tone-fg"}
+                    aria-hidden
+                  />
+                )}
                 {s.name}
-                <span className={cx("font-mono text-[11.5px] tabular", on ? "opacity-75" : "text-muted")}>{s.count}</span>
+                <span
+                  className={cx(
+                    "font-mono text-[11.5px] tabular",
+                    on ? "opacity-75" : "text-muted",
+                  )}
+                >
+                  {s.count}
+                </span>
               </Link>
             </li>
           );
@@ -718,11 +1001,28 @@ function CategoryPills({
   const shown = clicked ?? filters.category;
   const items = [
     { id: "", name: "Todas", count: total, color: null as string | null },
-    ...categories.map((c) => ({ id: c.name, name: c.name, count: c.count, color: c.color as string | null })),
-    ...(uncategorized ? [{ id: NO_CATEGORY, name: "Sin categoría", count: uncategorized, color: null }] : []),
+    ...categories.map((c) => ({
+      id: c.name,
+      name: c.name,
+      count: c.count,
+      color: c.color as string | null,
+    })),
+    ...(uncategorized
+      ? [
+          {
+            id: NO_CATEGORY,
+            name: "Sin categoría",
+            count: uncategorized,
+            color: null,
+          },
+        ]
+      : []),
   ];
   return (
-    <nav aria-label="Categorías" className="relative -mx-[18px] -mt-1 min-w-0 overflow-x-auto px-[18px] [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <nav
+      aria-label="Categorías"
+      className="relative -mx-[18px] -mt-1 min-w-0 overflow-x-auto px-[18px] [scrollbar-width:none] lg:mx-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
+    >
       <ul className="flex w-max gap-1.5 pb-1 lg:w-auto lg:flex-wrap">
         {items.map((c) => {
           const on = shown === c.id;
@@ -750,9 +1050,21 @@ function CategoryPills({
                       : "border-line-strong bg-surface/60 text-fg hover:bg-surface",
                 )}
               >
-                {c.color && !on && <span className="size-2.5 rounded-full bg-[var(--tone-chip)]" aria-hidden />}
+                {c.color && !on && (
+                  <span
+                    className="size-2.5 rounded-full bg-[var(--tone-chip)]"
+                    aria-hidden
+                  />
+                )}
                 {c.name}
-                <span className={cx("font-mono text-[11px] tabular", on ? "opacity-80" : "opacity-70")}>{c.count}</span>
+                <span
+                  className={cx(
+                    "font-mono text-[11px] tabular",
+                    on ? "opacity-80" : "opacity-70",
+                  )}
+                >
+                  {c.count}
+                </span>
               </Link>
             </li>
           );
@@ -777,7 +1089,9 @@ function CategoryPicker({
   const currentColor = options.find((o) => o.name === note.category)?.color;
   const [text, setText] = useState("");
   const typed = normalizeCategory(text);
-  const exists = typed ? options.find((o) => o.name.toLowerCase() === typed.toLowerCase()) : undefined;
+  const exists = typed
+    ? options.find((o) => o.name.toLowerCase() === typed.toLowerCase())
+    : undefined;
   const section = sectionOf(note.section);
   return (
     <div className="grid gap-4">
@@ -798,7 +1112,13 @@ function CategoryPicker({
           autoComplete="off"
           enterKeyHint="done"
           aria-label="Nueva categoría"
-          placeholder={options.length ? "Nueva categoría" : section.id === "videos" ? "IA, Música, Desarrollo personal…" : "Nombre de la categoría"}
+          placeholder={
+            options.length
+              ? "Nueva categoría"
+              : section.id === "videos"
+                ? "IA, Música, Desarrollo personal…"
+                : "Nombre de la categoría"
+          }
           className={cx(inputClass, "min-w-0 flex-1")}
         />
         <Button type="submit" variant="accent" disabled={!typed}>
@@ -808,7 +1128,11 @@ function CategoryPicker({
       {note.category && currentColor && (
         <div className="grid gap-2">
           <span className="kicker">Color de {note.category}</span>
-          <div role="radiogroup" aria-label={`Color de ${note.category}`} className="flex flex-wrap gap-2">
+          <div
+            role="radiogroup"
+            aria-label={`Color de ${note.category}`}
+            className="flex flex-wrap gap-2"
+          >
             {CATEGORY_COLORS.map((c) => {
               const on = currentColor === c;
               return (
@@ -836,7 +1160,10 @@ function CategoryPicker({
       {(options.length > 0 || note.category) && (
         <div className="grid gap-1">
           {options
-            .filter((o) => !typed || o.name.toLowerCase().includes(typed.toLowerCase()))
+            .filter(
+              (o) =>
+                !typed || o.name.toLowerCase().includes(typed.toLowerCase()),
+            )
             .map((o) => {
               const current = note.category === o.name;
               return (
@@ -847,16 +1174,29 @@ function CategoryPicker({
                   aria-pressed={current}
                   className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px]"
                 >
-                  <span style={tone(o.color)} className="chip-solid inline-flex size-8 items-center justify-center rounded-lg">
-                    {current ? <Check size={16} weight="bold" aria-hidden /> : <FolderSimple size={16} weight="fill" aria-hidden />}
+                  <span
+                    style={tone(o.color)}
+                    className="chip-solid inline-flex size-8 items-center justify-center rounded-lg"
+                  >
+                    {current ? (
+                      <Check size={16} weight="bold" aria-hidden />
+                    ) : (
+                      <FolderSimple size={16} weight="fill" aria-hidden />
+                    )}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{o.name}</span>
-                  <span className="font-mono text-[12px] text-muted tabular">{o.count}</span>
+                  <span className="font-mono text-[12px] text-muted tabular">
+                    {o.count}
+                  </span>
                 </button>
               );
             })}
           {note.category && (
-            <button type="button" onClick={() => onPick(null)} className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted">
+            <button
+              type="button"
+              onClick={() => onPick(null)}
+              className="tap-tint flex min-h-12 items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted"
+            >
               <span className="inline-flex size-8 items-center justify-center rounded-lg border border-dashed border-line-strong">
                 <X size={15} aria-hidden />
               </span>
@@ -891,7 +1231,10 @@ function Empty({
   return (
     <div className="grid justify-items-center gap-3 rounded-[20px] border border-dashed border-line-strong px-6 py-12 text-center">
       {Ico ? (
-        <span style={tone(section!.color)} className="chip-solid inline-flex size-12 items-center justify-center rounded-2xl">
+        <span
+          style={tone(section!.color)}
+          className="chip-solid inline-flex size-12 items-center justify-center rounded-2xl"
+        >
           <Ico size={24} weight="fill" aria-hidden />
         </span>
       ) : (
@@ -902,7 +1245,8 @@ function Empty({
       <p className="max-w-sm text-[14.5px] text-muted">{text}</p>
       {!searching && !later && (
         <Button variant="outline" size="sm" onClick={onNew}>
-          <Plus size={15} weight="bold" /> {section ? `Agregar a ${section.name}` : "Nueva nota"}
+          <Plus size={15} weight="bold" />{" "}
+          {section ? `Agregar a ${section.name}` : "Nueva nota"}
         </Button>
       )}
     </div>

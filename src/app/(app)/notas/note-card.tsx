@@ -25,7 +25,15 @@ import { cx } from "@/components/ui";
 import { StarsShow } from "./stars";
 import { photoUrl } from "@/components/photos";
 import { tone } from "@/lib/palette";
-import { bodyWithoutUrl, isVideoUrl, noteDomain, noteHeading, relativeDay, sectionOf, type NoteDTO } from "@/lib/notes-logic";
+import {
+  bodyWithoutUrl,
+  isVideoUrl,
+  noteDomain,
+  noteHeading,
+  relativeDay,
+  sectionOf,
+  type NoteDTO,
+} from "@/lib/notes-logic";
 import { dayOfInstant } from "@/lib/dates";
 
 const KIND_ICON: Record<string, Icon> = {
@@ -54,6 +62,8 @@ export type CardHandlers = {
   onMore: (e: React.MouseEvent) => void;
   /** La estrella de la tarjeta: 0 → 1 → 2 → 3 → 0. */
   onStars: () => void;
+  /** La chincheta: fija la nota arriba de todo (o la desfija). */
+  onPin: () => void;
 };
 
 /**
@@ -85,7 +95,10 @@ export function NoteCard({
   const heading = noteHeading(n);
   const text = bodyWithoutUrl(n.body, n.url);
   // Si el texto es lo mismo que se muestra como título, no se repite.
-  const rest = !n.title && text.trim().split(/\r?\n/)[0]?.trim() === heading ? text.trim().split(/\r?\n/).slice(1).join("\n").trim() : text;
+  const rest =
+    !n.title && text.trim().split(/\r?\n/)[0]?.trim() === heading
+      ? text.trim().split(/\r?\n/).slice(1).join("\n").trim()
+      : text;
   const day = relativeDay(dayOfInstant(new Date(n.createdAt)), today);
   const kindIcon = KIND_ICON[n.urlKind ?? ""] ?? Globe;
   // El tilde se dibuja solo después de tocarlo (nunca al cargar).
@@ -98,23 +111,44 @@ export function NoteCard({
     <button
       type="button"
       onClick={handlers.onOpen}
-      className={cx("text-left after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline-none", cls)}
+      className={cx(
+        "text-left after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline-none",
+        cls,
+      )}
     >
-      <span className={cx(n.done && !video && "text-muted line-through decoration-faint")}>{heading}</span>
+      <span
+        className={cx(
+          n.done && !video && "text-muted line-through decoration-faint",
+        )}
+      >
+        {heading}
+      </span>
     </button>
   );
 
   const meta = (
     <div className="relative z-[1] flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px] text-muted">
       {showSection && (
-        <span className="inline-flex items-center gap-1" style={tone(section.color)}>
-          <section.icon size={13} weight="fill" className="text-tone-fg" aria-hidden />
+        <span
+          className="inline-flex items-center gap-1"
+          style={tone(section.color)}
+        >
+          <section.icon
+            size={13}
+            weight="fill"
+            className="text-tone-fg"
+            aria-hidden
+          />
           {section.short ?? section.name}
         </span>
       )}
       {showSection && <span aria-hidden>·</span>}
       <span className="font-mono text-[11.5px] tabular">{day}</span>
-      {pending && <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-0.5 text-[11.5px] text-[var(--st-skip-fg)]">Sin subir todavía</span>}
+      {pending && (
+        <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-0.5 text-[11.5px] text-[var(--st-skip-fg)]">
+          Sin subir todavía
+        </span>
+      )}
       {n.done && !video && (
         <span className="inline-flex items-center gap-1 rounded-full bg-[var(--st-done-bg)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--st-done-fg)]">
           <Check size={11} weight="bold" aria-hidden /> {doneLabel(n)}
@@ -123,14 +157,24 @@ export function NoteCard({
       <button
         type="button"
         onClick={handlers.onCategory}
-        aria-label={n.category ? `Categoría: ${n.category}. Cambiarla` : "Ponerle una categoría"}
+        aria-label={
+          n.category
+            ? `Categoría: ${n.category}. Cambiarla`
+            : "Ponerle una categoría"
+        }
         style={n.category ? tone(categoryColor ?? "stone") : undefined}
         className={cx(
           "inline-flex min-h-7 max-w-[14rem] items-center gap-1 rounded-full px-2 text-[12px] transition-[filter,color,border-color]",
-          n.category ? "chip-solid font-medium hover:brightness-[1.08]" : "border border-dashed border-line-strong text-muted hover:border-solid hover:text-fg",
+          n.category
+            ? "chip-solid font-medium hover:brightness-[1.08]"
+            : "border border-dashed border-line-strong text-muted hover:border-solid hover:text-fg",
         )}
       >
-        {n.category ? <FolderSimple size={12} weight="fill" aria-hidden /> : <Plus size={11} weight="bold" aria-hidden />}
+        {n.category ? (
+          <FolderSimple size={12} weight="fill" aria-hidden />
+        ) : (
+          <Plus size={11} weight="bold" aria-hidden />
+        )}
         <span className="truncate">{n.category ?? "Categoría"}</span>
       </button>
       {n.tags.map((t) => (
@@ -143,43 +187,71 @@ export function NoteCard({
           #{t}
         </button>
       ))}
-      <button
-        type="button"
-        onClick={handlers.onStars}
-        aria-label={n.stars ? `Importancia: ${n.stars} de 3 estrellas. Tocá para cambiar` : "Marcar como importante"}
-        title="Importancia"
-        className={cx(
-          "tap-tint ml-auto inline-flex min-h-8 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-surface-2",
-          !n.stars && "text-faint hover:text-muted",
-        )}
-      >
-        {n.stars ? <StarsShow n={n.stars} size={14} /> : <Star size={16} aria-hidden />}
-      </button>
-      <button
-        type="button"
-        onClick={handlers.onMore}
-        aria-label="Más acciones: borrar, mover, fijar…"
-        title="Más acciones"
-        className="tap-tint inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-      >
-        <DotsThree size={20} weight="bold" aria-hidden />
-      </button>
+      {/* Chincheta, estrella y ⋯ juntas: si no entran en el renglón, bajan las tres a la derecha. */}
+      <span className="ml-auto flex shrink-0 items-center">
+        <button
+          type="button"
+          onClick={handlers.onPin}
+          aria-pressed={n.pinned}
+          aria-label={
+            n.pinned
+              ? "Fijada arriba. Tocá para desfijarla"
+              : "Fijar arriba de todo"
+          }
+          title={n.pinned ? "Desfijar" : "Fijar arriba"}
+          className={cx(
+            "tap-tint inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface-2",
+            n.pinned ? "text-accent-fg" : "text-faint hover:text-muted",
+          )}
+        >
+          <PushPin
+            size={16}
+            weight={n.pinned ? "fill" : "regular"}
+            aria-hidden
+          />
+        </button>
+        <button
+          type="button"
+          onClick={handlers.onStars}
+          aria-label={
+            n.stars
+              ? `Importancia: ${n.stars} de 3 estrellas. Tocá para cambiar`
+              : "Marcar como importante"
+          }
+          title="Importancia"
+          className={cx(
+            "tap-tint inline-flex min-h-8 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-surface-2",
+            !n.stars && "text-faint hover:text-muted",
+          )}
+        >
+          {n.stars ? (
+            <StarsShow n={n.stars} size={14} />
+          ) : (
+            <Star size={16} aria-hidden />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handlers.onMore}
+          aria-label="Más acciones: borrar, mover, fijar…"
+          title="Más acciones"
+          className="tap-tint inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        >
+          <DotsThree size={20} weight="bold" aria-hidden />
+        </button>
+      </span>
     </div>
-  );
-
-  const pin = n.pinned && (
-    <span className="absolute top-2.5 right-2.5 z-[1] inline-flex size-6 items-center justify-center rounded-full bg-accent-soft text-accent-fg" title="Fijada">
-      <PushPin size={13} weight="fill" aria-label="Fijada" />
-    </span>
   );
 
   const shell = (children: React.ReactNode, cls?: string) => (
     <article
       data-note={n.id}
       onContextMenu={handlers.onContextMenu}
-      className={cx("lift relative rounded-[18px] border border-line bg-surface", cls)}
+      className={cx(
+        "lift relative rounded-[18px] border border-line bg-surface",
+        cls,
+      )}
     >
-      {pin}
       {children}
     </article>
   );
@@ -201,7 +273,10 @@ export function NoteCard({
               alt=""
               loading="lazy"
               referrerPolicy="no-referrer"
-              className={cx("size-full object-cover transition-opacity duration-[var(--dur-state)]", n.done && "opacity-55")}
+              className={cx(
+                "size-full object-cover transition-opacity duration-[var(--dur-state)]",
+                n.done && "opacity-55",
+              )}
             />
           ) : (
             <span className="flex size-full items-center justify-center text-faint">
@@ -211,7 +286,10 @@ export function NoteCard({
               })()}
             </span>
           )}
-          <span aria-hidden className="absolute inset-0 flex items-center justify-center">
+          <span
+            aria-hidden
+            className="absolute inset-0 flex items-center justify-center"
+          >
             <span className="inline-flex size-9 items-center justify-center rounded-full bg-black/55 text-white lg:size-11">
               <Play size={16} weight="fill" />
             </span>
@@ -223,7 +301,9 @@ export function NoteCard({
           )}
         </a>
         <div className="grid min-w-0 flex-1 content-start gap-1.5 lg:p-4 lg:pt-3">
-          {titleBtn("line-clamp-2 pr-6 text-[15px] leading-snug font-semibold lg:pr-0")}
+          {titleBtn(
+            "line-clamp-2 pr-6 text-[15px] leading-snug font-semibold lg:pr-0",
+          )}
           <div className="relative z-[1] flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted">
             {(() => {
               const K = kindIcon;
@@ -237,14 +317,25 @@ export function NoteCard({
                 handlers.onToggleDone();
               }}
               aria-pressed={n.done}
-              aria-label={n.done ? "Visto (tocá para desmarcar)" : "Marcar visto"}
+              aria-label={
+                n.done ? "Visto (tocá para desmarcar)" : "Marcar visto"
+              }
               className={cx(
                 "tap-target ml-auto inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full text-[12px] font-medium transition-colors lg:h-7 lg:w-auto lg:px-2.5",
-                n.done ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]" : "border border-line-strong text-muted hover:text-fg",
+                n.done
+                  ? "bg-[var(--st-done-bg)] text-[var(--st-done-fg)]"
+                  : "border border-line-strong text-muted hover:text-fg",
               )}
             >
-              <CheckCircle size={16} weight={n.done ? "fill" : "regular"} aria-hidden className={cx(justMarked && "check-draw")} />
-              <span className="max-lg:hidden">{n.done ? "Visto" : "Marcar visto"}</span>
+              <CheckCircle
+                size={16}
+                weight={n.done ? "fill" : "regular"}
+                aria-hidden
+                className={cx(justMarked && "check-draw")}
+              />
+              <span className="max-lg:hidden">
+                {n.done ? "Visto" : "Marcar visto"}
+              </span>
             </button>
           </div>
           {meta}
@@ -273,15 +364,21 @@ export function NoteCard({
               )}
             />
           ) : (
-            <span style={tone(section.color)} className="chip-solid inline-flex size-10 shrink-0 items-center justify-center rounded-xl">
+            <span
+              style={tone(section.color)}
+              className="chip-solid inline-flex size-10 shrink-0 items-center justify-center rounded-xl"
+            >
               {(() => {
-                const K = n.urlKind && n.urlKind !== "web" ? kindIcon : section.icon;
+                const K =
+                  n.urlKind && n.urlKind !== "web" ? kindIcon : section.icon;
                 return <K size={20} weight="fill" aria-hidden />;
               })()}
             </span>
           )}
           <div className="grid min-w-0 flex-1 gap-1 pr-6">
-            {titleBtn("line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]")}
+            {titleBtn(
+              "line-clamp-2 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]",
+            )}
             <a
               href={n.url}
               target="_blank"
@@ -294,9 +391,15 @@ export function NoteCard({
           </div>
         </div>
         {n.price && (
-          <span className="justify-self-start rounded-full bg-accent-soft px-2.5 py-1 font-mono text-[12.5px] text-accent-fg">{n.price}</span>
+          <span className="justify-self-start rounded-full bg-accent-soft px-2.5 py-1 font-mono text-[12.5px] text-accent-fg">
+            {n.price}
+          </span>
         )}
-        {rest && <p className="line-clamp-2 text-[13.5px] whitespace-pre-line text-muted [overflow-wrap:anywhere]">{rest}</p>}
+        {rest && (
+          <p className="line-clamp-2 text-[13.5px] whitespace-pre-line text-muted [overflow-wrap:anywhere]">
+            {rest}
+          </p>
+        )}
         {meta}
       </div>,
     );
@@ -306,19 +409,45 @@ export function NoteCard({
     const shown = n.photos.slice(0, 3);
     return shell(
       <div className="grid gap-2.5 p-3 lg:p-3.5">
-        <div className={cx("grid gap-1.5 overflow-hidden rounded-xl", shown.length > 1 ? "grid-cols-3" : "grid-cols-1")}>
+        <div
+          className={cx(
+            "grid gap-1.5 overflow-hidden rounded-xl",
+            shown.length > 1 ? "grid-cols-3" : "grid-cols-1",
+          )}
+        >
           {shown.map((p, i) => (
-            <span key={p.id} className={cx("relative bg-surface-2", shown.length > 1 && i === 0 ? "col-span-2 row-span-2 aspect-square" : shown.length > 1 ? "aspect-square" : "aspect-[4/3]")}>
+            <span
+              key={p.id}
+              className={cx(
+                "relative bg-surface-2",
+                shown.length > 1 && i === 0
+                  ? "col-span-2 row-span-2 aspect-square"
+                  : shown.length > 1
+                    ? "aspect-square"
+                    : "aspect-[4/3]",
+              )}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photoUrl(p.id)} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+              <img
+                src={photoUrl(p.id)}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 size-full object-cover"
+              />
               {i === shown.length - 1 && n.photos.length > shown.length && (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[14px] font-semibold text-white">+{n.photos.length - shown.length}</span>
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[14px] font-semibold text-white">
+                  +{n.photos.length - shown.length}
+                </span>
               )}
             </span>
           ))}
         </div>
         {titleBtn("line-clamp-2 pr-6 text-[15px] leading-snug font-semibold")}
-        {rest && <p className="line-clamp-2 text-[13.5px] whitespace-pre-line text-muted">{rest}</p>}
+        {rest && (
+          <p className="line-clamp-2 text-[13.5px] whitespace-pre-line text-muted">
+            {rest}
+          </p>
+        )}
         {meta}
       </div>,
     );
@@ -328,13 +457,20 @@ export function NoteCard({
     <div className="grid gap-2 p-3.5 lg:p-4">
       {n.title ? (
         <>
-          {titleBtn("pr-6 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]")}
+          {titleBtn(
+            "pr-6 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]",
+          )}
           {rest && <Folded text={rest} done={n.done} />}
         </>
       ) : (
         <>
           {/* Sin título: el texto es la tarjeta (el botón invisible la abre). */}
-          <button type="button" onClick={handlers.onOpen} aria-label={`Editar: ${heading}`} className="absolute inset-0 rounded-[inherit] focus-visible:outline-none" />
+          <button
+            type="button"
+            onClick={handlers.onOpen}
+            aria-label={`Editar: ${heading}`}
+            className="absolute inset-0 rounded-[inherit] focus-visible:outline-none"
+          />
           <Folded text={n.body} done={n.done} strong />
         </>
       )}
@@ -347,7 +483,15 @@ export function NoteCard({
  * Texto con 4 renglones como mucho; "Ver más" lo despliega en alto (sin salto)
  * y "Ver menos" lo vuelve a plegar. El botón aparece solo si hay más.
  */
-function Folded({ text, done, strong }: { text: string; done: boolean; strong?: boolean }) {
+function Folded({
+  text,
+  done,
+  strong,
+}: {
+  text: string;
+  done: boolean;
+  strong?: boolean;
+}) {
   const box = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
   const [more, setMore] = useState(false);
@@ -370,9 +514,13 @@ function Folded({ text, done, strong }: { text: string; done: boolean; strong?: 
         style={{ maxHeight: open ? (full ?? undefined) : "calc(1.55em * 4)" }}
         className={cx(
           "overflow-hidden whitespace-pre-line [overflow-wrap:anywhere] transition-[max-height] duration-[var(--dur-state)] ease-[var(--ease-out)] motion-reduce:transition-none",
-          strong ? "pr-6 text-[15px] leading-[1.55] text-fg" : "text-[14px] leading-[1.55] text-muted",
+          strong
+            ? "pr-6 text-[15px] leading-[1.55] text-fg"
+            : "text-[14px] leading-[1.55] text-muted",
           done && "text-muted line-through decoration-faint",
-          !open && more && "[mask-image:linear-gradient(to_bottom,black_70%,transparent)]",
+          !open &&
+            more &&
+            "[mask-image:linear-gradient(to_bottom,black_70%,transparent)]",
         )}
       >
         {text}
