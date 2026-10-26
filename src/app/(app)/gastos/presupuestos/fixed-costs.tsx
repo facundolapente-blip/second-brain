@@ -78,6 +78,9 @@ import { centsToInput, parseAmount } from "@/lib/finance-logic";
 import { CURRENCIES, moneyCents, moneyWhole } from "@/lib/format";
 import { tone } from "@/lib/palette";
 
+/** Línea entre columnas de la tabla de la compu (la misma de Tareas). */
+const CELL = "border-l border-line first:border-l-0";
+
 /** La etiqueta de quién paga: se toca para cambiarla. */
 type Payer = "mine" | "paid" | "paused";
 const PAYER: Record<Payer, { label: string; color: string }> = {
@@ -199,38 +202,22 @@ export function FixedCosts({
       await reorderBudgetLines(group, ids);
     });
 
-  // Anchos de las columnas (compu): cada una el suyo, la tabla mide la suma (como en Tareas).
+  // Anchos de las columnas (compu), igual que la tabla de Tareas: cada columna tiene su ancho y la
+  // tabla mide la suma; arrastrar un borde cambia solo esa columna y lo de la derecha se corre.
   const [widths, setWidths] = useState<FixedColumnWidths>(columns);
   const widthOf = (k: FixedColumnKey) =>
     widths[k] ?? FIXED_COLUMNS.find((c) => c.key === k)!.width;
-  // Mover un borde cambia solo las dos columnas que lo tocan: lo que gana una lo pierde la de al
-  // lado y el resto de la tabla no se mueve (pedido de Facu). El último borde agranda la última.
-  const dragStart = useRef<Record<FixedColumnKey, number> | null>(null);
   const resize = (k: FixedColumnKey, w: number, save: boolean) => {
-    const base =
-      dragStart.current ??
-      (dragStart.current = Object.fromEntries(
-        FIXED_COLUMNS.map((c) => [c.key, widthOf(c.key)]),
-      ) as Record<FixedColumnKey, number>);
-    const i = FIXED_COLUMNS.findIndex((c) => c.key === k);
-    const nb = FIXED_COLUMNS[i + 1]?.key;
-    const next: Record<FixedColumnKey, number> = { ...base };
-    if (nb) {
-      const lo = Math.max(FIXED_COLUMN_MIN - base[k], base[nb] - FIXED_COLUMN_MAX);
-      const hi = Math.min(FIXED_COLUMN_MAX - base[k], base[nb] - FIXED_COLUMN_MIN);
-      const delta = Math.round(Math.min(hi, Math.max(lo, w - base[k])));
-      next[k] = base[k] + delta;
-      next[nb] = base[nb] - delta;
-    } else {
-      next[k] = Math.round(Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)));
-    }
+    const next = {
+      ...widths,
+      [k]: Math.round(
+        Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)),
+      ),
+    };
     setWidths(next);
-    if (save) {
-      dragStart.current = null;
-      quiet(saveBudgetColumns(next));
-    }
+    if (save) quiet(saveBudgetColumns(next));
   };
-  const colsVar = FIXED_COLUMNS.map((c) => `${widthOf(c.key)}px`).join(" ");
+  const total = FIXED_COLUMNS.reduce((a, c) => a + widthOf(c.key), 0);
 
   const fixed = list.filter((l) => l.list !== "solo").sort(byLineOrder);
   const solo = list.filter((l) => l.list === "solo").sort(byLineOrder);
@@ -388,7 +375,6 @@ export function FixedCosts({
       "Cada cuánto",
     );
 
-  const cell = "lg:px-2";
   return (
     <>
       <TintedCard
@@ -400,7 +386,7 @@ export function FixedCosts({
             ? `${currencies(mine)} vos · ${currencies(paid)} te pagan${pausedCount ? ` · ${pausedCount} ${pausedCount === 1 ? "pausado" : "pausados"}` : ""}`
             : "Lo que se paga todos los meses"
         }
-        bodyClassName="gap-3!"
+        bodyClassName="gap-3! lg:gap-0! lg:p-0!"
         action={
           <span className="flex items-center gap-1.5">
             <button
@@ -422,81 +408,219 @@ export function FixedCosts({
         }
       >
         {fixed.length === 0 ? (
-          <p className="text-[14px] text-muted">
+          <p className="text-[14px] text-muted lg:px-5 lg:py-4">
             Anotá lo que pagás todos los meses (alquiler, celular,
             suscripciones) y quién lo paga.
           </p>
         ) : (
-          // Si los anchos suman más que la tarjeta, la tabla se corre de costado.
-          <div className="lg:-mx-2 lg:overflow-x-auto">
-            <div
-              role="table"
-              aria-label="Gastos fijos"
-              className="relative grid lg:w-max"
-              style={{ "--fc-cols": colsVar } as React.CSSProperties}
-            >
-              <div
-                role="row"
-                className="hidden border-b border-line pb-1.5 font-mono text-[11px] tracking-wide text-muted uppercase lg:grid lg:grid-cols-[var(--fc-cols)]"
-              >
-                {FIXED_COLUMNS.map((c) => (
-                  <span
-                    key={c.key}
-                    role="columnheader"
-                    className={cx(
-                      cell,
-                      "truncate",
-                      (c.key === "amount" || c.key === "monthly") &&
-                        "text-right",
-                    )}
+          <>
+            {/* ── Compu: tabla como la de Tareas (líneas entre columnas, rayado, anchos que se arrastran) ── */}
+            <div className="hidden max-w-full overflow-x-auto overflow-y-hidden border-b border-line-strong bg-surface lg:block lg:w-fit">
+              <div className="relative w-max">
+                <Sortable
+                  ids={fixed.map((l) => l.id)}
+                  onReorder={(ids) => reorder("fixed", ids)}
+                  disabled={fixed.length < 2}
+                >
+                  <table
+                    className="table-fixed border-collapse text-left text-[13.5px]"
+                    style={{ width: total, minWidth: total }}
                   >
-                    {c.label}
-                  </span>
-                ))}
+                    <colgroup>
+                      {FIXED_COLUMNS.map((c) => (
+                        <col key={c.key} style={{ width: widthOf(c.key) }} />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr className="border-b border-line-strong bg-surface-2 text-[11px] tracking-[0.06em] text-muted uppercase">
+                        {FIXED_COLUMNS.map((c) => (
+                          <th
+                            key={c.key}
+                            className={cx(
+                              CELL,
+                              "px-3 py-2.5 font-medium",
+                              (c.key === "amount" || c.key === "monthly") &&
+                                "text-right",
+                            )}
+                          >
+                            <span className="block truncate">{c.label}</span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fixed.map((l, i) => {
+                        const p = PAYER[payerOf(l)];
+                        const paused = l.list === "paused";
+                        return (
+                          <SortableItem
+                            key={l.id}
+                            id={l.id}
+                            as="tr"
+                            onContextMenu={(e) => rowMenu(e, l)}
+                            draggingClass="bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+                            className={cx(
+                              "group cursor-grab border-b border-line transition-colors last:border-b-0 hover:bg-surface-2 active:cursor-grabbing",
+                              i % 2 === 1 &&
+                                "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
+                            )}
+                          >
+                            <td className={cx(CELL, "py-1 pr-3 pl-1.5")}>
+                              <button
+                                type="button"
+                                onClick={() => open(l, l.list)}
+                                className="grid min-h-11 w-full min-w-0 content-center gap-0.5 rounded-lg px-1.5 text-left"
+                              >
+                                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 leading-snug font-medium">
+                                  <span
+                                    className={cx(
+                                      "break-words",
+                                      paused && "text-muted",
+                                    )}
+                                  >
+                                    {l.name}
+                                  </span>
+                                  {l.wouldCut && (
+                                    <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
+                                      Lo sacaría
+                                    </span>
+                                  )}
+                                  {l.variable && (
+                                    <span className="text-[11.5px] font-normal text-muted">
+                                      variable
+                                    </span>
+                                  )}
+                                </span>
+                                {l.note && (
+                                  <span className="text-[12px] text-muted">
+                                    {l.note}
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+                            <td className={cx(CELL, "px-3")}>
+                              <button
+                                type="button"
+                                onClick={(e) => categoryMenu(e, l)}
+                                title="Cambiar la categoría"
+                                className="group/cat inline-flex min-h-9 max-w-full items-center rounded-md"
+                              >
+                                {l.category ? (
+                                  <CategoryTag
+                                    name={l.category}
+                                    color={categoryColors[l.category]}
+                                  />
+                                ) : (
+                                  <span className="text-[12.5px] text-faint opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible/cat:opacity-100">
+                                    + Categoría
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+                            <td
+                              className={cx(
+                                CELL,
+                                "px-3 text-right tabular text-muted",
+                                paused && "line-through decoration-faint",
+                              )}
+                            >
+                              {l.amountCents === null
+                                ? "—"
+                                : moneyCents(l.amountCents, l.currency)}
+                            </td>
+                            <td className={cx(CELL, "px-3")}>
+                              <button
+                                type="button"
+                                onClick={(e) => freqMenu(e, l)}
+                                title="Cambiar cada cuánto se paga"
+                                className="-mx-1.5 inline-flex min-h-9 max-w-full items-center truncate rounded-md px-1.5 text-muted hover:bg-surface-2 hover:text-fg"
+                              >
+                                {freqText(l)}
+                              </button>
+                            </td>
+                            <td
+                              className={cx(
+                                CELL,
+                                "px-3 text-right tabular font-medium",
+                                l.amountCents === null &&
+                                  "font-normal text-faint",
+                                paused &&
+                                  "font-normal text-muted line-through decoration-faint",
+                              )}
+                            >
+                              {l.amountCents === null
+                                ? "—"
+                                : moneyCents(monthlyCents(l)!, l.currency)}
+                            </td>
+                            <td className={cx(CELL, "px-3")}>
+                              <button
+                                type="button"
+                                onClick={() => toggle(l)}
+                                title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
+                                aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
+                                style={tone(p.color)}
+                                className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
+                              >
+                                {p.label}
+                              </button>
+                            </td>
+                          </SortableItem>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Sortable>
+                {/* Bordes para cambiar el ancho: los mismos de Tareas. */}
+                <ColumnResizers
+                  cols={FIXED_COLUMNS.map((c) => ({
+                    key: c.key,
+                    label: c.label,
+                    width: widthOf(c.key),
+                  }))}
+                  onResize={resize}
+                />
               </div>
-              {/* Arrastrar ordena (compu: clic y arrastrar; celular: mantener apretado). */}
+            </div>
+
+            {/* ── Celular: la lista de siempre ── */}
+            <div className="lg:hidden">
               <Sortable
                 ids={fixed.map((l) => l.id)}
                 onReorder={(ids) => reorder("fixed", ids)}
                 disabled={fixed.length < 2}
               >
-                {fixed.map((l) => {
-                  const p = PAYER[payerOf(l)];
-                  return (
-                    <SortableItem
-                      key={l.id}
-                      id={l.id}
-                      as="div"
-                      role="row"
-                      onContextMenu={(e) => rowMenu(e, l)}
-                      draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0 lg:cursor-grab lg:grid-cols-[var(--fc-cols)] lg:gap-x-0 lg:py-1.5 lg:active:cursor-grabbing"
-                    >
-                      <span
-                        role="cell"
-                        className={cx(cell, "min-w-0 max-lg:row-span-2")}
+                <ul className="grid">
+                  {fixed.map((l) => {
+                    const p = PAYER[payerOf(l)];
+                    return (
+                      <SortableItem
+                        key={l.id}
+                        id={l.id}
+                        onContextMenu={(e) => rowMenu(e, l)}
+                        draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0"
                       >
-                        <button
-                          type="button"
-                          onClick={() => open(l, l.list)}
-                          className="grid min-h-10 w-full min-w-0 content-center text-left hover:text-accent-fg"
-                        >
-                          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14.5px] leading-snug">
-                            <span className="break-words">{l.name}</span>
-                            {l.wouldCut && (
-                              <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
-                                Lo sacaría
-                              </span>
-                            )}
-                            {l.variable && (
-                              <span className="text-[11.5px] text-muted">
-                                variable
-                              </span>
-                            )}
-                          </span>
-                          {(l.note || l.category || !isPlainMonthly(l)) && (
-                            <span className="text-[12px] text-muted">
-                              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5 lg:hidden">
+                        <span className="row-span-2 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => open(l, l.list)}
+                            className="grid min-h-10 w-full min-w-0 content-center text-left"
+                          >
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14.5px] leading-snug">
+                              <span className="break-words">{l.name}</span>
+                              {l.wouldCut && (
+                                <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
+                                  Lo sacaría
+                                </span>
+                              )}
+                              {l.variable && (
+                                <span className="text-[11.5px] text-muted">
+                                  variable
+                                </span>
+                              )}
+                            </span>
+                            {(l.note || l.category || !isPlainMonthly(l)) && (
+                              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5 text-[12px] text-muted">
                                 {l.category && (
                                   <CategoryTag
                                     name={l.category}
@@ -510,110 +634,42 @@ export function FixedCosts({
                                     .join(" · ")}
                                 </span>
                               </span>
-                              <span className="max-lg:hidden">{l.note}</span>
-                            </span>
+                            )}
+                          </button>
+                        </span>
+                        <span
+                          className={cx(
+                            "col-start-2 row-start-1 text-right tabular text-[14px] font-medium",
+                            l.amountCents === null && "font-normal text-faint",
+                            l.list === "paused" &&
+                              "font-normal text-muted line-through decoration-faint",
                           )}
-                        </button>
-                      </span>
-                      <span
-                        role="cell"
-                        className={cx(cell, "min-w-0 max-lg:hidden")}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => categoryMenu(e, l)}
-                          title="Cambiar la categoría"
-                          className="group/cat inline-flex min-h-9 max-w-full items-center rounded-md"
                         >
-                          {l.category ? (
-                            <CategoryTag
-                              name={l.category}
-                              color={categoryColors[l.category]}
-                            />
-                          ) : (
-                            <span className="text-[12.5px] text-faint opacity-0 transition-opacity group-hover/cat:opacity-100 group-focus-visible/cat:opacity-100">
-                              + Categoría
-                            </span>
-                          )}
-                        </button>
-                      </span>
-                      <span
-                        role="cell"
-                        className={cx(
-                          cell,
-                          "text-right tabular text-[13.5px] text-muted max-lg:hidden",
-                          l.list === "paused" &&
-                            "line-through decoration-faint",
-                        )}
-                      >
-                        {l.amountCents === null
-                          ? "—"
-                          : moneyCents(l.amountCents, l.currency)}
-                      </span>
-                      <span
-                        role="cell"
-                        className={cx(cell, "min-w-0 max-lg:hidden")}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => freqMenu(e, l)}
-                          title="Cambiar cada cuánto se paga"
-                          className="-mx-1.5 inline-flex min-h-9 max-w-full items-center truncate rounded-md px-1.5 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
-                        >
-                          {freqText(l)}
-                        </button>
-                      </span>
-                      <span
-                        role="cell"
-                        className={cx(
-                          cell,
-                          "text-right tabular text-[14px] font-medium max-lg:col-start-2 max-lg:row-start-1",
-                          l.amountCents === null && "font-normal text-faint",
-                          l.list === "paused" &&
-                            "font-normal text-muted line-through decoration-faint",
-                        )}
-                      >
-                        {l.amountCents === null
-                          ? "—"
-                          : moneyCents(monthlyCents(l)!, l.currency)}
-                      </span>
-                      <span
-                        role="cell"
-                        className={cx(
-                          cell,
-                          "max-lg:col-start-2 max-lg:row-start-2 max-lg:justify-self-end",
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggle(l)}
-                          title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
-                          aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
-                          style={tone(p.color)}
-                          className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
-                        >
-                          {p.label}
-                        </button>
-                      </span>
-                    </SortableItem>
-                  );
-                })}
+                          {l.amountCents === null
+                            ? "—"
+                            : moneyCents(monthlyCents(l)!, l.currency)}
+                        </span>
+                        <span className="col-start-2 row-start-2 justify-self-end">
+                          <button
+                            type="button"
+                            onClick={() => toggle(l)}
+                            aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
+                            style={tone(p.color)}
+                            className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
+                          >
+                            {p.label}
+                          </button>
+                        </span>
+                      </SortableItem>
+                    );
+                  })}
+                </ul>
               </Sortable>
-              {/* Bordes para cambiar el ancho, como en Tareas. */}
-              <ColumnResizers
-                cols={FIXED_COLUMNS.map((c) => ({
-                  key: c.key,
-                  label: c.label,
-                  width: widthOf(c.key),
-                }))}
-                onResize={resize}
-                className="max-lg:hidden"
-              />
             </div>
-          </div>
+          </>
         )}
         {fixed.length > 0 && (
-          <p className="border-t border-line pt-3 text-[13px] text-muted">
+          <p className="border-t border-line pt-3 text-[13px] text-muted lg:border-t-0 lg:px-5 lg:py-3.5">
             Todo junto:{" "}
             <b className="font-semibold text-fg tabular">
               {moneyWhole(mine.uyuCents + paid.uyuCents)}

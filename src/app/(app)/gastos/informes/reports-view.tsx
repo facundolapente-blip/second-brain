@@ -14,6 +14,7 @@ import {
   byCategory,
   byMonth,
   isSelected,
+  passFromAllAccounts,
   personalFlowRows,
   type AccountDTO,
   type CategoryDTO,
@@ -162,8 +163,18 @@ export function ReportsView({
 
   const scoped = useMemo(() => {
     // De la plata de otra persona, solo la diferencia del mes; con "Personales", sin trabajo.
+    // Lo de tu madre, con todas las cuentas personales aunque mires una sola (el efectivo que te
+    // da y después pasás a Itau no se ve desde Itau).
+    const personalIds = new Set(accounts.filter((a) => !a.business).map((a) => a.id));
+    const scopeHasPersonal = accounts.some((a) => !a.business && isSelected(scope, a.id));
     const mine = personalFlowRows(
-      rows.filter((r) => isSelected(scope, r.accountId)),
+      passFromAllAccounts(
+        rows.filter((r) => isSelected(scope, r.accountId)),
+        rows,
+        (r) => !!r.pass,
+        (r) => personalIds.has(r.accountId),
+        scopeHasPersonal,
+      ),
       lk.currencyOf,
       selection === null,
     );
@@ -175,7 +186,7 @@ export function ReportsView({
       // A pesos enteros cada movimiento, como `toUyu` (Inicio, Proyección): así "Todo en pesos" da la misma cifra.
       return { ...r, cents: Math.round((r.cents * per) / 100) * 100 };
     });
-  }, [rows, scope, selection, lk, currency, allPesos, rate, todayRates]);
+  }, [rows, scope, selection, lk, currency, allPesos, rate, todayRates, accounts]);
   const yearMode = period.kind === "year";
   const year = yearMode ? period.year : month.slice(0, 4);
   const prevYear = String(Number(year) - 1);

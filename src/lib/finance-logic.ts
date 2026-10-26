@@ -616,6 +616,23 @@ export function txFlowEntries(
   return out;
 }
 
+/**
+ * La plata de otra persona se cuenta con todas las cuentas personales, aunque se esté mirando
+ * una sola (pedido de Facu, 2026-10-26): la madre le da efectivo, él lo pasa a Itau y paga desde
+ * ahí; mirando solo Itau, la diferencia del mes tiene que ser la misma que con todas. Devuelve lo
+ * de las cuentas elegidas sin lo ajeno, más todo lo ajeno de las cuentas personales (solo si
+ * entre las elegidas hay alguna personal: mirando solo trabajo, nada de eso).
+ */
+export function passFromAllAccounts<T>(
+  scoped: T[],
+  all: T[],
+  isPass: (r: T) => boolean,
+  isPersonal: (r: T) => boolean,
+  scopeHasPersonal: boolean,
+): T[] {
+  return [...scoped.filter((r) => !isPass(r)), ...(scopeHasPersonal ? all.filter((r) => isPass(r) && isPersonal(r)) : [])];
+}
+
 /** Total por categoría (null = sin clasificar), de mayor a menor. */
 export function byCategory(rows: FlowRow[], kind: "expense" | "income"): { categoryId: string | null; cents: number }[] {
   const m = new Map<string | null, number>();

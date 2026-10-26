@@ -14,6 +14,8 @@ import { moneyCents, moneyWhole } from "@/lib/format";
 import {
   balanceByCurrency,
   centsToInput,
+  passFromAllAccounts,
+  isSelected,
   txFlowEntries,
   dayLabel,
   groupByDay,
@@ -157,6 +159,13 @@ export function MovementsView({
     () => [...queued.filter((q) => periodIncludes(period, q.date)), ...shown.list].filter((t) => touchesSelection(t, scope)),
     [queued, shown.list, scope, period],
   );
+  // Para las cifras: lo de tu madre con todas las cuentas personales, aunque mires una sola.
+  const forFlows = useMemo(() => {
+    const all = [...queued.filter((q) => periodIncludes(period, q.date)), ...shown.list];
+    const personalIds = new Set(accounts.filter((a) => !a.business).map((a) => a.id));
+    const isPass = (t: TxDTO) => t.kind !== "transfer" && !!lk.category(t.categoryId)?.pass;
+    return passFromAllAccounts(visible, all, isPass, (t) => personalIds.has(t.accountId), accounts.some((a) => !a.business && isSelected(scope, a.id)));
+  }, [queued, shown.list, period, visible, accounts, lk, scope]);
   const replaced = useReplaced(visible);
   // Otro período: los datos entran desde ese lado; otras cuentas: fundido. Lo nuevo entra suave.
   const dataKey = `${period.from}|${period.to}|${scope?.join(",") ?? "todas"}`;
@@ -175,7 +184,7 @@ export function MovementsView({
     const expCat: Record<string, Record<string, number>> = {};
     // Transferencias y ajustes no cuentan; un reintegro resta del gasto; de la plata de
     // otra persona, solo la diferencia del mes; con "Personales", nada de trabajo.
-    for (const f of txFlowEntries(visible, lk.category, lk.currencyOf, selection === null)) {
+    for (const f of txFlowEntries(forFlows, lk.category, lk.currencyOf, selection === null)) {
       const c = f.currency;
       const target = f.kind === "income" ? inc : exp;
       target[c] = (target[c] ?? 0) + f.cents;
@@ -184,7 +193,7 @@ export function MovementsView({
       byCat[k] = (byCat[k] ?? 0) + f.cents;
     }
     return { inc, exp, incCat, expCat };
-  }, [visible, lk, selection]);
+  }, [forFlows, lk, selection]);
   // Neto = ingresos − gastos (como Informes): sin transferencias ni ajustes de saldo.
   const net = useMemo(() => {
     const out: Record<string, number> = {};
@@ -294,7 +303,7 @@ export function MovementsView({
               </div>
               <div className="hidden gap-4 lg:grid">
                 <SideBalances accounts={accounts} selection={selection} onChange={setSelection} />
-                <CategorySpend txs={visible} lk={lk} month={reportMonth} personal={selection === null} />
+                <CategorySpend txs={forFlows} lk={lk} month={reportMonth} personal={selection === null} />
               </div>
             </aside>
 

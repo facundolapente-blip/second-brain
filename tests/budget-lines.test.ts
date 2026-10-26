@@ -60,3 +60,23 @@ describe("colores de las categorías", () => {
     expect(assignCategoryColors(["Casa"], { Casa: "green" }).changed).toBe(false);
   });
 });
+
+describe("lo de mamá con todas las cuentas", () => {
+  it("mirando una cuenta, suma lo ajeno de todas las personales", async () => {
+    const { passFromAllAccounts } = await import("@/lib/finance-logic");
+    type R = { id: string; acc: string; pass: boolean };
+    const all: R[] = [
+      { id: "viandas", acc: "itau", pass: true },
+      { id: "super", acc: "itau", pass: false },
+      { id: "mama-efectivo", acc: "efectivo", pass: true },
+      { id: "efectivo-cafe", acc: "efectivo", pass: false },
+      { id: "negocio", acc: "prex", pass: true },
+    ];
+    const itau = all.filter((r) => r.acc === "itau");
+    const personal = (r: R) => r.acc !== "prex";
+    const ids = (rs: R[]) => rs.map((r) => r.id).sort();
+    expect(ids(passFromAllAccounts(itau, all, (r) => r.pass, personal, true))).toEqual(["mama-efectivo", "super", "viandas"]);
+    // Mirando solo trabajo, nada de lo ajeno personal.
+    expect(ids(passFromAllAccounts(all.filter((r) => r.acc === "prex"), all, (r) => r.pass, personal, false))).toEqual([]);
+  });
+});
