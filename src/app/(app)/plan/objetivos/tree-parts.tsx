@@ -14,6 +14,7 @@ import type { KeyResultDTO, StepDTO } from "@/lib/plan-logic";
 export type Op =
   | { type: "addKr"; kr: KeyResultDTO }
   | { type: "renameKr"; id: string; title: string }
+  | { type: "removeKr"; ids: string[] }
   | { type: "addStep"; step: StepDTO }
   | { type: "step"; id: string; patch: Partial<StepDTO> }
   | { type: "removeStep"; id: string };
@@ -24,6 +25,8 @@ export function reduce(krs: KeyResultDTO[], op: Op): KeyResultDTO[] {
       return [...krs.filter((k) => k.id !== op.kr.id), op.kr];
     case "renameKr":
       return krs.map((k) => (k.id === op.id ? { ...k, title: op.title } : k));
+    case "removeKr":
+      return krs.filter((k) => !op.ids.includes(k.id));
     case "addStep":
       return krs.map((k) => (k.id === op.step.keyResultId ? { ...k, steps: [...k.steps.filter((s) => s.id !== op.step.id), op.step] } : k));
     case "step":

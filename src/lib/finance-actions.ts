@@ -14,7 +14,7 @@ import { dayIn, installmentDate, splitInstallments } from "./card-logic";
 import { isPaletteKey } from "./palette";
 import { ACCOUNT_TYPES, CURRENCIES } from "./format";
 import { ACCOUNT_TYPE_ICON, centsToDecimalString, parseAmount, TX_KINDS, type TxKind } from "./finance-logic";
-import { CATEGORY_COLORS, CATEGORY_COLORS_KEY, isBudgetList, isFreq, MAX_TIMES, parseColorMap } from "./budget-lines";
+import { assignCategoryColors, CATEGORY_COLORS, CATEGORY_COLORS_KEY, cleanCategory, FIXED_COLUMNS_KEY, isBudgetList, isFreq, MAX_TIMES, parseColorMap, parseFixedWidths } from "./budget-lines";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -1040,4 +1040,121 @@ export async function reorderBudgetLines(group: string, ids: string[]) {
     ids.map((id, i) => prisma.budgetLine.updateMany({ where: { id: String(id), list: { in: lists } }, data: { order: i + 1 } })),
   );
   refrescar();
+}
+
+async function readColors(): Promise<Record<string, string>> {
+  const row = await prisma.appSetting.findUnique({ where: { key: CATEGORY_COLORS_KEY } });
+  return parseColorMap(row?.value);
+}
+async function writeColors(map: Record<string, string>) {
+  const value = JSON.stringify(map);
+  await prisma.appSetting.upsert({ where: { key: CATEGORY_COLORS_KEY }, create: { key: CATEGORY_COLORS_KEY, value }, update: { value } });
+}
+
+/** Cambia el nombre de un gasto fijo ahí mismo (clic derecho). */
+export async function renameBudgetLine(id: string, name: string) {
+  await exigirSesion();
+  const n = String(name ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
+  if (!n) return;
+  await prisma.budgetLine.updateMany({ where: { id: String(id) }, data: { name: n } });
+  refrescar();
+}
+
+/** Cambia cada cuánto se paga (desde la tabla; las veces quedan como estaban). */
+export async function setBudgetLineFreq(id: string, freq: string) {
+  await exigirSesion();
+  if (!isFreq(freq)) return;
+  await prisma.budgetLine.updateMany({ where: { id: String(id) }, data: { freq } });
+  refrescar();
+}
+
+/** Le pone (o saca, con null) la categoría a un gasto fijo; una nueva toma un color libre. */
+export async function setBudgetLineCategory(id: string, category: string | null) {
+  await exigirSesion();
+  const c = category === null ? null : cleanCategory(category) || null;
+  await prisma.budgetLine.updateMany({ where: { id: String(id) }, data: { category: c } });
+  if (c) {
+    const map = await readColors();
+    const { colors, changed } = assignCategoryColors([c], map);
+    if (changed) await writeColors(colors);
+  }
+  refrescar();
+}
+
+/** Una copia debajo del original (mismo todo, nombre con "(copia)"). */
+export async function duplicateBudgetLine(id: string): Promise<ActionResult> {
+  await exigirSesion();
+  const l = await prisma.budgetLine.findUnique({ where: { id: String(id) } });
+  if (!l) return { ok: false, error: "Ese gasto ya no está." };
+  const next = await prisma.budgetLine.findFirst({ where: { order: { gt: l.order } }, orderBy: { order: "asc" }, select: { order: true } });
+  const { id: _id, createdAt: _c, updatedAt: _u, source: _s, externalId: _e, ...rest } = l;
+  void _id;
+  void _c;
+  void _u;
+  void _s;
+  void _e;
+  const copy = await prisma.budgetLine.create({
+    data: { ...rest, name: `${l.name} (copia)`.slice(0, 80), order: next ? (l.order + next.order) / 2 : l.order + 1 },
+  });
+  await logActivity("created", "budgetLine", copy.id, copy.name);
+  refrescar();
+  return { ok: true, id: copy.id };
+}
+
+/** Crea una categoría (sin gastos todavía) con un color libre o el elegido. */
+export async function addBudgetCategory(name: string, color?: string | null): Promise<ActionResult> {
+  await exigirSesion();
+  const c = cleanCategory(name);
+  if (!c) return { ok: false, error: "Escribí el nombre." };
+  const map = await readColors();
+  if (map[c]) return { ok: false, error: "Ya existe." };
+  const pick = color && (CATEGORY_COLORS as readonly string[]).includes(color) ? color : null;
+  await writeColors(pick ? { ...map, [c]: pick } : assignCategoryColors([c], map).colors);
+  refrescar();
+  return { ok: true };
+}
+
+/** Cambia el nombre de una categoría en todos sus gastos (si ya existe la otra, se juntan). */
+export async function renameBudgetCategory(from: string, to: string): Promise<ActionResult> {
+  await exigirSesion();
+  const a = cleanCategory(from);
+  const b = cleanCategory(to);
+  if (!a || !b) return { ok: false, error: "Escribí el nombre." };
+  if (a === b) return { ok: true };
+  await prisma.budgetLine.updateMany({ where: { category: a }, data: { category: b } });
+  const map = await readColors();
+  const color = map[b] ?? map[a];
+  delete map[a];
+  if (color) map[b] = color;
+  await writeColors(map);
+  refrescar();
+  return { ok: true };
+}
+
+export async function setBudgetCategoryColor(name: string, color: string) {
+  await exigirSesion();
+  const c = cleanCategory(name);
+  if (!c || !(CATEGORY_COLORS as readonly string[]).includes(color)) return;
+  await writeColors({ ...(await readColors()), [c]: color });
+  refrescar();
+}
+
+/** Borra una categoría: sus gastos quedan sin categoría (los gastos no se tocan). */
+export async function deleteBudgetCategory(name: string) {
+  await exigirSesion();
+  const c = cleanCategory(name);
+  if (!c) return;
+  await prisma.budgetLine.updateMany({ where: { category: c }, data: { category: null } });
+  const map = await readColors();
+  delete map[c];
+  await writeColors(map);
+  await logActivity("deleted", "budgetLine", null, `Categoría "${c}" de gastos fijos`);
+  refrescar();
+}
+
+/** Anchos de las columnas de la tabla de gastos fijos (se arrastran en la compu). */
+export async function saveBudgetColumns(widths: Record<string, number>) {
+  await exigirSesion();
+  const value = JSON.stringify(parseFixedWidths(JSON.stringify(widths ?? {})));
+  await prisma.appSetting.upsert({ where: { key: FIXED_COLUMNS_KEY }, create: { key: FIXED_COLUMNS_KEY, value }, update: { value } });
 }

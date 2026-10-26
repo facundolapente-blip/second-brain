@@ -28,7 +28,7 @@ import { Tick } from "../motion";
 import { useGastosNew } from "../new-action";
 import { NavDim, usePeriodSwipe } from "../period-step";
 import { FixedCosts } from "./fixed-costs";
-import type { BudgetLineDTO } from "@/lib/budget-lines";
+import type { BudgetLineDTO, FixedColumnWidths } from "@/lib/budget-lines";
 
 const STATE_TONE: Record<BudgetState, { bar: string; text: string }> = {
   ok: { bar: "var(--st-done-line)", text: "text-[var(--st-done-fg)]" },
@@ -46,8 +46,8 @@ export function BudgetsView({
   projects,
   lines,
   categoryColors,
+  columns,
   toUyu,
-  avgSpendCents,
 }: {
   month: string;
   today: string;
@@ -57,8 +57,8 @@ export function BudgetsView({
   projects: ProjectDTO[];
   lines: BudgetLineDTO[];
   categoryColors: Record<string, string>;
+  columns: FixedColumnWidths;
   toUyu: Record<string, number>;
-  avgSpendCents: number | null;
 }) {
   const catById = new Map(categories.map((c) => [c.id, c]));
   const share = monthShare(month, today);
@@ -305,7 +305,7 @@ export function BudgetsView({
           </Link>
         </TintedCard>
 
-        <FixedCosts lines={lines} categoryColors={categoryColors} toUyu={toUyu} avgSpendCents={avgSpendCents} />
+        <FixedCosts lines={lines} categoryColors={categoryColors} columns={columns} toUyu={toUyu} />
 
         {without.length > 0 && (
           <TintedCard

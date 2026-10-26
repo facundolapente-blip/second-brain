@@ -2,14 +2,15 @@
 
 import { useOptimistic, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CaretDown, CaretRight, Check, DotsThree, Minus, PencilSimple, Plus } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, DotsThree, Minus, NotePencil, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
+import { showContextMenu } from "@/components/context-menu";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyDeleted } from "@/components/undo-toast";
 import { useTick } from "@/components/motion";
 import { cx, Sheet, type SheetHandle } from "@/components/ui";
 import { formatShort } from "@/lib/dates";
-import { addStep, addSubgoal, bumpObjective, deleteStep, renameKeyResult, renameStep, scheduleStep, toggleStep, unscheduleStep } from "@/lib/offline/plan";
-import { ancestorsOf, byStepOrder, childrenOf, groupGoals, isAchieved, nodePct, quarterPath, stepCount, treePct, type QuarterStop } from "@/lib/objective-tree";
+import { addStep, addSubgoal, bumpObjective, deleteKeyResult, deleteObjective, deleteStep, renameKeyResult, renameStep, scheduleStep, toggleStep, unscheduleStep } from "@/lib/offline/plan";
+import { ancestorsOf, byStepOrder, childrenOf, descendantsOf, groupGoals, isAchieved, nodePct, quarterPath, stepCount, treePct, type QuarterStop } from "@/lib/objective-tree";
 import { effectiveKr, newClientId, type KeyResultDTO, type KrLinkOption, type ObjectiveDTO } from "@/lib/plan-logic";
 import { ProgressBar } from "../plan-ui";
 import { KrSheet, ObjectiveForm, type KrSheetHandle } from "./objective-forms";
@@ -42,6 +43,8 @@ export function ObjectivesBoard({
 }) {
   const sp = useSearchParams();
   const [all, apply] = useOptimistic([...objectives.flatMap((o) => o.keyResults), ...loose], reduce);
+  // Objetivos grandes borrados con el clic derecho: desaparecen al toque (la papelera los guarda).
+  const [gone, hide] = useOptimistic<string[], string>([], (ids, id) => [...ids, id]);
   const [, start] = useSafeTransition();
   const krSheet = useRef<KrSheetHandle>(null);
   const scheduleSheet = useRef<ScheduleHandle>(null);
@@ -51,7 +54,7 @@ export function ObjectivesBoard({
   // Lo elegido: en la compu, sin nada elegido se ve el primero; en el celular, la lista.
   const LOOSE = "sueltos";
   const groups: ObjectiveDTO[] = [
-    ...objectives.map((o) => ({ ...o, keyResults: all.filter((k) => k.objectiveId === o.id) })),
+    ...objectives.filter((o) => !gone.includes(o.id)).map((o) => ({ ...o, keyResults: all.filter((k) => k.objectiveId === o.id) })),
     ...(all.some((k) => !k.objectiveId)
       ? [{ id: LOOSE, title: "Sin objetivo grande", year, role: null, area: null, priority: 0, deadline: null, status: "doing" as const, progress: null, goal: null, focus: [], keyResults: all.filter((k) => !k.objectiveId) }]
       : []),
@@ -125,6 +128,68 @@ export function ObjectivesBoard({
 
   const realObjectives = groups.filter((g) => g.id !== LOOSE);
 
+  /** Clic derecho en un objetivo chico: abrir, cambiar el nombre, editar o borrar (con lo que sale de él). */
+  const krMenu = (e: React.MouseEvent, k: KeyResultDTO) => {
+    const below = descendantsOf(all, k.id);
+    showContextMenu(
+      e,
+      [
+        { label: "Abrir", icon: <ArrowRight size={15} />, onSelect: () => go(k.objectiveId ?? LOOSE, k.id) },
+        { label: "Cambiar nombre", icon: <PencilSimple size={15} />, rename: { value: k.title, onSave: (t) => t.trim() && ctx.renameKr(k, t.trim()) } },
+        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => krSheet.current?.open(k) },
+        {
+          label: below.length ? `Borrar (y ${below.length} más chicos)` : "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            const ids = [k.id, ...below.map((b) => b.id)];
+            if (kr && ids.includes(kr.id) && shown) go(shown.id, null);
+            start(async () => {
+              apply({ type: "removeKr", ids });
+              await deleteKeyResult(k.id);
+              notifyDeleted(`"${k.title}" borrado`);
+            });
+          },
+        },
+      ],
+      k.title,
+    );
+  };
+
+  /** Clic derecho en un objetivo grande: abrir, editar o borrar (a la papelera con todo lo suyo). */
+  const objectiveMenu = (e: React.MouseEvent, g: ObjectiveDTO) => {
+    if (g.id === LOOSE) return;
+    showContextMenu(
+      e,
+      [
+        { label: "Abrir", icon: <ArrowRight size={15} />, onSelect: () => go(g.id, null) },
+        {
+          label: "Editar",
+          icon: <NotePencil size={15} />,
+          onSelect: () => {
+            go(g.id, null);
+            setEditKey((n) => n + 1);
+            editSheet.current?.open();
+          },
+        },
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            if (shown?.id === g.id) go(null, null);
+            start(async () => {
+              hide(g.id);
+              await deleteObjective(g.id);
+              notifyDeleted(`"${cleanTitle(g.title)}" borrado`);
+            });
+          },
+        },
+      ],
+      cleanTitle(g.title),
+    );
+  };
+
   return (
     <>
       <div className="grid lg:min-h-[32rem] lg:grid-cols-[minmax(14rem,0.75fr)_minmax(0,1.25fr)_minmax(0,1.1fr)]">
@@ -140,6 +205,7 @@ export function ObjectivesBoard({
                   <button
                     type="button"
                     onClick={() => go(g.id, null)}
+                    onContextMenu={(e) => objectiveMenu(e, g)}
                     aria-current={on ? "true" : undefined}
                     className={cx(
                       "tap-tint grid w-full gap-1.5 rounded-xl px-3 py-2.5 text-left transition-colors",
@@ -224,13 +290,14 @@ export function ObjectivesBoard({
                   all={krs}
                   selected={kr?.id ?? null}
                   onPick={(k) => go(shown.id, k.id)}
+                  onMenu={krMenu}
                   empty={krs.length === 0 ? "¿Qué tiene que pasar para lograrlo? Partilo en objetivos más chicos." : "Nada pendiente ahora."}
                 />
               )}
               {shown.id !== LOOSE && <AddGoal ctx={ctx} parentId={null} label="Objetivo más chico" placeholder="Un objetivo más chico: terminar 4 temas…" open={krs.length === 0} />}
 
               {grouped.achieved.length > 0 && (
-                <GoalGroup title={`Logrados · ${grouped.achieved.length}`} tone="done" list={grouped.achieved} all={krs} selected={kr?.id ?? null} onPick={(k) => go(shown.id, k.id)} />
+                <GoalGroup title={`Logrados · ${grouped.achieved.length}`} tone="done" list={grouped.achieved} all={krs} selected={kr?.id ?? null} onPick={(k) => go(shown.id, k.id)} onMenu={krMenu} />
               )}
               {grouped.unfinished.length > 0 && (
                 <GoalGroup
@@ -240,6 +307,7 @@ export function ObjectivesBoard({
                   all={krs}
                   selected={kr?.id ?? null}
                   onPick={(k) => go(shown.id, k.id)}
+                  onMenu={krMenu}
                 />
               )}
             </>
@@ -376,6 +444,7 @@ function GoalGroup({
   all,
   selected,
   onPick,
+  onMenu,
   empty,
   tone,
   foldable,
@@ -385,6 +454,8 @@ function GoalGroup({
   all: KeyResultDTO[];
   selected: string | null;
   onPick: (k: KeyResultDTO) => void;
+  /** Clic derecho en una fila. */
+  onMenu?: (e: React.MouseEvent, k: KeyResultDTO) => void;
   empty?: string;
   tone?: "done";
   foldable?: boolean;
@@ -395,6 +466,7 @@ function GoalGroup({
       <button
         type="button"
         onClick={() => onPick(k)}
+        onContextMenu={onMenu ? (e) => onMenu(e, k) : undefined}
         aria-current={selected === k.id ? "true" : undefined}
         className={cx(
           "tap-tint flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[14px] transition-colors",

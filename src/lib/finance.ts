@@ -14,7 +14,7 @@ import {
   type ScheduleFrequency,
 } from "./schedule-logic";
 import { convertCents, rolloverCarry, type CategoryBudgetDTO, type ForeignSpend, type ProjectDTO } from "./budget-logic";
-import { assignCategoryColors, CATEGORY_COLORS_KEY, isBudgetList, isFreq, parseColorMap, type BudgetLineDTO } from "./budget-lines";
+import { assignCategoryColors, CATEGORY_COLORS_KEY, FIXED_COLUMNS_KEY, isBudgetList, isFreq, parseColorMap, parseFixedWidths, type BudgetLineDTO, type FixedColumnWidths } from "./budget-lines";
 import { ensureAdjustmentCategories } from "./importers/adjustments";
 import { getRates, toUyu } from "./fx";
 import {
@@ -997,4 +997,10 @@ export async function getBudgetCategoryColors(lines: BudgetLineDTO[]): Promise<R
     await prisma.appSetting.upsert({ where: { key: CATEGORY_COLORS_KEY }, create: { key: CATEGORY_COLORS_KEY, value }, update: { value } });
   }
   return colors;
+}
+
+/** Anchos guardados de las columnas de la tabla de gastos fijos. */
+export async function getBudgetColumns(): Promise<FixedColumnWidths> {
+  const row = await prisma.appSetting.findUnique({ where: { key: FIXED_COLUMNS_KEY } });
+  return parseFixedWidths(row?.value);
 }

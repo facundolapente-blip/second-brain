@@ -122,3 +122,36 @@ export function parseColorMap(raw: string | null | undefined): Record<string, st
     return {};
   }
 }
+
+/** Columnas de la tabla de gastos fijos (compu), con su ancho de entrada en px. */
+export const FIXED_COLUMNS = [
+  { key: "name", label: "Gasto", width: 280 },
+  { key: "category", label: "Categoría", width: 170 },
+  { key: "amount", label: "Monto", width: 120 },
+  { key: "freq", label: "Frecuencia", width: 140 },
+  { key: "monthly", label: "Por mes", width: 120 },
+  { key: "payer", label: "Quién paga", width: 140 },
+] as const;
+export type FixedColumnKey = (typeof FIXED_COLUMNS)[number]["key"];
+export type FixedColumnWidths = Partial<Record<FixedColumnKey, number>>;
+export const FIXED_COLUMNS_KEY = "gastos_fijos_columnas";
+export const FIXED_COLUMN_MIN = 60;
+export const FIXED_COLUMN_MAX = 640;
+
+/** Los anchos guardados, solo los que valen (entre el mínimo y el máximo). */
+export function parseFixedWidths(raw: string | null | undefined): FixedColumnWidths {
+  const out: FixedColumnWidths = {};
+  try {
+    const v = JSON.parse(raw ?? "{}") as Record<string, unknown>;
+    for (const c of FIXED_COLUMNS) {
+      const w = Number(v?.[c.key]);
+      if (Number.isFinite(w)) out[c.key] = Math.round(Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)));
+    }
+  } catch {
+    /* vacío */
+  }
+  return out;
+}
+
+/** Nombre de una categoría: sin espacios de más, hasta 40 caracteres. */
+export const cleanCategory = (s: unknown) => String(s ?? "").trim().replace(/\s+/g, " ").slice(0, 40);

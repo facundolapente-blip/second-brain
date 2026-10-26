@@ -7,8 +7,25 @@ import {
   useRef,
   useState,
 } from "react";
-import { House, Plus, Receipt } from "@phosphor-icons/react";
-import { safeForm, useSafeTransition } from "@/components/safe-action";
+import {
+  ArrowsClockwise,
+  Check,
+  CopySimple,
+  House,
+  NotePencil,
+  PencilSimple,
+  Plus,
+  Receipt,
+  Tag,
+  Trash,
+} from "@phosphor-icons/react";
+import { ColumnResizers } from "@/components/column-resizers";
+import {
+  showContextMenu,
+  type ContextMenuItem,
+} from "@/components/context-menu";
+import { notifyDeleted, notifyInfo } from "@/components/undo-toast";
+import { quiet, safeForm, useSafeTransition } from "@/components/safe-action";
 import { Sortable, SortableItem } from "@/components/sortable";
 import { TintedCard } from "@/components/tinted-card";
 import {
@@ -22,15 +39,29 @@ import {
   type SheetHandle,
 } from "@/components/ui";
 import {
+  addBudgetCategory,
+  deleteBudgetCategory,
   deleteBudgetLine,
+  duplicateBudgetLine,
+  renameBudgetCategory,
+  renameBudgetLine,
   reorderBudgetLines,
+  saveBudgetColumns,
   saveBudgetLine,
+  setBudgetCategoryColor,
+  setBudgetLineCategory,
+  setBudgetLineFreq,
   setBudgetLinePayer,
   type ActionResult,
 } from "@/lib/offline/finance";
 import {
   byLineOrder,
   CATEGORY_COLORS,
+  FIXED_COLUMN_MAX,
+  FIXED_COLUMN_MIN,
+  FIXED_COLUMNS,
+  type FixedColumnKey,
+  type FixedColumnWidths,
   FREQ_LABEL,
   FREQS,
   freqText,
@@ -113,40 +144,46 @@ function CategoryTag({
   );
 }
 
+type Op =
+  | { id: string; list: BudgetList }
+  | { order: string[] }
+  | { patch: Partial<BudgetLineDTO>; id: string }
+  | { remove: string };
+
+function reduceLines(ls: BudgetLineDTO[], op: Op): BudgetLineDTO[] {
+  if ("order" in op) {
+    const pos = new Map(op.order.map((id, i) => [id, i + 1]));
+    return ls.map((l) => (pos.has(l.id) ? { ...l, order: pos.get(l.id)! } : l));
+  }
+  if ("remove" in op) return ls.filter((l) => l.id !== op.remove);
+  if ("patch" in op)
+    return ls.map((l) => (l.id === op.id ? { ...l, ...op.patch } : l));
+  return ls.map((l) => (l.id === op.id ? { ...l, list: op.list } : l));
+}
+
+/**
+ * Gastos fijos (2026-10-25, de su página "Presupuesto" de Notion): una tabla con lo que se
+ * paga todos los meses, su frecuencia, lo que sale por mes y una etiqueta de quién lo paga;
+ * debajo, el plan "Si vivo solo". En la compu, las columnas se ensanchan arrastrando el borde
+ * (como en Tareas), la categoría y la frecuencia se cambian tocándolas y el clic derecho de
+ * una fila edita, duplica o borra.
+ */
 export function FixedCosts({
   lines,
   categoryColors,
+  columns,
   toUyu,
-  avgSpendCents,
 }: {
   lines: BudgetLineDTO[];
   categoryColors: Record<string, string>;
+  columns: FixedColumnWidths;
   toUyu: Record<string, number>;
-  avgSpendCents: number | null;
 }) {
-  // Lo optimista: cambiar la etiqueta y el orden arrastrando se ven al toque.
-  const [list, apply] = useOptimistic(
-    lines,
-    (
-      ls: BudgetLineDTO[],
-      op: { id: string; list: BudgetList } | { order: string[] },
-    ) => {
-      if ("order" in op) {
-        const pos = new Map(op.order.map((id, i) => [id, i + 1]));
-        return ls.map((l) =>
-          pos.has(l.id) ? { ...l, order: pos.get(l.id)! } : l,
-        );
-      }
-      return ls.map((l) => (l.id === op.id ? { ...l, list: op.list } : l));
-    },
-  );
-  const reorder = (group: "fixed" | "solo", ids: string[]) =>
-    start(async () => {
-      apply({ order: ids });
-      await reorderBudgetLines(group, ids);
-    });
+  // Lo optimista: etiqueta, orden, categoría, frecuencia, nombre y borrar se ven al toque.
+  const [list, apply] = useOptimistic(lines, reduceLines);
   const [, start] = useSafeTransition();
   const sheet = useRef<SheetHandle>(null);
+  const catSheet = useRef<SheetHandle>(null);
   const [editing, setEditing] = useState<{
     line?: BudgetLineDTO;
     list: BudgetList;
@@ -156,9 +193,31 @@ export function FixedCosts({
     setEditing((e) => ({ line, list: l, key: e.key + 1 }));
     sheet.current?.open();
   };
+  const reorder = (group: "fixed" | "solo", ids: string[]) =>
+    start(async () => {
+      apply({ order: ids });
+      await reorderBudgetLines(group, ids);
+    });
+
+  // Anchos de las columnas (compu): cada una el suyo, la tabla mide la suma (como en Tareas).
+  const [widths, setWidths] = useState<FixedColumnWidths>(columns);
+  const widthOf = (k: FixedColumnKey) =>
+    widths[k] ?? FIXED_COLUMNS.find((c) => c.key === k)!.width;
+  const resize = (k: FixedColumnKey, w: number, save: boolean) => {
+    const next = {
+      ...widths,
+      [k]: Math.round(
+        Math.min(FIXED_COLUMN_MAX, Math.max(FIXED_COLUMN_MIN, w)),
+      ),
+    };
+    setWidths(next);
+    if (save) quiet(saveBudgetColumns(next));
+  };
+  const colsVar = FIXED_COLUMNS.map((c) => `${widthOf(c.key)}px`).join(" ");
 
   const fixed = list.filter((l) => l.list !== "solo").sort(byLineOrder);
   const solo = list.filter((l) => l.list === "solo").sort(byLineOrder);
+  // Lo pausado no entra en ninguna cuenta.
   const mine = lineTotal(
     fixed.filter((l) => l.list === "mine"),
     toUyu,
@@ -173,8 +232,12 @@ export function FixedCosts({
     (l) => l.list !== "paused" && l.currency !== "UYU" && l.amountCents,
   );
   const pausedCount = fixed.filter((l) => l.list === "paused").length;
+  // Todas las categorías: las que tienen color guardado (también las creadas sin gastos) y las de los gastos.
   const categories = [
-    ...new Set(list.map((l) => l.category).filter((c): c is string => !!c)),
+    ...new Set([
+      ...Object.keys(categoryColors),
+      ...list.map((l) => l.category).filter((c): c is string => !!c),
+    ]),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
   const toggle = (l: BudgetLineDTO) => {
@@ -184,7 +247,131 @@ export function FixedCosts({
       await setBudgetLinePayer(l.id, next);
     });
   };
+  const setCategory = (l: BudgetLineDTO, category: string | null) =>
+    start(async () => {
+      apply({ id: l.id, patch: { category } });
+      await setBudgetLineCategory(l.id, category);
+    });
+  const setFreq = (l: BudgetLineDTO, freq: Freq) =>
+    start(async () => {
+      apply({ id: l.id, patch: { freq } });
+      await setBudgetLineFreq(l.id, freq);
+    });
+  const remove = (l: BudgetLineDTO) =>
+    start(async () => {
+      apply({ remove: l.id });
+      await deleteBudgetLine(l.id);
+      notifyDeleted(`${l.name} borrado`);
+    });
+  const duplicate = (l: BudgetLineDTO) =>
+    start(async () => {
+      await duplicateBudgetLine(l.id);
+      notifyInfo(`${l.name} duplicado`);
+    });
 
+  /** Clic derecho en una fila: editar, cambiar el nombre, duplicar o borrar. */
+  const rowMenu = (e: React.MouseEvent, l: BudgetLineDTO) =>
+    showContextMenu(
+      e,
+      [
+        {
+          label: "Editar",
+          icon: <NotePencil size={15} />,
+          onSelect: () => open(l, l.list),
+        },
+        {
+          label: "Cambiar nombre",
+          icon: <PencilSimple size={15} />,
+          rename: {
+            value: l.name,
+            onSave: (name) => {
+              const n = name.trim();
+              if (!n) return;
+              start(async () => {
+                apply({ id: l.id, patch: { name: n } });
+                await renameBudgetLine(l.id, n);
+              });
+            },
+          },
+        },
+        {
+          label: "Duplicar",
+          icon: <CopySimple size={15} />,
+          onSelect: () => duplicate(l),
+        },
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => remove(l),
+        },
+      ],
+      l.name,
+    );
+
+  /** Tocar la categoría: elegir otra, sacarla, crear una nueva o editar las categorías. */
+  const categoryMenu = (e: React.MouseEvent, l: BudgetLineDTO) => {
+    const items: ContextMenuItem[] = categories.map((c) => ({
+      label: c,
+      icon:
+        l.category === c ? (
+          <Check size={15} weight="bold" />
+        ) : (
+          <span
+            aria-hidden
+            style={tone(categoryColors[c] ?? "stone")}
+            className="chip-solid inline-block size-3 rounded-full"
+          />
+        ),
+      onSelect: () => setCategory(l, c),
+    }));
+    if (l.category)
+      items.push({
+        label: "Sin categoría",
+        icon: <Tag size={15} />,
+        onSelect: () => setCategory(l, null),
+      });
+    items.push({
+      label: "Nueva categoría…",
+      icon: <Plus size={15} />,
+      rename: {
+        value: "",
+        onSave: (name) => name.trim() && setCategory(l, name.trim()),
+      },
+    });
+    items.push({
+      label: "Editar categorías…",
+      icon: <PencilSimple size={15} />,
+      onSelect: () => catSheet.current?.open(),
+    });
+    showContextMenu(e, items, "Categoría");
+  };
+
+  /** Tocar la frecuencia: cada cuánto (las veces se cambian en la hoja). */
+  const freqMenu = (e: React.MouseEvent, l: BudgetLineDTO) =>
+    showContextMenu(
+      e,
+      [
+        ...FREQS.map((f) => ({
+          label: FREQ_LABEL[f],
+          icon:
+            l.freq === f ? (
+              <Check size={15} weight="bold" />
+            ) : (
+              <span className="inline-block size-[15px]" aria-hidden />
+            ),
+          onSelect: () => setFreq(l, f),
+        })),
+        {
+          label: "Cuántas veces…",
+          icon: <ArrowsClockwise size={15} />,
+          onSelect: () => open(l, l.list),
+        },
+      ],
+      "Cada cuánto",
+    );
+
+  const cell = "lg:px-2";
   return (
     <>
       <TintedCard
@@ -198,13 +385,23 @@ export function FixedCosts({
         }
         bodyClassName="gap-3!"
         action={
-          <button
-            type="button"
-            className="tcard-pill press"
-            onClick={() => open(undefined, "mine")}
-          >
-            <Plus size={14} weight="bold" aria-hidden /> Gasto
-          </button>
+          <span className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className="tcard-pill press"
+              onClick={() => catSheet.current?.open()}
+            >
+              <Tag size={14} aria-hidden />{" "}
+              <span className="max-sm:sr-only">Categorías</span>
+            </button>
+            <button
+              type="button"
+              className="tcard-pill press"
+              onClick={() => open(undefined, "mine")}
+            >
+              <Plus size={14} weight="bold" aria-hidden /> Gasto
+            </button>
+          </span>
         }
       >
         {fixed.length === 0 ? (
@@ -213,136 +410,189 @@ export function FixedCosts({
             suscripciones) y quién lo paga.
           </p>
         ) : (
-          <div role="table" aria-label="Gastos fijos" className="grid">
+          // Si los anchos suman más que la tarjeta, la tabla se corre de costado.
+          <div className="lg:-mx-2 lg:overflow-x-auto">
             <div
-              role="row"
-              className="hidden border-b border-line pb-1.5 font-mono text-[11px] tracking-wide text-muted uppercase lg:grid lg:grid-cols-[minmax(0,1fr)_8rem_7.5rem_8rem_7.5rem_8.5rem] lg:gap-3"
+              role="table"
+              aria-label="Gastos fijos"
+              className="relative grid lg:w-max"
+              style={{ "--fc-cols": colsVar } as React.CSSProperties}
             >
-              <span role="columnheader">Gasto</span>
-              <span role="columnheader">Categoría</span>
-              <span role="columnheader" className="text-right">
-                Monto
-              </span>
-              <span role="columnheader">Frecuencia</span>
-              <span role="columnheader" className="text-right">
-                Por mes
-              </span>
-              <span role="columnheader">Quién paga</span>
-            </div>
-            {/* Arrastrar ordena (compu: clic y arrastrar; celular: mantener apretado). */}
-            <Sortable
-              ids={fixed.map((l) => l.id)}
-              onReorder={(ids) => reorder("fixed", ids)}
-              disabled={fixed.length < 2}
-            >
-              {fixed.map((l) => {
-                const p = PAYER[payerOf(l)];
-                return (
-                  <SortableItem
-                    key={l.id}
-                    id={l.id}
-                    as="div"
-                    role="row"
-                    draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_8rem_7.5rem_8rem_7.5rem_8.5rem] lg:cursor-grab lg:py-1.5 lg:active:cursor-grabbing"
+              <div
+                role="row"
+                className="hidden border-b border-line pb-1.5 font-mono text-[11px] tracking-wide text-muted uppercase lg:grid lg:grid-cols-[var(--fc-cols)]"
+              >
+                {FIXED_COLUMNS.map((c) => (
+                  <span
+                    key={c.key}
+                    role="columnheader"
+                    className={cx(
+                      cell,
+                      "truncate",
+                      (c.key === "amount" || c.key === "monthly") &&
+                        "text-right",
+                    )}
                   >
-                    <span role="cell" className="min-w-0 max-lg:row-span-2">
-                      <button
-                        type="button"
-                        onClick={() => open(l, l.list)}
-                        className="grid min-h-10 w-full min-w-0 content-center text-left hover:text-accent-fg"
+                    {c.label}
+                  </span>
+                ))}
+              </div>
+              {/* Arrastrar ordena (compu: clic y arrastrar; celular: mantener apretado). */}
+              <Sortable
+                ids={fixed.map((l) => l.id)}
+                onReorder={(ids) => reorder("fixed", ids)}
+                disabled={fixed.length < 2}
+              >
+                {fixed.map((l) => {
+                  const p = PAYER[payerOf(l)];
+                  return (
+                    <SortableItem
+                      key={l.id}
+                      id={l.id}
+                      as="div"
+                      role="row"
+                      onContextMenu={(e) => rowMenu(e, l)}
+                      draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-line bg-surface py-2 last:border-b-0 lg:cursor-grab lg:grid-cols-[var(--fc-cols)] lg:gap-x-0 lg:py-1.5 lg:active:cursor-grabbing"
+                    >
+                      <span
+                        role="cell"
+                        className={cx(cell, "min-w-0 max-lg:row-span-2")}
                       >
-                        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14.5px] leading-snug">
-                          <span className="break-words">{l.name}</span>
-                          {l.wouldCut && (
-                            <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
-                              Lo sacaría
-                            </span>
-                          )}
-                          {l.variable && (
-                            <span className="text-[11.5px] text-muted">
-                              variable
-                            </span>
-                          )}
-                        </span>
-                        {(l.note || l.category || !isPlainMonthly(l)) && (
-                          <span className="text-[12px] text-muted">
-                            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5 lg:hidden">
-                              {l.category && (
-                                <CategoryTag
-                                  name={l.category}
-                                  color={categoryColors[l.category]}
-                                  small
-                                />
-                              )}
-                              <span>
-                                {[unitText(l), l.note]
-                                  .filter(Boolean)
-                                  .join(" · ")}
+                        <button
+                          type="button"
+                          onClick={() => open(l, l.list)}
+                          className="grid min-h-10 w-full min-w-0 content-center text-left hover:text-accent-fg"
+                        >
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14.5px] leading-snug">
+                            <span className="break-words">{l.name}</span>
+                            {l.wouldCut && (
+                              <span className="rounded-full bg-[var(--st-skip-bg)] px-2 py-px text-[11px] font-medium text-[var(--st-skip-fg)]">
+                                Lo sacaría
                               </span>
-                            </span>
-                            <span className="max-lg:hidden">{l.note}</span>
+                            )}
+                            {l.variable && (
+                              <span className="text-[11.5px] text-muted">
+                                variable
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </button>
-                    </span>
-                    <span role="cell" className="min-w-0 max-lg:hidden">
-                      {l.category && (
-                        <CategoryTag
-                          name={l.category}
-                          color={categoryColors[l.category]}
-                        />
-                      )}
-                    </span>
-                    <span
-                      role="cell"
-                      className={cx(
-                        "text-right tabular text-[13.5px] text-muted max-lg:hidden",
-                        l.list === "paused" && "line-through decoration-faint",
-                      )}
-                    >
-                      {l.amountCents === null
-                        ? "—"
-                        : moneyCents(l.amountCents, l.currency)}
-                    </span>
-                    <span
-                      role="cell"
-                      className="truncate text-[13px] text-muted max-lg:hidden"
-                    >
-                      {freqText(l)}
-                    </span>
-                    <span
-                      role="cell"
-                      className={cx(
-                        "text-right tabular text-[14px] font-medium max-lg:col-start-2 max-lg:row-start-1",
-                        l.amountCents === null && "font-normal text-faint",
-                        l.list === "paused" &&
-                          "font-normal text-muted line-through decoration-faint",
-                      )}
-                    >
-                      {l.amountCents === null
-                        ? "—"
-                        : moneyCents(monthlyCents(l)!, l.currency)}
-                    </span>
-                    <span
-                      role="cell"
-                      className="max-lg:col-start-2 max-lg:row-start-2 max-lg:justify-self-end"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggle(l)}
-                        title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
-                        aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
-                        style={tone(p.color)}
-                        className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
+                          {(l.note || l.category || !isPlainMonthly(l)) && (
+                            <span className="text-[12px] text-muted">
+                              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5 lg:hidden">
+                                {l.category && (
+                                  <CategoryTag
+                                    name={l.category}
+                                    color={categoryColors[l.category]}
+                                    small
+                                  />
+                                )}
+                                <span>
+                                  {[unitText(l), l.note]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </span>
+                              </span>
+                              <span className="max-lg:hidden">{l.note}</span>
+                            </span>
+                          )}
+                        </button>
+                      </span>
+                      <span
+                        role="cell"
+                        className={cx(cell, "min-w-0 max-lg:hidden")}
                       >
-                        {p.label}
-                      </button>
-                    </span>
-                  </SortableItem>
-                );
-              })}
-            </Sortable>
+                        <button
+                          type="button"
+                          onClick={(e) => categoryMenu(e, l)}
+                          title="Cambiar la categoría"
+                          className="group/cat inline-flex min-h-9 max-w-full items-center rounded-md"
+                        >
+                          {l.category ? (
+                            <CategoryTag
+                              name={l.category}
+                              color={categoryColors[l.category]}
+                            />
+                          ) : (
+                            <span className="text-[12.5px] text-faint opacity-0 transition-opacity group-hover/cat:opacity-100 group-focus-visible/cat:opacity-100">
+                              + Categoría
+                            </span>
+                          )}
+                        </button>
+                      </span>
+                      <span
+                        role="cell"
+                        className={cx(
+                          cell,
+                          "text-right tabular text-[13.5px] text-muted max-lg:hidden",
+                          l.list === "paused" &&
+                            "line-through decoration-faint",
+                        )}
+                      >
+                        {l.amountCents === null
+                          ? "—"
+                          : moneyCents(l.amountCents, l.currency)}
+                      </span>
+                      <span
+                        role="cell"
+                        className={cx(cell, "min-w-0 max-lg:hidden")}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => freqMenu(e, l)}
+                          title="Cambiar cada cuánto se paga"
+                          className="-mx-1.5 inline-flex min-h-9 max-w-full items-center truncate rounded-md px-1.5 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+                        >
+                          {freqText(l)}
+                        </button>
+                      </span>
+                      <span
+                        role="cell"
+                        className={cx(
+                          cell,
+                          "text-right tabular text-[14px] font-medium max-lg:col-start-2 max-lg:row-start-1",
+                          l.amountCents === null && "font-normal text-faint",
+                          l.list === "paused" &&
+                            "font-normal text-muted line-through decoration-faint",
+                        )}
+                      >
+                        {l.amountCents === null
+                          ? "—"
+                          : moneyCents(monthlyCents(l)!, l.currency)}
+                      </span>
+                      <span
+                        role="cell"
+                        className={cx(
+                          cell,
+                          "max-lg:col-start-2 max-lg:row-start-2 max-lg:justify-self-end",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggle(l)}
+                          title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
+                          aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
+                          style={tone(p.color)}
+                          className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
+                        >
+                          {p.label}
+                        </button>
+                      </span>
+                    </SortableItem>
+                  );
+                })}
+              </Sortable>
+              {/* Bordes para cambiar el ancho, como en Tareas. */}
+              <ColumnResizers
+                cols={FIXED_COLUMNS.map((c) => ({
+                  key: c.key,
+                  label: c.label,
+                  width: widthOf(c.key),
+                }))}
+                onResize={resize}
+                className="max-lg:hidden"
+              />
+            </div>
           </div>
         )}
         {fixed.length > 0 && (
@@ -351,10 +601,20 @@ export function FixedCosts({
             <b className="font-semibold text-fg tabular">
               {moneyWhole(mine.uyuCents + paid.uyuCents)}
             </b>{" "}
-            por mes
-            {" · "}vos{" "}
-            <span className="tabular">{moneyWhole(mine.uyuCents)}</span>
-            {hasUsd && usd ? ` (los dólares a $ ${fmtRate(usd)})` : ""}
+            por mes · pago yo{" "}
+            <b className="font-semibold text-fg tabular">
+              {moneyWhole(mine.uyuCents)}
+            </b>{" "}
+            · me pagan{" "}
+            <b className="font-semibold text-fg tabular">
+              {moneyWhole(paid.uyuCents)}
+            </b>
+            {hasUsd && usd
+              ? ` · todo en pesos (los dólares a $ ${fmtRate(usd)})`
+              : ""}
+            {pausedCount
+              ? ` · sin contar ${pausedCount === 1 ? "el pausado" : `los ${pausedCount} pausados`}`
+              : ""}
           </p>
         )}
       </TintedCard>
@@ -368,7 +628,7 @@ export function FixedCosts({
             ? `${moneyWhole(plan.uyuCents)} por mes`
             : "Un plan para comparar"
         }
-        bodyClassName="gap-4! lg:grid! lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start lg:gap-x-8!"
+        bodyClassName="gap-3!"
         action={
           <button
             type="button"
@@ -385,72 +645,55 @@ export function FixedCosts({
             lo de hoy.
           </p>
         ) : (
-          <Sortable
-            ids={solo.map((l) => l.id)}
-            onReorder={(ids) => reorder("solo", ids)}
-            disabled={solo.length < 2}
-          >
-            <ul className="grid">
-              {solo.map((l) => (
-                <SortableItem
-                  key={l.id}
-                  id={l.id}
-                  draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
-                  className="border-b border-line bg-surface last:border-b-0 lg:cursor-grab lg:active:cursor-grabbing"
-                >
-                  <button
-                    type="button"
-                    onClick={() => open(l, "solo")}
-                    className="flex min-h-10 w-full items-center gap-3 py-1 text-left hover:text-accent-fg"
+          <div className="lg:max-w-2xl">
+            <Sortable
+              ids={solo.map((l) => l.id)}
+              onReorder={(ids) => reorder("solo", ids)}
+              disabled={solo.length < 2}
+            >
+              <ul className="grid">
+                {solo.map((l) => (
+                  <SortableItem
+                    key={l.id}
+                    id={l.id}
+                    draggingClass="rounded-lg bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]"
+                    className="border-b border-line bg-surface last:border-b-0 lg:cursor-grab lg:active:cursor-grabbing"
                   >
-                    <span className="grid min-w-0 flex-1">
-                      <span className="text-[14px] break-words">{l.name}</span>
-                      {(l.note || !isPlainMonthly(l)) && (
-                        <span className="text-[12px] text-muted">
-                          {[unitText(l), l.note].filter(Boolean).join(" · ")}
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={cx(
-                        "tabular text-[14px]",
-                        l.amountCents === null && "text-faint",
-                      )}
+                    <button
+                      type="button"
+                      onClick={() => open(l, "solo")}
+                      className="flex min-h-10 w-full items-center gap-3 py-1 text-left hover:text-accent-fg"
                     >
-                      {l.amountCents === null
-                        ? "—"
-                        : moneyCents(monthlyCents(l)!, l.currency)}
-                    </span>
-                  </button>
-                </SortableItem>
-              ))}
-              <li className="flex items-center justify-between gap-3 pt-2 text-[14px] font-semibold">
-                <span>Total</span>
-                <span className="tabular">{moneyWhole(plan.uyuCents)}</span>
-              </li>
-            </ul>
-          </Sortable>
-        )}
-        {solo.length > 0 && (
-          <dl className="grid gap-1.5 rounded-xl bg-surface-2 p-3.5 text-[13px]">
-            <Compare
-              label="Fijos de hoy (todos)"
-              value={mine.uyuCents + paid.uyuCents}
-              plan={plan.uyuCents}
-            />
-            <Compare
-              label="Fijos que pagás vos"
-              value={mine.uyuCents}
-              plan={plan.uyuCents}
-            />
-            {avgSpendCents !== null && (
-              <Compare
-                label="Lo que gastás por mes (promedio de 3 meses)"
-                value={avgSpendCents}
-                plan={plan.uyuCents}
-              />
-            )}
-          </dl>
+                      <span className="grid min-w-0 flex-1">
+                        <span className="text-[14px] break-words">
+                          {l.name}
+                        </span>
+                        {(l.note || !isPlainMonthly(l)) && (
+                          <span className="text-[12px] text-muted">
+                            {[unitText(l), l.note].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={cx(
+                          "tabular text-[14px]",
+                          l.amountCents === null && "text-faint",
+                        )}
+                      >
+                        {l.amountCents === null
+                          ? "—"
+                          : moneyCents(monthlyCents(l)!, l.currency)}
+                      </span>
+                    </button>
+                  </SortableItem>
+                ))}
+                <li className="flex items-center justify-between gap-3 pt-2 text-[14px] font-semibold">
+                  <span>Total</span>
+                  <span className="tabular">{moneyWhole(plan.uyuCents)}</span>
+                </li>
+              </ul>
+            </Sortable>
+          </div>
         )}
       </TintedCard>
 
@@ -471,37 +714,17 @@ export function FixedCosts({
           categories={categories}
           categoryColors={categoryColors}
           onDone={() => sheet.current?.close()}
+          onDuplicate={duplicate}
+        />
+      </Sheet>
+      <Sheet ref={catSheet} title="Categorías">
+        <CategoriesEditor
+          categories={categories}
+          colors={categoryColors}
+          counts={countBy(fixed)}
         />
       </Sheet>
     </>
-  );
-}
-
-/** "Fijos que pagás vos  $ 44.750 · viviendo solo, $ 43.850 más". */
-function Compare({
-  label,
-  value,
-  plan,
-}: {
-  label: string;
-  value: number;
-  plan: number;
-}) {
-  const diff = plan - value;
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-      <dt className="text-muted">{label}</dt>
-      <dd className="tabular">
-        {moneyWhole(value)}
-        <span className="text-muted">
-          {" "}
-          ·{" "}
-          {diff === 0
-            ? "igual"
-            : `${moneyWhole(Math.abs(diff))} ${diff > 0 ? "más" : "menos"} viviendo solo`}
-        </span>
-      </dd>
-    </div>
   );
 }
 
@@ -511,12 +734,14 @@ function LineForm({
   categories,
   categoryColors,
   onDone,
+  onDuplicate,
 }: {
   line?: BudgetLineDTO;
   list: BudgetList;
   categories: string[];
   categoryColors: Record<string, string>;
   onDone: () => void;
+  onDuplicate: (l: BudgetLineDTO) => void;
 }) {
   const [state, action, pending] = useActionState<
     ActionResult | null,
@@ -739,6 +964,18 @@ function LineForm({
           {pending ? "Guardando…" : "Guardar"}
         </Button>
         {line && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              onDone();
+              onDuplicate(line);
+            }}
+          >
+            <CopySimple size={15} aria-hidden /> Duplicar
+          </Button>
+        )}
+        {line && (
           <ConfirmButton
             undo={`${line.name} borrado`}
             onConfirm={() => {
@@ -751,5 +988,160 @@ function LineForm({
         )}
       </div>
     </form>
+  );
+}
+
+/** Cuántos gastos tiene cada categoría. */
+function countBy(lines: BudgetLineDTO[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const l of lines)
+    if (l.category) out[l.category] = (out[l.category] ?? 0) + 1;
+  return out;
+}
+
+/** Crear, cambiar el nombre, el color o borrar las categorías de los gastos fijos. */
+function CategoriesEditor({
+  categories,
+  colors,
+  counts,
+}: {
+  categories: string[];
+  colors: Record<string, string>;
+  counts: Record<string, number>;
+}) {
+  const [, start] = useSafeTransition();
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    start(async () => {
+      const r = await addBudgetCategory(n);
+      if (!r.ok) return setError(r.error);
+      setError(null);
+      setName("");
+    });
+  };
+  return (
+    <div className="grid gap-4">
+      {categories.length === 0 ? (
+        <p className="text-[13.5px] text-muted">Todavía no hay categorías.</p>
+      ) : (
+        <ul className="grid">
+          {categories.map((c) => (
+            <CategoryRow
+              key={c}
+              name={c}
+              color={colors[c]}
+              count={counts[c] ?? 0}
+            />
+          ))}
+        </ul>
+      )}
+      {categories.length > 0 && (
+        <p className="text-[12px] text-muted">
+          Borrar una categoría deja sus gastos sin categoría (los gastos no se
+          borran).
+        </p>
+      )}
+      <div className="grid gap-1.5">
+        <span className="kicker">Nueva categoría</span>
+        <div className="flex items-center gap-2">
+          <Input
+            value={name}
+            maxLength={40}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder="Transporte, Suscripciones…"
+            aria-label="Nombre de la categoría nueva"
+            className="h-10 min-w-0 flex-1"
+          />
+          <Button type="button" size="sm" variant="accent" onClick={add}>
+            Agregar
+          </Button>
+        </div>
+        {error && (
+          <p role="alert" className="text-[13px] text-danger">
+            {error}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CategoryRow({
+  name,
+  color,
+  count,
+}: {
+  name: string;
+  color?: string;
+  count: number;
+}) {
+  const [, start] = useSafeTransition();
+  const [text, setText] = useState(name);
+  const save = () => {
+    const t = text.trim();
+    if (!t || t === name) return setText(name);
+    start(() => renameBudgetCategory(name, t));
+  };
+  return (
+    <li className="grid gap-2 border-b border-line py-3 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <Input
+          value={text}
+          maxLength={40}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLInputElement).blur();
+            }
+            if (e.key === "Escape") setText(name);
+          }}
+          aria-label={`Nombre de ${name}`}
+          className="h-9 min-w-0 flex-1"
+        />
+        <span className="shrink-0 text-[12px] text-muted tabular">
+          {count === 1 ? "1 gasto" : `${count} gastos`}
+        </span>
+        <ConfirmButton
+          undo={undefined}
+          confirmLabel="¿Borrar?"
+          onConfirm={() => start(() => deleteBudgetCategory(name))}
+          className="h-9 shrink-0 px-3 text-[13px]"
+        >
+          <Trash size={14} aria-hidden />
+          <span className="sr-only">Borrar {name}</span>
+        </ConfirmButton>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {CATEGORY_COLORS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={color === k}
+            aria-label={`${name} en ${k}`}
+            onClick={() => start(() => setBudgetCategoryColor(name, k))}
+            style={tone(k)}
+            className={cx(
+              "chip-solid size-7 rounded-full",
+              color === k &&
+                "ring-2 ring-fg ring-offset-2 ring-offset-[var(--surface)]",
+            )}
+          />
+        ))}
+        <span className="ml-1">
+          <CategoryTag name={name} color={color} />
+        </span>
+      </div>
+    </li>
   );
 }
