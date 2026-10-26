@@ -1,14 +1,15 @@
 /**
  * Gastos fijos de Presupuestos (2026-10-25): lo que se paga todos los meses, separado en
- * lo que paga Facu y lo que le pagan, más el plan "Si vivo solo". Reglas puras (cliente y servidor).
+ * lo que paga Facu, lo que le pagan y lo pausado (no suma), más el plan "Si vivo solo". Reglas puras (cliente y servidor).
  */
 
-export const BUDGET_LISTS = ["mine", "paid", "solo"] as const;
+export const BUDGET_LISTS = ["mine", "paid", "paused", "solo"] as const;
 export type BudgetList = (typeof BUDGET_LISTS)[number];
 
 export const LIST_LABEL: Record<BudgetList, string> = {
   mine: "Lo pago yo",
   paid: "Me lo pagan",
+  paused: "Pausado",
   solo: "Si vivo solo",
 };
 

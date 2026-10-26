@@ -1005,10 +1005,12 @@ export async function deleteBudgetLine(id: string) {
   refrescar();
 }
 
-/** Cambia quién paga un gasto fijo (la etiqueta de la tabla: lo pago yo / me lo pagan). */
+/** La etiqueta de un gasto fijo: lo pago yo / me lo pagan / pausado (lo pausado no suma). */
+const PAYERS = ["mine", "paid", "paused"];
+/** Cambia la etiqueta de un gasto fijo (quién lo paga, o pausado). */
 export async function setBudgetLinePayer(id: string, list: string) {
   await exigirSesion();
-  if (list !== "mine" && list !== "paid") return;
-  await prisma.budgetLine.updateMany({ where: { id: String(id), list: { in: ["mine", "paid"] } }, data: { list } });
+  if (!PAYERS.includes(list)) return;
+  await prisma.budgetLine.updateMany({ where: { id: String(id), list: { in: PAYERS } }, data: { list } });
   refrescar();
 }

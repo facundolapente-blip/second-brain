@@ -38,10 +38,15 @@ import { CURRENCIES, moneyCents, moneyWhole } from "@/lib/format";
 import { tone } from "@/lib/palette";
 
 /** La etiqueta de quién paga: se toca para cambiarla. */
-const PAYER: Record<"mine" | "paid", { label: string; color: string }> = {
+type Payer = "mine" | "paid" | "paused";
+const PAYER: Record<Payer, { label: string; color: string }> = {
   mine: { label: "Lo pago yo", color: "teal" },
   paid: { label: "Me lo pagan", color: "purple" },
+  paused: { label: "Pausado", color: "stone" },
 };
+/** Tocar la etiqueta la pasa a la siguiente: lo pago yo → me lo pagan → pausado → lo pago yo. */
+const NEXT: Record<Payer, Payer> = { mine: "paid", paid: "paused", paused: "mine" };
+const payerOf = (l: BudgetLineDTO): Payer => (l.list === "paid" || l.list === "paused" ? l.list : "mine");
 
 const fmtRate = (n: number) =>
   n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
@@ -99,13 +104,14 @@ export function FixedCosts({
   );
   const plan = lineTotal(solo, toUyu);
   const usd = toUyu.USD;
-  const hasUsd = fixed.some((l) => l.currency !== "UYU" && l.amountCents);
+  const hasUsd = fixed.some((l) => l.list !== "paused" && l.currency !== "UYU" && l.amountCents);
+  const pausedCount = fixed.filter((l) => l.list === "paused").length;
   const categories = [
     ...new Set(list.map((l) => l.category).filter((c): c is string => !!c)),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
   const toggle = (l: BudgetLineDTO) => {
-    const next: BudgetList = l.list === "mine" ? "paid" : "mine";
+    const next: BudgetList = NEXT[payerOf(l)];
     start(async () => {
       setPayer({ id: l.id, list: next });
       await setBudgetLinePayer(l.id, next);
@@ -120,7 +126,7 @@ export function FixedCosts({
         className="lg:col-span-7"
         meta={
           fixed.length
-            ? `${currencies(mine)} vos · ${currencies(paid)} te pagan`
+            ? `${currencies(mine)} vos · ${currencies(paid)} te pagan${pausedCount ? ` · ${pausedCount} ${pausedCount === 1 ? "pausado" : "pausados"}` : ""}`
             : "Lo que se paga todos los meses"
         }
         bodyClassName="gap-3!"
@@ -153,7 +159,7 @@ export function FixedCosts({
               <span role="columnheader">Quién paga</span>
             </div>
             {fixed.map((l) => {
-              const p = PAYER[l.list === "paid" ? "paid" : "mine"];
+              const p = PAYER[payerOf(l)];
               return (
                 <div
                   key={l.id}
@@ -200,6 +206,7 @@ export function FixedCosts({
                     className={cx(
                       "text-right tabular text-[14px] max-sm:col-start-2 max-sm:row-start-1",
                       l.amountCents === null && "text-faint",
+                      l.list === "paused" && "text-muted line-through decoration-faint",
                     )}
                   >
                     {l.amountCents === null
@@ -213,7 +220,7 @@ export function FixedCosts({
                     <button
                       type="button"
                       onClick={() => toggle(l)}
-                      title="Tocá para cambiar quién lo paga"
+                      title="Tocá para cambiarlo: lo pago yo, me lo pagan o pausado"
                       aria-label={`${l.name}: ${p.label}. Tocá para cambiarlo.`}
                       style={tone(p.color)}
                       className="chip-solid press inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-medium whitespace-nowrap"
@@ -434,7 +441,7 @@ function LineForm({
         <div className="grid gap-1.5">
           <span className="kicker">Quién paga</span>
           <div className="flex flex-wrap gap-2">
-            {(["mine", "paid"] as const).map((k) => (
+            {(["mine", "paid", "paused"] as const).map((k) => (
               <button
                 key={k}
                 type="button"
