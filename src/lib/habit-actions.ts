@@ -8,6 +8,7 @@ import { addDays, isISODate, todayISO, toDbDate } from "./dates";
 import { isPaletteKey } from "./palette";
 import type { LogStatus } from "./habit-logic";
 import { HABIT_CONFIG_LOCKED } from "./importers/habitnow";
+import { syncLinkedBlocks } from "./plan-habit-link";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false, error: string };
 
@@ -49,6 +50,7 @@ export async function setHabitLog(
   if (s === null) {
     if (!finalNote) {
       await prisma.habitLog.deleteMany({ where: key });
+      await syncLinkedBlocks(habitId, key.date, false);
       refrescar();
       return;
     }
@@ -60,6 +62,9 @@ export async function setHabitLog(
     create: { ...key, status: s, value: v, note: finalNote, source: "app" },
     update: { status: s, value: v, note: finalNote, source: "app" },
   });
+  // Gym: marcar el hábito tilda su bloque del Plan ese día (y sacarle el hecho lo destilda).
+  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { target: true } });
+  await syncLinkedBlocks(habitId, key.date, s === "done" && v >= Math.max(1, habit?.target ?? 1));
   refrescar();
 }
 
