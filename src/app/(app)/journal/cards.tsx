@@ -12,6 +12,7 @@ import {
   Notebook,
   PenNib,
   Smiley,
+  Star,
   TextAa,
   Trophy,
 } from "@phosphor-icons/react";
@@ -33,6 +34,7 @@ const ICONS = {
   notebook: Notebook,
   pen: PenNib,
   smiley: Smiley,
+  star: Star,
   text: TextAa,
   trophy: Trophy,
 } as const;

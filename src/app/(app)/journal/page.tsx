@@ -24,13 +24,15 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   const tag = normalizeTag(one(sp.etiqueta));
   const moodN = Number(one(sp.animo));
   const mood = isMood(moodN) ? moodN : undefined;
+  const starred = one(sp.favoritas) === "1";
   const limit = Math.min(2000, Math.max(60, Number(one(sp.n)) || 60));
-  const filtering = !!(q || tag || mood);
+  const filtering = !!(q || tag || mood || starred);
+  const onlyStarred = starred && !q && !tag && !mood;
   const ver = one(sp.ver).slice(0, 64);
 
   const [home, { entries, hasMore, total, byYear }, tags, jar, reading, quick] = await Promise.all([
     getHome(),
-    getEntries({ q, tag, mood, limit }),
+    getEntries({ q, tag, mood, starred, limit }),
     getAllTags(),
     cookies(),
     ver ? getEntry(ver) : null,
@@ -50,6 +52,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   if (q) more.set("q", q);
   if (tag) more.set("etiqueta", tag);
   if (mood) more.set("animo", String(mood));
+  if (starred) more.set("favoritas", "1");
   // Lo mismo que se está viendo (búsqueda, filtros, cantidad), con o sin la entrada abierta en el panel.
   const base = new URLSearchParams(more);
   if (limit > 60) base.set("n", String(limit));
@@ -72,7 +75,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         tabs={<JournalTabs />}
         actions={
           <>
-            <HomeActions q={q} tag={tag} mood={mood ?? null} tags={tags} />
+            <HomeActions q={q} tag={tag} mood={mood ?? null} starred={starred} tags={tags} />
             <span className="ml-2">
               <WriteTodayButton wroteToday={home.wroteToday} />
             </span>
@@ -106,12 +109,18 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           </div>
         )}
 
-        {filtering && (
-          <FilterSummary count={total} q={q} tag={tag} mood={mood} />
+        {filtering && !(onlyStarred && entries.length === 0) && (
+          <FilterSummary count={total} q={q} tag={tag} mood={mood} starred={starred} />
         )}
 
         {entries.length === 0 ? (
-          filtering ? (
+          onlyStarred ? (
+            <JCard icon="star" title="Sin favoritas" meta="Todavía no marcaste ninguna" action={{ href: "/journal", label: "Ver todas" }}>
+              <p className="max-w-[48ch] text-[14.5px] leading-relaxed text-muted">
+                Abrí una entrada y tocá la estrella de arriba: va a aparecer acá.
+              </p>
+            </JCard>
+          ) : filtering ? (
             <JCard icon="search" title="Sin resultados" meta="Ninguna entrada coincide" action={{ href: "/journal", label: "Limpiar" }}>
               <p className="max-w-[44ch] text-[14.5px] leading-relaxed text-muted">
                 Probá con otra palabra o sacá algún filtro. La búsqueda no distingue tildes ni mayúsculas.
@@ -121,7 +130,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
             <EmptyJournal />
           )
         ) : (
-<SwapOnChange k={`${q}|${tag}|${mood}`}>          <div className="grid gap-5 lg:gap-6">
+<SwapOnChange k={`${q}|${tag}|${mood}|${starred}`}>          <div className="grid gap-5 lg:gap-6">
             {/* Un año por tarjeta; en el celular la cabecera del año queda pegada arriba (journal.css). */}
             {years.map((g) => (
               <JCard
@@ -186,11 +195,13 @@ function FilterSummary({
   q,
   tag,
   mood,
+  starred,
 }: {
   count: number;
   q: string;
   tag: string;
   mood?: number;
+  starred?: boolean;
 }) {
   const parts: string[] = [];
   if (q) parts.push(`con "${q}"`);
@@ -200,7 +211,7 @@ function FilterSummary({
     <div className="reveal flex items-center gap-3 rounded-full border bg-surface py-2 pr-2 pl-5 text-[15px]">
       <span className="min-w-0 flex-1">
         <span className="font-medium">
-          {count.toLocaleString("es-UY")} {count === 1 ? "entrada" : "entradas"}
+          {count.toLocaleString("es-UY")} {starred ? (count === 1 ? "favorita" : "favoritas") : count === 1 ? "entrada" : "entradas"}
         </span>{" "}
         <span className="text-muted">{parts.join(", ")}</span>
       </span>

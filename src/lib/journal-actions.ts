@@ -180,6 +180,15 @@ export async function discardIfEmpty(id: string) {
   }
 }
 
+/** Marca o desmarca una entrada como favorita (la estrella; pedido de Facu, 2026-10-27). */
+export async function setEntryStarred(id: string, starred: boolean): Promise<{ ok: true }> {
+  await exigirSesion();
+  if (!validId(id)) throw new Error("Entrada inválida");
+  await prisma.journalEntry.updateMany({ where: { id }, data: { starred: !!starred } });
+  refrescar();
+  return { ok: true };
+}
+
 /**
  * Manda la entrada a la papelera. No redirige: el editor avisa "Entrada borrada ·
  * Deshacer" recién cuando terminó (si no, un Deshacer rápido restauraba otra cosa) y vuelve solo.

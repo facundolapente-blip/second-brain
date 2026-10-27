@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useSafeTransition } from "@/components/safe-action";
+import { quiet, useSafeTransition } from "@/components/safe-action";
+import { haptic } from "@/components/haptics";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, CaretLeft, Smiley, SmileyBlank, SmileyMeh, SmileyNervous, SmileySad, SmileyWink, type Icon, type IconWeight } from "@phosphor-icons/react";
+import { Camera, CaretLeft, Smiley, SmileyBlank, SmileyMeh, SmileyNervous, SmileySad, SmileyWink, Star, type Icon, type IconWeight } from "@phosphor-icons/react";
 import { MenuButton } from "@/components/shell";
 import { cx } from "@/components/ui";
 import { formatLong, formatShort } from "@/lib/dates";
 import { moodInfo } from "@/lib/journal-logic";
-import { writeOnDay } from "@/lib/offline/journal";
+import { setEntryStarred, writeOnDay } from "@/lib/offline/journal";
 import { tone } from "@/lib/palette";
 import type { EntryCardDTO } from "@/lib/journal";
 import { previewEntry } from "./reader-slot";
@@ -37,6 +38,63 @@ export function MoodBadge({ mood, size = 36 }: { mood: number | null; size?: num
     >
       <MoodIcon mood={mood} size={Math.round(size * 0.62)} weight="duotone" />
     </span>
+  );
+}
+
+// ─── Favorita ───────────────────────────────────────────────────────────────
+
+/**
+ * La estrella de una entrada (favorita). Cambia al toque y se guarda sola (sin
+ * señal, queda en la cola). `pill` va en la cabecera teñida del panel de lectura;
+ * `icon`, en la barra del editor.
+ */
+export function StarToggle({ id, starred, variant = "icon" }: { id: string; starred: boolean; variant?: "icon" | "pill" }) {
+  const [on, setOn] = useState(starred);
+  const [popped, setPopped] = useState(false);
+  // Llegó otro valor del servidor (o se marcó desde otro lado): manda ese.
+  const [seen, setSeen] = useState(starred);
+  if (seen !== starred) {
+    setSeen(starred);
+    setOn(starred);
+  }
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    setPopped(next);
+    haptic(next ? "success" : "tap");
+    quiet(
+      setEntryStarred(id, next).catch((e) => {
+        setOn(!next);
+        throw e;
+      }),
+    );
+  };
+  const label = on ? "Favorita. Tocá para sacarla de favoritas" : "Marcar como favorita";
+  const icon = (
+    <Star
+      size={variant === "pill" ? 15 : 22}
+      weight={on ? "fill" : "regular"}
+      className={cx(on && "text-[var(--p-yellow-chip)]", on && popped && "mark-pop")}
+      aria-hidden
+    />
+  );
+  if (variant === "pill")
+    return (
+      <button type="button" onClick={toggle} aria-pressed={on} aria-label={label} title={on ? "Sacar de favoritas" : "Marcar como favorita"} className="tcard-pill press relative px-2.5! before:absolute before:-inset-1">
+        {icon}
+      </button>
+    );
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={on}
+      aria-label={label}
+      title={on ? "Sacar de favoritas" : "Marcar como favorita"}
+      className={cx("tap-tint inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface-2", !on && "text-muted hover:text-fg")}
+    >
+      {icon}
+    </button>
   );
 }
 
@@ -175,7 +233,17 @@ export function EntryCard({
               !entry.title && <span className="display text-[17px] text-muted">Sin texto</span>
             )}
           </span>
-          <MoodBadge mood={entry.mood} size={30} />
+          {(entry.starred || entry.mood) && (
+            <span className="grid shrink-0 justify-items-center gap-1.5">
+              <MoodBadge mood={entry.mood} size={30} />
+              {entry.starred && (
+                <span title="Favorita">
+                  <Star size={entry.mood ? 16 : 18} weight="fill" className="text-[var(--p-yellow-chip)]" aria-hidden />
+                  <span className="sr-only">Favorita</span>
+                </span>
+              )}
+            </span>
+          )}
         </span>
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5 text-[12.5px] text-muted">
           {entry.tags.slice(0, 3).map((t) => (

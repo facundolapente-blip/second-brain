@@ -14,7 +14,7 @@ import { deleteEntry, discardIfEmpty, saveEntry, type EntryInput } from "@/lib/o
 import { isEmptyEntry, MOODS, normalizeTag, TAGS_MAX, TITLE_MAX, wordCount } from "@/lib/journal-logic";
 import type { EntryDTO } from "@/lib/journal";
 import { tone } from "@/lib/palette";
-import { MoodIcon, useWrite } from "../journal-ui";
+import { MoodIcon, StarToggle, useWrite } from "../journal-ui";
 import { journalReturn } from "../journal-nav";
 
 type Status = "idle" | "pending" | "saving" | "saved" | "local" | "error";
@@ -238,6 +238,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
           </label>
 
           <SaveStatus status={status} />
+          <StarToggle id={entry.id} starred={entry.starred} />
           <IconButton label="Más opciones" onClick={() => moreSheet.current?.open()} className="size-11">
             <DotsThreeVertical size={22} weight="bold" />
           </IconButton>

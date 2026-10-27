@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ClockCounterClockwise, FunnelSimple, MagnifyingGlass, PenNib, X } from "@phosphor-icons/react";
+import { ClockCounterClockwise, FunnelSimple, MagnifyingGlass, PenNib, Star, X } from "@phosphor-icons/react";
 import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui";
 import { diffDays, formatLong, formatShort } from "@/lib/dates";
 import { MEMORY_COOKIE, MOODS } from "@/lib/journal-logic";
@@ -32,11 +32,13 @@ export function HomeActions({
   q,
   tag,
   mood,
+  starred,
   tags,
 }: {
   q: string;
   tag: string;
   mood: number | null;
+  starred: boolean;
   tags: string[];
 }) {
   const [searching, setSearching] = useState(!!q);
@@ -73,6 +75,13 @@ export function HomeActions({
     <>
       <IconButton label="Buscar" onClick={() => setSearching(true)}>
         <MagnifyingGlass size={20} />
+      </IconButton>
+      <IconButton
+        label={starred ? "Ver todas las entradas" : "Ver favoritas"}
+        aria-pressed={starred}
+        onClick={() => nav({ favoritas: starred ? null : "1" })}
+      >
+        <Star size={20} weight={starred ? "fill" : "regular"} className={cx(starred && "text-[var(--p-yellow-chip)]")} />
       </IconButton>
       <IconButton label="Filtrar" onClick={() => sheet.current?.open()} className="relative">
         <FunnelSimple size={20} weight={tag || mood ? "fill" : "regular"} className={cx(!!(tag || mood) && "text-accent")} />

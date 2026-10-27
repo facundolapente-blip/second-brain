@@ -27,6 +27,8 @@ model JournalEntry {
   /// Ánimo del 1 (muy mal) al 5 (muy bien). Opcional.
   mood       Int?
   tags       String[] @default([])
+  /// Marcada como favorita (estrella). Sola no hace que una entrada vacía cuente.
+  starred    Boolean  @default(false)
   /// De dónde viene: null = escrita en la app; si no, el nombre del importador
   /// (la app de diario de origen). Junto con externalId deja reimportar sin duplicar.
   source     String?

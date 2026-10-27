@@ -10,7 +10,7 @@ import { Bone } from "@/components/skeleton";
 import { formatLong } from "@/lib/dates";
 import { moodInfo, wordCount } from "@/lib/journal-logic";
 import type { EntryCardDTO, EntryDTO } from "@/lib/journal";
-import { MoodBadge } from "./journal-ui";
+import { MoodBadge, StarToggle } from "./journal-ui";
 
 const nf = new Intl.NumberFormat("es-UY");
 const EVENT = "sb:journal-ver";
@@ -61,6 +61,7 @@ function ReaderCard({
   date,
   title,
   words,
+  starred,
   closeHref,
   onClose,
   busy,
@@ -70,6 +71,7 @@ function ReaderCard({
   date: string;
   title: string | null;
   words: number;
+  starred: boolean;
   closeHref: string;
   onClose: () => void;
   busy?: boolean;
@@ -83,6 +85,7 @@ function ReaderCard({
       meta={words === 1 ? "1 palabra" : `${nf.format(words)} palabras`}
       action={
         <span className="flex shrink-0 items-center gap-1.5">
+          <StarToggle id={id} starred={starred} variant="pill" />
           <Link href={`/journal/${id}`} className="tcard-pill press">
             <PencilSimple size={14} aria-hidden /> Editar
           </Link>
@@ -120,7 +123,7 @@ function Heading({ title, date, mood }: { title: string | null; date: string; mo
 /** Lo que ya se sabe por la tarjeta, mientras llega el resto. */
 function EntryPreview({ entry, closeHref, onClose }: { entry: EntryCardDTO; closeHref: string; onClose: () => void }) {
   return (
-    <ReaderCard id={entry.id} date={entry.date} title={entry.title} words={entry.words} closeHref={closeHref} onClose={onClose} busy>
+    <ReaderCard id={entry.id} date={entry.date} title={entry.title} words={entry.words} starred={entry.starred} closeHref={closeHref} onClose={onClose} busy>
           <Heading title={entry.title} date={entry.date} mood={entry.mood} />
           {entry.excerpt ? (
             <div className="prose-serif grid gap-4 text-[17.5px] leading-[1.75] text-fg/90">
@@ -150,7 +153,7 @@ export function EntryReader({ entry, closeHref, onClose }: { entry: EntryDTO; cl
     .filter(Boolean);
 
   return (
-    <ReaderCard id={entry.id} date={entry.date} title={entry.title} words={words} closeHref={closeHref} onClose={onClose ?? (() => {})}>
+    <ReaderCard id={entry.id} date={entry.date} title={entry.title} words={words} starred={entry.starred} closeHref={closeHref} onClose={onClose ?? (() => {})}>
           <Heading title={entry.title} date={entry.date} mood={entry.mood} />
 
           {paragraphs.length === 0 ? (

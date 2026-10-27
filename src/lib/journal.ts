@@ -12,6 +12,8 @@ export type EntryCardDTO = {
   excerpt: string;
   mood: number | null;
   tags: string[];
+  /** Favorita (estrella). */
+  starred: boolean;
   /** Palabras de título + texto, para la tarjeta. */
   words: number;
   photos: number;
@@ -24,6 +26,7 @@ export type EntryDTO = {
   body: string;
   mood: number | null;
   tags: string[];
+  starred: boolean;
   updatedAt: string;
   photos: PhotoDTO[];
 };
@@ -43,6 +46,7 @@ const CARD_SELECT = {
   body: true,
   mood: true,
   tags: true,
+  starred: true,
   _count: { select: { attachments: true } },
 } as const;
 
@@ -53,6 +57,7 @@ type CardRow = {
   body: string;
   mood: number | null;
   tags: string[];
+  starred?: boolean;
   _count?: { attachments: number };
 };
 
@@ -64,6 +69,7 @@ function toCard(e: CardRow, max = 280): EntryCardDTO {
     excerpt: excerpt(e.body, max),
     mood: e.mood,
     tags: e.tags,
+    starred: !!e.starred,
     words: wordCount(e.body) + wordCount(e.title ?? ""),
     photos: e._count?.attachments ?? 0,
   };
@@ -71,17 +77,18 @@ function toCard(e: CardRow, max = 280): EntryCardDTO {
 
 const ORDER: Prisma.JournalEntryOrderByWithRelationInput[] = [{ date: "desc" }, { createdAt: "desc" }];
 
-export type EntryFilters = { q?: string; tag?: string; mood?: number; limit?: number };
+export type EntryFilters = { q?: string; tag?: string; mood?: number; starred?: boolean; limit?: number };
 
 /** Sin tildes ni mayúsculas: "Día" y "dia" son lo mismo al buscar. */
 export function fold(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-export async function getEntries({ q, tag, mood, limit = 60 }: EntryFilters) {
+export async function getEntries({ q, tag, mood, starred, limit = 60 }: EntryFilters) {
   const and: Prisma.JournalEntryWhereInput[] = [NOT_EMPTY];
   if (tag) and.push({ tags: { has: tag } });
   if (mood) and.push({ mood });
+  if (starred) and.push({ starred: true });
   if (q) {
     // Postgres no ignora tildes sin una extensión: se filtra acá (son pocas miles).
     const needle = fold(q.trim());
@@ -127,6 +134,7 @@ export async function getEntry(id: string): Promise<EntryDTO | null> {
     body: e.body,
     mood: e.mood,
     tags: e.tags,
+    starred: e.starred,
     updatedAt: e.updatedAt.toISOString(),
     photos: e.attachments.map(toPhotoDTO),
   };
