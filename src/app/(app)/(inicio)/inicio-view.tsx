@@ -10,9 +10,11 @@ import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
 import { useEffect, useId, useOptimistic, useRef, useState, useSyncExternalStore } from "react";
 import {
+  ArrowArcRight,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  CalendarBlank,
   CalendarCheck,
   ChartLineUp,
   Check,
@@ -25,6 +27,7 @@ import {
   PiggyBank,
   PlayCircle,
   Plus,
+  Trash,
   Wallet,
   WarningCircle,
   type Icon,
@@ -36,7 +39,11 @@ import { FinanceIcon } from "@/lib/finance-icons";
 import { tone } from "@/lib/palette";
 import { dec1, money, moneyCents, shortNumber } from "@/lib/format";
 import { daysLeftLabel, isFreeBlock, timeRange } from "@/lib/plan-logic";
-import { setBlockDone } from "@/lib/offline/plan";
+import { deleteBlock, rescheduleBlock, setBlockDone } from "@/lib/offline/plan";
+import { showContextMenu } from "@/components/context-menu";
+import { notifyDeleted, notifyInfo } from "@/components/undo-toast";
+import { haptic } from "@/components/haptics";
+import { useRouter } from "next/navigation";
 import { writeOnDay } from "@/lib/offline/journal";
 import { MenuButton } from "@/components/shell";
 import "./inicio.css";
@@ -672,11 +679,89 @@ function useSeenWhile(ref: React.RefObject<HTMLElement | null>, active: boolean)
 
 type PlanBlock = Dashboard["plan"]["today"][number];
 
+type PlanPatch = { id: string; remove?: boolean } & Partial<Pick<PlanBlock, "done" | "startTime" | "endTime">>;
+
 function PlanToday({ d }: { d: Dashboard }) {
-  const [blocks, setDone] = useOptimistic(d.plan.today, (cur: PlanBlock[], u: { id: string; done: boolean }) =>
-    cur.map((b) => (b.id === u.id ? { ...b, done: u.done } : b)),
+  const router = useRouter();
+  const [blocks, patch] = useOptimistic(d.plan.today, (cur: PlanBlock[], { id, remove, ...u }: PlanPatch) =>
+    remove ? cur.filter((b) => b.id !== id) : cur.map((b) => (b.id === id ? { ...b, ...u } : b)),
   );
+  const setDone = patch;
   const [, start] = useSafeTransition();
+
+  // Clic derecho en un bloque (en el celular, mantener apretado): pasarlo a mañana, cambiarle
+  // la fecha y la hora, verlo en el Plan o borrarlo (pedido de Facu, 2026-10-27). Lo que se va
+  // de hoy sale de la lista al toque.
+  const moveTo = (b: PlanBlock, date: string, startTime: string | null, endTime: string | null) =>
+    start(async () => {
+      patch(date === b.date ? { id: b.id, startTime, endTime } : { id: b.id, remove: true });
+      await rescheduleBlock(b.id, date, startTime, endTime);
+    });
+  function blockMenu(e: React.MouseEvent, b: PlanBlock) {
+    showContextMenu(
+      e,
+      [
+        {
+          label: "Pasar a mañana",
+          icon: <ArrowArcRight size={15} />,
+          onSelect: () => {
+            moveTo(b, addDays(b.date, 1), b.startTime, b.endTime);
+            notifyInfo(`"${b.title}" pasó a mañana`);
+          },
+        },
+        {
+          label: "Cambiar fecha y hora",
+          icon: <CalendarBlank size={15} />,
+          schedule: { date: b.date, start: b.startTime, end: b.endTime, onSave: (date, s, en) => moveTo(b, date, s, en) },
+        },
+        { label: "Ver en el Plan", icon: <CalendarCheck size={15} />, onSelect: () => router.push(`/plan?semana=${b.date}`) },
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            start(async () => {
+              patch({ id: b.id, remove: true });
+              await deleteBlock(b.id);
+            });
+            notifyDeleted("Bloque borrado");
+          },
+        },
+      ],
+      b.title,
+    );
+  }
+  // Mantener apretado ~0,45 s sin mover abre el mismo menú; el toque que sigue no tilda.
+  const hold = useRef<{ t?: ReturnType<typeof setTimeout>; x: number; y: number; firedAt: number }>({ x: 0, y: 0, firedAt: 0 });
+  const holdProps = (b: PlanBlock) => ({
+    onTouchStart: (e: React.TouchEvent<HTMLButtonElement>) => {
+      clearTimeout(hold.current.t);
+      if (e.touches.length !== 1) return;
+      const el = e.currentTarget;
+      const { clientX: x, clientY: y } = e.touches[0];
+      Object.assign(hold.current, { x, y });
+      hold.current.t = setTimeout(() => {
+        hold.current.firedAt = Date.now();
+        haptic("threshold");
+        // El menú compartido espera un evento de mouse: alcanza con la posición y el elemento.
+        blockMenu({ target: el, currentTarget: el, clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} } as unknown as React.MouseEvent, b);
+      }, 450);
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      const t = e.touches[0];
+      if (Math.hypot(t.clientX - hold.current.x, t.clientY - hold.current.y) > 8) clearTimeout(hold.current.t);
+    },
+    onTouchEnd: (e: React.TouchEvent) => {
+      clearTimeout(hold.current.t);
+      if (Date.now() - hold.current.firedAt < 1500) e.preventDefault();
+    },
+    onTouchCancel: () => clearTimeout(hold.current.t),
+    // Android manda un `contextmenu` con el mismo gesto: no abrirlo dos veces.
+    onContextMenu: (e: React.MouseEvent) => {
+      if (Date.now() - hold.current.firedAt < 1500) return e.preventDefault();
+      blockMenu(e, b);
+    },
+  });
   const real = blocks.filter((b) => !isFreeBlock(b));
   const doneN = real.filter((b) => b.done).length;
   const overdue = d.plan.overdue;
@@ -709,16 +794,18 @@ function PlanToday({ d }: { d: Dashboard }) {
               <li key={b.id}>
                 <button
                   type="button"
-                  disabled={free}
-                  aria-pressed={b.done}
+                  aria-disabled={free || undefined}
+                  aria-pressed={free ? undefined : b.done}
+                  {...holdProps(b)}
                   onClick={() => {
+                    if (free || Date.now() - hold.current.firedAt < 800) return;
                     setTappedBlock(b.id);
                     start(async () => {
                       setDone({ id: b.id, done: !b.done });
                       await setBlockDone(b.id, !b.done);
                     });
                   }}
-                  className="tap-tint relative flex min-h-11 w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors duration-[80ms] hover:bg-surface-2 disabled:hover:bg-transparent"
+                  className="tap-tint relative flex min-h-11 w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors duration-[80ms] hover:bg-surface-2 aria-disabled:hover:bg-transparent [-webkit-touch-callout:none] select-none"
                 >
                   {/* "Libre" no se tilda (igual que en el Plan): sin círculo, con el mismo lugar para que el texto quede alineado. */}
                   {free ? (

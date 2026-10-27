@@ -9,7 +9,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, parseTaskColumnOrder, TASK_COLUMN_ORDER_KEY, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId } from "./plan-logic";
+import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, parseTaskColumnOrder, TASK_COLUMN_ORDER_KEY, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId, lastDayOf, nextRepeatDate } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -343,16 +343,17 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
   if (id) {
     const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true } });
     if (!before) return { ok: false, error: "Esa tarea ya no existe." };
+    // Pasar a terminada se hace una sola vez aunque lleguen dos pedidos juntos (la hoja que
+    // guarda al cerrar y el tablero, o la cola sin conexión): si no, una tarea que se repite
+    // creaba dos "próximas".
+    const finishing = status === "done" && before.status !== "done" && (await finish(id));
     await prisma.planTask.update({
       where: { id },
-      data: {
-        ...data,
-        completedAt: status === "done" ? (before.status === "done" ? undefined : new Date()) : null,
-      },
+      data: { ...data, ...(status === "done" ? {} : { completedAt: null }) },
     });
     // Después de guardar, así la siguiente sale con la repetición recién elegida
     // y la terminada queda sin repetirse.
-    if (status === "done" && before.status !== "done") await spawnNext(id);
+    if (finishing) await spawnNext(id);
     // Con pasos, el progreso no es el escrito a mano: lo dan los pasos.
     await syncStepsProgress(id, false);
     refrescar();
@@ -385,15 +386,22 @@ export async function saveTask(_prev: ActionResult | null, fd: FormData): Promis
 export async function setTaskStatus(id: string, status: TaskStatus) {
   await exigirSesion();
   if (!TASK_STATUSES.includes(status)) throw new Error("Estado inválido");
-  const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true } });
+  const before = await prisma.planTask.findUnique({ where: { id }, select: { status: true, title: true } });
   if (!before || before.status === status) return;
-  const t = await prisma.planTask.update({
-    where: { id },
-    data: { status, completedAt: status === "done" ? new Date() : null },
-  });
-  if (status === "done") await spawnNext(id);
-  if (status === "done") await logActivity("done", "task", id, `Terminada: ${t.title}`);
+  if (status === "done") {
+    if (!(await finish(id))) return;
+    await spawnNext(id);
+    await logActivity("done", "task", id, `Terminada: ${before.title}`);
+  } else {
+    await prisma.planTask.update({ where: { id }, data: { status, completedAt: null } });
+  }
   refrescar();
+}
+
+/** La pasa a terminada solo si todavía no lo estaba; true si este pedido fue el que la terminó. */
+async function finish(id: string): Promise<boolean> {
+  const r = await prisma.planTask.updateMany({ where: { id, status: { not: "done" } }, data: { status: "done", completedAt: new Date() } });
+  return r.count === 1;
 }
 
 /**
@@ -652,18 +660,8 @@ export async function moveBlock(raw: string, date: string, startTime?: string | 
 
 // ─── Tareas que se repiten y pasos ──────────────────────────────────────────
 
-const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
 /** Corre una fecha; en las mensuales cae el día `day` (o el último del mes si no lo tiene). */
-function shiftDate(iso: string, repeat: string, every: number, day?: number): string {
-  if (repeat === "daily") return addDays(iso, every);
-  if (repeat === "weekly") return addDays(iso, 7 * every);
-  const [y, m, d] = iso.split("-").map(Number);
-  const t = new Date(Date.UTC(y, m - 1 + every, 1));
-  t.setUTCDate(Math.min(day ?? d, lastDayOf(t.getUTCFullYear(), t.getUTCMonth() + 1)));
-  return t.toISOString().slice(0, 10);
-}
-
 /**
  * Día del mes original de cada tarea mensual que se repite (id → día), para que un
  * 31 que pasó por febrero (28) vuelva al 31 en marzo. Sin cambiar el esquema:
@@ -697,9 +695,7 @@ async function spawnNext(id: string) {
   }
   // Si estaba vencida, la siguiente se corre hasta hoy o después (nunca nace vencida),
   // siempre contando desde la misma fecha (n vueltas de una).
-  let n = 1;
-  let next = shiftDate(base, t.repeat, t.repeatEvery, day);
-  while (next < today && n < 1000) next = shiftDate(base, t.repeat, t.repeatEvery * ++n, day);
+  const next = nextRepeatDate(base, t.repeat, t.repeatEvery, today, day);
   const created = await prisma.planTask.create({
     data: {
       title: t.title,

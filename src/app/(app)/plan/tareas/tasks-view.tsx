@@ -11,7 +11,7 @@ import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSim
 import { saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
 import { ColumnResizers } from "@/components/column-resizers";
 import { addDays, formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, taskFromForm } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, repeatNotice, taskFromForm } from "@/lib/plan-logic";
 import { cx } from "@/components/ui";
 import { TintedCard } from "@/components/tinted-card";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
@@ -191,6 +191,8 @@ export function TasksBoard({
         setJustCreated(id);
       }
       const next = taskFromForm(fd, task ?? null, id);
+      const notice = task && task.status !== "done" && next?.status === "done" ? repeatNotice(next) : null;
+      if (notice) notifyInfo(notice);
       startDeadline(async () => {
         if (next) applyTask(task ? next : { add: next });
         const r = await saveTask(null, fd);
@@ -227,7 +229,7 @@ export function TasksBoard({
         await setTaskStatus(t.id, "done");
       }),
     );
-    notifyInfo(`"${t.title}" terminada`);
+    notifyInfo(repeatNotice(t) ?? `"${t.title}" terminada`);
   }
   function swipeWeek(t: TaskDTO) {
     const d = addDays(t.deadline ?? today, 7);

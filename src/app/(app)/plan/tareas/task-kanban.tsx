@@ -5,9 +5,10 @@ import { DndContext, DragOverlay, TouchSensor, useDraggable, useDroppable, useSe
 import { CalendarPlus, Plus } from "@phosphor-icons/react";
 import { useSafeTransition } from "@/components/safe-action";
 import { haptic } from "@/components/haptics";
+import { notifyInfo } from "@/components/undo-toast";
 import { setTaskStatus } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { daysLeft, daysLeftLabel, TASK_DRAG, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
+import { daysLeft, daysLeftLabel, repeatNotice, TASK_DRAG, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
 import { useNewIds, useTick } from "@/components/motion";
@@ -104,6 +105,8 @@ export function TaskKanban({
     const t = moved.find((x) => x.id === taskId);
     if (!t || !to || !COLUMNS.includes(to) || t.status === to) return false;
     haptic(to === "done" ? "complete" : "success");
+    const notice = to === "done" ? repeatNotice(t) : null;
+    if (notice) notifyInfo(notice);
     start(async () => {
       move({ id: t.id, status: to });
       await setTaskStatus(t.id, to);

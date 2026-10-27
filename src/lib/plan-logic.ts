@@ -2,7 +2,7 @@
  * Reglas del Plan semanal, sin base ni React (servidor y cliente).
  * Calcadas del "Plan Semanal" de Notion de Facu.
  */
-import { addDays, diffDays, isISODate, startOfWeek, TZ } from "./dates";
+import { addDays, diffDays, formatShort, isISODate, startOfWeek, todayISO, TZ } from "./dates";
 
 export type TaskStatus = "backlog" | "todo" | "doing" | "done";
 export type KrStatus = "todo" | "doing" | "done" | "closed";
@@ -194,6 +194,41 @@ export function repeatLabel(repeat: TaskDTO["repeat"], every: number): string | 
   if (!repeat) return null;
   const unit = REPEAT_LABEL[repeat];
   return every > 1 ? `Cada ${every} ${repeat === "monthly" ? "meses" : `${unit}s`}` : `Cada ${unit}`;
+}
+
+export const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+/** Corre una fecha según la repetición (un 31 mensual cae el último día de los meses cortos; `day` = día original). */
+export function shiftDate(iso: string, repeat: string, every: number, day?: number): string {
+  if (repeat === "daily") return addDays(iso, every);
+  if (repeat === "weekly") return addDays(iso, 7 * every);
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + every, 1));
+  t.setUTCDate(Math.min(day ?? d, lastDayOf(t.getUTCFullYear(), t.getUTCMonth() + 1)));
+  return t.toISOString().slice(0, 10);
+}
+
+/**
+ * La fecha de la próxima vuelta de una tarea que se repite: desde su deadline (o hoy),
+ * corrida hasta hoy o después (nunca nace vencida), siempre contando desde la misma fecha.
+ */
+export function nextRepeatDate(base: string, repeat: string, every: number, today: string, day?: number): string {
+  let n = 1;
+  let next = shiftDate(base, repeat, every, day);
+  while (next < today && n < 1000) next = shiftDate(base, repeat, every * ++n, day);
+  return next;
+}
+
+/**
+ * Al terminar una tarea que se repite se crea sola la próxima (con el mismo nombre): el aviso
+ * lo dice, si no parecía duplicada (le pasó a Facu con "Caso Estrategia", 2026-10-27).
+ */
+export function repeatNotice(t: Pick<TaskDTO, "title" | "repeat" | "repeatEvery" | "deadline">): string | null {
+  const rep = repeatLabel(t.repeat, t.repeatEvery);
+  if (!t.repeat || !rep) return null;
+  const today = todayISO();
+  const next = nextRepeatDate(t.deadline ?? today, t.repeat, t.repeatEvery, today);
+  return `"${t.title}" terminada. Se repite ${rep.toLowerCase()}: la próxima vence el ${formatShort(next)}`;
 }
 
 export type BlockDTO = {

@@ -313,3 +313,19 @@ describe("orden de las columnas de tareas", () => {
     expect(moveTaskColumn(o, "date", "date", true)).toBe(o);
   });
 });
+
+import { nextRepeatDate } from "../src/lib/plan-logic";
+
+describe("nextRepeatDate", () => {
+  it("semanal: una semana después del deadline", () => {
+    expect(nextRepeatDate("2026-10-27", "weekly", 1, "2026-10-27")).toBe("2026-11-03");
+  });
+  it("vencida: se corre hasta hoy o después, contando desde la misma fecha", () => {
+    expect(nextRepeatDate("2026-10-06", "weekly", 1, "2026-10-27")).toBe("2026-10-27");
+    expect(nextRepeatDate("2026-10-05", "weekly", 1, "2026-10-27")).toBe("2026-11-02");
+  });
+  it("mensual: un 31 cae el último día y vuelve al 31", () => {
+    expect(nextRepeatDate("2026-01-31", "monthly", 1, "2026-01-31")).toBe("2026-02-28");
+    expect(nextRepeatDate("2026-02-28", "monthly", 1, "2026-02-28", 31)).toBe("2026-03-31");
+  });
+});
