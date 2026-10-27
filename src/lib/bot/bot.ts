@@ -8,7 +8,7 @@ import { logActivity } from "../trash";
 import { createQuickTransaction } from "../quick-add";
 import { getDashboard } from "../dashboard";
 import { appendValueNote, VALUES_KEY } from "../values";
-import { looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask } from "./parse";
+import { isSkipMessage, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, SKIP_REPLY } from "./parse";
 import { cleanPatch, ENERGY_LABELS, formatSleep, formatWeight, STRESS_LABELS } from "../checkin-logic";
 import { applyCheckin } from "../checkin-save";
 import { MOODS } from "../journal-logic";
@@ -53,6 +53,9 @@ export const HELP = [
   "",
   "hoy: resumen del día",
   "",
+  "NO adelante (en mayúsculas): no se anota en ningún lado:",
+  "NO esto es solo para mí",
+  "",
   "Todo lo demás va a Notas y se cataloga solo:",
   "un link de YouTube, Instagram o TikTok → Videos",
   "un link de una tienda → Para comprar (si después mandás el precio, se le suma)",
@@ -62,7 +65,7 @@ export const HELP = [
 ].join("\n");
 
 const SHORT_HELP =
-  "No te entendí. Probá con:\nGG 350 almuerzo itau\nGG +2450 sueldo\nTT llamar al banco viernes\nJJ hoy fue un buen día\nCC animo 4 energia 3 sueño 7:30\nbloque gym mañana 18\nnota primero lo importante\nhoy\n\nayuda: todos los ejemplos";
+  "No te entendí. Probá con:\nGG 350 almuerzo itau\nGG +2450 sueldo\nTT llamar al banco viernes\nJJ hoy fue un buen día\nCC animo 4 energia 3 sueño 7:30\nbloque gym mañana 18\nnota primero lo importante\nhoy\nNO adelante: no se anota\n\nayuda: todos los ejemplos";
 
 const MAX_TEXT = 1000;
 /** El journal acepta textos largos (WhatsApp manda hasta 4096 caracteres). */
@@ -71,6 +74,8 @@ const MAX_JOURNAL = 4096;
 export async function handleBotMessage(raw: string, msgId: string | null = null): Promise<string> {
   const text = raw.trim();
   if (!text) return SHORT_HELP;
+  // "NO …" en mayúsculas: no se anota en ningún lado.
+  if (isSkipMessage(text)) return SKIP_REPLY;
   const { cmd, rest } = parseCommand(text);
   if (text.length > (cmd === "diario" || cmd === null ? MAX_JOURNAL : MAX_TEXT)) return `Es muy largo (máximo ${cmd === "diario" || cmd === null ? MAX_JOURNAL : MAX_TEXT} caracteres).`;
   const today = todayISO();

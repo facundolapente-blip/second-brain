@@ -139,3 +139,14 @@ describe("check-in por WhatsApp (CC)", () => {
     expect(parseCheckin("nota me dolió la cabeza", TODAY)).toEqual({ date: TODAY, fields: {}, note: "me dolió la cabeza" });
   });
 });
+
+import { isSkipMessage } from "@/lib/bot/parse";
+
+describe("isSkipMessage (NO adelante)", () => {
+  it("NO en mayúsculas al principio: no se anota", () => {
+    for (const t of ["NO", "NO esto es solo para mí", "NO: probando", "NO, nada", "  NO\nalgo"]) expect(isSkipMessage(t)).toBe(true);
+  });
+  it("un no normal o una palabra que empieza con NO sigue yendo a Notas", () => {
+    for (const t of ["no sé si comprar esto", "No me olvido", "NOTA importante", "NOVEDAD", "nota algo", "", null]) expect(isSkipMessage(t)).toBe(false);
+  });
+});

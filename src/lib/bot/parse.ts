@@ -38,6 +38,16 @@ const COMMANDS: Record<string, Exclude<BotCommand, null>> = {
   comandos: "ayuda",
 };
 
+/**
+ * "NO" en mayúsculas al principio: el mensaje no se guarda en ningún lado (pedido de Facu,
+ * 2026-10-27: hay cosas que manda al bot y no quiere en Notas). Solo en mayúsculas, así un
+ * "no sé si…" normal sigue yendo a Notas. Vale "NO", "NO: …", "NO, …" o "NO …".
+ */
+export const SKIP_REPLY = "Listo, eso no lo anoté.";
+export function isSkipMessage(text: string | null | undefined): boolean {
+  return /^NO(?=$|[\s.,:;!¡?¿\-–—])/.test((text ?? "").trim());
+}
+
 /** Primera palabra como comando ("tarea", "/tarea", "/start@MiBot"); el resto, tal cual. */
 export function parseCommand(text: string): { cmd: BotCommand; rest: string } {
   const t = text.trim();

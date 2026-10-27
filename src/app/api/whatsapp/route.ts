@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { handleBotMessage } from "@/lib/bot/bot";
+import { isSkipMessage, SKIP_REPLY } from "@/lib/bot/parse";
 import { saveMediaNote, type IncomingMedia } from "@/lib/bot/notes";
 
 export const dynamic = "force-dynamic";
@@ -152,7 +153,10 @@ export async function POST(req: Request) {
   const msgId = typeof msg.id === "string" && msg.id ? msg.id.slice(0, 120) : null;
   let answer: string;
   try {
-    if (mediaKind) {
+    const caption = mediaKind ? msg[mediaKind]?.caption : null;
+    // Una foto o un archivo con "NO" adelante en el texto tampoco se guarda.
+    if (mediaKind && isSkipMessage(typeof caption === "string" ? caption : null)) answer = SKIP_REPLY;
+    else if (mediaKind) {
       // Fotos y documentos van a Notas → Archivos (la foto se guarda; lo demás queda anotado).
       const part = msg[mediaKind] ?? {};
       const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
