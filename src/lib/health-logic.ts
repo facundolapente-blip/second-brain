@@ -1,9 +1,10 @@
 /**
  * Salud (servidor y cliente, sin base): períodos, promedios y comparaciones de lo
- * que mide el reloj (pasos, sueño, estrés, pulso, distancia, calorías, peso).
+ * que mide el reloj (pasos, sueño, estrés, pulso, distancia, calorías, peso) y de
+ * lo que se carga en el check-in (ánimo, energía, estrés sentido).
  */
 import { formatSleep } from "./checkin-logic";
-import { monthBounds, shiftMonth } from "./dates";
+import { addDays, isISODate, monthBounds, shiftMonth, startOfWeek } from "./dates";
 
 export type HealthDay = {
   date: string;
@@ -17,11 +18,17 @@ export type HealthDay = {
   distanceM: number | null;
   activeKcal: number | null;
   weightG: number | null;
+  /** Ánimo del día (1 a 5): el del check-in o, si no hay, el del journal. */
+  mood: number | null;
+  /** Energía del check-in (1 a 5). */
+  energy: number | null;
+  /** Estrés que sentiste, del check-in (1 a 5); aparte del que mide el reloj. */
+  feel: number | null;
 };
 
 export type HealthKey = Exclude<keyof HealthDay, "date">;
 
-export const HEALTH_KEYS: HealthKey[] = ["steps", "sleepMin", "stress", "hrMin", "hrMax", "distanceM", "activeKcal", "weightG"];
+export const HEALTH_KEYS: HealthKey[] = ["steps", "sleepMin", "stress", "hrMin", "hrMax", "distanceM", "activeKcal", "weightG", "mood", "energy", "feel"];
 
 /**
  * Lo que se completa recién cuando termina el día: hoy se dibuja (más claro) pero
@@ -30,12 +37,14 @@ export const HEALTH_KEYS: HealthKey[] = ["steps", "sleepMin", "stress", "hrMin",
 export const PARTIAL_TODAY: ReadonlySet<HealthKey> = new Set(["steps", "stress", "hrMin", "hrMax", "distanceM", "activeKcal"]);
 
 export function emptyHealthDay(date: string): HealthDay {
-  return { date, steps: null, sleepMin: null, stress: null, hrMin: null, hrMax: null, distanceM: null, activeKcal: null, weightG: null };
+  return { date, steps: null, sleepMin: null, stress: null, hrMin: null, hrMax: null, distanceM: null, activeKcal: null, weightG: null, mood: null, energy: null, feel: null };
 }
 
+export type HealthKind = "week" | "month" | "year";
+
 export type HealthPeriod = {
-  kind: "month" | "year";
-  /** YYYY-MM o YYYY. */
+  kind: HealthKind;
+  /** YYYY-MM-DD (el lunes de la semana), YYYY-MM o YYYY. */
   key: string;
   prevKey: string;
   from: string;
@@ -47,9 +56,20 @@ export type HealthPeriod = {
   isCurrent: boolean;
 };
 
-/** El mes o el año pedido en la dirección (`?mes=YYYY-MM` / `?anio=YYYY`, no futuros); si no, el mes en curso. */
-export function periodFromParams(sp: { mes?: string | string[]; anio?: string | string[] }, today: string): { kind: "month" | "year"; key: string } {
-  const { mes, anio } = sp;
+/**
+ * La semana, el mes o el año pedido en la dirección (`?semana=YYYY-MM-DD` (cualquier
+ * día: se toma su lunes) / `?mes=YYYY-MM` / `?anio=YYYY`, no futuros); si no, el mes en curso.
+ */
+export function periodFromParams(
+  sp: { semana?: string | string[]; mes?: string | string[]; anio?: string | string[] },
+  today: string,
+): { kind: HealthKind; key: string } {
+  const { semana, mes, anio } = sp;
+  if (semana === "hoy") return { kind: "week", key: startOfWeek(today) };
+  if (typeof semana === "string" && isISODate(semana) && semana >= "2000-01-01") {
+    const monday = startOfWeek(semana <= today ? semana : today);
+    return { kind: "week", key: monday };
+  }
   if (typeof anio === "string" && /^\d{4}$/.test(anio) && anio <= today.slice(0, 4) && anio >= "2000") return { kind: "year", key: anio };
   const current = today.slice(0, 7);
   const month = typeof mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) && mes <= current && mes >= "2000-01" ? mes : current;
@@ -57,7 +77,24 @@ export function periodFromParams(sp: { mes?: string | string[]; anio?: string | 
 }
 
 /** Límites del período y del anterior (mismas reglas que el Resumen). */
-export function healthPeriod(kind: "month" | "year", key: string, today: string): HealthPeriod {
+export function healthPeriod(kind: HealthKind, key: string, today: string): HealthPeriod {
+  if (kind === "week") {
+    const end = addDays(key, 6);
+    const prevKey = addDays(key, -7);
+    const isCurrent = key <= today && today <= end;
+    const to = end < today ? end : today;
+    return {
+      kind,
+      key,
+      prevKey,
+      from: key,
+      to,
+      prevFrom: prevKey,
+      // En la semana en curso, la anterior hasta el mismo día de la semana.
+      prevTo: isCurrent ? addDays(to, -7) : addDays(key, -1),
+      isCurrent,
+    };
+  }
   if (kind === "year") {
     const prevKey = String(Number(key) - 1);
     const isCurrent = key === today.slice(0, 4);
@@ -139,6 +176,9 @@ export function summarizeHealth(now: HealthDay[], before: HealthDay[], today: st
     hrMax: m("hrMax"),
     distanceM: m("distanceM"),
     activeKcal: m("activeKcal"),
+    mood: m("mood"),
+    energy: m("energy"),
+    feel: m("feel"),
     weight: { last: lastOf(now, "weightG"), prevLast: lastOf(before, "weightG") },
   };
 }
@@ -176,6 +216,9 @@ export function monthlyAverages(days: HealthDay[], today: string): MonthHealth[]
     distanceM: averageOf(ds, "distanceM", today),
     activeKcal: averageOf(ds, "activeKcal", today),
     weightG: lastOf(ds, "weightG")?.value ?? null,
+    mood: averageOf(ds, "mood", today),
+    energy: averageOf(ds, "energy", today),
+    feel: averageOf(ds, "feel", today),
   }));
 }
 

@@ -45,6 +45,21 @@ describe("periodFromParams y healthPeriod", () => {
     expect(healthPeriod("year", "2028", "2028-02-29").prevTo).toBe("2027-02-28");
     expect(healthPeriod("year", "2025", "2026-10-20")).toMatchObject({ to: "2025-12-31", prevTo: "2024-12-31", isCurrent: false });
   });
+  it("la semana: cualquier día lleva a su lunes, sin futuras; la en curso, contra la anterior hasta el mismo día", () => {
+    // 2026-10-28 es miércoles.
+    expect(periodFromParams({ semana: "hoy" }, "2026-10-28")).toEqual({ kind: "week", key: "2026-10-26" });
+    expect(periodFromParams({ semana: "2026-10-22" }, "2026-10-28")).toEqual({ kind: "week", key: "2026-10-19" });
+    expect(periodFromParams({ semana: "2026-12-01" }, "2026-10-28")).toEqual({ kind: "week", key: "2026-10-26" });
+    expect(periodFromParams({ semana: "2026-02-30" }, "2026-10-28")).toEqual({ kind: "month", key: "2026-10" });
+    expect(healthPeriod("week", "2026-10-26", "2026-10-28")).toMatchObject({
+      from: "2026-10-26",
+      to: "2026-10-28",
+      prevFrom: "2026-10-19",
+      prevTo: "2026-10-21",
+      isCurrent: true,
+    });
+    expect(healthPeriod("week", "2026-10-19", "2026-10-28")).toMatchObject({ to: "2026-10-25", prevTo: "2026-10-18", isCurrent: false });
+  });
 });
 
 describe("promedios", () => {

@@ -8,6 +8,7 @@ import {
   monthlyAverages,
   summarizeHealth,
   type HealthDay,
+  type HealthKind,
 } from "./health-logic";
 
 /**
@@ -15,11 +16,15 @@ import {
  * período en curso, hasta el mismo día). Sale de `DailyCheckin` directo: no hace
  * falta todo `getDailyMetrics` (hábitos, gastos, plan) para esto.
  */
-export async function getHealth(kind: "month" | "year", key: string) {
+export async function getHealth(kind: HealthKind, key: string) {
   const today = todayISO();
   const period = healthPeriod(kind, key, today);
-  const rows = await prisma.dailyCheckin.findMany({
-    where: { date: { gte: toDbDate(period.prevFrom), lte: toDbDate(period.to) } },
+  const range = { gte: toDbDate(period.prevFrom), lte: toDbDate(period.to) };
+  // El ánimo es uno solo por día (check-in y journal se copian entre sí); si un día
+  // viejo solo lo tiene en el journal, vale ese (la primera entrada con ánimo).
+  const [rows, entries] = await Promise.all([
+    prisma.dailyCheckin.findMany({
+    where: { date: range },
     select: {
       date: true,
       steps: true,
@@ -30,9 +35,18 @@ export async function getHealth(kind: "month" | "year", key: string) {
       distanceM: true,
       activeKcal: true,
       weightG: true,
+      mood: true,
+      energy: true,
+      stress: true,
     },
     orderBy: { date: "asc" },
-  });
+    }),
+    prisma.journalEntry.findMany({
+      where: { date: range, mood: { not: null } },
+      select: { date: true, mood: true },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
   const byDate = new Map<string, HealthDay>();
   for (const r of rows) {
     byDate.set(fromDbDate(r.date), {
@@ -45,7 +59,15 @@ export async function getHealth(kind: "month" | "year", key: string) {
       distanceM: r.distanceM,
       activeKcal: r.activeKcal,
       weightG: r.weightG,
+      mood: r.mood,
+      energy: r.energy,
+      feel: r.stress,
     });
+  }
+  for (const e of entries) {
+    const d = fromDbDate(e.date);
+    const day = byDate.get(d) ?? emptyHealthDay(d);
+    if (day.mood === null) byDate.set(d, { ...day, mood: e.mood });
   }
   // Todos los días del período (los que no tienen dato quedan vacíos: son huecos en los gráficos).
   const days: HealthDay[] = [];
@@ -57,6 +79,8 @@ export async function getHealth(kind: "month" | "year", key: string) {
     days,
     summary: summarizeHealth(days, before, today),
     months: kind === "year" ? monthlyAverages(days, today) : [],
+    /** Ya hay algo del reloj (sin eso, la pantalla invita a conectarlo). */
+    hasWatch: hasAnyData(days.map((d) => ({ ...d, mood: null, energy: null, feel: null }))),
     hasData: hasAnyData(days),
   };
 }

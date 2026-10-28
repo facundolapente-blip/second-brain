@@ -4,7 +4,8 @@ import { PillSwitch } from "@/components/pill-switch";
 import { usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
 import { useEffect, useRef, useState } from "react";
-import { BatteryHigh, Brain, CaretDown, Check, Fire, Footprints, Heartbeat, Minus, Moon, Path, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
+import Link from "next/link";
+import { ArrowRight, BatteryHigh, Brain, CaretDown, Check, Fire, Footprints, Heartbeat, Minus, Moon, Path, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
 import { saveCheckin } from "@/lib/offline/checkin";
 import {
   ENERGY_LABELS,
@@ -256,6 +257,12 @@ export function CheckinCard({
       </div>
       </div>
       {hasWatch && <WatchStrip key={day} slots={watchSlots} watch={watch[day]} swap={daySwap} />}
+      {/* Todo esto en gráficos, por semana, mes o año (Herramientas → Salud). */}
+      {open && (
+        <Link href="/salud?semana=hoy" className="inline-flex min-h-11 items-center gap-1 self-start text-[13px] font-medium text-muted hover:text-fg">
+          Ver cómo estuviste en gráficos <ArrowRight size={13} aria-hidden />
+        </Link>
+      )}
       </div>
     </TintedCard>
   );

@@ -1,4 +1,4 @@
-import { formatMonth, todayISO } from "@/lib/dates";
+import { formatMonth, formatShort, todayISO } from "@/lib/dates";
 import { SlideOnChange } from "@/components/motion-wrap";
 import { getHealth } from "@/lib/health";
 import { periodFromParams } from "@/lib/health-logic";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ searchParams }: PageProps<"/salud">) {
   const p = periodFromParams(await searchParams, todayISO());
-  return { title: p.kind === "year" ? `Salud ${p.key}` : `Salud · ${formatMonth(p.key)}` };
+  return { title: p.kind === "year" ? `Salud ${p.key}` : p.kind === "week" ? `Salud · semana del ${formatShort(p.key)}` : `Salud · ${formatMonth(p.key)}` };
 }
 
 export default async function SaludPage({ searchParams }: PageProps<"/salud">) {

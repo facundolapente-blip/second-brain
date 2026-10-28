@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Brain, CaretLeft, CaretRight, Fire, Footprints, Heartbeat, Moon, Path, Scales, Trophy, Watch, type Icon } from "@phosphor-icons/react";
+import { ArrowDownRight, ArrowUpRight, BatteryHigh, Brain, CaretLeft, CaretRight, Fire, Footprints, Heartbeat, Moon, Path, Scales, Smiley, Trophy, Watch, Waves, type Icon } from "@phosphor-icons/react";
 import { PeriodArrow, usePeriodNav } from "../period-nav";
 import type { HealthData } from "@/lib/health";
 import {
@@ -22,8 +22,10 @@ import {
   type HealthKey,
   type MonthHealth,
 } from "@/lib/health-logic";
-import { addDays, formatMonth, formatShort, monthBounds, shiftMonth, todayISO } from "@/lib/dates";
-import { formatSleep, formatWeight } from "@/lib/checkin-logic";
+import { addDays, formatMonth, formatShort, monthBounds, shiftMonth, startOfWeek, todayISO, weekdayInitial } from "@/lib/dates";
+import { ENERGY_LABELS, formatSleep, formatWeight, STRESS_LABELS } from "@/lib/checkin-logic";
+import { MOODS } from "@/lib/journal-logic";
+import { PillSwitch } from "@/components/pill-switch";
 import { dec1, shortNumber } from "@/lib/format";
 import { tone } from "@/lib/palette";
 import { PageHeader } from "@/components/page-header";
@@ -41,7 +43,10 @@ const navClass =
 type Values = Record<HealthKey, number | null>;
 
 /** Color (de la paleta) e ícono de cada medida: se reconocen igual en las cifras y en los gráficos. */
-const METRIC: Record<"steps" | "sleepMin" | "stress" | "hr" | "distanceM" | "activeKcal" | "weightG", { color: string; icon: Icon; id: string }> = {
+const METRIC: Record<"steps" | "sleepMin" | "stress" | "hr" | "distanceM" | "activeKcal" | "weightG" | "mood" | "energy" | "feel", { color: string; icon: Icon; id: string }> = {
+  mood: { color: "yellow", icon: Smiley, id: "animo" },
+  energy: { color: "green", icon: BatteryHigh, id: "energia" },
+  feel: { color: "pink", icon: Waves, id: "como-te-sentiste" },
   steps: { color: "green", icon: Footprints, id: "pasos" },
   sleepMin: { color: "purple", icon: Moon, id: "sueno" },
   stress: { color: "blue", icon: Brain, id: "estres" },
@@ -63,6 +68,25 @@ function withRestOfYear(months: MonthHealth[], year: string): MonthHealth[] {
   return out;
 }
 
+/** La semana en curso también se dibuja entera (lunes a domingo). */
+function withRestOfWeek(days: HealthDay[], monday: string): HealthDay[] {
+  const out = [...days];
+  for (let d = addDays(days.at(-1)?.date ?? monday, days.length ? 1 : 0); d <= addDays(monday, 6); d = addDays(d, 1)) out.push(emptyHealthDay(d));
+  return out;
+}
+
+/** Escalas de 1 a 5 (ánimo, energía, estrés sentido): "3,4 · Normal". */
+const pick5 = (labels: string[], v: number) => labels[Math.min(4, Math.max(0, Math.round(v) - 1))];
+const scaleText = (labels: string[]) => (v: number) => `${dec1(v)} · ${pick5(labels, v)}`;
+const MOOD_LABELS = MOODS.map((m) => m.label);
+const moodTone = (v: number) => MOODS[Math.min(4, Math.max(0, Math.round(v) - 1))].color;
+const fiveScale = () => ({ lo: 0, hi: 5, ticks: [0, 1, 2, 3, 4] });
+
+type Kind = "week" | "month" | "year";
+const kindOf = (k: string): Kind => (/^\d{4}$/.test(k) ? "year" : /^\d{4}-\d{2}$/.test(k) ? "month" : "week");
+/** "26 oct – 1 nov" */
+const weekLabel = (monday: string) => `${formatShort(monday)} – ${formatShort(addDays(monday, 6))}`;
+
 /** El mes en curso se dibuja entero (los días que faltan, vacíos): el eje no cambia día a día. */
 function withRestOfMonth(days: HealthDay[], month: string): HealthDay[] {
   const end = monthBounds(month).to;
@@ -74,36 +98,60 @@ function withRestOfMonth(days: HealthDay[], month: string): HealthDay[] {
 export function HealthView({ data }: { data: HealthData }) {
   const { period, summary: s, today } = data;
   const isYear = period.kind === "year";
+  const isWeek = period.kind === "week";
   const key = period.key;
-  const vs = isYear ? `vs ${period.prevKey}` : `vs ${monthWord(period.prevKey)}`;
+  const word = isYear ? "año" : isWeek ? "semana" : "mes";
+  const prevName = isYear ? period.prevKey : isWeek ? "la semana anterior" : monthWord(period.prevKey);
+  const vs = isWeek ? "vs semana anterior" : `vs ${prevName}`;
 
   // Flechas y "Mes/Año": el rótulo cambia al toque; varios toques se suman (usePeriodNav).
   const nav = usePeriodNav(key);
   const now = todayISO();
-  const shownYear = /^\d{4}$/.test(nav.shown);
-  const shownCurrent = nav.shown === now.slice(0, shownYear ? 4 : 7);
-  const shift = (k: string, d: number) => (/^\d{4}$/.test(k) ? String(Number(k) + d) : shiftMonth(k, d));
-  const hrefOf = (k: string) => (/^\d{4}$/.test(k) ? `/salud?anio=${k}` : `/salud?mes=${k}`);
+  const shownKind = kindOf(nav.shown);
+  const shownCurrent = shownKind === "week" ? nav.shown >= startOfWeek(now) : nav.shown === now.slice(0, shownKind === "year" ? 4 : 7);
+  const shift = (k: string, d: number) => {
+    const kk = kindOf(k);
+    return kk === "year" ? String(Number(k) + d) : kk === "month" ? shiftMonth(k, d) : addDays(k, 7 * d);
+  };
+  const hrefOf = (k: string) => {
+    const kk = kindOf(k);
+    return kk === "year" ? `/salud?anio=${k}` : kk === "month" ? `/salud?mes=${k}` : `/salud?semana=${k}`;
+  };
   const goTo = (k: string) => nav.go(k, hrefOf(k));
-  const shownWord = shownYear ? "año" : "mes";
-  const lastMonth = period.to.slice(0, 7);
-  const toggleKey = shownYear
-    ? nav.shown === key
-      ? lastMonth
-      : `${nav.shown}-12` > now.slice(0, 7)
-        ? now.slice(0, 7)
-        : `${nav.shown}-12`
-    : nav.shown.slice(0, 4);
+  const shownWord = shownKind === "year" ? "año" : shownKind === "week" ? "semana" : "mes";
+  // Al cambiar entre Semana, Mes y Año se queda en la misma época (el último día que se mira).
+  const keyFor = (k: Kind) => (k === "year" ? period.to.slice(0, 4) : k === "month" ? period.to.slice(0, 7) : startOfWeek(period.to));
+  const kindSwitch = (className: string) => (
+    <PillSwitch<Kind>
+      label="Período"
+      className={className}
+      value={shownKind}
+      options={[
+        { value: "week", label: "Semana" },
+        { value: "month", label: "Mes" },
+        { value: "year", label: "Año" },
+      ]}
+      onChange={(k) => goTo(keyFor(k))}
+      item="h-8 px-3 text-[13px]"
+    />
+  );
+  const kicker = shownKind === "year" ? nav.shown : shownKind === "week" ? `Semana del ${weekLabel(nav.shown)}` : cap(formatMonth(nav.shown));
 
   // Puntos de los gráficos: un día (vista del mes) o un mes (vista del año).
   const points: Point[] = isYear
     ? withRestOfYear(data.months, period.key).map((m) => ({ key: m.month, label: cap(formatMonth(m.month)), tick: formatMonth(m.month).charAt(0).toUpperCase(), partialToday: false, v: m }))
-    : withRestOfMonth(data.days, period.key).map((d) => {
+    : isWeek
+      ? withRestOfWeek(data.days, period.key).map((d) => ({ key: d.date, label: formatShort(d.date), tick: weekdayInitial(d.date), partialToday: d.date === today, v: d }))
+      : withRestOfMonth(data.days, period.key).map((d) => {
         const day = Number(d.date.slice(8));
         return { key: d.date, label: formatShort(d.date), tick: [1, 8, 15, 22, 29].includes(day) ? String(day) : null, partialToday: d.date === today, v: d };
       });
   const has = (k: HealthKey) => points.some((p) => p.v[k] !== null);
   // Los gráficos van de a dos: si son impares, el último ocupa todo el ancho (sin hueco al lado).
+  const feelCharts = [has("mood") && "mood", has("energy") && "energy", has("feel") && "feel"].filter(Boolean);
+  const hasFeel = feelCharts.length > 0;
+  // Ánimo, energía y estrés sentido: si son impares, el último va a todo el ancho.
+  const wideFeel = (k: keyof typeof METRIC) => (feelCharts.length % 2 === 1 && feelCharts.at(-1) === k ? "lg:col-span-2" : undefined);
   const charts = [
     has("steps") && "steps",
     has("sleepMin") && "sleepMin",
@@ -116,8 +164,8 @@ export function HealthView({ data }: { data: HealthData }) {
   const wide = (k: keyof typeof METRIC) => (charts.length % 2 === 1 && charts.at(-1) === k ? "lg:col-span-2" : undefined);
 
   const compare = period.isCurrent
-    ? `${isYear ? "Año" : "Mes"} en curso: promedio por día con datos, comparado con ${isYear ? period.prevKey : monthWord(period.prevKey)} hasta el mismo día.`
-    : `Promedio por día con datos, comparado con ${isYear ? period.prevKey : monthWord(period.prevKey)}.`;
+    ? `${cap(word)} en curso: promedio por día con datos, comparado con ${prevName} hasta el mismo día.`
+    : `Promedio por día con datos, comparado con ${prevName}.`;
 
   const stressLvl = s.stress.avg === null ? null : stressLevel(s.stress.avg);
   const withWeight = !!(s.weight.last || s.weight.prevLast);
@@ -127,19 +175,12 @@ export function HealthView({ data }: { data: HealthData }) {
     <>
       <PageHeader
         title="Salud"
-        kicker={shownYear ? nav.shown : cap(formatMonth(nav.shown))}
+        kicker={kicker}
         wide
         actions={
           <>
-            <PeriodArrow
-              href={hrefOf(toggleKey)}
-              onGo={() => goTo(toggleKey)}
-              label={shownYear ? "Ver el mes" : "Ver el año"}
-              className="mr-1 inline-flex h-9 shrink-0 items-center rounded-full border border-line-strong px-3 text-[13px] whitespace-nowrap text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:px-3.5"
-            >
-              <span className="sm:hidden">{shownYear ? "Mes" : "Año"}</span>
-              <span className="hidden sm:inline">{shownYear ? "Ver el mes" : "Ver el año"}</span>
-            </PeriodArrow>
+            {/* En el celular va en su propia fila (abajo): si no, tapa las flechas. */}
+            {kindSwitch("mr-1 shrink-0 max-sm:hidden")}
             <PeriodArrow href={hrefOf(shift(nav.shown, -1))} onGo={() => goTo(shift(nav.shown, -1))} label={`${cap(shownWord)} anterior`} className={navClass}>
               <CaretLeft size={18} weight="bold" />
             </PeriodArrow>
@@ -152,16 +193,17 @@ export function HealthView({ data }: { data: HealthData }) {
         }
       />
       <main {...nav.bodyProps} className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 pb-16 lg:grid-cols-2 lg:gap-5 lg:px-10 lg:pt-4">
+        <div className="sm:hidden">{kindSwitch("w-full [&>*]:flex-1")}</div>
         {!data.hasData ? (
           <TintedCard
             icon={Watch}
-            title={`Este ${isYear ? "año" : "mes"} no hay datos del reloj`}
-            meta="Pasos, sueño, estrés, pulso y peso"
+            title={`${isWeek ? "Esta semana" : `Este ${word}`} no hay datos`}
+            meta="Check-in y reloj"
             action={{ href: "/datos", label: "Datos" }}
             className="lg:col-span-2"
           >
             <p className="max-w-[56ch] text-[14px] leading-relaxed text-muted">
-              Los pasos, el sueño, el estrés, el pulso, la distancia, las calorías y el peso llegan solos desde el reloj Huawei (por intervals.icu) o se importan de
+              El ánimo, la energía y el estrés salen del check-in de Inicio (¿Cómo estás?). Los pasos, el sueño, el estrés, el pulso, la distancia, las calorías y el peso llegan solos desde el reloj Huawei (por intervals.icu) o se importan de
               Google Fit o Samsung Health.
             </p>
             <Link href="/datos" className="inline-flex min-h-11 items-center self-start rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink hover:opacity-90">
@@ -170,9 +212,97 @@ export function HealthView({ data }: { data: HealthData }) {
           </TintedCard>
         ) : (
           <>
-            <Hero days={data.days} today={today} isYear={isYear} />
+            {hasFeel && (
+              <section aria-label="Cómo te sentiste" className="grid gap-3 lg:col-span-2">
+                <h2 className="text-[15px] font-semibold tracking-tight">Cómo te sentiste</h2>
+                <p className="-mt-1.5 text-[13px] leading-relaxed text-muted">
+                  Del check-in de Inicio, de 1 a 5. El ánimo es uno solo por día: el mismo que marcás en el journal. {compare}
+                </p>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:gap-3">
+                  <Tile
+                    metric="mood"
+                    color={s.mood.avg === null ? undefined : moodTone(s.mood.avg)}
+                    label="Ánimo"
+                    value={s.mood.avg === null ? "–" : dec1(s.mood.avg)}
+                    badge={s.mood.avg !== null && <span className="text-[12px] text-muted">{pick5(MOOD_LABELS, s.mood.avg)} · {s.mood.days} {s.mood.days === 1 ? "día" : "días"}</span>}
+                    spark={points.map((p) => p.v.mood)}
+                  >
+                    <Change value={changeOf(s.mood.avg, s.mood.prevAvg, "diff", 1)} unit="" good="up" vs={vs} digits={1} />
+                  </Tile>
+                  <Tile
+                    metric="energy"
+                    label="Energía"
+                    value={s.energy.avg === null ? "–" : dec1(s.energy.avg)}
+                    badge={s.energy.avg !== null && <span className="text-[12px] text-muted">{pick5(ENERGY_LABELS, s.energy.avg)} · {s.energy.days} {s.energy.days === 1 ? "día" : "días"}</span>}
+                    spark={points.map((p) => p.v.energy)}
+                  >
+                    <Change value={changeOf(s.energy.avg, s.energy.prevAvg, "diff", 1)} unit="" good="up" vs={vs} digits={1} />
+                  </Tile>
+                  <Tile
+                    metric="feel"
+                    label="Estrés"
+                    value={s.feel.avg === null ? "–" : dec1(s.feel.avg)}
+                    badge={s.feel.avg !== null && <span className="text-[12px] text-muted">{pick5(STRESS_LABELS, s.feel.avg)} · {s.feel.days} {s.feel.days === 1 ? "día" : "días"}</span>}
+                    spark={points.map((p) => p.v.feel)}
+                  >
+                    <Change value={changeOf(s.feel.avg, s.feel.prevAvg, "diff", 1)} unit="" good="down" vs={vs} digits={1} />
+                  </Tile>
+                </div>
+              </section>
+            )}
+            {has("mood") && (
+              <Chart
+                title="Ánimo"
+                metric="mood"
+                className={wideFeel("mood")}
+                avg={s.mood.avg}
+                points={points}
+                isYear={isYear}
+                series={[{ name: "Ánimo", key: "mood", color: chip(METRIC.mood.color) }]}
+                fmt={scaleText(MOOD_LABELS)}
+                tickFmt={(v) => String(v)}
+                scale={fiveScale}
+                barColor={(v) => chip(moodTone(v))}
+                legend={MOODS.map((m) => ({ name: `${m.value} ${m.label}`, color: chip(m.color) }))}
+                note={isYear ? "Promedio de cada mes." : "El del check-in o, si ese día no hay, el del journal."}
+              />
+            )}
+            {has("energy") && (
+              <Chart
+                title="Energía"
+                metric="energy"
+                className={wideFeel("energy")}
+                avg={s.energy.avg}
+                points={points}
+                isYear={isYear}
+                series={[{ name: "Energía", key: "energy", color: chip(METRIC.energy.color) }]}
+                fmt={scaleText(ENERGY_LABELS)}
+                tickFmt={(v) => String(v)}
+                scale={fiveScale}
+                note={`1 sin pilas, 5 a full.${isYear ? " Promedio de cada mes." : ""}`}
+              />
+            )}
+            {has("feel") && (
+              <Chart
+                title="Estrés que sentiste"
+                metric="feel"
+                className={wideFeel("feel")}
+                avg={s.feel.avg}
+                points={points}
+                isYear={isYear}
+                series={[{ name: "Estrés", key: "feel", color: chip(METRIC.feel.color) }]}
+                fmt={scaleText(STRESS_LABELS)}
+                tickFmt={(v) => String(v)}
+                scale={fiveScale}
+                note={`1 nada, 5 mucho.${isYear ? " Promedio de cada mes." : ""} El que mide el reloj va más abajo.`}
+              />
+            )}
 
-            <section aria-label={`El ${isYear ? "año" : "mes"} en números`} className="grid gap-3 lg:col-span-2">
+            {data.hasWatch && <Hero days={data.days} today={today} word={word} />}
+
+            {data.hasWatch && (
+            <section aria-label="Del reloj, en números" className="grid gap-3 lg:col-span-2">
+              {hasFeel && <h2 className="mt-2 text-[15px] font-semibold tracking-tight">Del reloj</h2>}
               <p className="text-[13px] leading-relaxed text-muted">
                 {compare}
                 {period.isCurrent && " Hoy no entra en los promedios de pasos, estrés, pulso, distancia y calorías: el día no terminó."}
@@ -188,7 +318,7 @@ export function HealthView({ data }: { data: HealthData }) {
                 <Tile
                   metric="stress"
                   color={stressLvl?.tone}
-                  label="Estrés"
+                  label="Estrés del reloj"
                   value={s.stress.avg === null ? "–" : nf.format(s.stress.avg)}
                   badge={stressLvl && <span style={tone(stressLvl.tone)} className="chip-solid rounded-full px-2 py-0.5 text-[11.5px] font-medium">{stressLvl.label}</span>}
                   spark={points.map((p) => p.v.stress)}
@@ -230,6 +360,7 @@ export function HealthView({ data }: { data: HealthData }) {
                 )}
               </div>
             </section>
+            )}
 
             {has("steps") && (
               <Chart
@@ -266,7 +397,7 @@ export function HealthView({ data }: { data: HealthData }) {
             )}
             {has("stress") && (
               <Chart
-                title="Estrés"
+                title="Estrés del reloj"
                 metric="stress"
                 className={wide("stress")}
                 avg={s.stress.avg}
@@ -426,7 +557,9 @@ function Tile({
 }
 
 /** Arriba de todo: cuántos días llegaste a las metas (anillos) y los récords del período. */
-function Hero({ days, today, isYear }: { days: HealthDay[]; today: string; isYear: boolean }) {
+function Hero({ days, today, word }: { days: HealthDay[]; today: string; word: string }) {
+  const inThe = word === "semana" ? "la semana" : `el ${word}`;
+  const ofThe = word === "semana" ? "de la semana" : `del ${word}`;
   const h = healthHighlights(days, today);
   const when = (d: string) => formatShort(d);
   const records = [
@@ -440,7 +573,7 @@ function Hero({ days, today, isYear }: { days: HealthDay[]; today: string; isYea
   return (
     <TintedCard
       icon={Trophy}
-      title={`Cómo te fue en el ${isYear ? "año" : "mes"}`}
+      title={`Cómo te fue en ${inThe}`}
       meta={`Metas: ${nf.format(STEPS_GOAL)} pasos y 7 h de sueño`}
       className="lg:col-span-2"
       bodyClassName={cx(goals && records.length > 0 && "sm:grid! sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] sm:items-start sm:gap-7!")}
@@ -455,7 +588,7 @@ function Hero({ days, today, isYear }: { days: HealthDay[]; today: string; isYea
         <div className="grid min-w-0 gap-2.5">
           <h3 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight">
             <Trophy size={15} weight="fill" className="text-[var(--p-yellow-chip)]" aria-hidden />
-            Lo mejor del {isYear ? "año" : "mes"}
+            Lo mejor {ofThe}
           </h3>
           <ul className="grid grid-cols-2 gap-2">
             {records.map((r) => {
