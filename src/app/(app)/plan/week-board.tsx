@@ -5,7 +5,7 @@ import { haptic } from "@/components/haptics";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
-import { HOURS_TODO_FOLD_COOKIE, hoursScrollTarget, isBlockNow, isFreeBlock, minutesNow, placeAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type SortKeyPatch, TASK_DRAG } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, hoursScrollTarget, isBlockNow, isFreeBlock, isUrgent, minutesNow, placeAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type SortKeyPatch, TASK_DRAG } from "@/lib/plan-logic";
 import { PRIORITIES, PriorityDots } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -576,7 +576,7 @@ function TodoRow({
         setDragging(true);
       }}
       onDragEnd={() => setDragging(false)}
-      className={cx("tap-tint flex min-h-9 min-w-0 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2", dragging && "plan-drag-source")}
+      className={cx("tap-tint flex min-h-9 min-w-0 items-center gap-1.5 rounded-md pr-1 hover:bg-surface-2", !free && isUrgent(b, b.done) && "urgent-row", dragging && "plan-drag-source")}
       title="Arrastralo a una hora para agendarlo"
     >
       {free ? (
@@ -658,6 +658,8 @@ function Chip({
         "group flex cursor-grab items-start gap-1 overflow-hidden rounded-lg bg-tone px-1.5 py-1 text-tone-fg transition-opacity duration-[var(--dur-state)] active:cursor-grabbing",
         full && "h-full",
         b.done && "opacity-60",
+        // Urgente: borde rojo por dentro (el relleno es el color de su categoría).
+        !isFreeBlock(b) && isUrgent(b, b.done) && "ring-2 ring-[var(--p-red-chip)] ring-inset",
         dragging && "plan-drag-source",
         live && "plan-live",
       )}

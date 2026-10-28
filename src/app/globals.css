@@ -528,6 +528,17 @@ dialog.sheet::backdrop {
 .free-row {
   background-color: color-mix(in oklab, var(--p-green-chip) 11%, var(--bg)) !important;
 }
+/* Prioridad 4 (Urgente) sin terminar: tarjetas y filas teñidas de rojo suave (bloques y tareas). */
+.urgent-block,
+.urgent-row {
+  background-color: color-mix(in oklab, var(--p-red-chip) 10%, var(--surface)) !important;
+}
+.urgent-block {
+  border-color: color-mix(in oklab, var(--p-red-chip) 35%, var(--line)) !important;
+}
+.urgent-row:hover {
+  background-color: color-mix(in oklab, var(--p-red-chip) 15%, var(--surface)) !important;
+}
 
 /* Puntos llenos de la prioridad: el mismo tono que las etiquetas llenas. */
 .prio-on {

@@ -19,6 +19,7 @@ import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplica
 import { addDays, formatShort, startOfWeek, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
+  isUrgent,
   sortBlocks,
   timeRange,
   WEEKDAY_LONG,
@@ -789,7 +790,7 @@ function DayList({
                     left={held === b.id || isFreeBlock(b) || b.done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: () => onToggle(b) }}
                     right={held === b.id ? undefined : { label: "Mañana", icon: <ArrowRight size={20} weight="bold" />, tone: "accent", onAction: () => onTomorrow(b) }}
                   >
-                    <div {...holdProps(b)} className={cx("tap-tint grid grid-cols-[60px_1fr] items-start gap-3 bg-surface", isFreeBlock(b) && "free-row")}>
+                    <div {...holdProps(b)} className={cx("tap-tint grid grid-cols-[60px_1fr] items-start gap-3 bg-surface", isFreeBlock(b) && "free-row", !isFreeBlock(b) && isUrgent(b, b.done) && "urgent-row")}>
                       <span className={cx("pt-3 text-right font-mono text-[13px] leading-tight font-medium tabular", live ? "text-accent-fg" : "text-fg/80")}>
                         {b.startTime ? (
                           <span className="inline-flex items-center justify-end gap-1.5">
@@ -847,6 +848,7 @@ export function BlockCard({
         compact ? "lift plan-hover tap-tint rounded-xl border border-line bg-surface px-2.5 py-2.5" : "py-2.5 pr-1",
         // "Libre": la misma tarjeta, teñida de verde suave.
         compact && free && "free-block",
+        compact && !free && isUrgent(b, b.done) && "urgent-block",
         compact && live && "plan-live",
       )}
     >

@@ -585,6 +585,11 @@ export function isFreeBlock(b: Pick<BlockDTO, "title">): boolean {
   return b.title.trim().toLowerCase() === "libre";
 }
 
+/** Prioridad 4 (Urgente) y sin terminar: tarea o bloque destacado con tinte rojo (como el verde de "Libre"). */
+export function isUrgent(x: { priority?: number | null }, done = false): boolean {
+  return x.priority === 4 && !done;
+}
+
 // ─── Tareas ─────────────────────────────────────────────────────────────────
 
 /** Días que faltan para el deadline (negativo si ya pasó). */

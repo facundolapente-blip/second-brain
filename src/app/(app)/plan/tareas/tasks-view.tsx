@@ -11,7 +11,7 @@ import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSim
 import { saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
 import { ColumnResizers } from "@/components/column-resizers";
 import { addDays, formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, repeatNotice, taskFromForm } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, isUrgent, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, repeatNotice, taskFromForm } from "@/lib/plan-logic";
 import { cx } from "@/components/ui";
 import { TintedCard } from "@/components/tinted-card";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
@@ -466,7 +466,7 @@ function TaskRow({
         left={done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: onDone }}
         right={done ? undefined : { label: "+1 semana", icon: <CalendarDots size={20} weight="bold" />, tone: "accent", onAction: onWeek }}
       >
-      <div className="bg-surface">
+      <div className={cx("bg-surface", isUrgent(t, done) && "urgent-row")}>
       <div className="tap-tint flex items-start gap-3 px-1 py-3">
         <DeadlinePicker task={t}>
           <DateBlock deadline={t.deadline} left={left} done={done} />
@@ -731,6 +731,7 @@ function TaskTable({
                       "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2 active:bg-surface-2",
                       !done && "cursor-grab active:cursor-grabbing",
                       i % 2 === 1 && "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
+                      isUrgent(t, done) && "urgent-row",
                       fresh?.has(t.id) && "reveal",
                       dragging === t.id && "plan-drag-source",
                     )}

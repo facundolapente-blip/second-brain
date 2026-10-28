@@ -8,7 +8,7 @@ import { haptic } from "@/components/haptics";
 import { notifyInfo } from "@/components/undo-toast";
 import { setTaskStatus } from "@/lib/offline/plan";
 import { formatShort } from "@/lib/dates";
-import { daysLeft, daysLeftLabel, repeatNotice, TASK_DRAG, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
+import { daysLeft, isUrgent, daysLeftLabel, repeatNotice, TASK_DRAG, TASK_STATUS, type CategoryDTO, type TaskDTO, type TaskStatus } from "@/lib/plan-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
 import { useNewIds, useTick } from "@/components/motion";
@@ -425,6 +425,7 @@ function Card({
         "relative grid w-full gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left",
         overlay ? "plan-pickup shadow-[var(--card-shadow)]" : "lift press tap-tint",
         done && "opacity-80",
+        isUrgent(t, done) && "urgent-block",
       )}
     >
       {!overlay && <button type="button" onClick={onOpen} aria-label={`Abrir ${t.title}`} className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" />}
