@@ -22,6 +22,27 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+/**
+ * Clic y arrastrar con el mouse, salvo si empieza sobre algo marcado `data-no-drag`
+ * (el texto de una nota: ahí arrastrar selecciona las letras, como en cualquier página).
+ */
+class MouseSensorSkippingText extends MouseSensor {
+  static activators: typeof MouseSensor.activators = [
+    {
+      eventName: "onMouseDown",
+      handler: ({ nativeEvent: event }, { onActivation }) => {
+        if (event.button !== 0) return false;
+        if (event.target instanceof Element && event.target.closest("[data-no-drag]")) return false;
+        onActivation?.({ event });
+        return true;
+      },
+    },
+  ];
+}
+
+/** Clases para un texto que se puede seleccionar con el mouse dentro de algo que se arrastra (junto con `data-no-drag`). */
+export const SELECTABLE_TEXT = "pointer-fine:relative pointer-fine:z-[1] pointer-fine:cursor-text pointer-fine:select-text";
+
 /** En una lista vertical, el elemento solo se mueve hacia arriba o abajo. */
 const onlyVertical: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
@@ -57,7 +78,7 @@ export function Sortable({
 }) {
   const dndId = useId();
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensorSkippingText, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );

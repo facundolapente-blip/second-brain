@@ -35,6 +35,18 @@ import {
   type NoteDTO,
 } from "@/lib/notes-logic";
 import { dayOfInstant } from "@/lib/dates";
+import { SELECTABLE_TEXT } from "@/components/sortable";
+
+/**
+ * El texto de la nota se puede seleccionar con el mouse (arrastrar sobre las letras
+ * no mueve la tarjeta, `data-no-drag`); un clic sin haber seleccionado la abre igual.
+ */
+const selectProps = (onOpen: () => void) => ({
+  "data-no-drag": "",
+  onClick: () => {
+    if (!window.getSelection()?.toString()) onOpen();
+  },
+});
 
 const KIND_ICON: Record<string, Icon> = {
   youtube: YoutubeLogo,
@@ -396,7 +408,7 @@ export function NoteCard({
           </span>
         )}
         {rest && (
-          <p className="line-clamp-2 text-[13.5px] whitespace-pre-line text-muted [overflow-wrap:anywhere]">
+          <p {...selectProps(handlers.onOpen)} className={cx("line-clamp-2 text-[13.5px] whitespace-pre-line text-muted [overflow-wrap:anywhere]", SELECTABLE_TEXT)}>
             {rest}
           </p>
         )}
@@ -444,7 +456,7 @@ export function NoteCard({
         </div>
         {titleBtn("line-clamp-2 pr-6 text-[15px] leading-snug font-semibold")}
         {rest && (
-          <p className="line-clamp-2 text-[13.5px] whitespace-pre-line text-muted">
+          <p {...selectProps(handlers.onOpen)} className={cx("line-clamp-2 text-[13.5px] whitespace-pre-line text-muted", SELECTABLE_TEXT)}>
             {rest}
           </p>
         )}
@@ -460,7 +472,7 @@ export function NoteCard({
           {titleBtn(
             "pr-6 text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]",
           )}
-          {rest && <Folded text={rest} done={n.done} />}
+          {rest && <Folded text={rest} done={n.done} onOpen={handlers.onOpen} />}
         </>
       ) : (
         <>
@@ -471,7 +483,7 @@ export function NoteCard({
             aria-label={`Editar: ${heading}`}
             className="absolute inset-0 rounded-[inherit] focus-visible:outline-none"
           />
-          <Folded text={n.body} done={n.done} strong />
+          <Folded text={n.body} done={n.done} strong onOpen={handlers.onOpen} />
         </>
       )}
       {meta}
@@ -487,10 +499,12 @@ function Folded({
   text,
   done,
   strong,
+  onOpen,
 }: {
   text: string;
   done: boolean;
   strong?: boolean;
+  onOpen: () => void;
 }) {
   const box = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
@@ -511,8 +525,10 @@ function Folded({
     <div className="grid gap-1">
       <p
         ref={box}
+        {...selectProps(onOpen)}
         style={{ maxHeight: open ? (full ?? undefined) : "calc(1.55em * 4)" }}
         className={cx(
+          SELECTABLE_TEXT,
           "overflow-hidden whitespace-pre-line [overflow-wrap:anywhere] transition-[max-height] duration-[var(--dur-state)] ease-[var(--ease-out)] motion-reduce:transition-none",
           strong
             ? "pr-6 text-[15px] leading-[1.55] text-fg"
