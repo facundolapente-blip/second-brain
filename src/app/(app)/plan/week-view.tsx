@@ -16,7 +16,7 @@ import { SwipeRow } from "@/components/swipe-row";
 import { PillSwitch } from "@/components/pill-switch";
 import { ArrowArcRight, ArrowRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank, CalendarDots } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask, saveBlock } from "@/lib/offline/plan";
-import { addDays, formatShort, startOfWeek, weekday } from "@/lib/dates";
+import { addDays, formatMonth, formatShort, monthKey, shiftMonth, startOfWeek, weekday } from "@/lib/dates";
 import {
   isFreeBlock,
   isUrgent,
@@ -28,8 +28,10 @@ import {
   type TaskDTO,
   placeAt,
   type SortKeyPatch,
+  PLAN_MONTH_COOKIE,
   PLAN_STEP_COOKIE,
   PLAN_VIEW_COOKIE,
+  monthGrid,
   blockFromForm,
   newClientId,
   topSortKey,
@@ -46,6 +48,7 @@ import { PlanTabs } from "./plan-nav";
 import { PlanWeekContext } from "./plan-context";
 import { land, ringWhileMenu } from "./drag-motion";
 import { BoardHours, BoardList } from "./week-board";
+import { BoardMonth, MonthMini } from "./month-board";
 
 const SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -79,6 +82,7 @@ function plusHour(start: string): string {
 }
 
 export function WeekView({
+  month,
   monday,
   start = monday,
   step: initialStep = "semana",
@@ -90,6 +94,8 @@ export function WeekView({
   todoFolded = false,
   initialView = "lista",
 }: {
+  /** Vista Mes ("YYYY-MM"): la grilla de ese mes en vez de la semana. */
+  month?: string;
   /** Lista o Por horas, como quedó la última vez (cookie). */
   initialView?: "lista" | "horas";
   /** Lo que va arriba del calendario: las tareas. */
@@ -107,15 +113,22 @@ export function WeekView({
   tasks: Pick<TaskDTO, "id" | "title" | "status" | "categoryId" | "priority">[];
 }) {
   const router = useRouter();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const isThisWeek = days.includes(today);
-  const [selected, setSelected] = useState(() => (pendingSelect && days.includes(pendingSelect) ? pendingSelect : isThisWeek ? today : start));
+  // En la vista Mes, los días de la grilla (semanas enteras, con los de los meses vecinos).
+  const days = month ? monthGrid(month).flat() : Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  const inPeriod = (d: string) => (month ? d.slice(0, 7) === month : days.includes(d));
+  // ¿Se ve hoy? (en el mes, solo si es el mes de hoy: no por un día de relleno).
+  const isThisWeek = month ? monthKey(today) === month : days.includes(today);
+  const [selected, setSelected] = useState(() => (pendingSelect && days.includes(pendingSelect) ? pendingSelect : isThisWeek ? today : month ? `${month}-01` : start));
   // Hacia dónde se movió: adelante desliza desde la derecha, atrás desde la izquierda.
   const [slide] = useState(() => pendingSlide ?? "");
   useEffect(() => {
     pendingSlide = null;
     pendingSelect = null;
   }, []);
+  // `/plan` a secas abre lo último que se miró: el mes o la semana.
+  useEffect(() => {
+    savePref(PLAN_MONTH_COOKIE, month ? "1" : "0");
+  }, [month]);
   // Minuto de ahora (cada minuto): la línea de Por horas y el bloque que está pasando.
   const now = useNow();
   // Elegir otro día en la tira del celular: la lista entra desde ese lado.
@@ -167,7 +180,7 @@ export function WeekView({
 
   const byDay = new Map(days.map((d) => [d, sortBlocks(blocks.filter((b) => b.date === d))]));
   // Solo lo que está en los días que se ven (un bloque recién pasado a otra semana deja de contar enseguida).
-  const work = blocks.filter((b) => !isFreeBlock(b) && days.includes(b.date));
+  const work = blocks.filter((b) => !isFreeBlock(b) && inPeriod(b.date));
   const doneCount = work.filter((b) => b.done).length;
   // "N de M hechos": al tildar, el número cambia con un corrimiento corto (al cargar, nada).
   const doneTick = useTick(doneCount);
@@ -358,11 +371,34 @@ export function WeekView({
   // Las flechas avanzan un día o una semana. Si se ve de lunes a domingo, la dirección
   // sigue siendo ?semana=; si no, ?desde= (siete días corridos desde ese día).
   const hrefFrom = (d: string) => (step === "semana" && d === startOfWeek(d) ? `/plan?semana=${d}` : `/plan?desde=${d}`);
+  const monthHref = (m: string) => `/plan?mes=${m}`;
   const n = step === "dia" ? 1 : 7;
-  const prev = hrefFrom(addDays(start, -n));
-  const next = hrefFrom(addDays(start, n));
-  const unit = step === "dia" ? "Día" : "Semana";
-  const todayHref = step === "dia" ? `/plan?desde=${today}` : "/plan";
+  const prev = month ? monthHref(shiftMonth(month, -1)) : hrefFrom(addDays(start, -n));
+  const next = month ? monthHref(shiftMonth(month, 1)) : hrefFrom(addDays(start, n));
+  const unit = month ? "Mes" : step === "dia" ? "Día" : "Semana";
+  const todayHref = month ? monthHref(monthKey(today)) : step === "dia" ? `/plan?desde=${today}` : "/plan";
+  /** Un día en la vista de semana (o de a un día, según el paso `s`), con ese día elegido. */
+  const weekHref = (d: string, s: "dia" | "semana") =>
+    s === "dia" ? `/plan?desde=${d}` : startOfWeek(d) === startOfWeek(today) ? "/plan" : `/plan?semana=${startOfWeek(d)}`;
+  /** Desde el mes: ir a ese día en la semana. */
+  function openDay(d: string, s: "dia" | "semana" = step) {
+    haptic("select");
+    pendingSelect = d;
+    // Antes de pedir la página: `/plan` a secas tiene que dar la semana, no el mes.
+    savePref(PLAN_MONTH_COOKIE, "0");
+    router.push(weekHref(d, s), { scroll: false });
+  }
+  /** Día / Semana / Mes: los dos primeros son el paso de las flechas de la semana; Mes cambia de vista. */
+  function pickStep(v: "dia" | "semana" | "mes") {
+    if (v === "mes") {
+      if (month) return;
+      savePref(PLAN_MONTH_COOKIE, "1");
+      router.push(monthHref(monthKey(selected)), { scroll: false });
+      return;
+    }
+    setStep(v);
+    if (month) openDay(selected, v);
+  }
   // Lo de antes y lo de después ya quedan pedidos: las flechas no esperan.
   useEffect(() => {
     router.prefetch(prev);
@@ -378,16 +414,19 @@ export function WeekView({
     const target = addDays(selected, delta);
     if (days.includes(target)) return pickDay(target);
     pendingSelect = target;
-    go(hrefFrom(addDays(start, delta * n)), delta > 0 ? "next" : "prev");
+    go(month ? monthHref(monthKey(target)) : hrefFrom(addDays(start, delta * n)), delta > 0 ? "next" : "prev");
   }
   const listSwipe = useSwipe({ onLeft: () => shiftDay(1), onRight: () => shiftDay(-1) });
   // Sobre la tira de días, deslizar cambia de semana (y queda elegido el mismo día de la semana).
+  // En el mes, deslizar sobre la grilla cambia de mes.
   const stripSwipe = useSwipe({
     onLeft: () => {
+      if (month) return go(next, "next");
       pendingSelect = addDays(selected, 7);
       go(hrefFrom(addDays(start, 7)), "next");
     },
     onRight: () => {
+      if (month) return go(prev, "prev");
       pendingSelect = addDays(selected, -7);
       go(hrefFrom(addDays(start, -7)), "prev");
     },
@@ -434,38 +473,41 @@ export function WeekView({
           tabs={<PlanTabs />}
           actions={
             <>
-              <Menu
-                trigger={(toggleMenu) => (
-                  <IconButton label="Más opciones" onClick={toggleMenu}>
-                    <DotsThreeVertical size={20} weight="bold" />
-                  </IconButton>
-                )}
-                items={[
-                  {
-                    // La misma tarjeta pasa a la semana siguiente (no se duplica).
-                    label: "Pasar toda la semana a la siguiente",
-                    icon: <ArrowArcRight size={16} />,
-                    onSelect: () =>
-                      startTransition(async () => {
-                        const r = await passWeek(monday);
-                        setCopyMsg(
-                          r.ok
-                            ? `Listo: ${r.count} ${r.count === 1 ? "tarjeta pasó" : "tarjetas pasaron"} a la semana que viene, sin tildar. Ajustá las que cambien de día.`
-                            : r.error,
-                        );
-                      }),
-                  },
-                  {
-                    label: "Copiar a la semana que viene",
-                    icon: <Copy size={16} />,
-                    onSelect: () =>
-                      startTransition(async () => {
-                        const r = await copyWeekToNext(monday);
-                        setCopyMsg(r.ok ? "Listo: la semana que viene ya tiene estos bloques." : r.error);
-                      }),
-                  },
-                ]}
-              />
+              {/* Pasar o copiar la semana: solo mirando una semana. */}
+              {!month && (
+                <Menu
+                  trigger={(toggleMenu) => (
+                    <IconButton label="Más opciones" onClick={toggleMenu}>
+                      <DotsThreeVertical size={20} weight="bold" />
+                    </IconButton>
+                  )}
+                  items={[
+                    {
+                      // La misma tarjeta pasa a la semana siguiente (no se duplica).
+                      label: "Pasar toda la semana a la siguiente",
+                      icon: <ArrowArcRight size={16} />,
+                      onSelect: () =>
+                        startTransition(async () => {
+                          const r = await passWeek(monday);
+                          setCopyMsg(
+                            r.ok
+                              ? `Listo: ${r.count} ${r.count === 1 ? "tarjeta pasó" : "tarjetas pasaron"} a la semana que viene, sin tildar. Ajustá las que cambien de día.`
+                              : r.error,
+                          );
+                        }),
+                    },
+                    {
+                      label: "Copiar a la semana que viene",
+                      icon: <Copy size={16} />,
+                      onSelect: () =>
+                        startTransition(async () => {
+                          const r = await copyWeekToNext(monday);
+                          setCopyMsg(r.ok ? "Listo: la semana que viene ya tiene estos bloques." : r.error);
+                        }),
+                    },
+                  ]}
+                />
+              )}
               <Button variant="accent" size="sm" className="ml-1 max-lg:hidden" title="Atajo: N" onClick={() => openNew(selected)}>
                 <Plus size={16} weight="bold" /> Nuevo bloque
               </Button>
@@ -482,8 +524,8 @@ export function WeekView({
           icon={CalendarDots}
           className="plan-week-card mt-5 lg:mt-7"
           title={
-            <span key={start} className={cx("inline-block tabular", slide)}>
-              {formatShort(days[0])} al {formatShort(days[6])}
+            <span key={month ?? start} className={cx("inline-block tabular", slide)}>
+              {month ? formatMonth(month).replace(/^./, (c) => c.toUpperCase()) : `${formatShort(days[0])} al ${formatShort(days[6])}`}
             </span>
           }
           meta={
@@ -526,14 +568,15 @@ export function WeekView({
           headExtra={
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               {/* Qué avanzan las flechas (se recuerda). */}
-              <PillSwitch
+              <PillSwitch<"dia" | "semana" | "mes">
                 label="Las flechas avanzan"
-                value={step}
+                value={month ? "mes" : step}
                 options={[
                   { value: "dia", label: "Día" },
                   { value: "semana", label: "Semana" },
+                  { value: "mes", label: "Mes" },
                 ]}
-                onChange={setStep}
+                onChange={pickStep}
                 {...HEAD_SWITCH}
                 item="h-8 px-2.5 text-[12.5px]"
               />
@@ -545,10 +588,10 @@ export function WeekView({
                   onClick={() => markSlide(today > start ? "next" : "prev")}
                   className="inline-flex min-h-9 items-center text-[13.5px] font-semibold text-[var(--head-fg)] underline decoration-[color-mix(in_oklab,var(--head-fg)_35%,transparent)] underline-offset-4 hover:decoration-current"
                 >
-                  {step === "dia" ? "Hoy" : "Esta semana"}
+                  {month ? "Este mes" : step === "dia" ? "Hoy" : "Esta semana"}
                 </Link>
               )}
-              <ViewToggle view={view} onChange={setView} className="ml-auto" />
+              {!month && <ViewToggle view={view} onChange={setView} className="ml-auto" />}
             </div>
           }
         >
@@ -563,69 +606,106 @@ export function WeekView({
             </p>
           )}
 
-          {/* Celular: tira de días + lista del día elegido */}
+          {/* Celular: tira de días (o el mes chico) + lista del día elegido */}
           <div className="lg:hidden">
-            {/* Deslizar sobre la tira cambia de semana. */}
-            <div {...stripSwipe} className={cx("mb-4 grid grid-cols-7 gap-1 border-b border-line pb-3", slide)} role="tablist" aria-label="Días">
-              {days.map((d) => {
-                const active = d === selected;
-                const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
-                const pending = byDay.get(d)!.some((b) => !b.done && !isFreeBlock(b));
-                return (
+            {month ? (
+              <>
+                {/* Deslizar sobre el mes cambia de mes; tocar un día lo elige. */}
+                <MonthMini {...stripSwipe} month={month} days={days} today={today} byDay={byDay} cats={cats} selected={selected} onPick={pickDay} className={cx("mb-4", slide)} />
+                <div key={selected} {...listSwipe} ref={keepRef} style={keepStyle} className={daySlide || slide || undefined}>
+                  <DayList
+                    day={selected}
+                    today={today}
+                    now={now}
+                    blocks={byDay.get(selected)!}
+                    cats={cats}
+                    onToggle={toggle}
+                    onEdit={openEdit}
+                    onNew={() => openNew(selected)}
+                    onMove={move}
+                    onTomorrow={toTomorrow}
+                    onMenu={blockMenu}
+                  />
                   <button
-                    key={d}
                     type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => pickDay(d)}
-                    className={cx(
-                      "tap-tint relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[10px] transition-colors",
-                      active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
-                      // El día recién elegido acusa el toque (solo después de tocar, no al cargar).
-                      active && daySlide && "plan-pick",
-                    )}
+                    onClick={() => openDay(selected)}
+                    className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-accent-fg underline decoration-[color-mix(in_oklab,currentColor_35%,transparent)] underline-offset-4"
                   >
-                    <span className={cx("font-mono text-[10px] font-medium tracking-[0.08em] uppercase", active ? "text-on-ink" : "text-muted")}>{SHORT[weekday(d)]}</span>
-                    <span className="figure text-[21px]">{Number(d.slice(8))}</span>
-                    <span
-                      className={cx(
-                        "mt-0.5 h-1.5 w-1.5 rounded-full",
-                        count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-ink" : "bg-accent") : active ? "bg-on-ink/50" : "bg-faint",
-                      )}
-                      aria-hidden
-                    />
-                    {d === today && !active && <span className="absolute inset-x-3 top-0 h-[2px] rounded-b-full bg-accent" aria-hidden />}
+                    Ver esa semana <ArrowRight size={14} weight="bold" aria-hidden />
                   </button>
-                );
-              })}
-            </div>
-            {/* Deslizar de costado sobre la lista cambia de día (como tocar otro en la tira). */}
-            <div {...listSwipe} key={`${view}-${selected}`} ref={keepRef} style={keepStyle} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
-              {view === "lista" ? (
-                <DayList
-                  day={selected}
-                  today={today}
-                  now={now}
-                  blocks={byDay.get(selected)!}
-                  cats={cats}
-                  onToggle={toggle}
-                  onEdit={openEdit}
-                  onNew={() => openNew(selected)}
-                  onMove={move}
-                  onTomorrow={toTomorrow}
-                  onMenu={blockMenu}
-                />
-              ) : (
-                // Por horas en el celular: el calendario del día elegido en la tira.
-                <BoardHours {...boardProps} days={[selected]} todoFolded={todoFolded} openSeq={hoursSeq} />
-              )}
-            </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Deslizar sobre la tira cambia de semana. */}
+                <div {...stripSwipe} className={cx("mb-4 grid grid-cols-7 gap-1 border-b border-line pb-3", slide)} role="tablist" aria-label="Días">
+                  {days.map((d) => {
+                    const active = d === selected;
+                    const count = byDay.get(d)!.filter((b) => !isFreeBlock(b)).length;
+                    const pending = byDay.get(d)!.some((b) => !b.done && !isFreeBlock(b));
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => pickDay(d)}
+                        className={cx(
+                          "tap-tint relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[10px] transition-colors",
+                          active ? "bg-ink text-on-ink" : "text-fg hover:bg-surface-2",
+                          // El día recién elegido acusa el toque (solo después de tocar, no al cargar).
+                          active && daySlide && "plan-pick",
+                        )}
+                      >
+                        <span className={cx("font-mono text-[10px] font-medium tracking-[0.08em] uppercase", active ? "text-on-ink" : "text-muted")}>{SHORT[weekday(d)]}</span>
+                        <span className="figure text-[21px]">{Number(d.slice(8))}</span>
+                        <span
+                          className={cx(
+                            "mt-0.5 h-1.5 w-1.5 rounded-full",
+                            count === 0 ? "bg-transparent" : pending ? (active ? "bg-on-ink" : "bg-accent") : active ? "bg-on-ink/50" : "bg-faint",
+                          )}
+                          aria-hidden
+                        />
+                        {d === today && !active && <span className="absolute inset-x-3 top-0 h-[2px] rounded-b-full bg-accent" aria-hidden />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Deslizar de costado sobre la lista cambia de día (como tocar otro en la tira). */}
+                <div {...listSwipe} key={`${view}-${selected}`} ref={keepRef} style={keepStyle} className={daySlide || slide || (viewSwap ? "swap" : undefined)}>
+                  {view === "lista" ? (
+                    <DayList
+                      day={selected}
+                      today={today}
+                      now={now}
+                      blocks={byDay.get(selected)!}
+                      cats={cats}
+                      onToggle={toggle}
+                      onEdit={openEdit}
+                      onNew={() => openNew(selected)}
+                      onMove={move}
+                      onTomorrow={toTomorrow}
+                      onMenu={blockMenu}
+                    />
+                  ) : (
+                    // Por horas en el celular: el calendario del día elegido en la tira.
+                    <BoardHours {...boardProps} days={[selected]} todoFolded={todoFolded} openSeq={hoursSeq} />
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Escritorio: lista de 7 columnas o calendario por horas; los bloques se arrastran. */}
+          {/* Escritorio: lista de 7 columnas, calendario por horas o el mes; los bloques se arrastran. */}
           <div className="hidden lg:block">
-            <div key={view} className={slide || (viewSwap ? "swap" : undefined)}>
-              {view === "lista" ? <BoardList {...boardProps} /> : <BoardHours {...boardProps} todoFolded={todoFolded} />}
+            <div key={month ?? view} className={slide || (viewSwap ? "swap" : undefined)}>
+              {month ? (
+                <BoardMonth month={month} days={days} today={today} byDay={byDay} cats={cats} onEdit={openEdit} onNew={openNew} onOpenDay={openDay} onMove={move} onMenu={blockMenu} onDropTask={dropTask} />
+              ) : view === "lista" ? (
+                <BoardList {...boardProps} />
+              ) : (
+                <BoardHours {...boardProps} todoFolded={todoFolded} />
+              )}
             </div>
           </div>
         </TintedCard>

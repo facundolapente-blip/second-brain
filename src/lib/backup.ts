@@ -15,7 +15,7 @@ import { prisma } from "./prisma";
 
 const SKIP = new Set<string>(["AuthUser", "AuthSession", "AuthAccount", "AuthVerification", "AuthRateLimit", "ActionReceipt", "PushSubscription"]);
 /** Ajustes que son claves de otros servicios: no van en los respaldos (se vuelven a pegar). */
-const SECRET_SETTINGS = new Set<string>(["reloj_intervals"]);
+const SECRET_SETTINGS = new Set<string>(["reloj_intervals", "google_calendar_token"]);
 const PREFIX = "respaldos/";
 /** Se guardan los últimos 30 y, de antes, el último de cada mes durante un año. */
 const KEEP_DAILY = 30;

@@ -19,6 +19,9 @@ import {
   timeRange,
   topSortKey,
   weekDays,
+  monthGrid,
+  monthCellBlocks,
+  isMonthKey,
   type TaskDTO,
   shiftEnd,
 } from "@/lib/plan-logic";
@@ -327,5 +330,39 @@ describe("nextRepeatDate", () => {
   it("mensual: un 31 cae el último día y vuelve al 31", () => {
     expect(nextRepeatDate("2026-01-31", "monthly", 1, "2026-01-31")).toBe("2026-02-28");
     expect(nextRepeatDate("2026-02-28", "monthly", 1, "2026-02-28", 31)).toBe("2026-03-31");
+  });
+});
+
+describe("vista Mes", () => {
+  it("monthGrid: semanas enteras de lunes a domingo (la grilla de la vista Mes)", () => {
+    // Noviembre 2026 empieza un domingo y termina un lunes: 6 semanas.
+    const nov = monthGrid("2026-11").flat();
+    expect(nov.length).toBe(42);
+    expect(nov[0]).toBe("2026-10-26");
+    expect(nov[6]).toBe("2026-11-01");
+    expect(nov.at(-1)).toBe("2026-12-06");
+    // Febrero 2027 empieza lunes y tiene 28 días: 4 semanas justas.
+    const feb = monthGrid("2027-02").flat();
+    expect(feb.length).toBe(28);
+    expect(feb[0]).toBe("2027-02-01");
+    expect(feb.at(-1)).toBe("2027-02-28");
+    // Octubre 2026: jueves 1 a sábado 31, 5 semanas.
+    const oct = monthGrid("2026-10").flat();
+    expect(oct.length).toBe(35);
+    expect(oct[0]).toBe("2026-09-28");
+    expect(oct.at(-1)).toBe("2026-11-01");
+  });
+
+  it("monthCellBlocks: '+N más' solo si sobran dos o más", () => {
+    expect(monthCellBlocks([1, 2, 3], 3)).toEqual({ shown: [1, 2, 3], more: 0 });
+    expect(monthCellBlocks([1, 2, 3, 4], 3)).toEqual({ shown: [1, 2, 3, 4], more: 0 });
+    expect(monthCellBlocks([1, 2, 3, 4, 5], 3)).toEqual({ shown: [1, 2, 3], more: 2 });
+  });
+
+  it("isMonthKey", () => {
+    expect(isMonthKey("2026-11")).toBe(true);
+    expect(isMonthKey("2026-13")).toBe(false);
+    expect(isMonthKey("2026-1")).toBe(false);
+    expect(isMonthKey(undefined)).toBe(false);
   });
 });

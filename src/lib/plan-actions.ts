@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { pushBlockToGoogle } from "./gcal";
 import { redirect } from "next/navigation";
 import { QUARTER_REVIEW_TAG } from "./review-logic";
 import { prisma } from "./prisma";
@@ -67,6 +69,19 @@ async function applySortKeys(others: unknown) {
   }
 }
 
+type Times = { date: Date; startTime: string | null; endTime: string | null };
+
+/**
+ * Si a un bloque que vino de Google Calendar se le cambió el día o el horario, el
+ * evento se mueve igual en Google (después de responder: la pantalla no espera).
+ * Lo creado en la app nunca va a Google.
+ */
+function toGoogle(id: string, before: Times & { source: string | null }, now: Times) {
+  if (before.source !== "gcal") return;
+  if (+before.date === +now.date && before.startTime === now.startTime && before.endTime === now.endTime) return;
+  after(() => pushBlockToGoogle(id));
+}
+
 /** Un bloque nuevo sin hora va arriba de todo en su día, con lugar propio (si no, empata con los demás). */
 async function newSortKey(date: Date): Promise<number> {
   const day = await prisma.planBlock.findMany({ where: { date }, select: { startTime: true, sortKey: true } });
@@ -131,6 +146,7 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
     if (!before) return { ok: false, error: "Ese bloque ya no existe." };
     const done = +before.date === +data.date ? before.done : await changeWeek(before, data.date);
     await prisma.planBlock.update({ where: { id }, data: { ...data, done } });
+    toGoogle(id, before, data);
     if (data.title !== before.title) await prisma.planStep.updateMany({ where: { blockId: id }, data: { title: data.title } });
     if (data.taskId && data.taskId !== before.taskId) {
       await prisma.planTask.updateMany({ where: { id: data.taskId }, data: { scheduled: true } });
@@ -249,6 +265,7 @@ export async function passToNextWeek(raw: string): Promise<ActionResult> {
   const to = toDbDate(addDays(fromDbDate(b.date), 7));
   const done = await changeWeek(b, to);
   await prisma.planBlock.update({ where: { id: b.id }, data: { date: to, done } });
+  toGoogle(b.id, b, { date: to, startTime: b.startTime, endTime: b.endTime });
   refrescar();
   return { ok: true };
 }
@@ -269,6 +286,7 @@ export async function passWeek(day: string): Promise<ActionResult & { count?: nu
     const to = toDbDate(addDays(fromDbDate(b.date), 7));
     const done = await changeWeek(b, to);
     await prisma.planBlock.update({ where: { id: b.id }, data: { date: to, done } });
+    toGoogle(b.id, b, { date: to, startTime: b.startTime, endTime: b.endTime });
   }
   await logActivity("updated", "block", null, `${blocks.length} tarjetas pasadas a la semana del ${addDays(monday, 7)}`);
   refrescar();
@@ -629,6 +647,7 @@ export async function rescheduleBlock(id: string, date: string, startTime: strin
   const to = toDbDate(date);
   const done = +b.date === +to ? b.done : await changeWeek(b, to);
   await prisma.planBlock.update({ where: { id: b.id }, data: { date: to, startTime: start, endTime: end, done } });
+  toGoogle(b.id, b, { date: to, startTime: start, endTime: end });
   refrescar();
 }
 
@@ -654,6 +673,7 @@ export async function moveBlock(raw: string, date: string, startTime?: string | 
   const done = +b.date === +to ? b.done : await changeWeek(b, to);
   const key = sortKey !== undefined && Number.isFinite(sortKey) && !start ? { sortKey } : {};
   await prisma.planBlock.update({ where: { id }, data: { date: to, startTime: start, endTime: end, done, ...key } });
+  toGoogle(id, b, { date: to, startTime: start, endTime: end });
   if (!start) await applySortKeys(others);
   refrescar();
 }

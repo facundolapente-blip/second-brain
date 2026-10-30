@@ -4,7 +4,7 @@ import { getHabitsWithLogs } from "./habits";
 import { habitScore } from "./habit-logic";
 import { getAccounts, getGoals } from "./finance";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
-import { parseTaskLinks, type MinorGoalDTO } from "./plan-logic";
+import { monthGrid, parseTaskLinks, type MinorGoalDTO } from "./plan-logic";
 import type {
   BlockDTO,
   CategoryDTO,
@@ -76,6 +76,19 @@ export async function getWeek(day: string, start?: string) {
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
   return { monday, start: from, blocks: rows.map(blockDTO), today: todayISO() };
+}
+
+/**
+ * Un mes ("YYYY-MM") para la vista Mes: los bloques de toda la grilla (de lunes a
+ * domingo, con los días de los meses vecinos que completan la primera y la última semana).
+ */
+export async function getMonth(month: string) {
+  const days = monthGrid(month).flat();
+  const rows = await prisma.planBlock.findMany({
+    where: { date: { gte: toDbDate(days[0]), lte: toDbDate(days[days.length - 1]) } },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+  });
+  return { month, days, blocks: rows.map(blockDTO), today: todayISO() };
 }
 
 export async function getTasks(): Promise<TaskDTO[]> {

@@ -146,6 +146,9 @@ export const TASK_COLUMN_DRAG = "text/x-columna";
 /** Tipo de dato al arrastrar una tarea de la tabla a un día de la semana. */
 export const TASK_DRAG = "text/x-tarea";
 
+/** Tipo de dato al arrastrar un bloque a otro día (semana y mes). */
+export const BLOCK_DRAG = "text/x-bloque";
+
 /** Cookie con los pendientes sin hora plegados en la vista por horas. */
 export const HOURS_TODO_FOLD_COOKIE = "plan_pendientes_plegados";
 
@@ -154,6 +157,9 @@ export const TASKS_FOLD_COOKIE = "plan_tareas_plegadas";
 
 /** Cookie con el paso de las flechas de la semana ("dia" o "semana"). */
 export const PLAN_STEP_COOKIE = "plan_paso";
+
+/** Cookie que dice si lo último que se miró fue el mes ("1") o la semana ("0"): `/plan` abre eso. */
+export const PLAN_MONTH_COOKIE = "plan_mes";
 
 /** Cookie con la vista de la semana elegida ("lista" u "horas"). */
 export const PLAN_VIEW_COOKIE = "plan_vista";
@@ -443,6 +449,20 @@ export const TASKS_LAYOUT_COOKIE = "tareas_vista";
 // ─── Fechas y horarios ──────────────────────────────────────────────────────
 
 export const WEEKDAY_LONG = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+/** ¿Es un mes "YYYY-MM" válido? */
+export function isMonthKey(s: unknown): s is string {
+  return typeof s === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
+}
+
+/**
+ * Lo que entra en la celda de un día del mes: los primeros `max` bloques y cuántos
+ * quedan afuera. Si sobra uno solo, entra (no tiene sentido "+1 más" en vez del bloque).
+ */
+export function monthCellBlocks<T>(blocks: T[], max: number): { shown: T[]; more: number } {
+  if (blocks.length <= max + 1) return { shown: blocks, more: 0 };
+  return { shown: blocks.slice(0, max), more: blocks.length - max };
+}
 
 /** Los 7 días (lunes a domingo) de la semana que contiene `iso`. */
 export function weekDays(iso: string): string[] {

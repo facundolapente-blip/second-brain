@@ -5,7 +5,7 @@ import { haptic } from "@/components/haptics";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CaretDown, Check, Plus } from "@phosphor-icons/react";
 import { weekday } from "@/lib/dates";
-import { HOURS_TODO_FOLD_COOKIE, hoursScrollTarget, isBlockNow, isFreeBlock, isUrgent, minutesNow, placeAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type SortKeyPatch, TASK_DRAG } from "@/lib/plan-logic";
+import { BLOCK_DRAG, HOURS_TODO_FOLD_COOKIE, hoursScrollTarget, isBlockNow, isFreeBlock, isUrgent, minutesNow, placeAt, WEEKDAY_LONG, type BlockDTO, type CategoryDTO, type SortKeyPatch, TASK_DRAG } from "@/lib/plan-logic";
 import { PRIORITIES, PriorityDots } from "./plan-ui";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
@@ -30,7 +30,7 @@ type Props = {
 };
 const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes(DRAG) || e.dataTransfer.types.includes(TASK_DRAG);
 
-const DRAG = "text/x-bloque";
+const DRAG = BLOCK_DRAG;
 
 /**
  * Mientras se arrastra algo que puede caer en la semana (un bloque o una tarea, desde

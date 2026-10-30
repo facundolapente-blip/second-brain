@@ -1,6 +1,7 @@
 import { pushConfigured } from "@/lib/push";
 import { runReminders } from "@/lib/reminders";
 import { syncWatch } from "@/lib/watch";
+import { syncGoogleCalendar } from "@/lib/gcal";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,10 +23,12 @@ export async function GET(req: Request) {
   const hora = Number(params.get("hora") ?? NaN);
   // De paso, cada hora: pasos, sueño y peso del reloj de los últimos 3 días (si está conectado).
   const watch = dryRun ? null : await syncWatch({ days: 3 }).catch(() => null);
+  // Y los eventos de Google Calendar (si está configurado).
+  const calendar = dryRun ? null : await syncGoogleCalendar({ force: true }).catch(() => null);
   if (!dryRun && !pushConfigured()) return Response.json({ ok: false, error: "Faltan las claves VAPID" }, { status: 500 });
   try {
     const run = await runReminders({ dryRun, hour: Number.isInteger(hora) && hora >= 0 && hora <= 23 ? hora : undefined });
-    return Response.json({ ok: true, ...run, reloj: watch });
+    return Response.json({ ok: true, ...run, reloj: watch, calendario: calendar });
   } catch (e) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

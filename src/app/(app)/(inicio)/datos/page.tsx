@@ -4,12 +4,14 @@ import { fromDbDate } from "@/lib/dates";
 import { backupsEnabled, getBackupStatus, listBackups, type BackupInfo } from "@/lib/backup";
 import { DataView } from "./data-view";
 import { getWatchStatus } from "@/lib/watch";
+import { getGcalStatus } from "@/lib/gcal";
 import { Backups } from "./backups";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Datos" };
 
-export default async function DatosPage() {
+export default async function DatosPage({ searchParams }: PageProps<"/datos">) {
+  const { google } = await searchParams;
   const [habits, logs, lastLog, entries, lastEntry, txs, lastTx, checkins, blocks, stepDays, lastSteps] = await Promise.all([
     prisma.habit.count(),
     prisma.habitLog.count(),
@@ -31,7 +33,7 @@ export default async function DatosPage() {
   } catch {
     // si el almacén no responde, la pantalla igual se ve
   }
-  const [status, watch] = await Promise.all([getBackupStatus(), getWatchStatus()]);
+  const [status, watch, gcal] = await Promise.all([getBackupStatus(), getWatchStatus(), getGcalStatus()]);
   return (
     <div data-module="inicio" className="min-h-dvh">
       <DataView
@@ -49,6 +51,8 @@ export default async function DatosPage() {
           lastSteps: d(lastSteps),
         }}
         watch={watch}
+        gcal={gcal}
+        google={typeof google === "string" ? google : undefined}
         backups={<Backups enabled={enabled} backups={backups} status={status} />}
       />
     </div>

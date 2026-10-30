@@ -1,30 +1,39 @@
 import { cookies } from "next/headers";
-import { isISODate, todayISO } from "@/lib/dates";
-import { getPlanCategories, getTasks, getWeek } from "@/lib/plan";
+import { syncGoogleSoon } from "@/lib/gcal";
+import { isISODate, monthKey, startOfWeek, todayISO } from "@/lib/dates";
+import { getMonth, getPlanCategories, getTasks, getWeek } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { WeekView } from "./week-view";
-import { HOURS_TODO_FOLD_COOKIE, parseTaskColumnOrder, parseTaskColumns, PLAN_STEP_COOKIE, PLAN_VIEW_COOKIE, TASKS_FOLD_COOKIE, TASK_COLUMN_ORDER_KEY, TASKS_LAYOUT_COOKIE } from "@/lib/plan-logic";
+import { HOURS_TODO_FOLD_COOKIE, isMonthKey, parseTaskColumnOrder, parseTaskColumns, PLAN_MONTH_COOKIE, PLAN_STEP_COOKIE, PLAN_VIEW_COOKIE, TASKS_FOLD_COOKIE, TASK_COLUMN_ORDER_KEY, TASKS_LAYOUT_COOKIE } from "@/lib/plan-logic";
 import { TasksBoard } from "./tareas/tasks-view";
 
 export const metadata = { title: "Plan semanal" };
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
-  const { semana, desde } = await searchParams;
+  // Los eventos nuevos o cambiados de Google Calendar entran antes de armar la semana.
+  await syncGoogleSoon();
+  const { semana, desde, mes } = await searchParams;
+  const jar = await cookies();
   const day = isISODate(semana) ? semana : todayISO();
+  // Vista Mes: con ?mes=, o en /plan a secas si lo último que se miró fue el mes (cookie).
+  const month = isMonthKey(mes) ? mes : !semana && !desde && jar.get(PLAN_MONTH_COOKIE)?.value === "1" ? monthKey(todayISO()) : null;
   // `desde`: siete días corridos desde ese día (las flechas de a un día).
-  const [{ monday, start, blocks, today }, categories, tasks, manual, jar, columns, columnOrder] = await Promise.all([
-    getWeek(day, isISODate(desde) ? desde : undefined),
+  const [period, categories, tasks, manual, columns, columnOrder] = await Promise.all([
+    month ? getMonth(month) : getWeek(day, isISODate(desde) ? desde : undefined),
     getPlanCategories(),
     getTasks(),
     prisma.appSetting.findUnique({ where: { key: "tareas_orden_manual" } }),
-    cookies(),
     prisma.appSetting.findUnique({ where: { key: "tareas_columnas" } }),
     prisma.appSetting.findUnique({ where: { key: TASK_COLUMN_ORDER_KEY } }),
   ]);
+  const { blocks, today } = period;
+  const isMonth = "month" in period;
+  const start = isMonth ? period.days[0] : period.start;
   return (
     <WeekView
-      key={start}
-      monday={monday}
+      key={isMonth ? period.month : start}
+      month={isMonth ? period.month : undefined}
+      monday={isMonth ? startOfWeek(start) : period.monday}
       start={start}
       step={jar.get(PLAN_STEP_COOKIE)?.value === "dia" ? "dia" : "semana"}
       today={today}
