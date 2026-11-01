@@ -494,8 +494,9 @@ export async function reorderTasks(ids: string[]) {
   const clean = ids.map(String).slice(0, 2000);
   await prisma.$transaction(clean.map((id, i) => prisma.planTask.updateMany({ where: { id }, data: { order: i } })));
   await prisma.appSetting.upsert({
-    where: { key: "tareas_orden_manual" },
-    create: { key: "tareas_orden_manual", value: "1" },
+    // Marca nueva (2026-11-01): la vieja "tareas_orden_manual" era de un orden de octubre que ya no se usaba.
+    where: { key: "tareas_orden_propio" },
+    create: { key: "tareas_orden_propio", value: "1" },
     update: { value: "1" },
   });
   refrescar();

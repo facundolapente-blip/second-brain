@@ -22,7 +22,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
     month ? getMonth(month) : getWeek(day, isISODate(desde) ? desde : undefined),
     getPlanCategories(),
     getTasks(),
-    prisma.appSetting.findUnique({ where: { key: "tareas_orden_manual" } }),
+    prisma.appSetting.findUnique({ where: { key: "tareas_orden_propio" } }),
     prisma.appSetting.findUnique({ where: { key: "tareas_columnas" } }),
     prisma.appSetting.findUnique({ where: { key: TASK_COLUMN_ORDER_KEY } }),
   ]);

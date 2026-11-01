@@ -834,3 +834,58 @@ export function monthGrid(month: string): string[][] {
 
 /** Un objetivo de "Otros objetivos": un renglón, sin tareas ni objetivos chicos. */
 export type MinorGoalDTO = { id: string; title: string; done: boolean; order: number };
+
+// ─── Orden de la tabla de tareas por columna (pedido de Facu, 2026-11-01) ────
+
+export type TaskSort = { key: TaskColumnKey; dir: "asc" | "desc" } | null;
+
+/** Clic en un encabezado: 1º ascendente, 2º descendente, 3º vuelve al orden de siempre. */
+export function nextTaskSort(cur: TaskSort, key: TaskColumnKey): TaskSort {
+  if (!cur || cur.key !== key) return { key, dir: "asc" };
+  return cur.dir === "asc" ? { key, dir: "desc" } : null;
+}
+
+/**
+ * Valor por el que se ordena cada columna (null = vacío: siempre al final, en los dos
+ * sentidos). Categoría por su nombre; Progreso, la parte de pasos tildados.
+ */
+function taskSortValue(t: TaskDTO, key: TaskColumnKey, categoryName: (id: string) => string | undefined): string | number | null {
+  switch (key) {
+    case "date":
+    case "deadline":
+      return t.deadline;
+    case "title":
+      return t.title.trim().toLowerCase();
+    case "category":
+      return t.categoryId ? (categoryName(t.categoryId) ?? "").toLowerCase() || null : null;
+    case "priority":
+      return t.priority;
+    case "progress":
+      return t.subtasks.length ? t.subtasks.filter((s) => s.done).length / t.subtasks.length : null;
+    case "scheduled":
+      return t.scheduled ? 1 : 0;
+  }
+}
+
+/** Ordena por una columna, estable (los empates quedan como venían) y con los vacíos al final. */
+export function sortTasksBy(list: TaskDTO[], sort: NonNullable<TaskSort>, categoryName: (id: string) => string | undefined): TaskDTO[] {
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return list
+    .map((t, i) => ({ t, i, v: taskSortValue(t, sort.key, categoryName) }))
+    .sort((a, b) => {
+      if (a.v === null || b.v === null) return a.v === b.v ? a.i - b.i : a.v === null ? 1 : -1;
+      const c = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v), "es");
+      return c * sign || a.i - b.i;
+    })
+    .map((x) => x.t);
+}
+
+/** Mueve `moved` antes o después de `target` en una lista de ids (para soltar una fila). */
+export function moveId(ids: string[], moved: string, target: string, after: boolean): string[] {
+  if (moved === target) return ids;
+  const rest = ids.filter((x) => x !== moved);
+  const at = rest.indexOf(target);
+  if (at < 0) return ids;
+  rest.splice(after ? at + 1 : at, 0, moved);
+  return rest;
+}

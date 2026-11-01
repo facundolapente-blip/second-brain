@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  nextTaskSort,
+  sortTasksBy,
+  moveId,
   moveTaskColumn,
   parseTaskColumnOrder,
   applyTaskView,
@@ -364,5 +367,34 @@ describe("vista Mes", () => {
     expect(isMonthKey("2026-13")).toBe(false);
     expect(isMonthKey("2026-1")).toBe(false);
     expect(isMonthKey(undefined)).toBe(false);
+  });
+});
+
+describe("orden de la tabla de tareas por columna", () => {
+  const t = (id: string, v: Partial<import("../src/lib/plan-logic.ts").TaskDTO>) =>
+    ({ id, title: id, categoryId: null, status: "todo", priority: 0, deadline: null, progress: null, goal: null, scheduled: false, notes: null, links: [], blockCount: 0, subtasks: [], repeat: null, repeatEvery: 1, order: 0, doneAt: null, ...v }) as import("../src/lib/plan-logic.ts").TaskDTO;
+  it("el clic va ascendente, descendente y vuelve al de siempre", () => {
+    expect(nextTaskSort(null, "priority")).toEqual({ key: "priority", dir: "asc" });
+    expect(nextTaskSort({ key: "priority", dir: "asc" }, "priority")).toEqual({ key: "priority", dir: "desc" });
+    expect(nextTaskSort({ key: "priority", dir: "desc" }, "priority")).toBeNull();
+    expect(nextTaskSort({ key: "priority", dir: "desc" }, "title")).toEqual({ key: "title", dir: "asc" });
+  });
+  it("ordena con los vacíos siempre al final", () => {
+    const list = [t("a", { deadline: "2026-11-05" }), t("b", {}), t("c", { deadline: "2026-11-01" })];
+    expect(sortTasksBy(list, { key: "deadline", dir: "asc" }, () => undefined).map((x) => x.id)).toEqual(["c", "a", "b"]);
+    expect(sortTasksBy(list, { key: "deadline", dir: "desc" }, () => undefined).map((x) => x.id)).toEqual(["a", "c", "b"]);
+  });
+  it("prioridad, categoría por nombre y progreso por pasos", () => {
+    const list = [t("a", { priority: 4, categoryId: "x" }), t("b", { priority: 1, categoryId: "y" }), t("c", { priority: 2 })];
+    expect(sortTasksBy(list, { key: "priority", dir: "asc" }, () => undefined).map((x) => x.id)).toEqual(["b", "c", "a"]);
+    const names: Record<string, string> = { x: "Trabajo", y: "Casa" };
+    expect(sortTasksBy(list, { key: "category", dir: "asc" }, (id) => names[id]).map((x) => x.id)).toEqual(["b", "a", "c"]);
+    const steps = [t("a", { subtasks: [{ id: "1", title: "", done: true }, { id: "2", title: "", done: false }] }), t("b", {}), t("c", { subtasks: [{ id: "3", title: "", done: true }] })];
+    expect(sortTasksBy(steps, { key: "progress", dir: "desc" }, () => undefined).map((x) => x.id)).toEqual(["c", "a", "b"]);
+  });
+  it("soltar una fila antes o después de otra", () => {
+    expect(moveId(["a", "b", "c", "d"], "d", "b", false)).toEqual(["a", "d", "b", "c"]);
+    expect(moveId(["a", "b", "c", "d"], "a", "c", true)).toEqual(["b", "c", "a", "d"]);
+    expect(moveId(["a", "b"], "a", "a", true)).toEqual(["a", "b"]);
   });
 });

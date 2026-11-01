@@ -7,11 +7,12 @@ import { SwipeRow } from "@/components/swipe-row";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
-import { CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots, ListChecks } from "@phosphor-icons/react";
-import { saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
+import { ArrowDown, ArrowUp, CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots, ListChecks } from "@phosphor-icons/react";
+import { reorderTasks, saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
 import { ColumnResizers } from "@/components/column-resizers";
 import { addDays, formatShort } from "@/lib/dates";
-import { applyTaskView, daysLeft, isUrgent, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, repeatNotice, taskFromForm } from "@/lib/plan-logic";
+import { applyTaskView, daysLeft, isUrgent, TASKS_FOLD_COOKIE, daysLeftLabel, repeatLabel, TASK_STATUS, TASK_VIEWS, type CategoryDTO, type TaskDTO, type TaskStatus, type TaskView, TASK_COLUMNS, TASK_COLUMN_MAX, TASK_COLUMN_MIN, type TaskColumnKey, type TaskColumnWidths, TASK_COLUMN_DRAG, moveTaskColumn, TASK_DRAG, TASKS_LAYOUT_COOKIE, boardTasks, newClientId, repeatNotice, taskFromForm, moveId, nextTaskSort, sortTasksBy, type TaskSort } from "@/lib/plan-logic";
+import { mergeOrder } from "@/components/sortable";
 import { cx } from "@/components/ui";
 import { TintedCard } from "@/components/tinted-card";
 import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
@@ -30,21 +31,27 @@ const LIMIT = 6;
 const GROUPS: TaskStatus[] = ["doing", "todo", "backlog", "done"];
 
 /**
- * Agrupa por estado y, dentro de cada grupo, primero lo que vence antes
- * (sin deadline al final, en el orden de la vista). "Terminadas" queda como
- * viene: de la terminada más reciente a la más vieja.
+ * Agrupa por estado y, dentro de cada grupo, el orden de siempre: el arrastrado a
+ * mano (desde que se arrastró una vez) o, si no, primero lo que vence antes (sin
+ * deadline al final). "Terminadas" queda como viene: de la más reciente a la más vieja.
+ * Con una columna elegida en el encabezado (`sort`), se ordena por ella dentro de cada grupo.
  */
-function arrange(list: TaskDTO[], view: TaskView): TaskDTO[] {
-  if (view === "done") return list;
-  return list
-    .map((t, i) => ({ t, i }))
-    .sort(
-      (a, b) =>
-        GROUPS.indexOf(a.t.status) - GROUPS.indexOf(b.t.status) ||
-        (a.t.deadline ?? "9999").localeCompare(b.t.deadline ?? "9999") ||
-        a.i - b.i,
-    )
-    .map((x) => x.t);
+function arrange(list: TaskDTO[], view: TaskView, manual = false, sort: TaskSort = null, categoryName: (id: string) => string | undefined = () => undefined): TaskDTO[] {
+  const base =
+    view === "done"
+      ? list
+      : list
+          .map((t, i) => ({ t, i }))
+          .sort(
+            (a, b) =>
+              GROUPS.indexOf(a.t.status) - GROUPS.indexOf(b.t.status) ||
+              (manual ? a.t.order - b.t.order : (a.t.deadline ?? "9999").localeCompare(b.t.deadline ?? "9999")) ||
+              a.i - b.i,
+          )
+          .map((x) => x.t);
+  if (!sort) return base;
+  const sorted = sortTasksBy(base, sort, categoryName);
+  return GROUPS.flatMap((g) => sorted.filter((t) => t.status === g));
 }
 
 /** Tareas visibles partidas en grupos de estado, con el total del grupo en la vista. */
@@ -84,7 +91,7 @@ export function DeadlinePicker({ task, children, className }: { task: TaskDTO; c
 }
 
 /** Vista y "Ver todas" del tablero: viven mientras la app está abierta (cambiar de semana no los pierde). */
-const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths; order?: TaskColumnKey[] } = { view: "deadline", all: false };
+const savedBoard: { view: TaskView; all: boolean; widths?: TaskColumnWidths; order?: TaskColumnKey[]; sort?: TaskSort } = { view: "deadline", all: false };
 
 export function TasksBoard({
   tasks,
@@ -150,21 +157,30 @@ export function TasksBoard({
     document.cookie = `${TASKS_LAYOUT_COOKIE}=${v}; path=/; max-age=31536000; samesite=lax`;
   }
   const board = layout === "tablero";
+  // Orden por una columna (clic en el encabezado: ascendente, descendente, el de siempre).
+  const [sort, setSort] = useState<TaskSort>(() => savedBoard.sort ?? null);
   useEffect(() => {
     savedBoard.view = view;
     savedBoard.all = all;
     savedBoard.widths = widths;
     savedBoard.order = order;
-  }, [view, all, widths, order]);
+    savedBoard.sort = sort;
+  }, [view, all, widths, order, sort]);
   const sheet = useRef<TaskSheetHandle>(null);
   const blockSheet = useRef<BlockSheetHandle>(null);
   const cats = categoryMap(categories);
-  const manual = manualOrder;
+  // Desde que se arrastra una fila, el orden de siempre es el arrastrado (también antes de que vuelva el servidor).
+  const [manual, setManual] = useState(manualOrder);
   // Todo lo que se cambia desde acá se ve enseguida (si falla, vuelve solo): el deadline,
   // lo guardado en la hoja, una tarea nueva (con el id que le pone el aparato, el mismo
   // que va a tener guardada), una borrada, terminar deslizando.
-  const [optimisticTasks, applyTask] = useOptimistic(tasks, (list: TaskDTO[], m: (Partial<TaskDTO> & { id: string }) | { add: TaskDTO; after?: string } | { remove: string }) =>
-    "add" in m
+  const [optimisticTasks, applyTask] = useOptimistic(tasks, (list: TaskDTO[], m: (Partial<TaskDTO> & { id: string }) | { add: TaskDTO; after?: string } | { remove: string } | { reorder: string[] }) =>
+    "reorder" in m
+      ? list.map((t) => {
+          const i = m.reorder.indexOf(t.id);
+          return i < 0 ? t : { ...t, order: i };
+        })
+      : "add" in m
       ? list.some((t) => t.id === m.add.id)
         ? list.map((t) => (t.id === m.add.id ? m.add : t))
         : m.after && list.some((t) => t.id === m.after)
@@ -237,7 +253,25 @@ export function TasksBoard({
     notifyInfo(`"${t.title}" vence el ${formatShort(d)}`);
   }
   const ordered = optimisticTasks;
-  const matching = arrange(applyTaskView(ordered, view, manual), view);
+  const categoryName = (id: string) => cats.get(id)?.name;
+  const matching = arrange(applyTaskView(ordered, view, manual), view, manual, sort, categoryName);
+  // Arrastrar una fila arriba o abajo de otra del mismo grupo (solo en el orden de siempre).
+  const canReorder = !sort && view !== "done";
+  function reorderRow(movedId: string, targetId: string, after: boolean) {
+    const moved = ordered.find((t) => t.id === movedId);
+    const target = ordered.find((t) => t.id === targetId);
+    if (!moved || !target || moved.status !== target.status || movedId === targetId) return;
+    const group = moveId(matching.filter((t) => t.status === moved.status).map((t) => t.id), movedId, targetId, after);
+    // Todas las tareas en el orden de siempre, con el grupo movido en sus mismos lugares.
+    const ids = mergeOrder(arrange(ordered, "deadline", manual).map((t) => t.id), group);
+    haptic("select");
+    // Fuera de la transición: si no, el orden propio recién se usaría cuando vuelve el servidor.
+    setManual(true);
+    startDeadline(async () => {
+      applyTask({ reorder: ids });
+      await reorderTasks(ids);
+    });
+  }
   // Una tarea recién creada que quedaría escondida después de las primeras 6: se muestran todas (si no, parecía que no se creó).
   const showAll = all || (!!justCreated && matching.slice(LIMIT).some((t) => t.id === justCreated));
   const visible = showAll ? matching : matching.slice(0, LIMIT);
@@ -389,7 +423,21 @@ export function TasksBoard({
         </div>
       ) : (
         <>
-          <TaskTable groups={groups} fresh={fresh} cats={cats} today={today} onOpen={(t) => sheet.current?.open(t)} onMenu={taskMenu} widths={widths} onResize={resize} order={order} onReorder={reorder} />
+          <TaskTable
+            groups={groups}
+            fresh={fresh}
+            cats={cats}
+            today={today}
+            onOpen={(t) => sheet.current?.open(t)}
+            onMenu={taskMenu}
+            widths={widths}
+            onResize={resize}
+            order={order}
+            onReorder={reorder}
+            sort={sort}
+            onSort={(k) => setSort((cur) => nextTaskSort(cur, k))}
+            onRowReorder={canReorder ? reorderRow : undefined}
+          />
           {/* Celular: la misma agrupación, con la fecha a la izquierda. */}
           <ul className="grid border-t border-line lg:hidden">
             {groups.map((g) => (
@@ -597,7 +645,15 @@ function TaskTable({
   onResize: resize,
   order,
   onReorder,
+  sort,
+  onSort,
+  onRowReorder,
 }: {
+  /** Columna por la que se ordena (o null: el orden de siempre). */
+  sort: TaskSort;
+  onSort: (k: TaskColumnKey) => void;
+  /** Soltar una fila arriba o abajo de otra del mismo grupo (solo con el orden de siempre). */
+  onRowReorder?: (moved: string, target: string, after: boolean) => void;
   groups: ReturnType<typeof groupsOf>;
   /** Orden de las columnas; se cambia arrastrando un encabezado. */
   order: TaskColumnKey[];
@@ -651,6 +707,9 @@ function TaskTable({
   const head = (k: TaskColumnKey) => ({ label: TASK_COLUMNS.find((c) => c.key === k)!.label });
   // La fila que se arrastra a un día queda apagada en su lugar mientras tanto.
   const [dragging, setDragging] = useState<string | null>(null);
+  // Dónde caería la fila que se arrastra (arriba o abajo de cuál), para la línea de color.
+  const [rowTarget, setRowTarget] = useState<{ id: string; after: boolean } | null>(null);
+  const statusOf = (id: string) => groups.find((g) => g.tasks.some((t) => t.id === id))?.status;
   return (
     // Si los anchos guardados suman más que la pantalla, la tabla se corre de costado.
     <div className="hidden max-w-full overflow-x-auto overflow-y-hidden rounded-xl border border-line-strong bg-surface lg:block lg:w-fit lg:rounded-none lg:border-x-0 max-[90rem]:w-auto">
@@ -669,8 +728,10 @@ function TaskTable({
                 // Arrastrar el encabezado cambia el orden de las columnas (como en Notion).
                 draggable
                 tabIndex={0}
-                title="Arrastrá para cambiar el orden (o Alt + flechas)"
-                aria-label={`${head(k).label}. Arrastrá o usá Alt y las flechas para moverla`}
+                title="Clic: ordenar por esta columna (ascendente, descendente, el de siempre). Arrastrá para moverla."
+                aria-label={`${head(k).label}. Clic para ordenar; arrastrá o usá Alt y las flechas para moverla`}
+                aria-sort={sort?.key === k ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                onClick={() => onSort(k)}
                 onDragStart={(e) => {
                   e.dataTransfer.setData(TASK_COLUMN_DRAG, k);
                   e.dataTransfer.effectAllowed = "move";
@@ -680,6 +741,11 @@ function TaskTable({
                 {...colDrop(k)}
                 onDragEnd={endColDrag}
                 onKeyDown={(e) => {
+                  if (!e.altKey && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    onSort(k);
+                    return;
+                  }
                   if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
                   e.preventDefault();
                   const to = cols[i + (e.key === "ArrowRight" ? 1 : -1)];
@@ -694,7 +760,11 @@ function TaskTable({
                   dropLine(k),
                 )}
               >
-                <span className="block truncate">{head(k).label}</span>
+                <span className={cx("flex min-w-0 items-center gap-1", k === "scheduled" && "justify-center", sort?.key === k && "text-fg")}>
+                  <span className="truncate">{head(k).label}</span>
+                  {sort?.key === k &&
+                    (sort.dir === "asc" ? <ArrowUp size={11} weight="bold" className="shrink-0" aria-hidden /> : <ArrowDown size={11} weight="bold" className="shrink-0" aria-hidden />)}
+                </span>
               </th>
             ))}
           </tr>
@@ -726,9 +796,32 @@ function TaskTable({
                       liftImage(e, e.currentTarget, ghostCard(t.title, cat ? `${cat} · soltala en un día` : "Soltala en un día"));
                       setDragging(t.id);
                     }}
-                    onDragEnd={() => setDragging(null)}
+                    onDragEnd={() => {
+                      setDragging(null);
+                      setRowTarget(null);
+                    }}
+                    // Soltar arriba o abajo de otra fila del mismo grupo la deja ahí (orden propio).
+                    onDragOver={(e) => {
+                      if (!onRowReorder || !dragging || dragging === t.id || statusOf(dragging) !== t.status || !e.dataTransfer.types.includes(TASK_DRAG)) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "copy";
+                      const box = e.currentTarget.getBoundingClientRect();
+                      const after = e.clientY > box.top + box.height / 2;
+                      if (rowTarget?.id !== t.id || rowTarget.after !== after) setRowTarget({ id: t.id, after });
+                    }}
+                    onDragLeave={(e) => {
+                      if (rowTarget?.id === t.id && !e.currentTarget.contains(e.relatedTarget as Node | null)) setRowTarget(null);
+                    }}
+                    onDrop={(e) => {
+                      if (!onRowReorder || !dragging || !rowTarget || rowTarget.id !== t.id) return;
+                      e.preventDefault();
+                      onRowReorder(dragging, t.id, rowTarget.after);
+                      setRowTarget(null);
+                      setDragging(null);
+                    }}
                     className={cx(
                       "group border-b border-line transition-colors last:border-b-0 hover:bg-surface-2 active:bg-surface-2",
+                      rowTarget?.id === t.id && (rowTarget.after ? "shadow-[inset_0_-3px_0_var(--accent)]" : "shadow-[inset_0_3px_0_var(--accent)]"),
                       !done && "cursor-grab active:cursor-grabbing",
                       i % 2 === 1 && "bg-[color-mix(in_oklab,var(--surface-2)_45%,var(--surface))]",
                       isUrgent(t, done) && "urgent-row",
@@ -751,7 +844,7 @@ function TaskTable({
                               // Pista de que la fila se arrastra a un día de la semana.
                               <span
                                 aria-hidden
-                                title="Arrastrala a un día de la semana para agendarla"
+                                title="Arrastrala a un día de la semana para agendarla, o arriba o abajo de otra para ordenarla"
                                 className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-faint transition-colors group-hover:text-muted hover:bg-surface-2 hover:text-fg active:cursor-grabbing"
                               >
                                 <CalendarPlus size={16} aria-hidden />
