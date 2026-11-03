@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayAtEnd, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, sleepOf } from "@/lib/bot/parse";
+import { dayAtEnd, guessCategory, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, sleepOf } from "@/lib/bot/parse";
 
 const TODAY = "2026-10-19";
 
@@ -148,5 +148,35 @@ describe("isSkipMessage (NO adelante)", () => {
   });
   it("un no normal o una palabra que empieza con NO sigue yendo a Notas", () => {
     for (const t of ["no sé si comprar esto", "No me olvido", "NOTA importante", "NOVEDAD", "nota algo", "", null]) expect(isSkipMessage(t)).toBe(false);
+  });
+});
+
+describe("tareas con fecha escrita, prioridad y categoría razonada", () => {
+  it("entiende '3 noviembre', '3 de noviembre' y 'el 3 de nov de 2027'", () => {
+    expect(parseTask("Story HM 3 noviembre", "2026-11-03")).toEqual({ title: "Story HM", deadline: "2026-11-03" });
+    expect(parseTask("pagar el 3 de noviembre", "2026-11-03")).toEqual({ title: "Pagar", deadline: "2026-11-03" });
+    expect(parseTask("pagar 3 de nov de 2027", "2026-11-03")).toEqual({ title: "Pagar", deadline: "2027-11-03" });
+    // Ya pasó este año: el del año que viene.
+    expect(parseTask("renovar 2 de marzo", "2026-11-03")).toEqual({ title: "Renovar", deadline: "2027-03-02" });
+  });
+  it("saca la prioridad de cualquier lado", () => {
+    expect(parseTask("Story HM 3 noviembre prioridad 3", "2026-11-03")).toEqual({ title: "Story HM", deadline: "2026-11-03", priority: 3 });
+    expect(parseTask("prioridad alta llamar al banco viernes", "2026-11-03")).toEqual({ title: "Llamar al banco", deadline: "2026-11-06", priority: 3 });
+    expect(parseTask("llamar p2", "2026-11-03")).toEqual({ title: "Llamar", deadline: null, priority: 2 });
+    expect(parseTask("entregar informe urgente", "2026-11-03")).toEqual({ title: "Entregar informe", deadline: null, priority: 4 });
+    expect(parseTask("capítulo 3 del libro", "2026-11-03")).toEqual({ title: "Capítulo 3 del libro", deadline: null });
+  });
+  it("razona la categoría por lo ya clasificado o por el nombre", () => {
+    const cats = [{ id: "t", name: "Trabajo" }, { id: "c", name: "Casa" }, { id: "n", name: "Nuevos Ingresos" }];
+    const history = [
+      { title: "HM reunión", categoryId: "t" },
+      { title: "Posteos HM", categoryId: "t" },
+      { title: "Limpiar casa", categoryId: "c" },
+    ];
+    expect(guessCategory("Story HM", cats, history)).toEqual({ categoryId: "t", title: "Story HM" });
+    expect(guessCategory("Story nueva", cats, history)).toEqual({ categoryId: null, title: "Story nueva" });
+    expect(guessCategory("Pintar la pieza casa", cats, history)).toEqual({ categoryId: "c", title: "Pintar la pieza" });
+    expect(guessCategory("#trabajo mandar mail", cats, history)).toEqual({ categoryId: "t", title: "mandar mail" });
+    expect(guessCategory("Vender discos nuevos ingresos", cats, history)).toEqual({ categoryId: "n", title: "Vender discos" });
   });
 });

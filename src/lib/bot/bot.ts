@@ -8,7 +8,7 @@ import { logActivity } from "../trash";
 import { createQuickTransaction } from "../quick-add";
 import { getDashboard } from "../dashboard";
 import { appendValueNote, VALUES_KEY } from "../values";
-import { isSkipMessage, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, SKIP_REPLY } from "./parse";
+import { guessCategory, isSkipMessage, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, SKIP_REPLY } from "./parse";
 import { cleanPatch, ENERGY_LABELS, formatSleep, formatWeight, STRESS_LABELS } from "../checkin-logic";
 import { applyCheckin } from "../checkin-save";
 import { MOODS } from "../journal-logic";
@@ -30,9 +30,10 @@ export const HELP = [
   "GG usd 20 nafta",
   "GG 20x3 café ayer",
   "",
-  "TT tarea del Plan (fecha opcional, queda como deadline):",
+  "TT tarea del Plan (fecha y prioridad opcionales; la categoría la deduzco por tus tareas):",
   "TT llamar al banco viernes",
   "TT pagar el alquiler 25/10",
+  "TT story HM 3 de noviembre prioridad 3",
   "",
   "JJ journal (se suma a la entrada de hoy; con ayer: a la de ayer):",
   "JJ hoy entrené y me sentí bien",
@@ -93,7 +94,7 @@ export async function handleBotMessage(raw: string, msgId: string | null = null)
     case "tarea": {
       const p = parseTask(rest, today);
       if ("error" in p) return p.error;
-      return await createTask(p.title, p.deadline, today);
+      return await createTask(p.title, p.deadline, today, p.priority);
     }
     case "bloque": {
       const p = parseBlock(rest, today);
@@ -166,13 +167,29 @@ async function checkinStatus(date: string, today: string, saved: boolean): Promi
 }
 
 /** Como `saveTask` al crear con lo de fábrica: Sin empezar, prioridad 1, arriba de todo. */
-async function createTask(title: string, deadline: string | null, today: string): Promise<string> {
+/** Categorías del Plan y lo ya clasificado (tareas y bloques de los últimos meses), para `guessCategory`. */
+async function planCategoryGuess(rawTitle: string) {
+  const since = new Date(Date.now() - 365 * 86_400_000);
+  const [categories, tasks, blocks] = await Promise.all([
+    prisma.planCategory.findMany({ select: { id: true, name: true } }),
+    prisma.planTask.findMany({ where: { categoryId: { not: null } }, select: { title: true, categoryId: true }, take: 2000, orderBy: { createdAt: "desc" } }),
+    prisma.planBlock.findMany({ where: { categoryId: { not: null }, date: { gte: since } }, select: { title: true, categoryId: true }, take: 3000, orderBy: { date: "desc" } }),
+  ]);
+  const g = guessCategory(rawTitle, categories, [...tasks, ...blocks]);
+  return { ...g, name: g.categoryId ? categories.find((c) => c.id === g.categoryId)?.name ?? null : null };
+}
+
+const PRIORITY_NAMES = ["", "baja", "media", "alta", "urgente"];
+
+async function createTask(rawTitle: string, deadline: string | null, today: string, priority?: number): Promise<string> {
+  const { categoryId, title, name } = await planCategoryGuess(rawTitle);
   const first = await prisma.planTask.aggregate({ _min: { order: true } });
   const created = await prisma.planTask.create({
     data: {
       title,
+      categoryId,
       status: "todo",
-      priority: 1,
+      priority: priority ?? 1,
       deadline: deadline ? toDbDate(deadline) : null,
       order: (first._min.order ?? 0) - 1,
     },
@@ -180,7 +197,7 @@ async function createTask(title: string, deadline: string | null, today: string)
   await logActivity("created", "task", created.id, `${title} (WhatsApp)`);
   revalidatePath("/plan", "layout");
   revalidatePath("/");
-  return `Tarea: ${title}${deadline ? ` · vence el ${formatLong(deadline, today)}` : ""}`;
+  return `Tarea: ${title}${deadline ? ` · vence el ${formatLong(deadline, today)}` : ""}${priority ? ` · prioridad ${PRIORITY_NAMES[priority]}` : ""}${name ? ` · ${name}` : ""}`;
 }
 
 /** Como `saveBlock` al crear: sin hora va arriba de todo en su día (`topSortKey`). */
@@ -194,15 +211,18 @@ async function createBlock(
     const day = await prisma.planBlock.findMany({ where: { date }, select: { startTime: true, sortKey: true } });
     sortKey = topSortKey(day);
   }
+  // La categoría, razonada como en las tareas (lo ya clasificado con las mismas palabras).
+  const guess = await planCategoryGuess(b.title);
+  b = { ...b, title: guess.title };
   const created = await prisma.planBlock.create({
-    data: { title: b.title, date, startTime: b.startTime, endTime: b.endTime, priority: 0, sortKey },
+    data: { title: b.title, date, startTime: b.startTime, endTime: b.endTime, priority: 0, sortKey, categoryId: guess.categoryId },
   });
   await logActivity("created", "block", created.id, `${b.title} (${b.date}) (WhatsApp)`);
   revalidatePath("/plan", "layout");
   revalidatePath("/");
   const hour = b.startTime ? ` · ${b.startTime}${b.endTime ? `–${b.endTime}` : ""}` : " · sin hora";
   const when = b.date === today ? "hoy" : formatLong(b.date, today);
-  return `Bloque: ${b.title} · ${when}${hour}`;
+  return `Bloque: ${b.title} · ${when}${hour}${guess.name ? ` · ${guess.name}` : ""}`;
 }
 
 /** Un renglón "- texto" al final de la sección "# Notas" de Valores (la crea si no está). */

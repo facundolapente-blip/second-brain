@@ -59,6 +59,58 @@ export function parseCommand(text: string): { cmd: BotCommand; rest: string } {
 
 const WEEKDAYS: Record<string, number> = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 };
 
+/** Meses escritos ("noviembre", "nov", "setiembre"/"septiembre"). */
+const MONTHS: Record<string, number> = {
+  enero: 1, ene: 1, febrero: 2, feb: 2, marzo: 3, mar: 3, abril: 4, abr: 4, mayo: 5, may: 5, junio: 6, jun: 6,
+  julio: 7, jul: 7, agosto: 8, ago: 8, setiembre: 9, septiembre: 9, set: 9, sep: 9, sept: 9, octubre: 10, oct: 10,
+  noviembre: 11, nov: 11, diciembre: 12, dic: 12,
+};
+
+/**
+ * Fecha con el mes escrito al final: "3 noviembre", "3 de noviembre", "3 de nov 2026",
+ * "3 de noviembre de 2026". Sin año, si ya pasó es la del año que viene.
+ */
+function monthDateAtEnd(f: string[], today: string): { date: string; used: number } | null {
+  const clean = f.map((w) => w.replace(/[.,;]+$/, ""));
+  let end = clean.length;
+  let year: string | null = null;
+  if (end >= 2 && /^\d{4}$/.test(clean[end - 1])) {
+    year = clean[end - 1];
+    end--;
+    if (end >= 1 && clean[end - 1] === "de") end--;
+  }
+  if (end < 2 || !Object.hasOwn(MONTHS, clean[end - 1])) return null;
+  const month = MONTHS[clean[end - 1]];
+  let k = end - 1;
+  if (k >= 1 && clean[k - 1] === "de") k--;
+  if (k < 1 || !/^\d{1,2}$/.test(clean[k - 1])) return null;
+  const day = Number(clean[k - 1]);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  let iso = `${year ?? today.slice(0, 4)}-${pad(month)}-${pad(day)}`;
+  if (!year && iso < today) iso = `${Number(today.slice(0, 4)) + 1}-${pad(month)}-${pad(day)}`;
+  if (!isISODate(iso)) return null;
+  return { date: iso, used: f.length - (k - 1) };
+}
+
+/**
+ * Prioridad en cualquier lugar del mensaje: "prioridad 3", "prioridad alta", "p3",
+ * o "urgente" al final. Mismo 1 a 4 del Plan (Baja, Media, Alta, Urgente).
+ */
+const PRIORITY_WORDS: Record<string, number> = { baja: 1, media: 2, alta: 3, urgente: 4 };
+export function priorityIn(words: string[]): { priority: number; rest: string[] } | null {
+  const f = words.map((w) => fold(w).replace(/[.,;]+$/, ""));
+  for (let i = 0; i < f.length; i++) {
+    if (f[i] === "prioridad" && i + 1 < f.length) {
+      const v = /^[1-4]$/.test(f[i + 1]) ? Number(f[i + 1]) : PRIORITY_WORDS[f[i + 1]];
+      if (v) return { priority: v, rest: [...words.slice(0, i), ...words.slice(i + 2)] };
+    }
+    const p = f[i].match(/^p([1-4])$/);
+    if (p) return { priority: Number(p[1]), rest: [...words.slice(0, i), ...words.slice(i + 1)] };
+  }
+  if (f.length > 1 && f[f.length - 1] === "urgente") return { priority: 4, rest: words.slice(0, -1) };
+  return null;
+}
+
 /**
  * Un día escrito al final de una lista de palabras: "hoy", "mañana", "pasado mañana",
  * "ayer", "viernes" (hoy si es viernes; si no, el próximo), "25/10", "25/10/2026",
@@ -70,7 +122,9 @@ export function dayAtEnd(words: string[], today: string): { date: string; used: 
   const n = f.length;
   let date: string | null = null;
   let used = 0;
-  if (n >= 2 && f[n - 2] === "pasado" && f[n - 1] === "manana") [date, used] = [addDays(today, 2), 2];
+  const written = monthDateAtEnd(f, today);
+  if (written) [date, used] = [written.date, written.used];
+  else if (n >= 2 && f[n - 2] === "pasado" && f[n - 1] === "manana") [date, used] = [addDays(today, 2), 2];
   else if (n >= 1) {
     const w = f[n - 1].replace(/[.,;]+$/, "");
     if (w === "hoy") date = today;
@@ -171,16 +225,21 @@ export function timeAnywhere(words: string[], bareAt: number | null): { start: s
   return null;
 }
 
-/** "tarea llamar al banco viernes" → título "Llamar al banco", deadline el viernes. */
-export function parseTask(rest: string, today: string): { title: string; deadline: string | null } | { error: string } {
-  const words = rest.trim().split(/\s+/).filter(Boolean);
+/**
+ * "tarea llamar al banco viernes" → título "Llamar al banco", deadline el viernes.
+ * También "Story HM 3 noviembre prioridad 3" (fecha con el mes escrito y prioridad en cualquier lado).
+ */
+export function parseTask(rest: string, today: string): { title: string; deadline: string | null; priority?: number } | { error: string } {
+  const all = rest.trim().split(/\s+/).filter(Boolean);
+  const prio = all.length > 1 ? priorityIn(all) : null;
+  const words = prio && prio.rest.length ? prio.rest : all;
   const day = words.length > 1 ? dayAtEnd(words, today) : null;
   // Si no está al final, el día puede ir en cualquier lado ("TT viernes llamar al banco").
   const any = !day && words.length > 1 ? dayAnywhere(words, today) : null;
   const titleWords = any && any.rest.length ? any.rest : words.slice(0, words.length - (day?.used ?? 0));
   const title = capital(titleWords.join(" ").slice(0, 160).trim());
   if (!title) return { error: "Falta el nombre de la tarea. Por ejemplo: tarea llamar al banco viernes" };
-  return { title, deadline: day?.date ?? (any && any.rest.length ? any.date : null) };
+  return { title, deadline: day?.date ?? (any && any.rest.length ? any.date : null), priority: prio && prio.rest.length ? prio.priority : undefined };
 }
 
 /**
@@ -378,4 +437,59 @@ export function parseCheckin(
     };
   if (!Object.keys(fields).length && !note) return { show: date };
   return { date, fields, note };
+}
+
+/**
+ * Categoría razonable para una tarea o un bloque, como en Gastos (pedido de Facu, 2026-11-03):
+ * 1) si el título nombra una categoría al final o con "#" ("… trabajo", "#casa"), esa (y se saca del título);
+ * 2) si no, la que más tienen las tareas y bloques ya clasificados con las mismas palabras
+ *    ("Story HM" → Trabajo porque "HM" casi siempre fue Trabajo). Hace falta que gane con
+ *    al menos 2 votos y el 60 %; si no, sin categoría.
+ */
+const STOP = new Set(["de", "del", "la", "el", "los", "las", "y", "a", "al", "en", "con", "para", "por", "un", "una", "que", "mi", "me"]);
+const wordsOf = (t: string) =>
+  fold(t)
+    .replace(/[^a-z0-9ñ ]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !STOP.has(w));
+
+export function guessCategory(
+  title: string,
+  categories: { id: string; name: string }[],
+  history: { title: string; categoryId: string | null }[],
+): { categoryId: string | null; title: string } {
+  const byName = new Map(categories.map((c) => [fold(c.name).trim(), c.id]));
+  const words = title.trim().split(/\s+/);
+  // "#trabajo" en cualquier lado.
+  for (let i = 0; i < words.length; i++) {
+    const m = words[i].match(/^#(.+)$/);
+    if (m && byName.has(fold(m[1]))) {
+      const rest = [...words.slice(0, i), ...words.slice(i + 1)].join(" ").trim();
+      return { categoryId: byName.get(fold(m[1]))!, title: rest || title };
+    }
+  }
+  // El nombre de la categoría al final (también de dos palabras, "nuevos ingresos").
+  for (const n of [2, 1]) {
+    if (words.length > n) {
+      const tail = fold(words.slice(-n).join(" ")).replace(/[.,;]+$/, "");
+      if (byName.has(tail)) return { categoryId: byName.get(tail)!, title: words.slice(0, -n).join(" ") };
+    }
+  }
+  const votes = new Map<string, number>();
+  const target = new Set(wordsOf(title));
+  if (!target.size) return { categoryId: null, title };
+  for (const h of history) {
+    if (!h.categoryId) continue;
+    const hw = new Set(wordsOf(h.title));
+    let hit = 0;
+    for (const w of target) if (hw.has(w)) hit++;
+    if (hit) votes.set(h.categoryId, (votes.get(h.categoryId) ?? 0) + hit);
+  }
+  let top: [string, number] | null = null;
+  let total = 0;
+  for (const e of votes) {
+    total += e[1];
+    if (!top || e[1] > top[1]) top = e;
+  }
+  return top && top[1] >= 2 && top[1] / total >= 0.6 ? { categoryId: top[0], title } : { categoryId: null, title };
 }
