@@ -807,18 +807,28 @@ function SearchBox({ filters }: { filters: Filters }) {
   const router = useRouter();
   const [pending, startSearch] = useTransition();
   const [q, setQ] = useState(filters.q);
-  const [sent, setSent] = useState(filters.q);
-  if (filters.q !== sent) {
-    // Cambió desde afuera (otra sección, Atrás): el campo lo sigue.
-    setSent(filters.q);
-    setQ(filters.q);
+  // Lo que ya se pidió desde este campo: cuando la dirección llega con uno de esos
+  // valores, es la respuesta a lo que se escribió y el campo no se toca (antes volvía
+  // a ese texto y se comía lo que se tecleaba mientras: "curso" quedaba "cuso").
+  const [seen, setSeen] = useState(filters.q);
+  const [sent, setSent] = useState<string[]>([]);
+  if (filters.q !== seen) {
+    setSeen(filters.q);
+    if (sent.includes(filters.q)) {
+      // Respuesta a lo propio: lo de antes ya no va a llegar.
+      setSent(sent.slice(sent.indexOf(filters.q) + 1));
+    } else {
+      // Cambió desde afuera (Atrás, otro enlace): el campo lo sigue.
+      setSent([]);
+      setQ(filters.q);
+    }
   }
   const go = useRef((value: string) => {
     void value;
   });
   useEffect(() => {
     go.current = (value: string) => {
-      setSent(value);
+      setSent((list) => [...list.slice(-20), value]);
       startSearch(() =>
         router.replace(hrefOf({ ...filters, q: value }), { scroll: false }),
       );
