@@ -1,12 +1,14 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { handleBotMessage } from "@/lib/bot/bot";
+import { handleBotMessage, handleReplyCommand } from "@/lib/bot/bot";
 import { isSkipMessage, SKIP_REPLY } from "@/lib/bot/parse";
-import { saveMediaNote, type IncomingMedia } from "@/lib/bot/notes";
+import { saveMediaNote, saveTextNote, type IncomingMedia } from "@/lib/bot/notes";
+import { AUDIO_MAX, transcribe, transcriptionReady } from "@/lib/transcribe";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+// Un audio largo se baja y se transcribe antes de contestar.
+export const maxDuration = 60;
 
 /**
  * Webhook del bot de WhatsApp (API de WhatsApp Cloud de Meta). No pasa por la sesión (ver
@@ -80,33 +82,55 @@ type Incoming = {
   document?: MediaPart;
   video?: MediaPart;
   audio?: MediaPart;
+  /** Si es una respuesta a otro mensaje: el id del citado. */
+  context?: { id?: unknown };
 };
 
 const MEDIA_KINDS = ["image", "document", "video", "audio"] as const;
 const IMAGE_MAX = 8 * 1024 * 1024;
 
-/** Baja una imagen de WhatsApp (dos pasos: la URL del archivo y después el archivo, los dos con el token). */
-async function downloadImage(mediaId: string, mime: string): Promise<File | null> {
+/**
+ * Baja un archivo de WhatsApp (dos pasos: la URL del archivo y después el archivo, los dos
+ * con el token). Fotos hasta 8 MB; audios hasta lo que acepta la transcripción.
+ */
+async function downloadMedia(mediaId: string, mime: string, kind: "image" | "audio"): Promise<File | null> {
   const token = process.env.WHATSAPP_TOKEN!;
   if (isTestToken(token)) return null;
+  const max = kind === "image" ? IMAGE_MAX : AUDIO_MAX;
   try {
     const info = await fetch(`${GRAPH}/${encodeURIComponent(mediaId)}`, {
       headers: { authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(8_000),
     }).then((r) => (r.ok ? (r.json() as Promise<{ url?: string; mime_type?: string; file_size?: number }>) : null));
-    if (!info?.url || (info.file_size ?? 0) > IMAGE_MAX) return null;
+    if (!info?.url || (info.file_size ?? 0) > max) return null;
     const res = await fetch(info.url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
-    if (buf.byteLength > IMAGE_MAX) return null;
-    const type = info.mime_type || mime || "image/jpeg";
-    const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+    if (buf.byteLength > max) return null;
+    const type = (info.mime_type || mime || (kind === "image" ? "image/jpeg" : "audio/ogg")).split(";")[0].trim();
+    const ext =
+      kind === "image"
+        ? type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"
+        : ({ "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "m4a", "audio/amr": "amr", "audio/wav": "wav", "audio/webm": "webm" } as Record<string, string>)[type] ?? "ogg";
     return new File([buf], `whatsapp.${ext}`, { type });
   } catch (e) {
-    console.error("[whatsapp] no se pudo bajar la foto:", e instanceof Error ? e.message : e);
+    console.error(`[whatsapp] no se pudo bajar ${kind === "image" ? "la foto" : "el audio"}:`, e instanceof Error ? e.message : e);
     return null;
   }
 }
+
+/** Un audio → su texto en Notas (como si lo hubiera escrito). Null si no se pudo transcribir. */
+async function saveAudioNote(part: MediaPart, msgId: string | null): Promise<string | null> {
+  if (!transcriptionReady() || typeof part.id !== "string" || !part.id) return null;
+  const file = await downloadMedia(part.id, typeof part.mime_type === "string" ? part.mime_type : "audio/ogg", "audio");
+  if (!file) return null;
+  const text = await transcribe(file);
+  if (!text) return null;
+  const saved = await saveTextNote(text, msgId, { audio: true });
+  const shown = text.length > 600 ? `${text.slice(0, 599).trimEnd()}…` : text;
+  return `${saved}\n\n"${shown}"`;
+}
+
 type Payload = { entry?: { changes?: { value?: { messages?: Incoming[] } }[] }[] };
 
 export async function POST(req: Request) {
@@ -151,11 +175,18 @@ export async function POST(req: Request) {
   }
 
   const msgId = typeof msg.id === "string" && msg.id ? msg.id.slice(0, 120) : null;
+  const quotedId = typeof msg.context?.id === "string" && msg.context.id ? msg.context.id : null;
   let answer: string;
   try {
     const caption = mediaKind ? msg[mediaKind]?.caption : null;
     // Una foto o un archivo con "NO" adelante en el texto tampoco se guarda.
-    if (mediaKind && isSkipMessage(typeof caption === "string" ? caption : null)) answer = SKIP_REPLY;
+    // Respondiendo a un mensaje propio con un comando: lo que guardó se pasa adonde diga.
+    const asReply = text && quotedId ? await handleReplyCommand(text, quotedId) : null;
+    // Un audio se transcribe y se guarda como texto (si no se puede, queda anotado en Archivos).
+    const heard = !asReply && mediaKind === "audio" ? await saveAudioNote(msg.audio ?? {}, msgId) : null;
+    if (asReply) answer = asReply;
+    else if (heard) answer = heard;
+    else if (mediaKind && isSkipMessage(typeof caption === "string" ? caption : null)) answer = SKIP_REPLY;
     else if (mediaKind) {
       // Fotos y documentos van a Notas → Archivos (la foto se guarda; lo demás queda anotado).
       const part = msg[mediaKind] ?? {};
@@ -164,7 +195,7 @@ export async function POST(req: Request) {
         kind: mediaKind,
         caption: str(part.caption),
         filename: str(part.filename),
-        file: mediaKind === "image" && str(part.id) ? await downloadImage(str(part.id)!, str(part.mime_type) ?? "image/jpeg") : null,
+        file: mediaKind === "image" && str(part.id) ? await downloadMedia(str(part.id)!, str(part.mime_type) ?? "image/jpeg", "image") : null,
       };
       answer = await saveMediaNote(media, msgId);
     } else answer = await handleBotMessage(text, msgId);

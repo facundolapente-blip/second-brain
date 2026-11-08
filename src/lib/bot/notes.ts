@@ -45,11 +45,12 @@ async function createOnce(data: Prisma.NoteCreateInput): Promise<{ id: string } 
 }
 
 /** Texto o link → nota en su sección, con título y miniatura del link si se pueden sacar. */
-export async function saveTextNote(text: string, msgId: string | null): Promise<string> {
+export async function saveTextNote(text: string, msgId: string | null, opts: { audio?: boolean } = {}): Promise<string> {
   const raw = detectUrl(text);
   const url = normalizeNoteUrl(raw);
   const section: NoteSectionId = classifyNote({ text, url });
-  const tags = suggestNoteTags({ text, url });
+  // Un audio transcripto lleva la etiqueta "audio" (así se encuentran todos juntos).
+  const tags = [...suggestNoteTags({ text, url }), ...(opts.audio ? ["audio"] : [])];
   let title: string | null = null;
   let thumbnail: string | null = null;
   if (url) {

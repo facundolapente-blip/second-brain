@@ -4,11 +4,11 @@ import { prisma } from "../prisma";
 import { formatLong, toDbDate, todayISO } from "../dates";
 import { moneyWhole } from "../format";
 import { isFreeBlock, topSortKey } from "../plan-logic";
-import { logActivity } from "../trash";
+import { logActivity, trashAndDelete } from "../trash";
 import { createQuickTransaction } from "../quick-add";
 import { getDashboard } from "../dashboard";
 import { appendValueNote, VALUES_KEY } from "../values";
-import { guessCategory, isSkipMessage, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, SKIP_REPLY } from "./parse";
+import { guessCategory, isDeleteReply, isSkipMessage, quotedNoteText, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, SKIP_REPLY } from "./parse";
 import { cleanPatch, ENERGY_LABELS, formatSleep, formatWeight, STRESS_LABELS } from "../checkin-logic";
 import { applyCheckin } from "../checkin-save";
 import { MOODS } from "../journal-logic";
@@ -62,6 +62,14 @@ export const HELP = [
   "un link de una tienda → Para comprar (si después mandás el precio, se le suma)",
   "cursos, música, otros links, ideas y textos → su sección",
   "fotos → Archivos",
+  "audios → los paso a texto y van a su sección",
+  "",
+  "Respondé a un mensaje tuyo con un comando para moverlo de Notas:",
+  "JJ (o JJ ayer) → al journal",
+  "TT (o TT viernes p3) → tarea",
+  "bloque mañana 18 → bloque de la semana",
+  "nota → a Valores",
+  "borrar → lo saca de Notas",
   "(Un renglón que empieza con un monto sigue siendo un gasto. Contraseñas y claves no se guardan.)",
 ].join("\n");
 
@@ -142,6 +150,72 @@ export async function handleBotMessage(raw: string, msgId: string | null = null)
   }
 }
 
+/**
+ * Responder en WhatsApp a un mensaje propio con un comando (pedido de Facu, 2026-11-08):
+ * lo que ese mensaje guardó en Notas se pasa adonde diga el comando y sale de Notas
+ * (a la papelera). JJ → journal (con "JJ ayer", a ayer), TT → tarea (lo de después de TT
+ * es la fecha o la prioridad: "TT viernes p3"; el texto entero queda en las notas de la
+ * tarea), GG → gasto, bloque → bloque ("bloque mañana 18"), nota → Valores, "borrar" o
+ * "NO" → solo la saca de Notas. Devuelve null si el mensaje citado no es una nota o el
+ * comando no aplica: entonces se trata como un mensaje común.
+ */
+export async function handleReplyCommand(raw: string, quotedId: string): Promise<string | null> {
+  const text = raw.trim();
+  const note = await prisma.note.findFirst({
+    where: { externalId: quotedId.slice(0, 120) },
+    select: { id: true, title: true, body: true, url: true, _count: { select: { attachments: true } } },
+  });
+  if (!note) {
+    // "JJ" o "borrar" solos no tienen nada que hacer sin la nota citada.
+    const { cmd, rest } = parseCommand(text);
+    const bare = isDeleteReply(text) || (!rest && (cmd === "diario" || cmd === "tarea" || cmd === "gasto" || cmd === "bloque" || cmd === "nota"));
+    return bare ? "Ese mensaje no está en Notas (puede que ya lo hayas movido o que haya sido un gasto o una tarea)." : null;
+  }
+  const { full, title } = quotedNoteText(note);
+  const today = todayISO();
+  const moved = async (answer: string) => {
+    await trashAndDelete("note", note.id);
+    revalidatePath("/notas");
+    revalidatePath("/");
+    return `${answer}\n(Lo saqué de Notas; está en la papelera por si acaso.)`;
+  };
+
+  if (isDeleteReply(text)) return (await trashAndDelete("note", note.id)) ? (revalidatePath("/notas"), "Listo, lo saqué de Notas (está en la papelera).") : "Ya no estaba en Notas.";
+  const { cmd, rest } = parseCommand(text);
+  switch (cmd) {
+    case "diario": {
+      if (!full) return "Ese mensaje no tiene texto para pasar al journal.";
+      const p = parseJournal(rest ? `${rest}\n${full}` : full, today);
+      if ("error" in p) return p.error;
+      const r = await appendToJournal(p.date, p.text, "WhatsApp");
+      // Las fotos de la nota pasan a la entrada.
+      if (note._count.attachments) await prisma.attachment.updateMany({ where: { noteId: note.id }, data: { noteId: null, journalEntryId: r.id } });
+      return await moved(`Pasado al journal ${p.date === today ? "de hoy" : "de ayer"}${note._count.attachments ? " (con las fotos)" : ""}.`);
+    }
+    case "tarea": {
+      if (!title) return "Ese mensaje no tiene texto para una tarea.";
+      const p = parseTask(`${title} ${rest}`.trim(), today);
+      if ("error" in p) return p.error;
+      return await moved(await createTask(p.title, p.deadline, today, p.priority, full !== title ? full : undefined));
+    }
+    case "gasto": {
+      const r = await createQuickTransaction(`${title} ${rest}`.trim(), undefined, "WhatsApp");
+      return r.ok ? await moved(r.summary) : `${r.error} Ese mensaje no parece un gasto.`;
+    }
+    case "bloque": {
+      if (!title) return "Ese mensaje no tiene texto para un bloque.";
+      const p = parseBlock(`${title} ${rest}`.trim(), today);
+      if ("error" in p) return p.error;
+      return await moved(await createBlock(p, today));
+    }
+    case "nota":
+      if (!full) return "Ese mensaje no tiene texto para Valores.";
+      return await moved(await addNote(full));
+    default:
+      return null;
+  }
+}
+
 /** Cómo quedó (o cómo va) el check-in de un día, con lo que falta. */
 async function checkinStatus(date: string, today: string, saved: boolean): Promise<string> {
   const c = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(date) } });
@@ -181,7 +255,7 @@ async function planCategoryGuess(rawTitle: string) {
 
 const PRIORITY_NAMES = ["", "baja", "media", "alta", "urgente"];
 
-async function createTask(rawTitle: string, deadline: string | null, today: string, priority?: number): Promise<string> {
+async function createTask(rawTitle: string, deadline: string | null, today: string, priority?: number, notes?: string): Promise<string> {
   const { categoryId, title, name } = await planCategoryGuess(rawTitle);
   const first = await prisma.planTask.aggregate({ _min: { order: true } });
   const created = await prisma.planTask.create({
@@ -191,6 +265,7 @@ async function createTask(rawTitle: string, deadline: string | null, today: stri
       status: "todo",
       priority: priority ?? 1,
       deadline: deadline ? toDbDate(deadline) : null,
+      notes: notes?.trim() ? notes.trim().slice(0, 5000) : null,
       order: (first._min.order ?? 0) - 1,
     },
   });

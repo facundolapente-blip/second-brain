@@ -53,8 +53,11 @@ export function parseCommand(text: string): { cmd: BotCommand; rest: string } {
   const t = text.trim();
   const m = t.match(/^\/?([^\s@]+)(?:@\S+)?(?:\s+([\s\S]*))?$/);
   const key = m ? fold(m[1]) : "";
-  const cmd = Object.hasOwn(COMMANDS, key) ? COMMANDS[key] : null;
-  return cmd ? { cmd, rest: (m?.[2] ?? "").trim() } : { cmd: null, rest: t };
+  let cmd = Object.hasOwn(COMMANDS, key) ? COMMANDS[key] : null;
+  const rest = (m?.[2] ?? "").trim();
+  // "hoy" y "ayuda" solo solos: "Hoy me di cuenta de…" es una nota, no el resumen.
+  if ((cmd === "hoy" || cmd === "ayuda") && rest) cmd = null;
+  return cmd ? { cmd, rest } : { cmd: null, rest: t };
 }
 
 const WEEKDAYS: Record<string, number> = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 };
@@ -492,4 +495,26 @@ export function guessCategory(
     if (!top || e[1] > top[1]) top = e;
   }
   return top && top[1] >= 2 && top[1] / total >= 0.6 ? { categoryId: top[0], title } : { categoryId: null, title };
+}
+
+// ─── Responder a un mensaje propio con un comando ───────────────────────────
+
+/**
+ * El texto de una nota para pasarlo a otro lado (respondiendo en WhatsApp a ese mensaje
+ * con JJ, TT, GG, bloque o nota): `full` para el journal o Valores (título, texto y link),
+ * `title` para una tarea o un bloque (un renglón).
+ */
+export function quotedNoteText(n: { title: string | null; body: string; url: string | null }): { full: string; title: string } {
+  const body = n.body.trim();
+  const title = (n.title ?? "").trim();
+  const parts = [title && !body.includes(title) ? title : "", body, n.url ?? ""].filter(Boolean);
+  const firstLine = body.split(/\r?\n/).find((l) => l.trim())?.trim() ?? "";
+  const short = (title || firstLine || n.url || "").replace(/\s+/g, " ").trim();
+  return { full: parts.join("\n"), title: short.length > 120 ? `${short.slice(0, 119).trimEnd()}…` : short };
+}
+
+/** "borrar" (o "NO") respondiendo a un mensaje: sacarlo de Notas. */
+export function isDeleteReply(text: string): boolean {
+  const t = text.trim().replace(/[.!]+$/, "");
+  return t === "NO" || /^(borrar|borra|borralo|eliminar|eliminalo)$/i.test(t);
 }

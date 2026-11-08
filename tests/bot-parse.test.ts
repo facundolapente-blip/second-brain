@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayAtEnd, guessCategory, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, sleepOf } from "@/lib/bot/parse";
+import { dayAtEnd, guessCategory, isDeleteReply, looksLikeExpense, looksLikePrice, parseBlock, parseCheckin, parseCommand, parseJournal, parseTask, quotedNoteText, sleepOf } from "@/lib/bot/parse";
 
 const TODAY = "2026-10-19";
 
@@ -178,5 +178,36 @@ describe("tareas con fecha escrita, prioridad y categoría razonada", () => {
     expect(guessCategory("Pintar la pieza casa", cats, history)).toEqual({ categoryId: "c", title: "Pintar la pieza" });
     expect(guessCategory("#trabajo mandar mail", cats, history)).toEqual({ categoryId: "t", title: "mandar mail" });
     expect(guessCategory("Vender discos nuevos ingresos", cats, history)).toEqual({ categoryId: "n", title: "Vender discos" });
+  });
+});
+
+describe("responder a un mensaje con un comando", () => {
+  it("arma el texto de la nota citada", () => {
+    expect(quotedNoteText({ title: null, body: "Llamar a Juan por lo del local", url: null })).toEqual({
+      full: "Llamar a Juan por lo del local",
+      title: "Llamar a Juan por lo del local",
+    });
+    const link = quotedNoteText({ title: "Curso de mezcla", body: "para ver", url: "https://x.com/c" });
+    expect(link.full).toBe("Curso de mezcla\npara ver\nhttps://x.com/c");
+    expect(link.title).toBe("Curso de mezcla");
+    expect(quotedNoteText({ title: null, body: "Primer renglón\nsegundo", url: null }).title).toBe("Primer renglón");
+    expect(quotedNoteText({ title: null, body: "a".repeat(200), url: null }).title.length).toBe(120);
+  });
+  it("borrar o NO saca la nota; un no en minúsculas no", () => {
+    expect(isDeleteReply("borrar")).toBe(true);
+    expect(isDeleteReply("Borralo.")).toBe(true);
+    expect(isDeleteReply("NO")).toBe(true);
+    expect(isDeleteReply("no")).toBe(false);
+    expect(isDeleteReply("No")).toBe(false);
+    expect(isDeleteReply("borrar esto")).toBe(false);
+  });
+});
+
+describe("hoy y ayuda solo solos", () => {
+  it("un texto que empieza con Hoy no es el resumen", () => {
+    expect(parseCommand("hoy").cmd).toBe("hoy");
+    expect(parseCommand("Hoy me di cuenta de algo").cmd).toBe(null);
+    expect(parseCommand("ayuda").cmd).toBe("ayuda");
+    expect(parseCommand("ayuda con la mudanza el sábado").cmd).toBe(null);
   });
 });
