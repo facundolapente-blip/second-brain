@@ -1197,3 +1197,40 @@ dialog.sheet.closing-drag::backdrop {
 .tmini-seg > span { height: 7px; border-radius: 999px; background: var(--surface-3); }
 .tmini-seg > span[data-on] { background: var(--head-chip); }
 .tmini-cap { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.02em; color: var(--muted); }
+
+/* Selector de fecha propio (components/date-picker.tsx): en el celular, hoja chica que
+   sube desde abajo con su fondo. Lo usan el Plan y el Journal. */
+@media (prefers-reduced-motion: no-preference) {
+  .dp-sheet-in {
+    animation: dp-sheet-in 280ms var(--ease-sheet, cubic-bezier(0.32, 0.72, 0, 1));
+  }
+  @keyframes dp-sheet-in {
+    from { translate: 0 100%; }
+  }
+  .dp-sheet-out {
+    animation: dp-sheet-out 140ms var(--ease-in, ease-in) forwards;
+  }
+  @keyframes dp-sheet-out {
+    to { translate: 0 100%; }
+  }
+}
+.dp-fade-in {
+  animation: dp-fade-in 180ms ease-out;
+}
+@keyframes dp-fade-in {
+  from { opacity: 0; }
+}
+.dp-fade-out {
+  animation: dp-fade-out 130ms ease-in forwards;
+}
+@keyframes dp-fade-out {
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dp-sheet-in {
+    animation: dp-fade-in 120ms ease-out;
+  }
+  .dp-sheet-out {
+    animation: dp-fade-out 120ms ease-in forwards;
+  }
+}

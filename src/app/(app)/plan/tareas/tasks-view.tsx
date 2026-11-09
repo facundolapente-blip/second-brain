@@ -4,6 +4,7 @@ import { leaveThen, useNewIds, useTick } from "@/components/motion";
 import { notifyDeleted, notifyError, notifyInfo } from "@/components/undo-toast";
 import { haptic } from "@/components/haptics";
 import { SwipeRow } from "@/components/swipe-row";
+import { useHoldMenu } from "@/components/hold-menu";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
@@ -19,7 +20,7 @@ import { BlockSheet, type BlockSheetHandle } from "../block-sheet";
 import { CategoryTag, categoryMap, PriorityTag, StepBar } from "../plan-ui";
 import { tone } from "@/lib/palette";
 import { TaskSheet, type TaskSheetActions, type TaskSheetHandle } from "./task-sheet";
-import { DatePicker } from "./date-picker";
+import { DatePicker } from "@/components/date-picker";
 import { usePlanWeek } from "../plan-context";
 import { ghostCard, liftImage, ringWhileMenu } from "../drag-motion";
 import { TaskKanban } from "./task-kanban";
@@ -455,6 +456,7 @@ export function TasksBoard({
                     onOpen={() => sheet.current?.open(t)}
                     onDone={() => swipeDone(t)}
                     onWeek={() => swipeWeek(t)}
+                    onMenu={(e) => taskMenu(e, t)}
                   />
                 ))}
               </Fragment>
@@ -493,9 +495,12 @@ function TaskRow({
   onOpen,
   onDone,
   onWeek,
+  onMenu,
   fresh,
 }: {
   task: TaskDTO;
+  /** Mantener apretado (o clic derecho): Cambiar nombre, Duplicar, Editar, Agendar en la semana, Borrar. */
+  onMenu: (e: React.MouseEvent) => void;
   category?: CategoryDTO | null;
   today: string;
   onOpen: () => void;
@@ -508,8 +513,10 @@ function TaskRow({
 }) {
   const left = daysLeft(t.deadline, today);
   const done = t.status === "done";
+  // Mantener apretada la tarea abre su menú (pedido de Facu, 2026-11-09).
+  const hold = useHoldMenu(onMenu);
   return (
-    <li data-task={t.id} className={cx("border-b border-line", fresh && "reveal")}>
+    <li data-task={t.id} {...hold} className={cx("border-b border-line", fresh && "reveal")}>
       <SwipeRow
         left={done ? undefined : { label: "Hecho", icon: <Check size={20} weight="bold" />, tone: "done", onAction: onDone }}
         right={done ? undefined : { label: "+1 semana", icon: <CalendarDots size={20} weight="bold" />, tone: "accent", onAction: onWeek }}

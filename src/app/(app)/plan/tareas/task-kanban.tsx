@@ -14,7 +14,7 @@ import { cx } from "@/components/ui";
 import { useNewIds, useTick } from "@/components/motion";
 import { CategoryTag, PriorityDots, StepBar } from "../plan-ui";
 import { land, landFrom, liftImage, useLandedKeys } from "../drag-motion";
-import { DatePicker } from "./date-picker";
+import { DatePicker } from "@/components/date-picker";
 
 /** Arrastre nativo de una tarjeta entre columnas (además de TASK_DRAG, que la deja agendar en un día). */
 const KANBAN_DRAG = "text/x-tarea-tablero";

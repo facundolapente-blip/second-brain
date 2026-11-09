@@ -78,7 +78,7 @@ export function Field({
 }
 
 export const inputClass =
-  "h-11 w-full rounded-[4px] border border-line-strong bg-surface px-3 text-[15px] text-fg placeholder:text-faint outline-none transition-colors focus:border-fg/50 focus:ring-2 focus:ring-[var(--focus)]";
+  "h-11 w-full rounded-[4px] border border-line-strong bg-surface px-3 text-[16px] pointer-fine:text-[15px] text-fg placeholder:text-faint outline-none transition-colors focus:border-fg/50 focus:ring-2 focus:ring-[var(--focus)]";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, spellCheck, ...props }, ref) {

@@ -9,7 +9,8 @@ import { PhotoStrip } from "@/components/photos";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CaretDown, CaretLeft, Check, DotsThreeVertical, Plus, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui";
-import { formatLong, formatRelative } from "@/lib/dates";
+import { addDays, formatLong, formatRelative } from "@/lib/dates";
+import { DatePicker } from "@/components/date-picker";
 import { deleteEntry, discardIfEmpty, saveEntry, type EntryInput } from "@/lib/offline/journal";
 import { isEmptyEntry, MOODS, normalizeTag, TAGS_MAX, TITLE_MAX, wordCount } from "@/lib/journal-logic";
 import type { EntryDTO } from "@/lib/journal";
@@ -128,7 +129,6 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   const moreSheet = useRef<SheetHandle>(null);
   const confirmSheet = useRef<SheetHandle>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const dateRef = useRef<HTMLInputElement>(null);
   const [leaving, startLeaving] = useSafeTransition();
   const [deleting, startDelete] = useSafeTransition();
   const { write } = useWrite();
@@ -214,28 +214,34 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
             <CaretLeft size={22} weight="bold" />
           </IconButton>
 
-          {/* La fecha se cambia con el selector nativo del sistema. */}
-          <label className="relative inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-1.5 rounded-[4px] px-2 hover:bg-surface-2">
+          {/* La fecha se cambia con el selector propio (Hoy, Ayer, Anteayer y un calendario):
+              el del sistema en Android a veces se abría dos veces y el segundo volvía a hoy. */}
+          <DatePicker
+            value={date}
+            today={today}
+            clearable={false}
+            shortcuts={[
+              { label: "Hoy", date: today },
+              { label: "Ayer", date: addDays(today, -1) },
+              { label: "Anteayer", date: addDays(today, -2) },
+            ]}
+            label="Fecha de la entrada"
+            className="min-w-0 shrink"
+            triggerClassName="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-[4px] px-2 text-left hover:bg-surface-2"
+            onChange={(d) => {
+              if (!d || d === date) return;
+              setDate(d);
+              update({ date: d });
+              // Se guarda enseguida: si se sale apurado, la fecha nueva ya está.
+              void flush();
+            }}
+          >
             {/* En el celular una fecha larga ("miércoles, 7 de octubre de 2025") pasa a dos renglones en vez de cortarse. */}
             <span className="display line-clamp-2 text-[19px] leading-[1.1] first-letter:uppercase min-[420px]:text-[21px]">
               {formatRelative(date, today)}
             </span>
             <CaretDown size={14} weight="bold" className="shrink-0 text-muted" />
-            <input
-              ref={dateRef}
-              type="date"
-              value={date}
-              required
-              aria-label="Fecha de la entrada"
-              onClick={() => dateRef.current?.showPicker?.()}
-              onChange={(e) => {
-                if (!e.target.value) return;
-                setDate(e.target.value);
-                update({ date: e.target.value });
-              }}
-              className="absolute inset-0 cursor-pointer opacity-0"
-            />
-          </label>
+          </DatePicker>
 
           <SaveStatus status={status} />
           <StarToggle id={entry.id} starred={entry.starred} />

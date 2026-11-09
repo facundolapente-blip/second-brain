@@ -16,8 +16,10 @@ const DAY_NAME = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes
 const isDesktop = () => window.matchMedia("(min-width: 1024px) and (pointer: fine)").matches;
 
 /**
- * Selector de deadline propio (reemplaza al del aparato): atajos Hoy, Mañana,
- * Próximo lunes, +1 semana y Sin fecha, y debajo un calendario chico del mes.
+ * Selector de fecha propio (reemplaza al del aparato, que en Android a veces se abría
+ * dos veces y el segundo devolvía la fecha vieja). Para los deadlines: atajos Hoy,
+ * Mañana, Próximo lunes, +1 semana y Sin fecha; otros atajos con `shortcuts` (el
+ * journal: Ayer, Hoy…) y sin "Sin fecha" con `clearable={false}`. Debajo, un calendario chico del mes.
  * En la compu se abre como cartel junto a la fecha; en el celular, como hoja
  * chica abajo. Teclado: flechas por día y semana, Re Pág / Av Pág por mes,
  * Inicio / Fin de la semana, Enter elige y Escape cierra (el foco vuelve a la fecha).
@@ -29,11 +31,17 @@ export function DatePicker({
   label,
   className,
   triggerClassName,
+  shortcuts,
+  clearable = true,
   children,
 }: {
   value: string | null;
   today: string;
   onChange: (date: string | null) => void;
+  /** Atajos arriba del calendario (si no, los de un deadline). */
+  shortcuts?: { label: string; date: string }[];
+  /** Ofrecer "Sin fecha". */
+  clearable?: boolean;
   /** Para el lector de pantalla y el título del cartel ("Deadline de X"). */
   label: string;
   className?: string;
@@ -77,7 +85,7 @@ export function DatePicker({
       </button>
       {open && (
         <Popover anchor={trigger} desktop={open.desktop} closing={closing} onClose={close} label={label}>
-          <Panel value={value} today={today} onPick={pick} onClose={close} />
+          <Panel value={value} today={today} onPick={pick} onClose={close} shortcuts={shortcuts} clearable={clearable} />
         </Popover>
       )}
     </span>
@@ -134,7 +142,7 @@ function Popover({
   const host = (anchor.current?.closest("[data-module]") as HTMLElement | null) ?? document.body;
   return createPortal(
     <>
-      {!desktop && <div aria-hidden className={cx("fixed inset-0 z-[70] bg-black/30", closing ? "plan-fade-out" : "plan-fade-in")} />}
+      {!desktop && <div aria-hidden className={cx("fixed inset-0 z-[70] bg-black/30", closing ? "dp-fade-out" : "dp-fade-in")} />}
       <div
         ref={box}
         role="dialog"
@@ -145,7 +153,7 @@ function Popover({
           "z-[71] border border-line-strong bg-surface text-fg shadow-[0_18px_44px_-18px_rgba(var(--shadow-tint),0.5)]",
           desktop
             ? cx("fixed w-[18.5rem] rounded-2xl p-2", pos && (closing ? "menu-out" : "menu-in"), pos?.up ? "origin-bottom-left" : "origin-top-left")
-            : cx("fixed inset-x-0 bottom-0 rounded-t-[22px] px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]", closing ? "plan-sheet-out" : "plan-sheet-in"),
+            : cx("fixed inset-x-0 bottom-0 rounded-t-[22px] px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]", closing ? "dp-sheet-out" : "dp-sheet-in"),
         )}
       >
         {!desktop && (
@@ -164,7 +172,21 @@ function Popover({
   );
 }
 
-function Panel({ value, today, onPick, onClose }: { value: string | null; today: string; onPick: (d: string | null) => void; onClose: () => void }) {
+function Panel({
+  value,
+  today,
+  onPick,
+  onClose,
+  shortcuts: custom,
+  clearable,
+}: {
+  value: string | null;
+  today: string;
+  onPick: (d: string | null) => void;
+  onClose: () => void;
+  shortcuts?: { label: string; date: string }[];
+  clearable: boolean;
+}) {
   const [month, setMonth] = useState((value ?? today).slice(0, 7));
   const [focus, setFocus] = useState(value ?? today);
   const grid = useRef<HTMLDivElement>(null);
@@ -204,7 +226,7 @@ function Panel({ value, today, onPick, onClose }: { value: string | null; today:
       onClose();
     }
   }
-  const shortcuts = deadlineShortcuts(today, value);
+  const shortcuts = custom ?? deadlineShortcuts(today, value);
   const weeks = monthGrid(month);
   return (
     <div
@@ -235,7 +257,7 @@ function Panel({ value, today, onPick, onClose }: { value: string | null; today:
             </button>
           </li>
         ))}
-        {value && (
+        {value && clearable && (
           <li>
             <button
               type="button"
