@@ -5,12 +5,15 @@ import { quiet, useSafeTransition } from "@/components/safe-action";
 import { haptic } from "@/components/haptics";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, CaretLeft, Smiley, SmileyBlank, SmileyMeh, SmileyNervous, SmileySad, SmileyWink, Star, type Icon, type IconWeight } from "@phosphor-icons/react";
+import { CalendarBlank, Camera, CaretLeft, CopySimple, NotePencil, Smiley, SmileyBlank, SmileyMeh, SmileyNervous, SmileySad, SmileyWink, Star, Trash, type Icon, type IconWeight } from "@phosphor-icons/react";
+import { showContextMenu } from "@/components/context-menu";
+import { useHoldMenu } from "@/components/hold-menu";
+import { notifyDeleted, notifyError, notifyInfo } from "@/components/undo-toast";
 import { MenuButton } from "@/components/shell";
 import { cx } from "@/components/ui";
-import { formatLong, formatShort } from "@/lib/dates";
+import { formatLong, formatShort, todayISO } from "@/lib/dates";
 import { moodInfo } from "@/lib/journal-logic";
-import { setEntryStarred, writeOnDay } from "@/lib/offline/journal";
+import { deleteEntry, duplicateEntry, moveEntryDate, setEntryStarred, writeOnDay } from "@/lib/offline/journal";
 import { tone } from "@/lib/palette";
 import type { EntryCardDTO } from "@/lib/journal";
 import { previewEntry } from "./reader-slot";
@@ -189,10 +192,100 @@ export function EntryCard({
     setWasSelected(selected);
     setPicking(false);
   }
-  const [day, month] = formatShort(entry.date).split(" ");
-  const wd = WEEKDAY_SHORT[new Date(`${entry.date}T00:00:00Z`).getUTCDay()];
+  // Clic derecho (o mantener apretado en el celular): Editar, Cambiar de día, Favorita,
+  // Duplicar y Borrar (pedido de Facu, 2026-11-09). Lo de la tarjeta cambia al toque.
+  const [starred, setStarred] = useState(entry.starred);
+  const [date, setDate] = useState(entry.date);
+  const [gone, setGone] = useState(false);
+  const [wasEntry, setWasEntry] = useState(entry);
+  if (wasEntry !== entry) {
+    setWasEntry(entry);
+    setStarred(entry.starred);
+    setDate(entry.date);
+  }
+  function openMenu(e: React.MouseEvent) {
+    showContextMenu(
+      e,
+      [
+        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => router.push(`/journal/${entry.id}`) },
+        {
+          label: "Cambiar de día",
+          icon: <CalendarBlank size={15} />,
+          day: {
+            date,
+            today: todayISO(),
+            onSave: (d) => {
+              const before = date;
+              setDate(d);
+              quiet(
+                moveEntryDate(entry.id, d)
+                  .then((r) => {
+                    if (!r.ok) {
+                      setDate(before);
+                      notifyError(r.error);
+                    } else notifyInfo(`Pasada al ${formatLong(d)}`);
+                  })
+                  .catch((err) => {
+                    setDate(before);
+                    throw err;
+                  }),
+              );
+            },
+          },
+        },
+        {
+          label: starred ? "Sacar de favoritas" : "Marcar como favorita",
+          icon: <Star size={15} weight={starred ? "fill" : "regular"} />,
+          onSelect: () => {
+            const next = !starred;
+            setStarred(next);
+            haptic("select");
+            quiet(
+              setEntryStarred(entry.id, next).catch((err) => {
+                setStarred(!next);
+                throw err;
+              }),
+            );
+          },
+        },
+        {
+          label: "Duplicar",
+          icon: <CopySimple size={15} />,
+          onSelect: () =>
+            quiet(
+              duplicateEntry(entry.id).then((r) => {
+                if ("error" in r) notifyError(r.error);
+                else notifyInfo("Entrada duplicada");
+              }),
+            ),
+        },
+        {
+          label: "Borrar",
+          icon: <Trash size={15} />,
+          danger: true,
+          onSelect: () => {
+            setGone(true);
+            quiet(
+              deleteEntry(entry.id)
+                .then(() => notifyDeleted("Entrada borrada"))
+                .catch((err) => {
+                  setGone(false);
+                  throw err;
+                }),
+            );
+          },
+        },
+      ],
+      entry.title || formatLong(date),
+    );
+  }
+  const hold = useHoldMenu(openMenu);
+  if (gone) return null;
+  const [day, month] = formatShort(date).split(" ");
+  const wd = WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()];
   return (
     <Link
+      {...hold}
       href={`/journal/${entry.id}`}
       aria-current={selected ? "true" : undefined}
       onClick={(e) => {
@@ -221,7 +314,7 @@ export function EntryCard({
       </span>
 
       <span className="grid min-w-0 content-start gap-1.5">
-        <span className="sr-only">{formatLong(entry.date)}</span>
+        <span className="sr-only">{formatLong(date)}</span>
         <span className="flex items-start gap-3">
           <span className="grid min-w-0 flex-1 gap-1">
             {entry.title && (
@@ -233,10 +326,10 @@ export function EntryCard({
               !entry.title && <span className="display text-[17px] text-muted">Sin texto</span>
             )}
           </span>
-          {(entry.starred || entry.mood) && (
+          {(starred || entry.mood) && (
             <span className="grid shrink-0 justify-items-center gap-1.5">
               <MoodBadge mood={entry.mood} size={30} />
-              {entry.starred && (
+              {starred && (
                 <span title="Favorita">
                   <Star size={entry.mood ? 16 : 18} weight="fill" className="text-[var(--p-yellow-chip)]" aria-hidden />
                   <span className="sr-only">Favorita</span>

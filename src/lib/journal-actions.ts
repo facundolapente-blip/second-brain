@@ -190,6 +190,45 @@ export async function setEntryStarred(id: string, starred: boolean): Promise<{ o
 }
 
 /**
+ * Copia de una entrada (clic derecho → Duplicar): mismo día, texto, ánimo y etiquetas;
+ * sin fotos ni estrella. El título lleva "(copia)" para distinguirla.
+ */
+export async function duplicateEntry(id: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  await exigirSesion();
+  if (!validId(id)) return { ok: false, error: "Entrada inválida." };
+  const e = await prisma.journalEntry.findUnique({ where: { id } });
+  if (!e) return { ok: false, error: "Esta entrada ya no existe." };
+  const copy = await prisma.journalEntry.create({
+    data: {
+      date: e.date,
+      title: e.title ? `${e.title} (copia)`.slice(0, TITLE_MAX) : null,
+      body: e.body,
+      mood: e.mood,
+      tags: e.tags,
+    },
+    select: { id: true },
+  });
+  await logActivity("created", "journal", copy.id, `Copia de la entrada del ${fromDbDate(e.date)}`);
+  refrescar();
+  return { ok: true, id: copy.id };
+}
+
+/** Cambia el día de una entrada (clic derecho → Cambiar de día). El ánimo se va con ella, como en el editor. */
+export async function moveEntryDate(id: string, date: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await exigirSesion();
+  if (!validId(id)) return { ok: false, error: "Entrada inválida." };
+  if (!isISODate(date)) return { ok: false, error: "Fecha inválida." };
+  const prev = await prisma.journalEntry.findUnique({ where: { id }, select: { date: true, mood: true } });
+  if (!prev) return { ok: false, error: "Esta entrada ya no existe." };
+  const from = fromDbDate(prev.date);
+  if (from === date) return { ok: true };
+  await prisma.journalEntry.update({ where: { id }, data: { date: toDbDate(date) } });
+  await moveCheckinMood(id, from, date, prev.mood, prev.mood);
+  refrescar();
+  return { ok: true };
+}
+
+/**
  * Manda la entrada a la papelera. No redirige: el editor avisa "Entrada borrada ·
  * Deshacer" recién cuando terminó (si no, un Deshacer rápido restauraba otra cosa) y vuelve solo.
  */

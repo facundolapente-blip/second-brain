@@ -8,6 +8,7 @@ import * as plan from "./plan-actions";
 import * as finance from "./finance-actions";
 import * as habit from "./habit-actions";
 import * as notes from "./notes-actions";
+import * as journal from "./journal-actions";
 
 /**
  * Acciones que no aguantan repetirse (crear, duplicar, pasar de semana, sumar):
@@ -17,7 +18,7 @@ import * as notes from "./notes-actions";
  * Ver `queueable(..., { once: true })` en `offline/queue.ts`.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const MODULES: Record<string, Record<string, (...args: any[]) => Promise<unknown>>> = { plan, finance, habit, notes };
+const MODULES: Record<string, Record<string, (...args: any[]) => Promise<unknown>>> = { plan, finance, habit, notes, journal };
 
 const DONE_WITHOUT_RESULT = { ok: true, repeated: true };
 /**

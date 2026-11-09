@@ -22,6 +22,12 @@ export type ContextMenuItem =
         end: string | null;
         onSave: (date: string, start: string | null, end: string | null) => void;
       };
+    }
+  | {
+      label: string;
+      icon?: React.ReactNode;
+      /** Solo el día, ahí mismo, con atajos Anteayer / Ayer / Hoy (entradas del journal). */
+      day: { date: string; today: string; onSave: (date: string) => void };
     };
 type FormItem = Exclude<ContextMenuItem, { onSelect: () => void }>;
 
@@ -145,6 +151,8 @@ export function ContextMenuHost() {
     >
       {renaming && "schedule" in renaming ? (
         <ScheduleForm item={renaming} onDone={() => dismiss()} />
+      ) : renaming && "day" in renaming ? (
+        <DayForm item={renaming} onDone={() => dismiss()} />
       ) : renaming && "rename" in renaming ? (
         <form
           className="reveal grid gap-2 p-2"
@@ -181,7 +189,7 @@ export function ContextMenuHost() {
               type="button"
               role="menuitem"
               onClick={() => {
-                if ("rename" in it || "schedule" in it) setRenaming(it);
+                if ("rename" in it || "schedule" in it || "day" in it) setRenaming(it);
                 else {
                   dismiss();
                   it.onSelect();
@@ -261,6 +269,60 @@ function ScheduleForm({ item, onDone }: { item: Extract<ContextMenuItem, { sched
         </label>
       </div>
       <span className="px-0.5 text-[11.5px] text-muted">Sin hora de inicio, queda para todo el día.</span>
+      <button type="submit" className="h-10 rounded-full bg-[var(--text)] text-[14px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">
+        Guardar
+      </button>
+    </form>
+  );
+}
+
+/** Solo el día: campo de fecha, atajos Anteayer / Ayer / Hoy y un día para atrás o para adelante. */
+function DayForm({ item, onDone }: { item: Extract<ContextMenuItem, { day: unknown }>; onDone: () => void }) {
+  const d = item.day;
+  const [date, setDate] = useState(d.date);
+  const save = (v: string) => {
+    if (v && v !== d.date) d.onSave(v);
+    onDone();
+  };
+  const chip = "h-9 flex-1 rounded-full border border-line-strong text-[12.5px] hover:bg-surface-2";
+  return (
+    <form
+      className="reveal grid w-[19rem] max-w-[86vw] gap-2.5 p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save(date);
+      }}
+    >
+      <span className="px-0.5 text-[12px] font-medium text-muted">{item.label}</span>
+      <div className="flex gap-1.5">
+        {[
+          ["Anteayer", shiftIso(d.today, -2)],
+          ["Ayer", shiftIso(d.today, -1)],
+          ["Hoy", d.today],
+        ].map(([label, v]) => (
+          <button key={label} type="button" onClick={() => save(v)} className={cx(chip, v === date ? "border-[var(--text)] font-semibold text-fg" : "text-fg")}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <label className="grid gap-1 text-[12px] text-muted">
+        Otro día
+        <input
+          type="date"
+          required
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="h-10 rounded-lg border border-line-strong bg-surface px-2.5 text-[16px] outline-none focus:border-accent pointer-fine:text-[14px]"
+        />
+      </label>
+      <div className="flex gap-1.5">
+        <button type="button" onClick={() => date && setDate(shiftIso(date, -1))} className={cx(chip, "text-muted hover:text-fg")}>
+          −1 día
+        </button>
+        <button type="button" onClick={() => date && setDate(shiftIso(date, 1))} className={cx(chip, "text-muted hover:text-fg")}>
+          +1 día
+        </button>
+      </div>
       <button type="submit" className="h-10 rounded-full bg-[var(--text)] text-[14px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">
         Guardar
       </button>
