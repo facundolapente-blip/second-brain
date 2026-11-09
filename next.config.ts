@@ -4,10 +4,17 @@ const nextConfig: NextConfig = {
   // Prisma trae el compilador de consultas en base64 para cada base (y el motor
   // viejo en wasm) para runtimes edge; acá no se usan: el cliente generado carga
   // su propio `query_compiler_bg.wasm`. Sin esto, ~55 MB de más en cada función.
+  // `sharp` (y sus binarios `@img/*`) es para optimizar imágenes en un servidor
+  // propio; en Vercel lo hace su servicio de imágenes, no la función.
+  // La clave es "**" y no "/**": el proxy se llama `proxy` (sin barra) y con
+  // "/**" quedaba afuera, cargando todo Prisma (pesaba 25,8 MB en Vercel).
+  // Todo esto cuenta para los 10 GB de "Function Storage" del plan gratis.
   outputFileTracingExcludes: {
-    "/**": [
+    "**": [
       "node_modules/@prisma/client/runtime/*.wasm-base64.*",
       "node_modules/@prisma/client/runtime/query_engine_bg.*",
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
     ],
   },
   poweredByHeader: false,
