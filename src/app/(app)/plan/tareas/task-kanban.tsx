@@ -60,6 +60,7 @@ export function TaskKanban({
   onOpen,
   onNew,
   onDeadline,
+  onMenu,
 }: {
   tasks: TaskDTO[];
   categories: CategoryDTO[];
@@ -68,6 +69,8 @@ export function TaskKanban({
   onNew: (status: TaskStatus) => void;
   /** Cambiar la fecha desde la tarjeta (botón aparte). */
   onDeadline?: (t: TaskDTO, deadline: string | null) => void;
+  /** Clic derecho en una tarjeta: el mismo menú que en la tabla. */
+  onMenu?: (e: React.MouseEvent, t: TaskDTO) => void;
 }) {
   const id = useId();
   const cats = new Map(categories.map((c) => [c.id, c]));
@@ -160,6 +163,7 @@ export function TaskKanban({
             onOpen={onOpen}
             onNew={() => onNew(status)}
             onDeadline={onDeadline}
+            onMenu={onMenu}
           />
         ))}
       </div>
@@ -208,7 +212,9 @@ function Column({
   onOpen,
   onNew,
   onDeadline,
+  onMenu,
 }: {
+  onMenu?: (e: React.MouseEvent, t: TaskDTO) => void;
   status: TaskStatus;
   tasks: TaskDTO[];
   cats: Map<string, CategoryDTO>;
@@ -298,6 +304,7 @@ function Column({
             onNativeStart={onNativeStart}
             onOpen={() => onOpen(t)}
             onDeadline={onDeadline}
+            onMenu={onMenu ? (e) => onMenu(e, t) : undefined}
           />,
         ])}
         {slot === tasks.length && placeholder}
@@ -322,7 +329,10 @@ function DraggableCard({
   onNativeStart,
   onOpen,
   onDeadline,
+  onMenu,
 }: {
+  /** Clic derecho: el menú de la tarea (no mientras se arrastra). */
+  onMenu?: (e: React.MouseEvent) => void;
   task: TaskDTO;
   category?: CategoryDTO | null;
   today: string;
@@ -344,6 +354,11 @@ function DraggableCard({
       className={cx("touch-manipulation", native && "cursor-grab active:cursor-grabbing", landed && "plan-land", (isDragging || nativeDragging) && "plan-drag-source")}
       {...(native ? {} : listeners)}
       draggable={native || undefined}
+      onContextMenu={(e) => {
+        // En el celular, mantener apretado es arrastrar: el menú del sistema no se abre encima.
+        if (isDragging || nativeDragging) return e.preventDefault();
+        onMenu?.(e);
+      }}
       onDragStart={
         native
           ? (e) => {

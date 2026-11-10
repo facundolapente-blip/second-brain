@@ -409,6 +409,7 @@ export function TasksBoard({
             onOpen={(t) => sheet.current?.open(t)}
             onNew={(status) => sheet.current?.open(undefined, { status })}
             onDeadline={changeDeadline}
+            onMenu={taskMenu}
           />
         </div>
       ) : visible.length === 0 ? (
