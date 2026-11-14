@@ -752,12 +752,17 @@ function WheelReading({ w, before, onEdit }: { w: WheelDTO; before: WheelDTO | n
       {parts.map((p, i) => {
         const score = p.area ? w.scores[p.area] : undefined;
         const d = p.area ? scoreDelta(w.scores, before?.scores, p.area) : null;
+        // Cada área con su color de la rueda (cabecera teñida y puntaje lleno); lo general, con el del módulo.
+        const hue = WHEEL_AREAS.find((a) => a.key === p.area)?.color;
+        const fill = hue ? areaColor(hue) : "var(--mod)";
+        const fillFg = hue ? `var(--p-${hue}-chip-fg)` : "var(--on-accent)";
         return (
           <section key={i} id={p.area ? areaAnchor(p.area) : undefined} className="scroll-mt-3 overflow-hidden rounded-2xl border border-line bg-surface transition-shadow duration-500">
-            <h3 className="flex items-center gap-2 border-b border-line bg-[color-mix(in_oklab,var(--mod)_9%,var(--surface))] px-4 py-2.5">
+            <h3 className="flex items-center gap-2 border-b border-line px-4 py-2.5" style={{ background: `color-mix(in oklab, ${fill} 22%, var(--surface))` }}>
+              <span aria-hidden className="size-3 shrink-0 rounded-[4px]" style={{ background: fill }} />
               <span className="text-[15.5px] font-semibold">{p.area ?? "Notas generales"}</span>
               {score !== undefined && (
-                <span className="ml-auto inline-flex h-7 min-w-9 items-center justify-center rounded-full bg-[var(--mod)] px-2 text-[14px] font-semibold text-on-accent tabular">
+                <span className="ml-auto inline-flex h-7 min-w-9 items-center justify-center rounded-full px-2 text-[14px] font-semibold tabular" style={{ background: fill, color: fillFg }}>
                   {formatScore(score)}
                 </span>
               )}
