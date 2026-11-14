@@ -14,7 +14,7 @@ import { haptic } from "@/components/haptics";
 import { useSwipe } from "@/components/swipe";
 import { SwipeRow } from "@/components/swipe-row";
 import { PillSwitch } from "@/components/pill-switch";
-import { ArrowArcRight, ArrowRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank, CalendarDots } from "@phosphor-icons/react";
+import { ArrowArcRight, ArrowRight, CaretLeft, CaretRight, Check, Clock, Copy, DotsThreeVertical, MapPin, Plus, CopySimple, NotePencil, PencilSimple, Trash, CalendarBlank, CalendarDots, Timer } from "@phosphor-icons/react";
 import { copyWeekToNext, moveBlock, passWeek, setBlockDone, deleteBlock, duplicateBlock, renameBlock, passToNextWeek, rescheduleBlock, scheduleTask, saveBlock } from "@/lib/offline/plan";
 import { addDays, formatMonth, formatShort, monthKey, shiftMonth, startOfWeek, weekday } from "@/lib/dates";
 import {
@@ -308,6 +308,8 @@ export function WeekView({
           onSelect: () => sheetActions.passWeek(b.id),
         },
         { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => sheetActions.duplicate(b.id) },
+        // Arranca el temporizador de Enfoque con este bloque (un bloque creado sin señal todavía no tiene id del servidor).
+        ...(!b.id.startsWith("pendiente-") && !isFreeBlock(b) ? [{ label: "Enfocarme", icon: <Timer size={15} />, onSelect: () => router.push(`/enfoque?bloque=${encodeURIComponent(b.id)}`) }] : []),
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => openEdit(b) },
         {
           label: "Borrar",

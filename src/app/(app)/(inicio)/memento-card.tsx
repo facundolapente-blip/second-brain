@@ -42,7 +42,7 @@ export function MementoCard({ config, today, className }: { config: MementoConfi
         meta={s ? `semana ${nf.format(s.lived)} de ${nf.format(s.total)}` : undefined}
         action={edit}
         className={className}
-        bodyClassName="gap-3!"
+        bodyClassName="gap-3! lg:grid! lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-x-8!"
       >
         {s && local ? (
           <>
@@ -61,7 +61,7 @@ export function MementoCard({ config, today, className }: { config: MementoConfi
             </div>
             <div>
               {/* Un cuadrito por año: los vividos llenos, este año con borde. */}
-              <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="img" aria-label={`${s.age} de ${local.years} años`}>
+              <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px] lg:grid-cols-[repeat(25,minmax(0,1fr))]" role="img" aria-label={`${s.age} de ${local.years} años`}>
                 {Array.from({ length: local.years }, (_, i) => (
                   <span
                     key={i}

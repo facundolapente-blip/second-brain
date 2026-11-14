@@ -4,7 +4,7 @@ import { getHabitsWithLogs } from "./habits";
 import { habitScore } from "./habit-logic";
 import { getAccounts, getGoals } from "./finance";
 import { addDays, fromDbDate, startOfWeek, toDbDate, todayISO } from "./dates";
-import { monthGrid, parseTaskLinks, type MinorGoalDTO } from "./plan-logic";
+import { isDreamKind, monthGrid, parseTaskLinks, type DreamDTO, type MinorGoalDTO } from "./plan-logic";
 import type {
   BlockDTO,
   CategoryDTO,
@@ -208,6 +208,22 @@ export async function getKrLinkOptions(): Promise<KrLinkOption[]> {
     ...accounts.map((a) => ({ value: `account:${a.id}`, label: `${a.name} (${a.currency})`, group: "Cuentas" as const })),
     ...goals.map((g) => ({ value: `goal:${g.id}`, label: g.name, group: "Metas de ahorro" as const })),
   ];
+}
+
+/** "Sueños por cumplir" (todos, de todos los años), con el objetivo grande al que pasaron. */
+export async function getDreams(): Promise<DreamDTO[]> {
+  const rows = await prisma.planDream.findMany({ orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
+  const ids = rows.map((r) => r.objectiveId).filter((x): x is string => !!x);
+  const objs = ids.length ? await prisma.planObjective.findMany({ where: { id: { in: ids } }, select: { id: true, year: true } }) : [];
+  const byId = new Map(objs.map((o) => [o.id, o]));
+  return rows.map((d) => ({
+    id: d.id,
+    title: d.title,
+    kind: isDreamKind(d.kind) ? d.kind : "personal",
+    done: d.done,
+    order: d.order,
+    objective: d.objectiveId ? (byId.get(d.objectiveId) ?? null) : null,
+  }));
 }
 
 /** "Otros objetivos" del año, en el orden en que se anotaron. */

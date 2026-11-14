@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChartPolar, ClockCounterClockwise, DotsThreeVertical, Minus, NotePencil, Plus, Trash, Eye } from "@phosphor-icons/react";
+import { BookOpenText, ChartPolar, ClockCounterClockwise, DotsThreeVertical, Minus, NotePencil, Plus, Trash, Eye } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { TintedCard } from "@/components/tinted-card";
 import { PillSwitch } from "@/components/pill-switch";
@@ -19,6 +19,7 @@ import {
   radarAt,
   radarPoints,
   scoreDelta,
+  splitWheelNote,
   WHEEL_AREAS,
   wheelAverage,
   type WheelScores,
@@ -64,6 +65,14 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
     sheet.current?.open();
   };
 
+  // Leer lo que escribió en una rueda (doble clic en la fecha, o "Leer" en el menú).
+  const readSheet = useRef<SheetHandle>(null);
+  const [reading, setReading] = useState<WheelDTO | null>(null);
+  const openRead = (w: WheelDTO) => {
+    setReading(w);
+    readSheet.current?.open();
+  };
+
   const sel = list.find((w) => w.id === selectedId) ?? list[0] ?? null;
   const older = sel ? list.filter((w) => w.id !== sel.id && w.date <= sel.date) : [];
   const cmp = (compareId ? list.find((w) => w.id === compareId && w.id !== sel?.id) : null) ?? older[0] ?? null;
@@ -90,6 +99,7 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
     showContextMenu(
       e,
       [
+        ...(w.note ? [{ label: "Leer lo que escribiste", icon: <BookOpenText size={15} />, onSelect: () => openRead(w) }] : []),
         { label: "Ver esta rueda", icon: <Eye size={15} />, onSelect: () => (setSelectedId(w.id), setCompareId(null)) },
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => openForm(w) },
         { label: "Borrar", icon: <Trash size={15} />, danger: true, onSelect: () => remove(w) },
@@ -160,7 +170,14 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
               {view === "radar" ? <Radar cur={sel.scores} cmp={cmp?.scores ?? null} /> : <Bars cur={sel.scores} cmp={cmp?.scores ?? null} avg={avg} avgDelta={avgDelta} />}
               <Legend sel={sel} cmp={cmp} avg={avg} cmpAvg={cmpAvg} />
               {view === "radar" && <ScoreList cur={sel.scores} cmp={cmp?.scores ?? null} />}
-              {sel.note && <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[13.5px] whitespace-pre-line">{sel.note}</p>}
+              {sel.note && (
+                <button type="button" onClick={() => openRead(sel)} className="tap-tint grid gap-1.5 rounded-xl bg-surface-2 px-3 py-2.5 text-left">
+                  <span className="line-clamp-3 text-[13.5px] text-muted">{notePreview(sel.note)}</span>
+                  <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-fg">
+                    <BookOpenText size={15} aria-hidden /> Leer lo que escribiste
+                  </span>
+                </button>
+              )}
             </>
           ) : (
             <div className="grid justify-items-start gap-3 py-2">
@@ -185,12 +202,26 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
                   selected={w.id === sel?.id}
                   onSelect={() => (setSelectedId(w.id), setCompareId(null))}
                   onMenu={(e) => wheelMenu(e, w)}
+                  onRead={w.note ? () => openRead(w) : undefined}
                 />
               ))}
             </ul>
           )}
         </TintedCard>
       </main>
+
+      <Sheet ref={readSheet} title={reading ? `Rueda del ${dayMonthYear(reading.date)}` : "Rueda"} wide>
+        {reading && (
+          <WheelReading
+            w={reading}
+            before={list.find((x) => x.date < reading.date) ?? null}
+            onEdit={() => {
+              readSheet.current?.close();
+              openForm(reading);
+            }}
+          />
+        )}
+      </Sheet>
 
       <Sheet ref={sheet} title={editing ? `Rueda del ${dayMonthYear(editing.date)}` : "Nueva rueda"}>
         <WheelForm
@@ -329,12 +360,14 @@ function HistoryRow({
   selected,
   onSelect,
   onMenu,
+  onRead,
 }: {
   w: WheelDTO;
   before: WheelDTO | null;
   selected: boolean;
   onSelect: () => void;
   onMenu: (e: React.MouseEvent) => void;
+  onRead?: () => void;
 }) {
   const avg = wheelAverage(w.scores);
   const prevAvg = before ? wheelAverage(before.scores) : null;
@@ -342,10 +375,21 @@ function HistoryRow({
   const hold = useHoldMenu(onMenu);
   return (
     <li {...hold} className={cx("flex items-center gap-2 border-b border-line last:border-b-0", selected && "bg-[color-mix(in_oklab,var(--mod)_8%,var(--surface))]")}>
-      <button type="button" onClick={onSelect} aria-current={selected ? "true" : undefined} className="tap-tint flex min-h-14 min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left">
+      <button
+        type="button"
+        onClick={onSelect}
+        onDoubleClick={onRead}
+        title={onRead ? "Doble clic para leer lo que escribiste" : undefined}
+        aria-current={selected ? "true" : undefined}
+        className="tap-tint flex min-h-14 min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left">
         <span className="grid min-w-0 flex-1 gap-0.5">
           <span className="text-[14px] font-medium">{dayMonthYear(w.date)}</span>
-          {w.note && <span className="truncate text-[12.5px] text-muted">{w.note}</span>}
+          {w.note && (
+            <span className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted">
+              <BookOpenText size={13} aria-hidden className="shrink-0" />
+              <span className="truncate">{w.note.length > 300 ? "Tiene lo que escribiste" : w.note}</span>
+            </span>
+          )}
         </span>
         <span className="text-right">
           <span className="block text-[17px] font-semibold tabular">{avg !== null ? formatScore(avg) : "–"}</span>
@@ -464,3 +508,48 @@ function WheelForm({ editing, last, today, onSaved }: { editing: WheelDTO | null
     </form>
   );
 }
+
+/**
+ * Lo que escribió en una rueda, área por área, con el puntaje y cuánto cambió contra la
+ * anterior (pedido de Facu, 2026-11-14: en Notion cada fecha era una página con su texto).
+ */
+function WheelReading({ w, before, onEdit }: { w: WheelDTO; before: WheelDTO | null; onEdit: () => void }) {
+  const parts = splitWheelNote(w.note);
+  const avg = wheelAverage(w.scores);
+  return (
+    <div className="grid gap-5">
+      <p className="font-mono text-[12px] text-muted tabular">
+        Promedio {avg !== null ? formatScore(avg) : "–"}
+        {before ? ` · contra ${dayMonthYear(before.date)}` : ""}
+      </p>
+      {parts.length === 0 && <p className="text-[14px] text-muted">Esta rueda no tiene nada escrito.</p>}
+      {parts.map((p, i) => {
+        const score = p.area ? w.scores[p.area] : undefined;
+        const d = p.area ? scoreDelta(w.scores, before?.scores, p.area) : null;
+        return (
+          <section key={i} className="grid gap-2">
+            {p.area && (
+              <h3 className="flex items-baseline gap-2 border-b border-line pb-1.5">
+                <span className="text-[16px] font-semibold">{p.area}</span>
+                {score !== undefined && <span className="ml-auto text-[16px] font-semibold tabular">{formatScore(score)}</span>}
+                {d !== null && <span className={cx("w-10 text-right font-mono text-[12px] tabular", tone(d))}>{formatDelta(d)}</span>}
+              </h3>
+            )}
+            {p.blocks.map((b, k) => (
+              <div key={k} className="grid gap-1">
+                {b.title && <p className="kicker">{b.title}</p>}
+                {b.text && <p className="max-w-[68ch] text-[15px] leading-relaxed whitespace-pre-line">{b.text}</p>}
+              </div>
+            ))}
+          </section>
+        );
+      })}
+      <Button onClick={onEdit} className="justify-self-start">
+        <NotePencil size={16} aria-hidden /> Editar esta rueda
+      </Button>
+    </div>
+  );
+}
+
+/** El principio de lo escrito, sin el rótulo de la primera área ("1. Salud."). */
+const notePreview = (note: string) => note.replace(/^\s*\d+\.[^\n]*\n/, "").trim();

@@ -22,6 +22,7 @@ import {
   type KrLinkOption,
   type KrStatus,
   type MinorGoalDTO,
+  type DreamDTO,
   type ObjectiveDTO,
   type Quarter,
 } from "@/lib/plan-logic";
@@ -34,6 +35,7 @@ import { PlanTabs } from "../plan-nav";
 import { KrSheet, ObjectiveForm, type KrSheetHandle } from "./objective-forms";
 import { ObjectivesBoard } from "./objectives-board";
 import { MinorGoals } from "./minor-goals";
+import { Dreams } from "./dreams";
 
 const fmtNum = (n: number) => n.toLocaleString("es-UY", { maximumFractionDigits: 2 });
 /** Los objetivos importados de Notion traían un número adelante ("2 Mejorar mi salud"). */
@@ -56,6 +58,7 @@ export function ObjectivesView({
   objectives,
   loose,
   minor,
+  dreams,
   links,
   today,
   year,
@@ -65,6 +68,7 @@ export function ObjectivesView({
   objectives: ObjectiveDTO[];
   loose: KeyResultDTO[];
   minor: MinorGoalDTO[];
+  dreams: DreamDTO[];
   links: KrLinkOption[];
   today: string;
   year: number;
@@ -208,6 +212,7 @@ export function ObjectivesView({
         </TintedCard>
 
         <MinorGoals goals={minor} year={year} />
+        <Dreams dreams={dreams} year={year} />
       </main>
 
       <Sheet ref={newSheet} title={`Nuevo objetivo ${year}`}>

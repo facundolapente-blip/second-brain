@@ -197,9 +197,9 @@ export function InicioView({
             <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
           </div>
         </div>
-        {/* La nota ocupa dos filas: a su izquierda, el saludo arriba y el Memento mori abajo. */}
-        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-7 lg:row-span-2" />
-        <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-5" />
+        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-7" />
+        {/* Memento mori a lo ancho: cifras a la izquierda, un cuadrito por año a la derecha. */}
+        <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-12" />
 
         {/* Fila 2: las cinco cifras. */}
         <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-3 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">

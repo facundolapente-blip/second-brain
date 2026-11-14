@@ -3,12 +3,13 @@
 import { PillSwitch } from "./pill-switch";
 import { notifyInfo, UndoToast } from "./undo-toast";
 import { ContextMenuHost } from "./context-menu";
+import { FocusPill } from "./focus-pill";
 import { PullToRefresh } from "./pull-refresh";
 import { plainClick } from "./tab-nav";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Bell, CalendarCheck, ChartLineUp, ChartPolar, Compass, ClipboardText, ClockCounterClockwise, Database, Heartbeat, House, List, Medal, Note, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
+import { Bell, CalendarCheck, ChartLineUp, ChartPolar, Timer, Compass, ClipboardText, ClockCounterClockwise, Database, Heartbeat, House, List, Medal, Note, Notebook, SignOut, Wallet, type Icon } from "@phosphor-icons/react";
 import { signOut } from "@/lib/auth-client";
 import { THEME_COLOR, THEME_COOKIE, THEMES, type Theme } from "@/lib/theme";
 import { BrainMark, ICON_GRADIENT } from "@/lib/brand";
@@ -36,6 +37,7 @@ const TOOLS: { href: string; label: string; icon: Icon }[] = [
   { href: "/analisis", label: "Análisis", icon: ChartLineUp },
   { href: "/salud", label: "Salud", icon: Heartbeat },
   { href: "/rueda", label: "Rueda de la vida", icon: ChartPolar },
+  { href: "/enfoque", label: "Enfoque", icon: Timer },
   { href: "/historial", label: "Historial y papelera", icon: ClockCounterClockwise },
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/datos", label: "Datos", icon: Database },
@@ -125,7 +127,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
           style={{ translate: `0 ${mark.y}px`, height: mark.h }}
         />
       )}
-      <ul className="grid gap-1">
+      <ul className="grid gap-1 lg:[@media(max-height:980px)]:gap-0.5">
         {MODULES.map((m, i) => {
           const active = isActive(m.href, m.href === "/");
           const Ico = m.icon;
@@ -139,8 +141,9 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   onNavigate?.();
                 }}
                 aria-current={active ? "page" : undefined}
-                // En la compu con poca altura (1024×768) el menú entra entero sin desplazarse.
-                className={cx("h-11 text-[15px] lg:[@media(max-height:860px)]:h-10", linkCls(active))}
+                // En la compu con poca altura (1024×768) el menú entra entero sin desplazarse (con las
+                // 12 herramientas de nov-2026 hubo que achicar renglones y huecos).
+                className={cx("h-11 text-[15px] lg:[@media(max-height:980px)]:h-9", linkCls(active))}
               >
                 <span className="font-mono text-[11px] tabular opacity-60">{String(i).padStart(2, "0")}</span>
                 <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
@@ -151,8 +154,8 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </ul>
-      <p className="mt-6 mb-1.5 lg:[@media(max-height:860px)]:mt-4 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
-      <ul className="grid gap-1">
+      <p className="mt-6 mb-1.5 lg:[@media(max-height:980px)]:mt-3 lg:[@media(max-height:980px)]:mb-1 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
+      <ul className="grid gap-1 lg:[@media(max-height:980px)]:gap-0.5">
         {TOOLS.map((t) => {
           const active = isActive(t.href);
           const Ico = t.icon;
@@ -166,7 +169,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   onNavigate?.();
                 }}
                 aria-current={active ? "page" : undefined}
-                className={cx("h-10 text-[14px] lg:[@media(max-height:860px)]:h-8", linkCls(active))}
+                className={cx("h-10 text-[14px] lg:[@media(max-height:980px)]:h-7 lg:[@media(max-height:980px)]:text-[13.5px]", linkCls(active))}
               >
                 <Ico size={17} weight={active ? "fill" : "regular"} aria-hidden />
                 {t.label}
@@ -535,9 +538,10 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
       </a>
       <UndoToast />
       <ContextMenuHost />
+      <FocusPill />
       <PullToRefresh />
       <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
-        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 overflow-y-auto overscroll-contain border-r border-side-line bg-side px-4 pt-7 pb-5 [scrollbar-width:thin] lg:flex print:hidden lg:[@media(max-height:860px)]:gap-4 lg:[@media(max-height:860px)]:pt-5 lg:[@media(max-height:860px)]:pb-4">
+        <aside className="sticky top-0 hidden h-dvh flex-col gap-8 overflow-y-auto overscroll-contain border-r border-side-line bg-side px-4 pt-7 pb-5 [scrollbar-width:thin] lg:flex print:hidden lg:[@media(max-height:980px)]:gap-3 lg:[@media(max-height:980px)]:pt-4 lg:[@media(max-height:980px)]:pb-3">
           <Brand />
           <Nav />
           <div className="mt-auto grid gap-3">

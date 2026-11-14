@@ -11,7 +11,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { isPaletteKey } from "./palette";
-import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, parseTaskColumnOrder, TASK_COLUMN_ORDER_KEY, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId, lastDayOf, nextRepeatDate } from "./plan-logic";
+import { isTime, nextQuarter, normalizeTime, QUARTERS, quarterRange, quarterReviewTemplate, REVIEW_DISMISSED_KEY, type KrStatus, type TaskStatus, parseTaskColumns, parseTaskColumnOrder, TASK_COLUMN_ORDER_KEY, type TaskColumnWidths, parseTaskLinks, topSortKey, type SortKeyPatch, isClientId, lastDayOf, nextRepeatDate, isDreamKind } from "./plan-logic";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -1125,6 +1125,79 @@ export async function unscheduleStep(id: string) {
   const st = await prisma.planStep.findUnique({ where: { id: String(id) }, select: { blockId: true } });
   if (st?.blockId) await trashAndDelete("block", st.blockId);
   refrescar();
+}
+
+// ─── Sueños por cumplir (de largo plazo, sin año) ───────────────────────────
+
+export async function addDream(input: { title: string; kind: string; clientId?: string }): Promise<ActionResult> {
+  await exigirSesion();
+  const title = cleanTitle(input?.title);
+  if (!title) return { ok: false, error: "Escribí el sueño." };
+  const kind = isDreamKind(input?.kind) ? input.kind : "personal";
+  const last = await prisma.planDream.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
+  const newId = await freshId(input.clientId, (x) => prisma.planDream.findUnique({ where: { id: x }, select: { id: true } }));
+  const d = await prisma.planDream.create({ data: { ...(newId ? { id: newId } : {}), title, kind, order: (last?.order ?? 0) + 1 } });
+  await logActivity("created", "dream", d.id, title);
+  refrescar();
+  return { ok: true, id: d.id };
+}
+
+/** Cumplido o no. */
+export async function toggleDream(id: string, done: boolean) {
+  await exigirSesion();
+  await prisma.planDream.updateMany({ where: { id: String(id) }, data: { done: !!done, doneAt: done ? new Date() : null } });
+  if (done) {
+    const d = await prisma.planDream.findUnique({ where: { id: String(id) }, select: { title: true } });
+    if (d) await logActivity("completed", "dream", String(id), d.title);
+  }
+  refrescar();
+}
+
+export async function renameDream(id: string, title: string) {
+  await exigirSesion();
+  const t = cleanTitle(title);
+  if (!t) return;
+  await prisma.planDream.updateMany({ where: { id: String(id) }, data: { title: t } });
+  refrescar();
+}
+
+/** Personal o profesional. */
+export async function setDreamKind(id: string, kind: string) {
+  await exigirSesion();
+  if (!isDreamKind(kind)) return;
+  await prisma.planDream.updateMany({ where: { id: String(id) }, data: { kind } });
+  refrescar();
+}
+
+export async function deleteDream(id: string) {
+  await exigirSesion();
+  await trashAndDelete("dream", String(id));
+  refrescar();
+}
+
+/**
+ * Lo pasa a objetivo grande del año que se mira (para partirlo en objetivos chicos y
+ * tareas). El sueño queda en la lista, atado a ese objetivo.
+ */
+export async function promoteDream(input: { id: string; year: number }): Promise<ActionResult> {
+  await exigirSesion();
+  const d = await prisma.planDream.findUnique({ where: { id: String(input?.id) } });
+  if (!d) return { ok: false, error: "Ese sueño ya no está en la lista." };
+  const year = Number(input?.year);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return { ok: false, error: "Año inválido." };
+  const linked = d.objectiveId ? await prisma.planObjective.findUnique({ where: { id: d.objectiveId }, select: { id: true } }) : null;
+  if (linked) return { ok: true, id: linked.id };
+  const taken = await prisma.planObjective.findFirst({ where: { year, title: d.title }, select: { id: true } });
+  const o =
+    taken ??
+    (await prisma.planObjective.create({
+      data: { title: d.title, year, status: "doing", order: await prisma.planObjective.count({ where: { year } }) },
+      select: { id: true },
+    }));
+  await prisma.planDream.update({ where: { id: d.id }, data: { objectiveId: o.id } });
+  if (!taken) await logActivity("created", "objective", o.id, `${d.title} (${year}, era un sueño)`);
+  refrescar();
+  return { ok: true, id: o.id };
 }
 
 // ─── Otros objetivos (los que no se parten en tareas) ───────────────────────

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsIso, formatDelta, formatScore, nextWheelDate, normalizeScore, notionArea, notionDate, parseScores, radarPoints, scoreDelta, wheelAverage } from "@/lib/life-wheel";
+import { addMonthsIso, splitWheelNote, formatDelta, formatScore, nextWheelDate, normalizeScore, notionArea, notionDate, parseScores, radarPoints, scoreDelta, wheelAverage } from "@/lib/life-wheel";
 
 describe("rueda de la vida", () => {
   const jun26 = { Salud: 7, Finanzas: 6, Amor: 7, "Entorno físico": 9, "Desarrollo profesional": 8, "Desarrollo personal": 8.5, Ocio: 8, Relaciones: 8 };
@@ -44,5 +44,22 @@ describe("rueda de la vida", () => {
     expect(notionArea("5 D Profesional")).toBe("Desarrollo profesional");
     expect(notionArea("8 Relaciones")).toBe("Relaciones");
     expect(notionArea("9 Otra")).toBeNull();
+  });
+});
+
+describe("lo escrito en una rueda", () => {
+  it("separa por área y deja los rótulos como subtítulo", () => {
+    const note = "Intro suelta.\n1. Salud.\nBien en general.\n\n4. Entorno físico.\nMe gusta mi cuarto.\n5. Desarrollo profesional.\nTrabajo\nEstoy sin empleo.\n\nDj/Productor\nSaqué un EP.";
+    const parts = splitWheelNote(note);
+    expect(parts.map((p) => p.area)).toEqual([null, "Salud", "Entorno físico", "Desarrollo profesional"]);
+    expect(parts[3].blocks).toEqual([
+      { title: "Trabajo", text: "Estoy sin empleo." },
+      { title: "Dj/Productor", text: "Saqué un EP." },
+    ]);
+    expect(parts[1].blocks).toEqual([{ title: null, text: "Bien en general." }]);
+  });
+  it("sin áreas, todo junto", () => {
+    expect(splitWheelNote("Una nota corta")).toEqual([{ area: null, blocks: [{ title: null, text: "Una nota corta" }] }]);
+    expect(splitWheelNote("")).toEqual([]);
   });
 });

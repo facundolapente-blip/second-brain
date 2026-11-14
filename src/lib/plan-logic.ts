@@ -832,6 +832,15 @@ export function monthGrid(month: string): string[][] {
   return weeks;
 }
 
+/** "Sueños por cumplir": de largo plazo, sin año. */
+export const DREAM_KINDS = [
+  { value: "personal", label: "Personales" },
+  { value: "profesional", label: "Profesionales" },
+] as const;
+export type DreamKind = (typeof DREAM_KINDS)[number]["value"];
+export const isDreamKind = (v: unknown): v is DreamKind => v === "personal" || v === "profesional";
+export type DreamDTO = { id: string; title: string; kind: DreamKind; done: boolean; order: number; objective: { id: string; year: number } | null };
+
 /** Un objetivo de "Otros objetivos": un renglón, sin tareas ni objetivos chicos. */
 export type MinorGoalDTO = { id: string; title: string; done: boolean; order: number };
 

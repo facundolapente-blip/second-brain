@@ -120,3 +120,44 @@ export function notionArea(name: string): string | null {
   };
   return map[clean] ?? null;
 }
+
+const foldArea = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+export type WheelNotePart = { area: string | null; blocks: { title: string | null; text: string }[] };
+
+/**
+ * Lo escrito en una rueda, separado por área. En su Notion cada área empieza con
+ * "1. Salud." y adentro a veces hay rótulos cortos ("Trabajo", "Facultad", "Familia"):
+ * esos quedan como subtítulo. Lo que va antes de la primera área queda con `area: null`.
+ * Si no reconoce ninguna área, devuelve todo junto.
+ */
+export function splitWheelNote(note: string | null | undefined): WheelNotePart[] {
+  if (!note?.trim()) return [];
+  const known = new Map(WHEEL_AREAS.map((a) => [foldArea(a.key), a.key] as const));
+  const parts: WheelNotePart[] = [{ area: null, blocks: [] }];
+  let title: string | null = null;
+  let buf: string[] = [];
+  const flush = () => {
+    const text = buf.join("\n").trim();
+    if (text || title) parts[parts.length - 1].blocks.push({ title, text });
+    title = null;
+    buf = [];
+  };
+  for (const raw of note.split(/\r?\n/)) {
+    const line = raw.trim();
+    const head = line.match(/^\d+\s*[.)]\s*(.+?)\.?$/);
+    const area = head ? known.get(foldArea(head[1])) : undefined;
+    if (area) {
+      flush();
+      parts.push({ area, blocks: [] });
+    } else if (parts.length > 1 && isSubtitle(line)) {
+      flush();
+      title = line;
+    } else buf.push(line);
+  }
+  flush();
+  return parts.filter((p) => p.blocks.length > 0);
+}
+
+/** "Trabajo", "Dj/Productor", "Familia": rótulo corto, sin punto final. */
+const isSubtitle = (line: string) => line.length > 0 && line.length <= 32 && line.split(/\s+/).length <= 4 && /^[A-ZÁÉÍÓÚÑ]/.test(line) && !/[.,;:!?]$/.test(line);

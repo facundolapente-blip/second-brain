@@ -820,6 +820,20 @@ model PlanStep {
 }
 
 /// "Otros objetivos" de un año (2026-10-25): los que no se parten en tareas, anotados en un renglón.
+/// "Sueños por cumplir" (2026-11-14): lo de largo plazo, sin año; personal o profesional.
+/// Pasarlo a objetivo grande lo deja en la lista atado a ese objetivo (`objectiveId`).
+model PlanDream {
+  id          String    @id @default(cuid())
+  title       String
+  kind        String    @default("personal")
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  order       Float     @default(0)
+  objectiveId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 model PlanMinorGoal {
   id        String    @id @default(cuid())
   year      Int

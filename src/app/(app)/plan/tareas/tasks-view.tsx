@@ -8,7 +8,8 @@ import { useHoldMenu } from "@/components/hold-menu";
 import { showContextMenu } from "@/components/context-menu";
 import { quiet, useSafeTransition } from "@/components/safe-action";
 import { createContext, Fragment, useContext, useOptimistic, useRef, useState, useEffect } from "react";
-import { ArrowDown, ArrowUp, CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots, ListChecks } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, CaretDown, Check, Plus, CalendarPlus, CopySimple, NotePencil, PencilSimple, Trash, CalendarDots, ListChecks, Timer } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
 import { reorderTasks, saveTaskColumnOrder, saveTaskColumns, setTaskDeadline, setTaskScheduled, deleteTask, duplicateTask, renameTask, saveTask, setTaskStatus } from "@/lib/offline/plan";
 import { ColumnResizers } from "@/components/column-resizers";
 import { addDays, formatShort } from "@/lib/dates";
@@ -281,6 +282,7 @@ export function TasksBoard({
   const hidden = matching.length - visible.length;
   // Clic derecho en una tarea (tabla de la compu).
   const [, startMenu] = useSafeTransition();
+  const router = useRouter();
   function taskMenu(e: React.MouseEvent, t: TaskDTO) {
     // La fila queda marcada mientras el menú está abierto.
     ringWhileMenu(e.currentTarget as HTMLElement);
@@ -295,6 +297,8 @@ export function TasksBoard({
         { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => sheetActions.duplicate(t) },
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => sheet.current?.open(t) },
         ...(t.status !== "done" ? [{ label: "Agendar en la semana", icon: <CalendarPlus size={15} />, onSelect: () => schedule(t) }] : []),
+        // Arranca el temporizador de Enfoque con esta tarea.
+        ...(t.status !== "done" ? [{ label: "Enfocarme", icon: <Timer size={15} />, onSelect: () => router.push(`/enfoque?tarea=${encodeURIComponent(t.id)}`) }] : []),
         {
           label: "Borrar",
           icon: <Trash size={15} />,

@@ -13,5 +13,6 @@ import "./values";
 import "./notes";
 import "./wheel";
 import "./memento";
+import "./focus";
 
 export { flushActions, pendingActions, subscribePending } from "./queue";
