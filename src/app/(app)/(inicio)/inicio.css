@@ -102,3 +102,15 @@
   .ini-gastos-body > div + div { padding-top: 20px; }
   .ini-gastos-body > div + div + div { border-left: 1px solid var(--border); }
 }
+
+/* Ritual de la mañana · "Hoy": la línea de 8 a 20 con una raya por hora. */
+.rit-tl {
+  background-color: var(--surface-2);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(100% / 12 - 1px),
+    var(--border) calc(100% / 12 - 1px),
+    var(--border) calc(100% / 12)
+  );
+}

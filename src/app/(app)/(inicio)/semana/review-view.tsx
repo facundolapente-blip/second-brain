@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { PeriodArrow, usePeriodNav } from "../period-nav";
-import { ArrowRight, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Medal, NotePencil, Smiley, Wallet } from "@phosphor-icons/react";
+import { ArrowRight, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Medal, NotePencil, Smiley, SunHorizon, Wallet } from "@phosphor-icons/react";
 import type { WeeklyReview } from "@/lib/review";
 import { addDays, formatShort, startOfWeek, todayISO, weekday } from "@/lib/dates";
 import { formatWeight } from "@/lib/checkin-logic";
@@ -82,6 +82,28 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
               plan: `/plan?semana=${r.monday}`,
             }}
           />
+          {r.ritual && (
+            <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] text-muted">
+              <SunHorizon size={16} aria-hidden className="shrink-0" />
+              <span>
+                Ritual de la mañana:{" "}
+                {r.ritual.missions > 0 && (
+                  <>
+                    misiones cumplidas <b className="font-semibold text-fg tabular">{r.ritual.yes} de {r.ritual.missions}</b>
+                    {r.ritual.partial > 0 && ` (${r.ritual.partial} a medias)`}
+                    {r.ritual.frogs > 0 && " · "}
+                  </>
+                )}
+                {r.ritual.frogs > 0 && (
+                  <>
+                    sapos comidos <b className="font-semibold text-fg tabular">{r.ritual.eaten}</b>
+                    {r.ritual.eaten !== r.ritual.frogs && ` de ${r.ritual.frogs}`}
+                  </>
+                )}
+                {r.ritual.missions === 0 && r.ritual.frogs === 0 && `${r.ritual.days} ${r.ritual.days === 1 ? "día armado" : "días armados"}`}
+              </span>
+            </p>
+          )}
         </section>
 
         {/* Reflexión */}

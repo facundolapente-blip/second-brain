@@ -904,3 +904,23 @@ model FocusSession {
 
   @@index([day])
 }
+
+/// Ritual matutino (2026-11-14, diseño 3 "Tablero del día" que eligió Facu): uno por día, todo
+/// opcional. La misión ("Hoy gano si…"), el sapo (una tarea del Plan o un texto libre), cuándo
+/// se lo comió y, a la noche, cómo le fue con la misión. Energía y ánimo son los del check-in
+/// (`DailyCheckin`), no se guardan acá.
+model DailyRitual {
+  id            String    @id @default(cuid())
+  day           DateTime  @unique @db.Date
+  mission       String?
+  /// Tarea del Plan elegida como sapo (sin relación: si se borra la tarea, queda el nombre).
+  frogTaskId    String?
+  frogTitle     String?
+  frogDoneAt    DateTime?
+  /// yes | partial | no (la pregunta de la noche).
+  missionResult String?
+  skipped       Boolean   @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

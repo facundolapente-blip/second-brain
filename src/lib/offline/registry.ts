@@ -14,5 +14,6 @@ import "./notes";
 import "./wheel";
 import "./memento";
 import "./focus";
+import "./ritual";
 
 export { flushActions, pendingActions, subscribePending } from "./queue";

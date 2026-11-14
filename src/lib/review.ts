@@ -6,6 +6,7 @@ import { toCents } from "./finance-logic";
 import { getPassFlows, NOT_ADJUSTMENT, PERSONAL } from "./finance";
 import { getRates, toUyu } from "./fx";
 import { REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
+import { getRitualWeek } from "./ritual";
 
 function avg(xs: (number | null)[]) {
   const v = xs.filter((x): x is number => x !== null);
@@ -45,7 +46,7 @@ export async function getWeeklyReview(day: string) {
   const sunday = addDays(monday, 6);
   const prevMonday = addDays(monday, -7);
 
-  const [{ days: all, habits }, txRows, categoryRows, tasksDone, tasksNext, review, pass] = await Promise.all([
+  const [{ days: all, habits }, txRows, categoryRows, tasksDone, tasksNext, review, pass, ritual] = await Promise.all([
     getDailyMetrics(prevMonday, sunday),
     prisma.transaction.findMany({
       // Gastos y reintegros (ingresos con categoría de gasto): el reintegro resta de su categoría,
@@ -76,6 +77,8 @@ export async function getWeeklyReview(day: string) {
       orderBy: { createdAt: "asc" },
     }),
     getPassFlows(monday, sunday),
+    // Ritual matutino: misiones cumplidas y sapos comidos (null si esa semana no hubo).
+    getRitualWeek(monday, sunday),
   ]);
   // Plata de otra persona: la diferencia del mes cuando es gasto (como categoría propia).
   const txs = [...txRows, ...pass.flows.filter((f) => f.kind === "expense")];
@@ -151,6 +154,7 @@ export async function getWeeklyReview(day: string) {
     topCategories,
     biggest,
     tasksDone,
+    ritual,
     tasksNext: tasksNext.map((t) => ({ id: t.id, title: t.title, deadline: fromDbDate(t.deadline!) })),
     weight:
       weights.length >= 1

@@ -3,6 +3,9 @@
 import { useSafeTransition } from "@/components/safe-action";
 import { QuoteCard } from "./quote-card";
 import { MementoCard } from "./memento-card";
+import { RitualRow } from "./ritual-row";
+import type { RitualData } from "@/lib/ritual";
+import { NIGHT_HOUR } from "@/lib/ritual-logic";
 import type { MementoConfig } from "@/lib/memento";
 import type { ValueNote } from "@/lib/values";
 import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
@@ -136,6 +139,7 @@ export function InicioView({
   latestNotes,
   memento,
   wheelDue,
+  ritual,
 }: {
   d: Dashboard;
   notes: ValueNote[];
@@ -144,12 +148,13 @@ export function InicioView({
   memento: MementoConfig | null;
   /** Ya pasaron 9 meses de la última Rueda de la vida (null si no toca). */
   wheelDue: { last: string; next: string } | null;
+  ritual: RitualData;
 }) {
   const prevName = monthName(shiftMonth(d.gastos.month, -1));
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
   const [habitProgress] = useState(() => progressStore({ done: d.habits.doneToday, total: d.habits.dueToday }));
 
-  const title = `${greeting(d.hour)}, Facu`;
+  const title = `${d.hour >= NIGHT_HOUR ? "Buenas noches" : greeting(d.hour)}, Facu`;
   const highlight = weekday(d.today) === 0 || weekday(d.today) === 1;
 
   return (
@@ -182,24 +187,24 @@ export function InicioView({
           </Link>
         )}
 
-        {/* Fila 1: saludo y nota del día. */}
-        <div className="flex min-w-0 flex-col justify-center gap-1.5 pb-1 max-lg:order-1 lg:col-span-5 lg:gap-2.5 lg:px-1 lg:pt-1.5 lg:pb-2">
-          <div className="flex items-center gap-2 max-lg:-ml-0.5">
-            <MenuButton />
-            <p className="kicker truncate">{formatLong(d.today)}</p>
-          </div>
-          <h1 className="display text-[32px] leading-[1.02] font-[750] tracking-[-0.04em] lg:text-[36px] xl:text-[44px]">{title}</h1>
-          <p className="max-w-[30rem] text-[15px] leading-normal text-pretty text-muted lg:text-[16px]">
-            <Summary d={d} />
-          </p>
-          <div className="mt-1 flex flex-wrap gap-1.5 lg:mt-2">
-            <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={highlight} />
-            <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
-          </div>
-        </div>
-        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-7" />
-        {/* Memento mori a lo ancho: cifras a la izquierda, un cuadrito por año a la derecha. */}
-        <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-12" />
+        {/* Fila 1: el ritual de la mañana (saludo, misión, sapo, hoy y logros). */}
+        <RitualRow
+          key={`ritual-${d.today}`}
+          d={d}
+          data={ritual}
+          notes={notes}
+          habits={habitProgress}
+          summary={<Summary d={d} />}
+          links={
+            <>
+              <HeaderLink href="/semana" label="Revisión semanal" icon={ClipboardText} highlight={highlight} />
+              <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
+            </>
+          }
+        />
+        {/* Memento mori (7) y la Nota del día (5), debajo del ritual. */}
+        <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-7" />
+        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-5" />
 
         {/* Fila 2: las cinco cifras. */}
         <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-3 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">
@@ -574,7 +579,8 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       meta={due === 0 ? "Hoy no toca ninguno" : complete ? `Día completo · ${due} de ${due}` : `${done} de ${due} · faltan ${due - done}`}
       action={{ href: "/habitos", label: "Ver todo" }}
       progress={due ? barDone / due : null}
-      className={cx("max-lg:order-4 lg:col-span-6 xl:col-span-7", celebrate && barSeen && "ini-glow")}
+      id="habitos-hoy"
+      className={cx("scroll-mt-20 max-lg:order-4 lg:col-span-6 xl:col-span-7", celebrate && barSeen && "ini-glow")}
       bodyClassName="ini-habits-body"
     >
       <span ref={barRef} aria-hidden className="block h-0" />
