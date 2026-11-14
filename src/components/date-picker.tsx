@@ -65,7 +65,7 @@ export function DatePicker({
     close();
   }
   return (
-    <span className={cx("relative inline-flex shrink-0", className)}>
+    <span className={cx("relative inline-flex", !/(^|\s)(shrink|flex-1)/.test(className ?? "") && "shrink-0", className)}>
       <button
         ref={trigger}
         type="button"
