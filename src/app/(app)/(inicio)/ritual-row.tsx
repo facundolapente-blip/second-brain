@@ -6,19 +6,13 @@ import {
   ArrowRight,
   CalendarCheck,
   CalendarPlus,
-  ChartPolar,
   Check,
-  CheckCircle,
-  Fire,
   Flag,
   ListChecks,
-  Medal,
   Moon,
   PencilSimple,
   SunHorizon,
-  Target,
   Timer,
-  type Icon,
 } from "@phosphor-icons/react";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyError, notifyInfo } from "@/components/undo-toast";
@@ -33,30 +27,23 @@ import type { ValueNote } from "@/lib/values";
 import type { Dashboard } from "@/lib/dashboard";
 import { isFreeBlock } from "@/lib/plan-logic";
 import { sleepText } from "@/lib/health-logic";
-import { ENERGY_LABELS, type CheckinPatch } from "@/lib/checkin-logic";
-import { greeting, MOODS } from "@/lib/journal-logic";
+import { greeting } from "@/lib/journal-logic";
 import {
   applyRitualPatch,
   emptyRitual,
   MISSION_MAX,
   MISSION_RESULTS,
   NIGHT_HOUR,
-  recentWins,
   ritualStage,
   type FrogCandidate,
   type MissionResult,
   type RitualDTO,
   type RitualPatch,
-  type Win,
 } from "@/lib/ritual-logic";
 import type { RitualData } from "@/lib/ritual";
 import { saveRitual } from "@/lib/offline/ritual";
-import { saveCheckin } from "@/lib/offline/checkin";
 import { scheduleTask } from "@/lib/offline/plan";
 import { CategoryTag } from "../plan/plan-ui";
-import { MoodIcon } from "../journal/journal-ui";
-import { Scale } from "./checkin-card";
-import { emitCheckin, useCheckinSync } from "./checkin-sync";
 
 type Progress = { done: number; total: number };
 export type ProgressSource = { get: () => Progress; subscribe: (f: () => void) => () => void };
@@ -67,7 +54,7 @@ const hhmm = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", 
 /**
  * Ritual matutino (diseño 3 "Tablero del día", 2026-11-14): la fila de arriba de Inicio.
  * A la izquierda el saludo y la misión del día con energía y ánimo (los del check-in); a la
- * derecha el sapo; debajo un vistazo a hoy y los logros recientes. Hecho, se pliega: la misión
+ * derecha el sapo; debajo un vistazo a hoy. Hecho, se pliega: la misión
  * queda de titular y el sapo como tarjeta chica con "Me lo comí". A la noche pregunta cómo fue.
  */
 export function RitualRow({
@@ -117,14 +104,6 @@ export function RitualRow({
   const night = stage === "night";
   // Desde las 19 h ya es "Buenas noches" (la pregunta de la noche arranca ahí).
   const title = `${d.hour >= NIGHT_HOUR ? "Buenas noches" : greeting(d.hour)}, Facu`;
-  const wins = recentWins({
-    today: d.today,
-    journalStreak: d.journal.streak,
-    habitDaysComplete: d.week.filter((w) => w.date <= d.today && w.habitsDue > 0 && w.habitsDone >= w.habitsDue).length,
-    goals: data.goals,
-    wheel: data.wheel,
-    ritualStreak: data.streak,
-  });
   const sleep = d.checkin.today.sleepMin;
 
   const hello = (
@@ -167,7 +146,6 @@ export function RitualRow({
             </button>
           </p>
         </div>
-        <Wins wins={wins} />
       </section>
     );
   }
@@ -194,7 +172,6 @@ export function RitualRow({
             />
           </div>
         )}
-        <Wins wins={wins} />
       </section>
     );
   }
@@ -204,7 +181,6 @@ export function RitualRow({
       <div className="grid min-w-0 content-start gap-3.5 lg:col-span-7">
         {hello}
         <MissionCard
-          d={d}
           ritual={ritual}
           note={pickForSlot(notes, quoteSlot(d.today, d.hour))}
           onTouch={() => setEditing(true)}
@@ -233,7 +209,6 @@ export function RitualRow({
         />
       </div>
       <TodayStrip d={d} habits={habits} />
-      <Wins wins={wins} />
     </section>
   );
 }
@@ -247,7 +222,6 @@ function nextBlock(d: Dashboard) {
 // ─── La misión ──────────────────────────────────────────────────────────────
 
 function MissionCard({
-  d,
   ritual,
   note,
   onTouch,
@@ -255,7 +229,6 @@ function MissionCard({
   onDone,
   onSkip,
 }: {
-  d: Dashboard;
   ritual: RitualDTO;
   note: ValueNote | null;
   onTouch: () => void;
@@ -350,7 +323,6 @@ function MissionCard({
           </div>
         </div>
       )}
-      <HowYouStart d={d} onTouch={onTouch} />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
@@ -375,79 +347,6 @@ function MissionCard({
       </div>
       {/* El resultado de la noche, si ya se contestó (se ve solo al editar después). */}
       {ritual.missionResult && <p className="text-[12.5px] text-muted">{MISSION_RESULTS.find((r) => r.value === ritual.missionResult)?.done}</p>}
-    </div>
-  );
-}
-
-/** ¿Cómo arrancás?: energía y ánimo, los mismos del check-in de hoy (se guardan ahí). */
-function HowYouStart({ d, onTouch }: { d: Dashboard; onTouch: () => void }) {
-  const date = d.checkin.today.date;
-  const [v, setV] = useState({ energy: d.checkin.today.energy, mood: d.checkin.today.mood });
-  const [, start] = useSafeTransition();
-  // Lo que se cargue en "¿Cómo estás?" se ve acá también.
-  useCheckinSync("ritual", (day, patch) => {
-    if (day !== date) return;
-    setV((cur) => ({
-      energy: "energy" in patch ? (patch.energy ?? null) : cur.energy,
-      mood: "mood" in patch ? (patch.mood ?? null) : cur.mood,
-    }));
-  });
-  function set(patch: CheckinPatch & { energy?: number | null; mood?: number | null }) {
-    const before = v;
-    onTouch();
-    setV((cur) => ({ ...cur, ...patch }));
-    emitCheckin(date, patch, "ritual");
-    start(
-      async () => {
-        await saveCheckin(date, patch);
-      },
-      {
-        onError: () => {
-          setV(before);
-          emitCheckin(date, { energy: before.energy, mood: before.mood }, "ritual");
-        },
-      },
-    );
-  }
-  return (
-    <div className="grid gap-2.5 border-t border-line pt-3">
-      <span className="kicker text-fg!">¿Cómo arrancás?</span>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-      <div className="flex items-center gap-2.5">
-        <span className="kicker">Energía</span>
-        <div className="w-[140px]">
-          <Scale value={v.energy} labels={ENERGY_LABELS} color="var(--c-habitos)" caps={false} onChange={(e) => set({ energy: e })} />
-        </div>
-      </div>
-      <div className="flex items-center gap-2.5">
-        <span className="kicker">Ánimo</span>
-        <div className="flex gap-1">
-          {MOODS.map((m) => {
-            const on = v.mood === m.value;
-            return (
-              <button
-                key={m.value}
-                type="button"
-                aria-pressed={on}
-                aria-label={m.label}
-                title={m.label}
-                onClick={() => {
-                  haptic("select");
-                  set({ mood: on ? null : m.value });
-                }}
-                style={tone(m.color)}
-                className={cx(
-                  "inline-flex size-10 items-center justify-center rounded-full transition-[background-color,color,scale] duration-200 active:scale-95",
-                  on ? "bg-tone text-tone-fg ring-2 ring-[var(--tone-solid)]" : "bg-surface-2 text-muted hover:text-fg",
-                )}
-              >
-                <MoodIcon mood={m.value} size={21} weight={on ? "fill" : "regular"} />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      </div>
     </div>
   );
 }
@@ -901,49 +800,3 @@ function TodayStrip({ d, habits }: { d: Dashboard; habits: ProgressSource }) {
   );
 }
 
-// ─── Logros recientes ───────────────────────────────────────────────────────
-
-const WIN_LOOK: Record<Win["kind"], { icon: Icon; color: string }> = {
-  journal: { icon: Fire, color: "var(--c-journal)" },
-  habits: { icon: CheckCircle, color: "var(--c-habitos)" },
-  goal: { icon: Target, color: "var(--c-plan)" },
-  wheel: { icon: ChartPolar, color: "var(--mod-inicio)" },
-  ritual: { icon: SunHorizon, color: "var(--p-orange-chip)" },
-};
-
-/** Tira de logros (calculados, no se guardan): solo los que tienen algo que decir. */
-function Wins({ wins }: { wins: Win[] }) {
-  if (!wins.length) return null;
-  return (
-    <section aria-label="Logros recientes" className="grid gap-2.5 lg:col-span-12">
-      <p className="flex items-center gap-2 text-[14.5px] font-semibold lg:px-1">
-        <Medal size={17} weight="fill" aria-hidden className="text-[var(--accent)]" />
-        Logros recientes
-      </p>
-      {/* Siempre de a quintos en la compu: con menos logros, los cuadritos no se estiran. */}
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5 lg:gap-3">
-        {wins.map((w, i) => {
-          const L = WIN_LOOK[w.kind];
-          return (
-            <Link
-              key={w.kind}
-              href={w.href}
-              className={cx(
-                "lift grid min-w-0 content-start gap-1 rounded-[14px] border border-line bg-surface px-3 py-2.5",
-                wins.length % 2 === 1 && i === wins.length - 1 && "max-lg:col-span-2",
-              )}
-            >
-              <span aria-hidden className="mb-0.5 inline-flex size-6 items-center justify-center rounded-lg text-white" style={{ background: L.color }}>
-                <L.icon size={14} weight="bold" />
-              </span>
-              <span className={cx("text-fg", w.text ? "line-clamp-2 text-[14.5px] leading-snug font-[650] tracking-[-0.01em]" : "truncate font-mono text-[19px] leading-tight font-semibold tracking-[-0.02em]")}>
-                {w.value}
-              </span>
-              <span className="text-[12px] leading-snug text-muted">{w.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}

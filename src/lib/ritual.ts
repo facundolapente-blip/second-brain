@@ -1,8 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma";
-import { addDays, dayOfInstant, fromDbDate, toDbDate } from "./dates";
-import { parseScores } from "./life-wheel";
-import { frogCandidates, isRitualDone, ritualStreak, ritualWeek, type MissionResult, type RitualDTO, type WinsInput } from "./ritual-logic";
+import { addDays, fromDbDate, toDbDate } from "./dates";
+import { frogCandidates, isRitualDone, ritualStreak, ritualWeek, type MissionResult, type RitualDTO } from "./ritual-logic";
 
 type RitualRow = NonNullable<Awaited<ReturnType<typeof prisma.dailyRitual.findFirst>>>;
 
@@ -20,22 +19,17 @@ export function ritualDTO(r: RitualRow): RitualDTO {
 }
 
 /**
- * Lo del ritual matutino para Inicio: el de hoy, las candidatas a sapo, la racha de rituales
- * y lo que hace falta para los logros recientes (lo demás sale de `getDashboard`).
+ * Lo del ritual matutino para Inicio: el de hoy, las candidatas a tarea prioritaria y la
+ * racha de rituales (lo demás sale de `getDashboard`).
  */
 export async function getRitualData(today: string) {
-  const since14 = new Date(Date.now() - 14 * 86_400_000);
-  const [row, recent, tasks, krs, minors, dreams, wheels] = await Promise.all([
+  const [row, recent, tasks] = await Promise.all([
     prisma.dailyRitual.findUnique({ where: { day: toDbDate(today) } }),
     prisma.dailyRitual.findMany({ where: { day: { gte: toDbDate(addDays(today, -400)), lte: toDbDate(today) } } }),
     prisma.planTask.findMany({
       where: { status: { not: "done" } },
       select: { id: true, title: true, status: true, priority: true, deadline: true, category: { select: { id: true, name: true, color: true } } },
     }),
-    prisma.planKeyResult.findMany({ where: { status: "done", updatedAt: { gte: since14 } }, select: { title: true, updatedAt: true } }),
-    prisma.planMinorGoal.findMany({ where: { done: true, doneAt: { gte: since14 } }, select: { title: true, doneAt: true } }),
-    prisma.planDream.findMany({ where: { done: true, doneAt: { gte: since14 } }, select: { title: true, doneAt: true } }),
-    prisma.lifeWheel.findMany({ orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 2, select: { date: true, scores: true } }),
   ]);
 
   // Cuántas veces se pasó de semana cada tarea: los registros que dejan sus bloques al
@@ -64,15 +58,6 @@ export async function getRitualData(today: string) {
     3,
   );
 
-  const goals: WinsInput["goals"] = [
-    ...krs.map((k) => ({ title: k.title, kind: "kr" as const, at: k.updatedAt })),
-    ...minors.map((m) => ({ title: m.title, kind: "minor" as const, at: m.doneAt! })),
-    ...dreams.map((m) => ({ title: m.title, kind: "dream" as const, at: m.doneAt! })),
-  ]
-    .sort((a, b) => +b.at - +a.at)
-    .map(({ title, kind, at }) => ({ title, kind, date: dayOfInstant(at) }));
-
-  const [w, wPrev] = wheels;
   return {
     ritual: row ? ritualDTO(row) : null,
     candidates,
@@ -80,8 +65,6 @@ export async function getRitualData(today: string) {
       recent.filter((r) => isRitualDone(ritualDTO(r))).map((r) => fromDbDate(r.day)),
       today,
     ),
-    goals,
-    wheel: w ? { date: fromDbDate(w.date), scores: parseScores(w.scores), prev: wPrev ? parseScores(wPrev.scores) : null } : null,
   };
 }
 

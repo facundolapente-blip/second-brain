@@ -187,54 +187,6 @@ export function frogCandidates(tasks: FrogTaskInput[], today: string, n = 3): Fr
     .map((t) => ({ ...t, reasons: frogReasons(t, today) }));
 }
 
-// ─── Logros recientes ───────────────────────────────────────────────────────
-
-export type WinKind = "journal" | "habits" | "goal" | "wheel" | "ritual";
-export type Win = { kind: WinKind; value: string; label: string; href: string; text?: boolean };
-
-export type WinsInput = {
-  today: string;
-  journalStreak: number;
-  /** Días de esta semana (hasta hoy) con todos los hábitos que tocaban hechos. */
-  habitDaysComplete: number;
-  /** Lo último logrado en los últimos 14 días (objetivo chico, otro objetivo o sueño), del más nuevo al más viejo. */
-  goals: { title: string; kind: "kr" | "minor" | "dream"; date: string }[];
-  /** La última rueda y la anterior (puntaje por área). */
-  wheel: { date: string; scores: Record<string, number>; prev: Record<string, number> | null } | null;
-  ritualStreak: number;
-};
-
-/** Días que cuentan como "reciente" para la rueda (se hace cada ~9 meses). */
-export const WHEEL_RECENT_DAYS = 30;
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** Los cuadritos de "Logros recientes": solo los que tienen algo que decir. */
-export function recentWins(i: WinsInput): Win[] {
-  const out: Win[] = [];
-  if (i.journalStreak >= 2) out.push({ kind: "journal", value: plural(i.journalStreak, "día", "días"), label: "Racha de journal", href: "/journal" });
-  if (i.habitDaysComplete >= 1)
-    out.push({ kind: "habits", value: plural(i.habitDaysComplete, "día", "días"), label: "Completos de hábitos esta semana", href: "/habitos" });
-  if (i.goals.length) {
-    const g = i.goals[0];
-    const what = g.kind === "dream" ? "Sueño cumplido" : g.kind === "minor" ? "Objetivo logrado" : "Objetivo chico logrado";
-    const more = i.goals.length - 1;
-    out.push({ kind: "goal", value: g.title, label: more ? `${what} (y ${more} más)` : what, href: "/plan/objetivos", text: true });
-  }
-  if (i.wheel?.prev && diffDays(i.today, i.wheel.date) <= WHEEL_RECENT_DAYS) {
-    let best: { area: string; d: number } | null = null;
-    for (const [area, v] of Object.entries(i.wheel.scores)) {
-      const p = i.wheel.prev[area];
-      if (typeof p !== "number") continue;
-      const d = Math.round((v - p) * 10) / 10;
-      if (d > 0 && (!best || d > best.d)) best = { area, d };
-    }
-    if (best) out.push({ kind: "wheel", value: `+${String(best.d).replace(".", ",")}`, label: `${best.area} subió en la rueda`, href: "/rueda" });
-  }
-  if (i.ritualStreak >= 2) out.push({ kind: "ritual", value: `${i.ritualStreak} seguidos`, label: "Rituales sin cortar", href: "/" });
-  return out;
-}
-
 // ─── Revisión semanal ───────────────────────────────────────────────────────
 
 export type RitualWeek = { missions: number; yes: number; partial: number; frogs: number; eaten: number; days: number };

@@ -7,7 +7,6 @@ import {
   isRitualDay,
   isRitualDone,
   missionText,
-  recentWins,
   ritualStage,
   ritualStreak,
   ritualWeek,
@@ -106,40 +105,12 @@ describe("ritual: datos", () => {
   });
 });
 
-describe("ritual: racha, logros y semana", () => {
+describe("ritual: racha y semana", () => {
   it("la racha cuenta desde ayer si hoy todavía no", () => {
     expect(ritualStreak(["2026-11-14", "2026-11-15"], today)).toBe(2);
     expect(ritualStreak(["2026-11-14", "2026-11-15", today], today)).toBe(3);
     expect(ritualStreak(["2026-11-13", "2026-11-15"], today)).toBe(1);
     expect(ritualStreak([], today)).toBe(0);
-  });
-  it("logros: solo los que tienen algo que decir", () => {
-    const none = recentWins({ today, journalStreak: 1, habitDaysComplete: 0, goals: [], wheel: null, ritualStreak: 1 });
-    expect(none).toEqual([]);
-    const all = recentWins({
-      today,
-      journalStreak: 12,
-      habitDaysComplete: 5,
-      goals: [
-        { title: "Leer 12 libros", kind: "kr", date: "2026-11-15" },
-        { title: "Viajar", kind: "dream", date: "2026-11-10" },
-      ],
-      wheel: { date: "2026-11-14", scores: { Salud: 7, Ocio: 8 }, prev: { Salud: 7.5, Ocio: 6 } },
-      ritualStreak: 7,
-    });
-    expect(all.map((w) => [w.kind, w.value, w.label])).toEqual([
-      ["journal", "12 días", "Racha de journal"],
-      ["habits", "5 días", "Completos de hábitos esta semana"],
-      ["goal", "Leer 12 libros", "Objetivo chico logrado (y 1 más)"],
-      ["wheel", "+2", "Ocio subió en la rueda"],
-      ["ritual", "7 seguidos", "Rituales sin cortar"],
-    ]);
-  });
-  it("la rueda vieja o sin subas no es un logro", () => {
-    const base = { today, journalStreak: 0, habitDaysComplete: 0, goals: [], ritualStreak: 0 };
-    expect(recentWins({ ...base, wheel: { date: "2026-06-01", scores: { Ocio: 8 }, prev: { Ocio: 6 } } })).toEqual([]);
-    expect(recentWins({ ...base, wheel: { date: "2026-11-14", scores: { Ocio: 5 }, prev: { Ocio: 6 } } })).toEqual([]);
-    expect(recentWins({ ...base, wheel: { date: "2026-11-14", scores: { Ocio: 6.5 }, prev: { Ocio: 6 } } })[0].value).toBe("+0,5");
   });
   it("la semana para la revisión", () => {
     expect(ritualWeek([])).toBeNull();
