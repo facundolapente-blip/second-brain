@@ -1456,11 +1456,14 @@ function NotesCard({ s, today }: { s: NotesSummary; today: string }) {
         </span>
       </Link>
       {s.latest.length ? (
-        <ul className="grid gap-0.5">
-          {s.latest.map((n) => {
+        // En la compu la tarjeta se estira hasta el alto de Hábitos: la lista llena ese lugar con
+        // las notas que entran enteras (filas fijas de 56 px; las que no entran van a filas de
+        // alto 0 y no se ven). En el celular, las 3 últimas (pedido de Facu, 2026-11-14).
+        <ul className="grid gap-0.5 lg:min-h-0 lg:flex-1 lg:basis-0 lg:auto-rows-[0px] lg:grid-rows-[repeat(auto-fill,56px)] lg:overflow-hidden">
+          {s.latest.map((n, i) => {
             const sec = sectionOf(n.section);
             return (
-              <li key={n.id} className="min-w-0">
+              <li key={n.id} className={cx("min-w-0 lg:overflow-hidden", i >= 3 && "max-lg:hidden")}>
                 <Link href={`/notas?seccion=${sec.id}`} className="tap-tint flex min-w-0 items-center gap-3 rounded-xl px-1 py-2 hover:bg-surface-2">
                   <span style={tone(sec.color)} className="chip-solid inline-flex size-8 shrink-0 items-center justify-center rounded-lg">
                     <sec.icon size={16} weight="fill" aria-hidden />

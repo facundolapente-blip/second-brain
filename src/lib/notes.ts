@@ -155,10 +155,10 @@ export async function getNoteTags(limit = 30): Promise<string[]> {
   return [...count].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit).map(([t]) => t);
 }
 
-/** Para Inicio: las últimas 3 y los videos sin ver. */
+/** Para Inicio: las últimas 12 (en la compu se ven las que entran; en el celular, 3) y los videos sin ver. */
 export async function getNotesSummary() {
   const [latest, laterVideos] = await Promise.all([
-    prisma.note.findMany({ select: SELECT, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 3 }),
+    prisma.note.findMany({ select: SELECT, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 12 }),
     prisma.note.count({ where: { section: "videos", done: false } }),
   ]);
   return { latest: latest.map(toDTO), laterVideos };
