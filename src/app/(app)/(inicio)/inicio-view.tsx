@@ -187,13 +187,23 @@ export function InicioView({
           </Link>
         )}
 
-        {/* Fila 1: el ritual de la mañana (saludo, misión, sapo, hoy y logros). */}
+        {/* Fila 1: el ritual de la mañana (saludo y "¿Cómo estás?", tarea prioritaria y hoy). */}
         <RitualRow
           key={`ritual-${d.today}`}
           d={d}
           data={ritual}
-          notes={notes}
           habits={habitProgress}
+          checkin={
+            // key: al cambiar de día (el Shell refresca sin desmontar) arranca de nuevo con
+            // las fechas nuevas; lo pendiente se manda al desmontar, con su fecha vieja.
+            <CheckinCard
+              key={d.today}
+              today={d.checkin.today}
+              yesterday={d.checkin.yesterday}
+              lastWeightG={d.checkin.lastWeightG}
+              watch={d.checkin.watch}
+            />
+          }
           summary={<Summary d={d} />}
           links={
             <>
@@ -222,18 +232,9 @@ export function InicioView({
           <NotesCard s={latestNotes} today={d.today} />
         </div>
 
-        {/* key: al cambiar de día (el Shell refresca sin desmontar) arranca de nuevo con
-            las fechas nuevas; lo pendiente se manda al desmontar, con su fecha vieja. */}
-        <CheckinCard
-          key={d.today}
-          today={d.checkin.today}
-          yesterday={d.checkin.yesterday}
-          lastWeightG={d.checkin.lastWeightG}
-          watch={d.checkin.watch}
-          className="max-lg:order-6 lg:col-span-6 xl:col-span-7"
-        />
-        <JournalCard d={d} />
         <GastosCard d={d} delta={delta} prevName={prevName} />
+        {/* Journal (5) junto a Tu semana (7); Constancia a lo ancho. */}
+        <JournalCard d={d} />
         <WeekMix d={d} />
         <Constancia d={d} />
       </main>
@@ -1023,7 +1024,7 @@ function WeekMix({ d }: { d: Dashboard }) {
       title="Tu semana"
       meta={rangeLabel(d.week[0].date, d.week[d.week.length - 1].date)}
       action={{ href: "/semana", label: "Revisión" }}
-      className="max-lg:order-10 lg:col-span-12 xl:col-span-5"
+      className="max-lg:order-10 lg:col-span-12 xl:col-span-7"
     >
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full min-w-[18rem] table-fixed border-separate border-spacing-y-1 text-center">
@@ -1386,7 +1387,7 @@ function JournalCard({ d }: { d: Dashboard }) {
       title="Journal"
       meta={j.last ? `Última entrada · ${j.last.date === d.today ? "hoy" : formatShort(j.last.date)}` : "Todavía no hay entradas"}
       action={{ href: "/journal", label: "Entradas" }}
-      className="max-lg:order-8 lg:col-span-6 xl:col-span-5"
+      className="max-lg:order-8 lg:col-span-12 xl:col-span-5"
     >
       <div className="grid grid-cols-3">
         <JournalNum value={j.streak} label={j.streak === 1 ? "día de racha" : "días de racha"} />
@@ -1512,7 +1513,7 @@ function Constancia({ d }: { d: Dashboard }) {
       icon={CalendarCheck}
       title="Constancia"
       meta={`Últimas ${weeks} semanas · cada cuadrito es un día`}
-      className="max-lg:order-11 lg:col-span-12 xl:col-span-7"
+      className="max-lg:order-11 lg:col-span-12"
     >
       <div className="grid gap-6 sm:grid-cols-2 sm:gap-7">
         <Heat

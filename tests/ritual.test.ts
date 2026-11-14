@@ -6,7 +6,6 @@ import {
   frogCandidates,
   isRitualDay,
   isRitualDone,
-  missionText,
   ritualStage,
   ritualStreak,
   ritualWeek,
@@ -60,35 +59,35 @@ describe("ritual: el sapo", () => {
 describe("ritual: estados", () => {
   it("a la mañana, armado, a la noche y salteado", () => {
     expect(ritualStage(r(), 8)).toBe("morning");
-    expect(ritualStage(r({ mission: "x" }), 8)).toBe("morning");
-    expect(ritualStage(r({ mission: "x", frogTitle: "y" }), 8)).toBe("done");
+    // Con la tarea prioritaria elegida (o con "Listo") queda armado.
+    expect(ritualStage(r({ frogTitle: "y" }), 8)).toBe("done");
     expect(ritualStage(r({ completedAt: "2026-11-16T11:00:00Z" }), 8)).toBe("done");
-    expect(ritualStage(r({ mission: "x", frogTitle: "y" }), 19)).toBe("night");
-    expect(ritualStage(r({ mission: "x", frogTitle: "y", missionResult: "yes" }), 21)).toBe("done");
-    expect(ritualStage(r({ skipped: true, mission: "x" }), 21)).toBe("skipped");
-    // Mientras se arma (o se tocó Editar) no se pliega.
-    expect(ritualStage(r({ mission: "x", frogTitle: "y" }), 8, true)).toBe("morning");
-    // Sin misión, a la noche no hay nada que preguntar.
-    expect(ritualStage(r({ frogTitle: "y" }), 22)).toBe("morning");
+    // A la noche pregunta si se hizo; hecha, ya no.
+    expect(ritualStage(r({ frogTitle: "y" }), 19)).toBe("night");
+    expect(ritualStage(r({ frogTitle: "y", frogDoneAt: "2026-11-16T12:00:00Z" }), 21)).toBe("done");
+    expect(ritualStage(r({ skipped: true, frogTitle: "y" }), 21)).toBe("skipped");
+    // Mientras se elige (o se tocó Cambiar) no se pliega.
+    expect(ritualStage(r({ frogTitle: "y" }), 8, true)).toBe("morning");
+    // Sin tarea prioritaria, a la noche no hay nada que preguntar.
+    expect(ritualStage(r({ completedAt: "2026-11-16T11:00:00Z" }), 22)).toBe("done");
+    expect(ritualStage(r(), 22)).toBe("morning");
   });
   it("salteado no cuenta como hecho", () => {
-    expect(isRitualDone(r({ skipped: true, mission: "x", frogTitle: "y" }))).toBe(false);
+    expect(isRitualDone(r({ skipped: true, frogTitle: "y" }))).toBe(false);
+    expect(isRitualDone(r({ frogTitle: "y" }))).toBe(true);
+    expect(isRitualDone(r())).toBe(false);
   });
 });
 
 describe("ritual: datos", () => {
   it("limpia lo que llega del cliente", () => {
-    expect(cleanRitualPatch({ mission: "  Hoy gano si   termino   la tienda " })).toEqual({ mission: "termino la tienda" });
-    expect(cleanRitualPatch({ mission: "   " })).toEqual({ mission: null });
-    expect(cleanRitualPatch({ missionResult: "quizás" })).toEqual({ missionResult: null });
+    expect(cleanRitualPatch({ frogTaskId: "abc", frogTitle: "  Llamar   al contador " })).toEqual({ frogTaskId: "abc", frogTitle: "Llamar al contador" });
+    // La misión ya no existe: si quedó algo en la cola sin conexión, se ignora.
+    expect(cleanRitualPatch({ mission: "termino la tienda", missionResult: "yes" })).toEqual({});
     expect(cleanRitualPatch({ frogTaskId: "abc", frogTitle: "" })).toEqual({ frogTaskId: null, frogTitle: null });
     expect(cleanRitualPatch({ frogDoneAt: "no" })).toEqual({ frogDoneAt: null });
     expect(cleanRitualPatch({ skipped: "si", completed: true })).toEqual({ skipped: false, completed: true });
     expect(cleanRitualPatch(null)).toEqual({});
-  });
-  it("la misión sin el principio repetido", () => {
-    expect(missionText("hoy gano si: llamo al contador")).toBe("llamo al contador");
-    expect(missionText("Hoy gano sin hacer nada")).toBe("Hoy gano sin hacer nada");
   });
   it("cambiar de sapo borra lo comido", () => {
     const eaten = r({ frogTitle: "a", frogTaskId: "1", frogDoneAt: "2026-11-16T12:00:00Z" });
@@ -114,13 +113,15 @@ describe("ritual: racha y semana", () => {
   });
   it("la semana para la revisión", () => {
     expect(ritualWeek([])).toBeNull();
-    expect(ritualWeek([r({ skipped: true, mission: "x" })])).toBeNull();
+    expect(ritualWeek([r({ skipped: true, frogTitle: "x" })])).toBeNull();
+    // Un "Listo" sin tarea prioritaria no suma nada que mostrar.
+    expect(ritualWeek([r({ completedAt: "2026-11-16T11:00:00Z" })])).toBeNull();
     expect(
       ritualWeek([
-        r({ mission: "a", missionResult: "yes", frogTitle: "s", frogDoneAt: "2026-11-16T12:00:00Z" }),
-        r({ mission: "b", missionResult: "partial", frogTitle: "t" }),
-        r({ mission: "c" }),
+        r({ frogTitle: "s", frogDoneAt: "2026-11-16T12:00:00Z" }),
+        r({ frogTitle: "t" }),
+        r({ completedAt: "2026-11-16T11:00:00Z" }),
       ]),
-    ).toEqual({ days: 3, missions: 3, yes: 1, partial: 1, frogs: 2, eaten: 1 });
+    ).toEqual({ frogs: 2, eaten: 1 });
   });
 });

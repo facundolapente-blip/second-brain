@@ -1,18 +1,16 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { addDays, fromDbDate, toDbDate } from "./dates";
-import { frogCandidates, isRitualDone, ritualStreak, ritualWeek, type MissionResult, type RitualDTO } from "./ritual-logic";
+import { frogCandidates, isRitualDone, ritualStreak, ritualWeek, type RitualDTO } from "./ritual-logic";
 
 type RitualRow = NonNullable<Awaited<ReturnType<typeof prisma.dailyRitual.findFirst>>>;
 
 export function ritualDTO(r: RitualRow): RitualDTO {
   return {
     day: fromDbDate(r.day),
-    mission: r.mission,
     frogTaskId: r.frogTaskId,
     frogTitle: r.frogTitle,
     frogDoneAt: r.frogDoneAt?.toISOString() ?? null,
-    missionResult: (r.missionResult as MissionResult | null) ?? null,
     skipped: r.skipped,
     completedAt: r.completedAt?.toISOString() ?? null,
   };
@@ -70,7 +68,7 @@ export async function getRitualData(today: string) {
 
 export type RitualData = Awaited<ReturnType<typeof getRitualData>>;
 
-/** Para la Revisión semanal: misiones cumplidas y sapos comidos de lunes a domingo. */
+/** Para la Revisión semanal: tareas prioritarias elegidas y hechas de lunes a domingo. */
 export async function getRitualWeek(monday: string, sunday: string) {
   const rows = await prisma.dailyRitual.findMany({ where: { day: { gte: toDbDate(monday), lte: toDbDate(sunday) } } });
   return ritualWeek(rows.map(ritualDTO));

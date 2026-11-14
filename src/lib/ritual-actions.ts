@@ -7,23 +7,20 @@ import { todayISO, toDbDate } from "./dates";
 import { cleanRitualPatch, isRitualDay } from "./ritual-logic";
 
 /**
- * Guarda uno o más campos del ritual matutino de un día (la misión, el sapo, "Me lo comí",
- * la respuesta de la noche, "Saltar hoy" o "Listo"). Energía y ánimo van por `saveCheckin`.
+ * Guarda uno o más campos del ritual matutino de un día (la tarea prioritaria, "La hice",
+ * "Saltar hoy" o "Listo"). Energía y ánimo van por `saveCheckin`.
  */
 export async function saveRitual(day: string, patch: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
   await exigirSesion();
   if (!isRitualDay(day, todayISO())) return { ok: false, error: "Fecha inválida." };
   const p = cleanRitualPatch(patch);
   const data: {
-    mission?: string | null;
     frogTaskId?: string | null;
     frogTitle?: string | null;
     frogDoneAt?: Date | null;
-    missionResult?: string | null;
     skipped?: boolean;
     completedAt?: Date | null;
   } = {};
-  if ("mission" in p) data.mission = p.mission;
   if ("frogTitle" in p) {
     // Una tarea del Plan: el nombre es el suyo (si ya no está, queda como sapo escrito).
     const task = p.frogTaskId ? await prisma.planTask.findUnique({ where: { id: p.frogTaskId }, select: { id: true, title: true } }) : null;
@@ -35,7 +32,6 @@ export async function saveRitual(day: string, patch: unknown): Promise<{ ok: tru
     const at = p.frogDoneAt ? new Date(p.frogDoneAt) : null;
     data.frogDoneAt = at && Math.abs(+at - Date.now()) < 8 * 86_400_000 ? at : at ? new Date() : null;
   }
-  if ("missionResult" in p) data.missionResult = p.missionResult;
   if ("skipped" in p) data.skipped = p.skipped;
   const where = { day: toDbDate(day) };
   if ("completed" in p) {

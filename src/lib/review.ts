@@ -77,7 +77,7 @@ export async function getWeeklyReview(day: string) {
       orderBy: { createdAt: "asc" },
     }),
     getPassFlows(monday, sunday),
-    // Ritual matutino: misiones cumplidas y sapos comidos (null si esa semana no hubo).
+    // Ritual matutino: tareas prioritarias elegidas y hechas (null si esa semana no hubo).
     getRitualWeek(monday, sunday),
   ]);
   // Plata de otra persona: la diferencia del mes cuando es gasto (como categoría propia).

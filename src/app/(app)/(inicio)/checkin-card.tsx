@@ -29,7 +29,6 @@ import { TintedCard } from "@/components/tinted-card";
 import { haptic } from "@/components/haptics";
 import { HOLD_CLASS, useHoldRepeat } from "../habitos/hold-repeat";
 import { MoodIcon } from "../journal/journal-ui";
-import { emitCheckin, useCheckinSync } from "./checkin-sync";
 
 /**
  * Check-in del día: ánimo, energía, estrés, sueño y peso en pocos toques.
@@ -135,15 +134,7 @@ export function CheckinCard({
     b.timer = setTimeout(send, 700);
     setData((d) => ({ ...d, [key]: { ...d[key], ...patch } }));
     setSaved(false);
-    emitCheckin(data[key].date, patch, "card");
   }
-  // Lo que se cargó en el ritual de la mañana (ánimo y energía) se ve acá al toque.
-  useCheckinSync("card", (date, patch) =>
-    setData((d) => ({
-      today: d.today.date === date ? { ...d.today, ...patch } : d.today,
-      yesterday: d.yesterday.date === date ? { ...d.yesterday, ...patch } : d.yesterday,
-    })),
-  );
 
   const status = (
     <span className="tabular grid" aria-live="polite">
@@ -373,19 +364,17 @@ function Row({ icon, label, hint, children, className }: { icon: React.ReactNode
   );
 }
 
-/** Escala de 1 a 5 como barras que crecen, con los extremos escritos debajo (`caps`). La usa también el ritual. */
-export function Scale({
+/** Escala de 1 a 5 como barras que crecen, con los extremos escritos debajo . */
+function Scale({
   value,
   labels,
   color,
   onChange,
-  caps = true,
 }: {
   value: number | null;
   labels: string[];
   color: string;
   onChange: (v: number | null) => void;
-  caps?: boolean;
 }) {
   // Lo que se enciende se llena de abajo hacia arriba, una barra tras otra desde la que ya
   // estaba (y se vacía de la más alta hacia abajo): se lee que la escala sube o baja.
@@ -432,7 +421,7 @@ export function Scale({
         );
       })}
     </div>
-    <div aria-hidden className={cx("flex justify-between text-[11px] text-muted", !caps && "hidden")}>
+    <div aria-hidden className="flex justify-between text-[11px] text-muted">
       <span>{labels[0]}</span>
       <span>{labels[labels.length - 1]}</span>
     </div>

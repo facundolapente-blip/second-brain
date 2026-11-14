@@ -1,65 +1,49 @@
 /**
  * Ritual matutino (servidor y cliente, sin base): qué mostrar según la hora, el sapo
- * que se propone, los logros recientes y la racha de rituales. Diseño 3 "Tablero del día"
- * que eligió Facu (2026-11-14): el ritual es la fila de arriba de Inicio.
+ * ("Tarea prioritaria" en la pantalla) que se propone y la racha de rituales. Diseño 3
+ * "Tablero del día" que eligió Facu (2026-11-14): el ritual es la fila de arriba de Inicio.
+ * La misión del día ("Hoy gano si…") se sacó el mismo día: en su lugar va "¿Cómo estás?".
  */
 import { addDays, diffDays, isISODate } from "./dates";
 
-export type MissionResult = "yes" | "partial" | "no";
-export const MISSION_RESULTS: { value: MissionResult; label: string; done: string }[] = [
-  { value: "yes", label: "Sí", done: "Misión cumplida" },
-  { value: "partial", label: "A medias", done: "Misión a medias" },
-  { value: "no", label: "No", done: "Misión sin cumplir" },
-];
-
-/** Desde esta hora (Montevideo) la misión pregunta cómo te fue. */
+/** Desde esta hora (Montevideo) es "Buenas noches" y se pregunta si se hizo la tarea prioritaria. */
 export const NIGHT_HOUR = 19;
-export const MISSION_MAX = 200;
 export const FROG_MAX = 120;
 
 export type RitualDTO = {
   day: string;
-  mission: string | null;
   frogTaskId: string | null;
   frogTitle: string | null;
-  /** Instante (ISO) en que se tildó "Me lo comí". */
+  /** Instante (ISO) en que se tildó "La hice". */
   frogDoneAt: string | null;
-  missionResult: MissionResult | null;
   skipped: boolean;
   completedAt: string | null;
 };
 
 export function emptyRitual(day: string): RitualDTO {
-  return { day, mission: null, frogTaskId: null, frogTitle: null, frogDoneAt: null, missionResult: null, skipped: false, completedAt: null };
+  return { day, frogTaskId: null, frogTitle: null, frogDoneAt: null, skipped: false, completedAt: null };
 }
 
 /** Lo que se puede cambiar de un ritual (cada campo, opcional). `completed` y `frogDone` ponen o sacan la hora. */
 export type RitualPatch = {
-  mission?: string | null;
   frogTaskId?: string | null;
   frogTitle?: string | null;
   frogDoneAt?: string | null;
-  missionResult?: MissionResult | null;
   skipped?: boolean;
   completed?: boolean;
 };
 
 const oneLine = (s: string, max: number) => s.replace(/\s+/g, " ").trim().slice(0, max);
 
-/** La misión sin el "Hoy gano si" del principio (la pantalla ya lo pone delante). */
-export function missionText(raw: string): string | null {
-  return oneLine(raw.replace(/^\s*hoy\s+gano\s+si(?![a-záéíóúñ])[\s.:,…-]*/i, ""), MISSION_MAX) || null;
-}
-
 /**
- * Valida un cambio que llega del cliente: textos de un renglón con tope, el resultado de la
- * noche en su lista, la hora del sapo como instante válido. Lo que no se entiende, se ignora.
+ * Valida un cambio que llega del cliente: el nombre del sapo en un renglón con tope, la hora
+ * en que se hizo como instante válido. Lo que no se entiende (también la misión y su
+ * respuesta de la noche, que ya no existen, si quedó algo en la cola sin conexión), se ignora.
  */
 export function cleanRitualPatch(raw: unknown): RitualPatch {
   if (!raw || typeof raw !== "object") return {};
   const p = raw as Record<string, unknown>;
   const out: RitualPatch = {};
-  if ("mission" in p) out.mission = typeof p.mission === "string" ? missionText(p.mission) : null;
   if ("frogTitle" in p || "frogTaskId" in p) {
     out.frogTitle = typeof p.frogTitle === "string" ? oneLine(p.frogTitle, FROG_MAX) || null : null;
     out.frogTaskId = typeof p.frogTaskId === "string" && p.frogTaskId.length <= 40 && out.frogTitle ? p.frogTaskId : null;
@@ -68,7 +52,6 @@ export function cleanRitualPatch(raw: unknown): RitualPatch {
     const t = typeof p.frogDoneAt === "string" ? Date.parse(p.frogDoneAt) : NaN;
     out.frogDoneAt = Number.isFinite(t) ? new Date(t).toISOString() : null;
   }
-  if ("missionResult" in p) out.missionResult = MISSION_RESULTS.some((r) => r.value === p.missionResult) ? (p.missionResult as MissionResult) : null;
   if ("skipped" in p) out.skipped = p.skipped === true;
   if ("completed" in p) out.completed = p.completed === true;
   return out;
@@ -77,7 +60,6 @@ export function cleanRitualPatch(raw: unknown): RitualPatch {
 /** Aplica un cambio ya validado a un ritual (lo usa la pantalla para verlo al toque). */
 export function applyRitualPatch(r: RitualDTO, p: RitualPatch, now: Date = new Date()): RitualDTO {
   const next = { ...r };
-  if ("mission" in p) next.mission = p.mission ?? null;
   if ("frogTitle" in p) {
     // Otro sapo: lo comido era del anterior.
     if ((p.frogTitle ?? null) !== r.frogTitle || (p.frogTaskId ?? null) !== r.frogTaskId) next.frogDoneAt = null;
@@ -85,30 +67,29 @@ export function applyRitualPatch(r: RitualDTO, p: RitualPatch, now: Date = new D
     next.frogTaskId = p.frogTaskId ?? null;
   }
   if ("frogDoneAt" in p) next.frogDoneAt = p.frogDoneAt ?? null;
-  if ("missionResult" in p) next.missionResult = p.missionResult ?? null;
   if ("skipped" in p) next.skipped = !!p.skipped;
   if ("completed" in p) next.completedAt = p.completed ? (r.completedAt ?? now.toISOString()) : null;
   return next;
 }
 
-/** El ritual quedó armado: se tocó "Listo" o tiene misión y sapo. */
+/** El ritual quedó armado: se tocó "Listo" o se eligió la tarea prioritaria. */
 export function isRitualDone(r: RitualDTO | null | undefined): boolean {
   if (!r || r.skipped) return false;
-  return !!r.completedAt || (!!r.mission && !!r.frogTitle);
+  return !!r.completedAt || !!r.frogTitle;
 }
 
 export type RitualStage = "morning" | "done" | "night" | "skipped";
 
 /**
- * Qué se ve arriba de Inicio: (a) la mañana para armar el día, (b) plegado cuando ya está,
- * (c) la noche (desde las 19 h, si hubo misión y no se respondió) o salteado.
- * `editing`: se está completando o se tocó "Editar" (no se pliega mientras tanto).
+ * Qué se ve arriba de Inicio: (a) la mañana para elegir la tarea prioritaria, (b) plegado
+ * cuando ya está, (c) la noche (desde las 19 h, si hubo tarea prioritaria y no se tildó) o
+ * salteado. `editing`: se está eligiendo o se tocó "Cambiar" (no se pliega mientras tanto).
  */
 export function ritualStage(r: RitualDTO, hour: number, editing = false): RitualStage {
   if (editing) return "morning";
   if (r.skipped) return "skipped";
-  if (hour >= NIGHT_HOUR && r.mission && !r.missionResult) return "night";
-  if (isRitualDone(r) || r.missionResult) return "done";
+  if (hour >= NIGHT_HOUR && r.frogTitle && !r.frogDoneAt) return "night";
+  if (isRitualDone(r)) return "done";
   return "morning";
 }
 
@@ -189,20 +170,13 @@ export function frogCandidates(tasks: FrogTaskInput[], today: string, n = 3): Fr
 
 // ─── Revisión semanal ───────────────────────────────────────────────────────
 
-export type RitualWeek = { missions: number; yes: number; partial: number; frogs: number; eaten: number; days: number };
+export type RitualWeek = { frogs: number; eaten: number };
 
-/** "Misiones cumplidas N de M · sapos comidos N" (null si esa semana no hubo rituales). */
-export function ritualWeek(rows: Pick<RitualDTO, "mission" | "missionResult" | "frogTitle" | "frogDoneAt" | "skipped" | "completedAt">[]): RitualWeek | null {
-  const used = rows.filter((r) => !r.skipped && (r.mission || r.frogTitle || r.completedAt));
-  if (!used.length) return null;
-  return {
-    days: used.length,
-    missions: used.filter((r) => r.mission).length,
-    yes: used.filter((r) => r.mission && r.missionResult === "yes").length,
-    partial: used.filter((r) => r.mission && r.missionResult === "partial").length,
-    frogs: used.filter((r) => r.frogTitle).length,
-    eaten: used.filter((r) => r.frogTitle && r.frogDoneAt).length,
-  };
+/** "Tareas prioritarias hechas N de M" (null si esa semana no se eligió ninguna). */
+export function ritualWeek(rows: Pick<RitualDTO, "frogTitle" | "frogDoneAt" | "skipped">[]): RitualWeek | null {
+  const frogs = rows.filter((r) => !r.skipped && r.frogTitle);
+  if (!frogs.length) return null;
+  return { frogs: frogs.length, eaten: frogs.filter((r) => r.frogDoneAt).length };
 }
 
 /** Día válido para guardar: hoy o hasta una semana atrás (la pregunta de la noche pasada medianoche). */

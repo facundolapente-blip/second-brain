@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   ArrowRight,
   CalendarCheck,
@@ -9,9 +9,7 @@ import {
   Check,
   Flag,
   ListChecks,
-  Moon,
   PencilSimple,
-  SunHorizon,
   Timer,
 } from "@phosphor-icons/react";
 import { useSafeTransition } from "@/components/safe-action";
@@ -22,21 +20,15 @@ import { TintedCard } from "@/components/tinted-card";
 import { MenuButton } from "@/components/shell";
 import { tone } from "@/lib/palette";
 import { formatLong } from "@/lib/dates";
-import { pickForSlot, quoteSlot } from "@/lib/quotes";
-import type { ValueNote } from "@/lib/values";
 import type { Dashboard } from "@/lib/dashboard";
 import { isFreeBlock } from "@/lib/plan-logic";
-import { sleepText } from "@/lib/health-logic";
 import { greeting } from "@/lib/journal-logic";
 import {
   applyRitualPatch,
   emptyRitual,
-  MISSION_MAX,
-  MISSION_RESULTS,
   NIGHT_HOUR,
   ritualStage,
   type FrogCandidate,
-  type MissionResult,
   type RitualDTO,
   type RitualPatch,
 } from "@/lib/ritual-logic";
@@ -53,21 +45,23 @@ const hhmm = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", 
 
 /**
  * Ritual matutino (diseño 3 "Tablero del día", 2026-11-14): la fila de arriba de Inicio.
- * A la izquierda el saludo y la misión del día con energía y ánimo (los del check-in); a la
- * derecha el sapo; debajo un vistazo a hoy. Hecho, se pliega: la misión
- * queda de titular y el sapo como tarjeta chica con "Me lo comí". A la noche pregunta cómo fue.
+ * A la izquierda el saludo y "¿Cómo estás?" (el check-in, que reemplazó a la misión del día);
+ * a la derecha la tarea prioritaria; debajo un vistazo a hoy. Elegida (o con "Listo"), se
+ * pliega: la tarea queda como tarjeta chica con "La hice" y el vistazo a hoy pasa debajo de
+ * ella. A la noche pregunta si se hizo.
  */
 export function RitualRow({
   d,
   data,
-  notes,
+  checkin,
   summary,
   links,
   habits,
 }: {
   d: Dashboard;
   data: RitualData;
-  notes: ValueNote[];
+  /** La tarjeta "¿Cómo estás?" (va debajo del saludo, siempre en el mismo lugar del árbol). */
+  checkin: React.ReactNode;
   /** La frase del resumen de siempre ("Llevás 2 de 6 hábitos…"). */
   summary: React.ReactNode;
   /** Las píldoras Revisión semanal / Análisis. */
@@ -76,7 +70,7 @@ export function RitualRow({
   habits: ProgressSource;
 }) {
   const [ritual, setRitual] = useState<RitualDTO>(() => data.ritual ?? emptyRitual(d.today));
-  // Se está armando (o se tocó "Editar"): no se pliega solo mientras tanto.
+  // Se está eligiendo (o se tocó "Cambiar"): no se pliega solo mientras tanto.
   const [editing, setEditing] = useState(false);
   const [, start] = useSafeTransition();
   const stage = ritualStage(ritual, d.hour, editing);
@@ -96,119 +90,88 @@ export function RitualRow({
     );
   }
 
-  // El sapo que se ve: el elegido o, si no hay, la primera candidata (propuesta).
+  // La tarea que se ve: la elegida o, si no hay, la primera candidata (propuesta).
   const chosen = ritual.frogTitle ? { id: ritual.frogTaskId, title: ritual.frogTitle } : null;
   const proposal = data.candidates[0] ?? null;
   const frogPatch = (c: { id: string | null; title: string }): RitualPatch => ({ frogTaskId: c.id, frogTitle: c.title });
 
-  const night = stage === "night";
   // Desde las 19 h ya es "Buenas noches" (la pregunta de la noche arranca ahí).
   const title = `${d.hour >= NIGHT_HOUR ? "Buenas noches" : greeting(d.hour)}, Facu`;
-  const sleep = d.checkin.today.sleepMin;
+  const morning = stage === "morning";
 
-  const hello = (
-    <div className="flex min-w-0 flex-col gap-1.5 lg:gap-2 lg:px-1 lg:pt-1.5">
-      <div className="flex items-center gap-2 max-lg:-ml-0.5">
-        <MenuButton />
-        <p className="kicker truncate">{formatLong(d.today)}</p>
-      </div>
-      <h1 className="display text-[32px] leading-[1.02] font-[750] tracking-[-0.04em] lg:text-[36px] xl:text-[44px]">{title}</h1>
-      <p className="max-w-[34rem] text-[15px] leading-normal text-pretty text-muted lg:text-[16px]">
-        {sleep !== null && (
-          <span className="mr-1.5 inline-flex items-center gap-1.5 whitespace-nowrap">
-            <Moon size={15} aria-hidden className="shrink-0" />
-            Dormiste <b className="font-mono text-[14px] font-semibold text-fg">{sleepText(sleep)}</b>.
-          </span>
-        )}
-        {summary}
-      </p>
-      <div className="mt-1 flex flex-wrap gap-1.5 lg:mt-2">{links}</div>
-    </div>
-  );
-
-  if (stage === "skipped") {
-    return (
-      <section aria-label="Ritual de la mañana" className="grid gap-3.5 max-lg:order-1 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
-        <div className="grid gap-3 lg:col-span-12">
-          {hello}
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-muted lg:px-1">
-            <SunHorizon size={16} aria-hidden />
-            Hoy salteaste el ritual.
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(true);
-                save({ skipped: false });
-              }}
-              className="inline-flex min-h-11 items-center font-medium text-fg underline underline-offset-4"
-            >
-              Armarlo igual
-            </button>
-          </p>
-        </div>
-      </section>
+  let side: React.ReactNode;
+  if (morning) {
+    side = (
+      <FrogCard
+        d={d}
+        candidates={data.candidates}
+        chosen={chosen}
+        onChoose={(c) => {
+          setEditing(true);
+          haptic("select");
+          save(frogPatch(c));
+        }}
+        onDone={() => {
+          haptic("success");
+          setEditing(false);
+          save({ completed: true, ...(!chosen && proposal ? frogPatch(proposal) : {}) });
+        }}
+        onSkip={() => {
+          setEditing(false);
+          save({ skipped: true });
+        }}
+      />
     );
+  } else if (stage === "skipped") {
+    side = (
+      <NoFrog
+        text="Hoy salteaste el ritual."
+        action="Armarlo igual"
+        onAction={() => {
+          setEditing(true);
+          save({ skipped: false });
+        }}
+      />
+    );
+  } else if (chosen) {
+    side = (
+      <SmallFrog
+        ritual={ritual}
+        ask={stage === "night"}
+        nextBlock={nextBlock(d)}
+        onEat={(eaten) => save({ frogDoneAt: eaten ? new Date().toISOString() : null })}
+        onChange={() => setEditing(true)}
+      />
+    );
+  } else {
+    side = <NoFrog text="Hoy sin tarea prioritaria." action="Elegir una" onAction={() => setEditing(true)} />;
   }
 
-  if (stage === "night" || stage === "done") {
-    const hasFrog = !!chosen;
-    return (
-      <section aria-label="Ritual de la mañana" className="grid gap-3.5 max-lg:order-1 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
-        <div className={cx("grid content-start gap-3.5", hasFrog ? "lg:col-span-7" : "lg:col-span-12")}>
-          {hello}
-          {night ? (
-            <NightMission mission={ritual.mission!} onAnswer={(v) => save({ missionResult: v })} />
-          ) : (
-            <DoneMission ritual={ritual} onEdit={() => setEditing(true)} />
-          )}
-        </div>
-        {hasFrog && (
-          <div className="lg:col-span-5">
-            <SmallFrog
-              ritual={ritual}
-              ask={night}
-              nextBlock={nextBlock(d)}
-              onEat={(eaten) => save({ frogDoneAt: eaten ? new Date().toISOString() : null })}
-            />
-          </div>
-        )}
-      </section>
-    );
-  }
-
+  // Mismo árbol en todos los estados (saludo y "¿Cómo estás?" a la izquierda, siempre en el
+  // mismo lugar): cambiar de estado no vuelve a montar el check-in ni pierde lo que se guarda.
   return (
     <section aria-label="Ritual de la mañana" className="grid gap-3.5 max-lg:order-1 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
       <div className="grid min-w-0 content-start gap-3.5 lg:col-span-7">
-        {hello}
-        <MissionCard
-          ritual={ritual}
-          note={pickForSlot(notes, quoteSlot(d.today, d.hour))}
-          onTouch={() => setEditing(true)}
-          onMission={(mission) => save({ mission })}
-          onDone={() => {
-            haptic("success");
-            setEditing(false);
-            save({ completed: true, ...(!chosen && proposal ? frogPatch(proposal) : {}) });
-          }}
-          onSkip={() => {
-            setEditing(false);
-            save({ skipped: true });
-          }}
-        />
+        <div className="flex min-w-0 flex-col gap-1.5 lg:gap-2 lg:px-1 lg:pt-1.5">
+          <div className="flex items-center gap-2 max-lg:-ml-0.5">
+            <MenuButton />
+            <p className="kicker truncate">{formatLong(d.today)}</p>
+          </div>
+          <h1 className="display text-[32px] leading-[1.02] font-[750] tracking-[-0.04em] lg:text-[36px] xl:text-[44px]">{title}</h1>
+          <p className="max-w-[34rem] text-[15px] leading-normal text-pretty text-muted lg:text-[16px]">
+            {summary}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1.5 lg:mt-2">{links}</div>
+        </div>
+        {checkin}
       </div>
-      <div className="min-w-0 lg:col-span-5">
-        <FrogCard
-          d={d}
-          candidates={data.candidates}
-          chosen={chosen}
-          onChoose={(c) => {
-            setEditing(true);
-            haptic("select");
-            save(frogPatch(c));
-          }}
-        />
+      {/* A la mañana la tarjeta para elegir ocupa todo el alto; plegado, la tarjeta chica y
+          debajo el vistazo a hoy (así la columna no queda con un hueco). */}
+      <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-5 lg:gap-5 lg:[&>*:last-child]:flex-1">
+        {side}
+        {!morning && <TodayStrip d={d} habits={habits} compact />}
       </div>
-      <TodayStrip d={d} habits={habits} />
+      {morning && <TodayStrip d={d} habits={habits} />}
     </section>
   );
 }
@@ -219,207 +182,7 @@ function nextBlock(d: Dashboard) {
   return d.plan.today.find((b) => b.startTime && b.startTime >= now && !b.done && !isFreeBlock(b)) ?? null;
 }
 
-// ─── La misión ──────────────────────────────────────────────────────────────
-
-function MissionCard({
-  ritual,
-  note,
-  onTouch,
-  onMission,
-  onDone,
-  onSkip,
-}: {
-  ritual: RitualDTO;
-  note: ValueNote | null;
-  onTouch: () => void;
-  onMission: (m: string | null) => void;
-  onDone: () => void;
-  onSkip: () => void;
-}) {
-  const [text, setText] = useState(ritual.mission ?? "");
-  const [status, setStatus] = useState<"idle" | "dirty" | "saved">("idle");
-  // Autoguardado como el resto de la app: a los 900 ms de dejar de escribir, al salir del
-  // campo y al ocultar la página.
-  const pending = useRef<{ text: string; timer?: ReturnType<typeof setTimeout> } | null>(null);
-  const saveRef = useRef(onMission);
-  useEffect(() => {
-    saveRef.current = onMission;
-  });
-  const flush = () => {
-    const p = pending.current;
-    if (!p) return;
-    pending.current = null;
-    clearTimeout(p.timer);
-    saveRef.current(p.text.trim() || null);
-    setStatus("saved");
-  };
-  const flushRef = useRef(flush);
-  useEffect(() => {
-    flushRef.current = flush;
-  });
-  useEffect(() => {
-    const onHide = () => document.visibilityState === "hidden" && flushRef.current();
-    const onLeave = () => flushRef.current();
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", onLeave);
-    return () => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", onLeave);
-      flushRef.current();
-    };
-  }, []);
-
-  return (
-    <div className="grid gap-3.5 rounded-[18px] border border-line bg-surface p-4 lg:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="kicker flex items-center gap-1.5 text-[var(--accent)]!">
-          <Flag size={13} weight="fill" aria-hidden />
-          La misión del día
-        </p>
-        <span className="grid font-mono text-[11px] text-muted" aria-live="polite">
-          <span className={cx("col-start-1 row-start-1 transition-opacity duration-150", status !== "dirty" && "opacity-0")}>Guardando…</span>
-          <span className={cx("col-start-1 row-start-1 inline-flex items-center gap-1 transition-opacity duration-150", status !== "saved" && "opacity-0")}>
-            <Check size={11} weight="bold" aria-hidden className={status === "saved" ? "check-draw" : undefined} /> Guardado
-          </span>
-        </span>
-      </div>
-      <label className="grid gap-0.5">
-        <span className="text-[15px] font-semibold text-[var(--accent)] lg:text-[16px]">Hoy gano si…</span>
-        <textarea
-          rows={1}
-          value={text}
-          maxLength={MISSION_MAX}
-          lang="es"
-          spellCheck
-          placeholder="Escribí una frase"
-          onChange={(e) => {
-            const v = e.target.value.replace(/\n/g, " ");
-            setText(v);
-            onTouch();
-            setStatus("dirty");
-            const p = (pending.current ??= { text: v });
-            p.text = v;
-            clearTimeout(p.timer);
-            p.timer = setTimeout(() => flushRef.current(), 900);
-          }}
-          onBlur={() => flushRef.current()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.currentTarget.blur();
-            }
-          }}
-          className="w-full resize-none bg-transparent text-[23px] leading-[1.2] font-[680] tracking-[-0.03em] text-fg outline-none [field-sizing:content] placeholder:text-faint lg:text-[28px]"
-        />
-      </label>
-      {note && (
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2.5 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-          <span aria-hidden className="w-[3px] rounded-full bg-[var(--accent)] opacity-55" />
-          <div className="min-w-0">
-            <Link href="/valores" className="kicker block hover:underline">
-              De tus Valores
-            </Link>
-            <p className="line-clamp-3 text-[13.5px] leading-snug text-fg">{note.text}</p>
-          </div>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            flushRef.current();
-            onSkip();
-          }}
-          className="press inline-flex h-10 items-center rounded-full px-3.5 text-[13px] font-medium text-muted hover:bg-surface-2 hover:text-fg"
-        >
-          Saltar hoy
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            flushRef.current();
-            onDone();
-          }}
-          className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink hover:opacity-90"
-        >
-          <Check size={14} weight="bold" aria-hidden /> Listo
-        </button>
-      </div>
-      {/* El resultado de la noche, si ya se contestó (se ve solo al editar después). */}
-      {ritual.missionResult && <p className="text-[12.5px] text-muted">{MISSION_RESULTS.find((r) => r.value === ritual.missionResult)?.done}</p>}
-    </div>
-  );
-}
-
-/** Plegado: la misión de titular (con el resultado de la noche, si ya se contestó). */
-function DoneMission({ ritual, onEdit }: { ritual: RitualDTO; onEdit: () => void }) {
-  const result = MISSION_RESULTS.find((r) => r.value === ritual.missionResult);
-  return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 rounded-[14px] border border-line bg-surface px-3.5 py-3 text-[15px] leading-snug">
-      <Flag size={17} weight="fill" aria-hidden className="mt-0.5 text-[var(--accent)]" />
-      <div className="grid gap-1.5">
-        {ritual.mission ? (
-          <p>
-            <span className="font-semibold text-[var(--accent)]">Hoy gano si</span> {ritual.mission}
-          </p>
-        ) : (
-          <p className="text-muted">Hoy sin misión.</p>
-        )}
-        {result && (
-          <span
-            style={tone(ritual.missionResult === "yes" ? "green" : ritual.missionResult === "partial" ? "yellow" : "red")}
-            className="chip-solid inline-flex h-6 w-fit items-center rounded-md px-2 text-[12px] font-medium"
-          >
-            {result.done}
-          </span>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label="Editar el ritual"
-        title="Editar"
-        className="-my-1.5 -mr-1.5 inline-flex size-10 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg"
-      >
-        <PencilSimple size={16} aria-hidden />
-      </button>
-    </div>
-  );
-}
-
-const RESULT_TONE: Record<MissionResult, string> = { yes: "green", partial: "yellow", no: "red" };
-
-/** A la noche: ¿Cumpliste la misión? Sí / A medias / No. */
-function NightMission({ mission, onAnswer }: { mission: string; onAnswer: (v: MissionResult) => void }) {
-  return (
-    <div className="grid gap-3 rounded-[14px] border border-line bg-surface px-3.5 py-3.5">
-      <div>
-        <p className="text-[15px] font-semibold">¿Cumpliste la misión?</p>
-        <p className="mt-0.5 text-[13.5px] text-muted">
-          <span className="font-semibold text-[var(--accent)]">Hoy gano si</span> {mission}
-        </p>
-      </div>
-      <div role="group" aria-label="¿Cumpliste la misión?" className="inline-flex w-fit flex-wrap gap-1 rounded-full border border-line bg-surface-2 p-1">
-        {MISSION_RESULTS.map((r) => (
-          <button
-            key={r.value}
-            type="button"
-            style={tone(RESULT_TONE[r.value])}
-            onClick={() => {
-              haptic(r.value === "no" ? "tap" : "success");
-              onAnswer(r.value);
-            }}
-            className="press inline-flex h-9 items-center rounded-full px-4 text-[13.5px] font-semibold text-muted transition-colors hover:bg-surface hover:text-[var(--tone-fg)]"
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── El sapo ────────────────────────────────────────────────────────────────
+// ─── La tarea prioritaria (el "sapo" en el código) ───────────────────────────
 
 function Reasons({ c }: { c: Pick<FrogCandidate, "reasons" | "category"> }) {
   return (
@@ -439,11 +202,16 @@ function FrogCard({
   candidates,
   chosen,
   onChoose,
+  onDone,
+  onSkip,
 }: {
   d: Dashboard;
   candidates: FrogCandidate[];
   chosen: { id: string | null; title: string } | null;
   onChoose: (c: { id: string | null; title: string }) => void;
+  /** "Listo": queda armado (con la propuesta si no se eligió otra). */
+  onDone: () => void;
+  onSkip: () => void;
 }) {
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState("");
@@ -564,21 +332,56 @@ function FrogCard({
           </button>
         )}
       </div>
+      <div className="mt-auto flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onSkip}
+          className="press inline-flex h-10 items-center rounded-full px-3.5 text-[13px] font-medium text-muted hover:bg-surface-2 hover:text-fg"
+        >
+          Saltar hoy
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="press inline-flex h-10 items-center gap-1.5 rounded-full bg-ink px-4 text-[13.5px] font-medium text-on-ink hover:opacity-90"
+        >
+          <Check size={14} weight="bold" aria-hidden /> Listo
+        </button>
+      </div>
     </TintedCard>
   );
 }
 
-/** El sapo plegado (y a la noche, la pregunta): "Me lo comí" lo pasa a verde con la hora. */
+/** Sin tarea prioritaria (salteado, o "Listo" sin ninguna): una línea y para elegir igual. */
+function NoFrog({ text, action, onAction }: { text: string; action: string; onAction: () => void }) {
+  return (
+    <TintedCard tone="plan" icon={Flag} title="Tarea prioritaria" meta="Lo primero del día" bodyClassName="gap-2.5!">
+      <p className="text-[13.5px] text-muted">{text}</p>
+      <button
+        type="button"
+        onClick={onAction}
+        className="press inline-flex h-10 w-fit items-center rounded-full border border-line-strong bg-surface px-4 text-[13.5px] font-semibold text-fg hover:bg-surface-2"
+      >
+        {action}
+      </button>
+    </TintedCard>
+  );
+}
+
+/** La tarea prioritaria plegada (y a la noche, la pregunta): "La hice" la pasa a verde con la hora. */
 function SmallFrog({
   ritual,
   ask,
   nextBlock,
   onEat,
+  onChange,
 }: {
   ritual: RitualDTO;
   ask: boolean;
   nextBlock: Dashboard["plan"]["today"][number] | null;
   onEat: (eaten: boolean) => void;
+  /** "Cambiar": vuelve a la tarjeta para elegir otra. */
+  onChange: () => void;
 }) {
   const eaten = !!ritual.frogDoneAt;
   // El brillo y la tilde dibujada, solo tras el toque (al abrir la página ya comido, quieto).
@@ -594,7 +397,7 @@ function SmallFrog({
   };
   if (ask && !eaten) {
     return (
-      <TintedCard tone="plan" icon={Flag} title="¿Hiciste la tarea prioritaria?" className="h-full" bodyClassName="gap-2.5!">
+      <TintedCard tone="plan" icon={Flag} title="¿Hiciste la tarea prioritaria?" bodyClassName="gap-2.5!">
         <p className="text-[16px] font-bold tracking-[-0.02em]">{ritual.frogTitle}</p>
         <div role="group" aria-label="¿Hiciste la tarea prioritaria?" className="inline-flex w-fit gap-1 rounded-full border border-line bg-surface-2 p-1">
           <button type="button" onClick={eat} className="press inline-flex h-9 items-center rounded-full px-4 text-[13.5px] font-semibold text-muted hover:bg-surface hover:text-fg">
@@ -622,7 +425,7 @@ function SmallFrog({
       title={eaten ? "Tarea prioritaria hecha" : "Tarea prioritaria"}
       meta={eaten ? hhmm.format(new Date(ritual.frogDoneAt!)) : "Lo primero del día"}
       progress={eaten ? 1 : null}
-      className={cx("h-full", justAte && eaten && "ini-glow")}
+      className={cx(justAte && eaten && "ini-glow")}
       bodyClassName="gap-1.5!"
       action={
         <button
@@ -650,11 +453,18 @@ function SmallFrog({
             Lo que sigue: {nextBlock.title} a las {nextBlock.startTime}
           </p>
         )
-      ) : ritual.frogTaskId ? (
-        <Link href={`/enfoque?tarea=${ritual.frogTaskId}`} className="inline-flex min-h-11 w-fit items-center gap-1.5 text-[13px] font-medium text-muted hover:text-fg">
-          <Timer size={15} aria-hidden /> Enfocarme
-        </Link>
-      ) : null}
+      ) : (
+        <div className="-mb-1.5 flex flex-wrap items-center gap-x-4">
+          {ritual.frogTaskId && (
+            <Link href={`/enfoque?tarea=${ritual.frogTaskId}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted hover:text-fg">
+              <Timer size={15} aria-hidden /> Enfocarme
+            </Link>
+          )}
+          <button type="button" onClick={onChange} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted hover:text-fg">
+            <PencilSimple size={15} aria-hidden /> Cambiar
+          </button>
+        </div>
+      )}
     </TintedCard>
   );
 }
@@ -666,8 +476,11 @@ const TL_TO = 20;
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 
-/** Un vistazo a hoy: los bloques de 8 a 20 en una línea (lista en el celular) y los hábitos que tocan. Solo para leer. */
-function TodayStrip({ d, habits }: { d: Dashboard; habits: ProgressSource }) {
+/**
+ * Un vistazo a hoy: los bloques de 8 a 20 en una línea (lista en el celular) y los hábitos que
+ * tocan. Solo para leer. `compact`: en la columna angosta (ritual plegado), siempre la lista.
+ */
+function TodayStrip({ d, habits, compact = false }: { d: Dashboard; habits: ProgressSource; compact?: boolean }) {
   const { done, total } = useSyncExternalStore(habits.subscribe, habits.get, habits.get);
   const blocks = d.plan.today;
   const real = blocks.filter((b) => !isFreeBlock(b));
@@ -700,15 +513,15 @@ function TodayStrip({ d, habits }: { d: Dashboard; habits: ProgressSource }) {
       title="Hoy"
       meta={`${real.length ? `${real.length} ${real.length === 1 ? "bloque" : "bloques"}` : "Sin bloques"} · ${total} ${total === 1 ? "hábito" : "hábitos"}`}
       action={{ href: "/plan", label: "Ver el plan" }}
-      className="lg:col-span-12"
+      className={compact ? undefined : "lg:col-span-12"}
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_200px] lg:items-center lg:gap-5">
+      <div className={cx("grid gap-4", compact ? "flex-1 content-between" : "lg:grid-cols-[minmax(0,1fr)_200px] lg:items-center lg:gap-5")}>
         {blocks.length === 0 ? (
           <p className="text-[13.5px] text-muted">Nada planificado para hoy.</p>
         ) : (
           <>
             {/* Compu: la línea de 8 a 20. */}
-            <div className="hidden min-w-0 gap-1.5 lg:grid">
+            <div className={cx("hidden min-w-0 gap-1.5", !compact && "lg:grid")}>
               <div className="rit-tl relative rounded-[10px]" style={{ height: 14 + laneCount * 34 }}>
                 {placed.map(({ b, s, e, lane }) => {
                   const left = (Math.max(0, s - TL_FROM * 60) / span) * 100;
@@ -749,7 +562,7 @@ function TodayStrip({ d, habits }: { d: Dashboard; habits: ProgressSource }) {
               )}
             </div>
             {/* Celular: una lista. */}
-            <ul className="grid gap-1.5 lg:hidden">
+            <ul className={cx("grid gap-1.5", !compact && "lg:hidden")}>
               {blocks.map((b) => {
                 const free = isFreeBlock(b);
                 return (

@@ -906,9 +906,10 @@ model FocusSession {
 }
 
 /// Ritual matutino (2026-11-14, diseño 3 "Tablero del día" que eligió Facu): uno por día, todo
-/// opcional. La misión ("Hoy gano si…"), el sapo (una tarea del Plan o un texto libre), cuándo
-/// se lo comió y, a la noche, cómo le fue con la misión. Energía y ánimo son los del check-in
-/// (`DailyCheckin`), no se guardan acá.
+/// opcional. El sapo ("Tarea prioritaria": una tarea del Plan o un texto libre), cuándo se lo
+/// comió, "Saltar hoy" y "Listo". Energía y ánimo son los del check-in (`DailyCheckin`), no se
+/// guardan acá. `mission` y `missionResult` quedaron sin uso desde que se sacó la misión del
+/// día (2026-11-14): los datos viejos siguen ahí, la app no los lee ni los escribe.
 model DailyRitual {
   id            String    @id @default(cuid())
   day           DateTime  @unique @db.Date
@@ -917,7 +918,7 @@ model DailyRitual {
   frogTaskId    String?
   frogTitle     String?
   frogDoneAt    DateTime?
-  /// yes | partial | no (la pregunta de la noche).
+  /// Sin uso desde 2026-11-14 (era yes | partial | no, la pregunta de la noche de la misión).
   missionResult String?
   skipped       Boolean   @default(false)
   completedAt   DateTime?

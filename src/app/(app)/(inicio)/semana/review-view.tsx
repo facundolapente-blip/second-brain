@@ -86,21 +86,8 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
             <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] text-muted">
               <SunHorizon size={16} aria-hidden className="shrink-0" />
               <span>
-                Ritual de la mañana:{" "}
-                {r.ritual.missions > 0 && (
-                  <>
-                    misiones cumplidas <b className="font-semibold text-fg tabular">{r.ritual.yes} de {r.ritual.missions}</b>
-                    {r.ritual.partial > 0 && ` (${r.ritual.partial} a medias)`}
-                    {r.ritual.frogs > 0 && " · "}
-                  </>
-                )}
-                {r.ritual.frogs > 0 && (
-                  <>
-                    tareas prioritarias hechas <b className="font-semibold text-fg tabular">{r.ritual.eaten}</b>
-                    {r.ritual.eaten !== r.ritual.frogs && ` de ${r.ritual.frogs}`}
-                  </>
-                )}
-                {r.ritual.missions === 0 && r.ritual.frogs === 0 && `${r.ritual.days} ${r.ritual.days === 1 ? "día armado" : "días armados"}`}
+                Ritual de la mañana: tareas prioritarias hechas <b className="font-semibold text-fg tabular">{r.ritual.eaten}</b>
+                {r.ritual.eaten !== r.ritual.frogs && ` de ${r.ritual.frogs}`}
               </span>
             </p>
           )}
