@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { forwardRef, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowRight,
   CalendarCheck,
@@ -19,7 +19,6 @@ import {
   Target,
   Timer,
   type Icon,
-  type IconProps,
 } from "@phosphor-icons/react";
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyError, notifyInfo } from "@/components/undo-toast";
@@ -64,18 +63,6 @@ export type ProgressSource = { get: () => Progress; subscribe: (f: () => void) =
 
 const hhmm = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
-/** Sapo (Phosphor no tiene): mismo trazo que el resto de los íconos, para la cabecera de la tarjeta. */
-const FrogIcon = forwardRef<SVGSVGElement, IconProps>(function FrogIcon({ size = 18, weight, className }, ref) {
-  const fill = weight === "fill";
-  return (
-    <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={fill ? 2.1 : 1.7} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d="M4 15.5c0-3.7 3.6-6.5 8-6.5s8 2.8 8 6.5c0 2.3-1.6 3.5-4 3.5H8c-2.4 0-4-1.2-4-3.5z" fill={fill ? "currentColor" : "none"} fillOpacity={fill ? 0.28 : 0} />
-      <circle cx="8.3" cy="7.6" r="2.3" />
-      <circle cx="15.7" cy="7.6" r="2.3" />
-      <path d="M9.5 14.5c.8.7 1.6 1 2.5 1s1.7-.3 2.5-1" />
-    </svg>
-  );
-}) as unknown as Icon;
 
 /**
  * Ritual matutino (diseño 3 "Tablero del día", 2026-11-14): la fila de arriba de Inicio.
@@ -579,8 +566,8 @@ function FrogCard({
   return (
     <TintedCard
       tone="plan"
-      icon={FrogIcon}
-      title="El sapo"
+      icon={Flag}
+      title="Tarea prioritaria"
       meta={chosen ? "Lo primero del día" : frog ? "Propuesto · lo primero del día" : "Lo primero del día"}
       action={{ href: "/plan#tareas", label: "Tareas" }}
       className="h-full"
@@ -628,7 +615,7 @@ function FrogCard({
         <p className="text-[13.5px] text-muted">No tenés tareas abiertas. Escribí cuál es la cosa difícil de hoy.</p>
       )}
       <div className="grid gap-0.5 border-t border-line pt-2.5">
-        <span className="kicker mb-1">{frog ? "Otras candidatas" : "Tu sapo"}</span>
+        <span className="kicker mb-1">{frog ? "Otras candidatas" : "Tu tarea prioritaria"}</span>
         {others.map((c) => (
           <div key={c.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-0.5 text-[13.5px]">
             <span className="min-w-0 truncate">
@@ -657,7 +644,7 @@ function FrogCard({
               maxLength={120}
               lang="es"
               spellCheck
-              aria-label="Tu sapo de hoy"
+              aria-label="Tu tarea prioritaria de hoy"
               placeholder="La cosa difícil de hoy"
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && setWriting(false)}
@@ -708,9 +695,9 @@ function SmallFrog({
   };
   if (ask && !eaten) {
     return (
-      <TintedCard tone="plan" icon={FrogIcon} title="¿Te comiste el sapo?" className="h-full" bodyClassName="gap-2.5!">
+      <TintedCard tone="plan" icon={Flag} title="¿Hiciste la tarea prioritaria?" className="h-full" bodyClassName="gap-2.5!">
         <p className="text-[16px] font-bold tracking-[-0.02em]">{ritual.frogTitle}</p>
-        <div role="group" aria-label="¿Te comiste el sapo?" className="inline-flex w-fit gap-1 rounded-full border border-line bg-surface-2 p-1">
+        <div role="group" aria-label="¿Hiciste la tarea prioritaria?" className="inline-flex w-fit gap-1 rounded-full border border-line bg-surface-2 p-1">
           <button type="button" onClick={eat} className="press inline-flex h-9 items-center rounded-full px-4 text-[13.5px] font-semibold text-muted hover:bg-surface hover:text-fg">
             Sí
           </button>
@@ -732,8 +719,8 @@ function SmallFrog({
   return (
     <TintedCard
       tone={eaten ? "habitos" : "plan"}
-      icon={FrogIcon}
-      title={eaten ? "Sapo comido" : "El sapo"}
+      icon={Flag}
+      title={eaten ? "Tarea prioritaria hecha" : "Tarea prioritaria"}
       meta={eaten ? hhmm.format(new Date(ritual.frogDoneAt!)) : "Lo primero del día"}
       progress={eaten ? 1 : null}
       className={cx("h-full", justAte && eaten && "ini-glow")}
@@ -753,7 +740,7 @@ function SmallFrog({
           >
             {eaten && <Check size={11} weight="bold" aria-hidden className={justAte ? "check-draw" : undefined} />}
           </span>
-          {eaten ? "Comido" : "Me lo comí"}
+          {eaten ? "Hecha" : "La hice"}
         </button>
       }
     >

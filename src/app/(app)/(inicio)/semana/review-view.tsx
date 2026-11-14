@@ -96,7 +96,7 @@ export function ReviewView({ r }: { r: WeeklyReview }) {
                 )}
                 {r.ritual.frogs > 0 && (
                   <>
-                    sapos comidos <b className="font-semibold text-fg tabular">{r.ritual.eaten}</b>
+                    tareas prioritarias hechas <b className="font-semibold text-fg tabular">{r.ritual.eaten}</b>
                     {r.ritual.eaten !== r.ritual.frogs && ` de ${r.ritual.frogs}`}
                   </>
                 )}
