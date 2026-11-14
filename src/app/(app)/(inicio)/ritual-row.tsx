@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import {
-  ArrowRight,
   CalendarCheck,
   CalendarPlus,
   Check,
   Flag,
-  ListChecks,
   PencilSimple,
   Timer,
 } from "@phosphor-icons/react";
@@ -37,8 +35,6 @@ import { saveRitual } from "@/lib/offline/ritual";
 import { scheduleTask } from "@/lib/offline/plan";
 import { CategoryTag } from "../plan/plan-ui";
 
-type Progress = { done: number; total: number };
-export type ProgressSource = { get: () => Progress; subscribe: (f: () => void) => () => void };
 
 const hhmm = new Intl.DateTimeFormat("es-UY", { timeZone: "America/Montevideo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
@@ -54,20 +50,20 @@ export function RitualRow({
   d,
   data,
   checkin,
+  plan,
   summary,
   links,
-  habits,
 }: {
   d: Dashboard;
   data: RitualData;
   /** La tarjeta "¿Cómo estás?" (va debajo del saludo, siempre en el mismo lugar del árbol). */
   checkin: React.ReactNode;
+  /** "Plan de hoy" (va a la derecha, debajo de la tarea prioritaria; pedido de Facu 2026-11-14). */
+  plan: React.ReactNode;
   /** La frase del resumen de siempre ("Llevás 2 de 6 hábitos…"). */
   summary: React.ReactNode;
   /** Las píldoras Revisión semanal / Análisis. */
   links: React.ReactNode;
-  /** El avance de hábitos de hoy (sigue los toques de la tarjeta de Hábitos). */
-  habits: ProgressSource;
 }) {
   const [ritual, setRitual] = useState<RitualDTO>(() => data.ritual ?? emptyRitual(d.today));
   // Se está eligiendo (o se tocó "Cambiar"): no se pliega solo mientras tanto.
@@ -165,13 +161,12 @@ export function RitualRow({
         </div>
         {checkin}
       </div>
-      {/* A la mañana la tarjeta para elegir ocupa todo el alto; plegado, la tarjeta chica y
-          debajo el vistazo a hoy (así la columna no queda con un hueco). */}
-      <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-5 lg:gap-5 lg:[&>*:last-child]:flex-1">
+      {/* A la derecha la tarea prioritaria y debajo "Plan de hoy", que se estira hasta el alto de
+          la columna de la izquierda (el "Hoy" propio del ritual se sacó: repetía el Plan de hoy). */}
+      <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-5 lg:gap-5">
         {side}
-        {!morning && <TodayStrip d={d} habits={habits} compact />}
+        {plan}
       </div>
-      {morning && <TodayStrip d={d} habits={habits} />}
     </section>
   );
 }
@@ -237,7 +232,6 @@ function FrogCard({
       title="Tarea prioritaria"
       meta={chosen ? "Lo primero del día" : frog ? "Propuesto · lo primero del día" : "Lo primero del día"}
       action={{ href: "/plan#tareas", label: "Tareas" }}
-      className="h-full"
       bodyClassName="gap-3.5!"
     >
       {frog ? (
@@ -468,148 +462,3 @@ function SmallFrog({
     </TintedCard>
   );
 }
-
-// ─── Hoy ────────────────────────────────────────────────────────────────────
-
-const TL_FROM = 8;
-const TL_TO = 20;
-
-const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-
-/**
- * Un vistazo a hoy: los bloques de 8 a 20 en una línea (lista en el celular) y los hábitos que
- * tocan. Solo para leer. `compact`: en la columna angosta (ritual plegado), siempre la lista.
- */
-function TodayStrip({ d, habits, compact = false }: { d: Dashboard; habits: ProgressSource; compact?: boolean }) {
-  const { done, total } = useSyncExternalStore(habits.subscribe, habits.get, habits.get);
-  const blocks = d.plan.today;
-  const real = blocks.filter((b) => !isFreeBlock(b));
-  const span = (TL_TO - TL_FROM) * 60;
-  // En la línea: los que tienen hora y caen (aunque sea en parte) entre las 8 y las 20.
-  const timed = blocks
-    .filter((b) => b.startTime)
-    .map((b) => {
-      const s = toMin(b.startTime!);
-      const e = b.endTime && toMin(b.endTime) > s ? toMin(b.endTime) : s + 60;
-      return { b, s, e };
-    })
-    .filter(({ s, e }) => e > TL_FROM * 60 && s < TL_TO * 60);
-  // Los que se pisan van en otra fila (hasta 3).
-  const lanes: number[] = [];
-  const placed = timed.map((x) => {
-    let lane = lanes.findIndex((end) => end <= x.s);
-    if (lane === -1) lane = lanes.length < 3 ? lanes.length : lanes.indexOf(Math.min(...lanes));
-    lanes[lane] = x.e;
-    return { ...x, lane };
-  });
-  const laneCount = Math.max(1, lanes.length);
-  const onLine = new Set(placed.map((p) => p.b.id));
-  const rest = blocks.filter((b) => !onLine.has(b.id));
-  const color = (b: (typeof blocks)[number]) => (b.category ? `var(--p-${b.category.color}-chip)` : "var(--c-plan)");
-
-  return (
-    <TintedCard
-      icon={CalendarCheck}
-      title="Hoy"
-      meta={`${real.length ? `${real.length} ${real.length === 1 ? "bloque" : "bloques"}` : "Sin bloques"} · ${total} ${total === 1 ? "hábito" : "hábitos"}`}
-      action={{ href: "/plan", label: "Ver el plan" }}
-      className={compact ? undefined : "lg:col-span-12"}
-    >
-      <div className={cx("grid gap-4", compact ? "flex-1 content-between" : "lg:grid-cols-[minmax(0,1fr)_200px] lg:items-center lg:gap-5")}>
-        {blocks.length === 0 ? (
-          <p className="text-[13.5px] text-muted">Nada planificado para hoy.</p>
-        ) : (
-          <>
-            {/* Compu: la línea de 8 a 20. */}
-            <div className={cx("hidden min-w-0 gap-1.5", !compact && "lg:grid")}>
-              <div className="rit-tl relative rounded-[10px]" style={{ height: 14 + laneCount * 34 }}>
-                {placed.map(({ b, s, e, lane }) => {
-                  const left = (Math.max(0, s - TL_FROM * 60) / span) * 100;
-                  const right = (Math.min(span, e - TL_FROM * 60) / span) * 100;
-                  const free = isFreeBlock(b);
-                  return (
-                    <span
-                      key={b.id}
-                      title={`${b.startTime}${b.endTime ? `–${b.endTime}` : ""} · ${b.title}`}
-                      className={cx(
-                        "absolute flex h-[28px] min-w-0 items-center gap-1.5 overflow-hidden rounded-lg border px-2 text-[12px] font-semibold whitespace-nowrap",
-                        free ? "free-block border-transparent text-fg" : "border-line bg-surface",
-                        b.done && "text-muted line-through decoration-faint",
-                      )}
-                      style={{
-                        left: `${left}%`,
-                        width: `calc(${right - left}% - 3px)`,
-                        top: 7 + lane * 34,
-                        boxShadow: free ? undefined : `inset 3px 0 0 ${color(b)}`,
-                      }}
-                    >
-                      <span className="truncate">{b.title}</span>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="relative h-4 font-mono text-[10.5px] text-muted">
-                {[8, 10, 12, 14, 16, 18, 20].map((h) => (
-                  <span key={h} className="absolute -translate-x-1/2 first:translate-x-0 last:-translate-x-full" style={{ left: `${((h - TL_FROM) / (TL_TO - TL_FROM)) * 100}%` }}>
-                    {h}
-                  </span>
-                ))}
-              </div>
-              {rest.length > 0 && (
-                <p className="truncate text-[12.5px] text-muted">
-                  {rest.some((b) => b.startTime) ? "Fuera de la línea" : "Sin hora"}: {rest.map((b) => (b.startTime ? `${b.title} (${b.startTime})` : b.title)).join(" · ")}
-                </p>
-              )}
-            </div>
-            {/* Celular: una lista. */}
-            <ul className={cx("grid gap-1.5", !compact && "lg:hidden")}>
-              {blocks.map((b) => {
-                const free = isFreeBlock(b);
-                return (
-                  <li
-                    key={b.id}
-                    className={cx(
-                      "grid grid-cols-[3.25rem_8px_minmax(0,1fr)] items-center gap-2.5 rounded-[10px] border px-2.5 py-2 text-[14px]",
-                      free ? "free-row border-transparent" : "border-line bg-surface",
-                    )}
-                  >
-                    <span className={cx("font-mono text-[12px] tabular", free ? "text-fg" : "text-muted")}>{b.startTime ?? "—"}</span>
-                    <span aria-hidden className={cx("size-2 rounded-full", free && "invisible")} style={{ background: color(b) }} />
-                    <span className={cx("truncate", b.done && "text-muted line-through decoration-faint")}>
-                      {free && b.endTime ? `Libre hasta las ${b.endTime.replace(/^0/, "")}` : b.title}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-        <a
-          href="#habitos-hoy"
-          className="grid gap-2 rounded-xl border border-[color-mix(in_oklab,var(--c-habitos)_18%,transparent)] bg-[color-mix(in_oklab,var(--c-habitos)_8%,var(--surface))] px-3 py-2.5 transition-[filter] hover:brightness-[0.98]"
-        >
-          <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-fg">
-            <ListChecks size={16} aria-hidden className="text-[var(--c-habitos)]" />
-            {total} {total === 1 ? "hábito" : "hábitos"} para hoy
-          </span>
-          {total > 0 && (
-            <span aria-hidden className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${Math.min(total, 24)}, minmax(0, 1fr))` }}>
-              {Array.from({ length: Math.min(total, 24) }, (_, i) => (
-                <span
-                  key={i}
-                  className="h-1.5 rounded-full"
-                  style={{ background: i < Math.round((done / total) * Math.min(total, 24)) ? "var(--c-habitos)" : "color-mix(in oklab, var(--c-habitos) 22%, transparent)" }}
-                />
-              ))}
-            </span>
-          )}
-          <span className="flex items-center justify-between gap-2 text-[12px] text-muted">
-            {total === 0 ? "Hoy no toca ninguno" : done === 0 ? "Ninguno marcado todavía" : done >= total ? "Día completo" : `${done} de ${total} hechos`}
-            <ArrowRight size={13} aria-hidden />
-          </span>
-        </a>
-      </div>
-    </TintedCard>
-  );
-}
-

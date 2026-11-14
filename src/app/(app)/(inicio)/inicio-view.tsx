@@ -187,12 +187,11 @@ export function InicioView({
           </Link>
         )}
 
-        {/* Fila 1: el ritual de la mañana (saludo y "¿Cómo estás?", tarea prioritaria y hoy). */}
+        {/* Fila 1: el ritual de la mañana (saludo y "¿Cómo estás?"; tarea prioritaria y Plan de hoy). */}
         <RitualRow
           key={`ritual-${d.today}`}
           d={d}
           data={ritual}
-          habits={habitProgress}
           checkin={
             // key: al cambiar de día (el Shell refresca sin desmontar) arranca de nuevo con
             // las fechas nuevas; lo pendiente se manda al desmontar, con su fecha vieja.
@@ -204,6 +203,7 @@ export function InicioView({
               watch={d.checkin.watch}
             />
           }
+          plan={<PlanToday d={d} />}
           summary={<Summary d={d} />}
           links={
             <>
@@ -225,10 +225,9 @@ export function InicioView({
           <ReserveStat reserve={reserve} prevName={prevName} month={d.gastos.month} />
         </section>
 
-        {/* Hábitos (7) junto a Plan y Notas (5, la última se estira hasta el alto de Hábitos). */}
+        {/* Hábitos (7) junto a Notas (5, se estira hasta el alto de Hábitos). "Plan de hoy" subió al ritual. */}
         <HabitsToday d={d} store={habitProgress} />
         <div className="contents lg:col-span-6 lg:flex xl:col-span-5 lg:min-w-0 lg:flex-col lg:gap-5">
-          <PlanToday d={d} />
           <NotesCard s={latestNotes} today={d.today} />
         </div>
 
@@ -809,7 +808,7 @@ function PlanToday({ d }: { d: Dashboard }) {
       meta={meta}
       action={{ href: "/plan", label: "Ver la semana" }}
       progress={real.length ? doneN / real.length : null}
-      className="max-lg:order-5 lg:flex-none"
+      className="lg:flex-1"
       bodyClassName="@container"
     >
       {blocks.length > 0 ? (
