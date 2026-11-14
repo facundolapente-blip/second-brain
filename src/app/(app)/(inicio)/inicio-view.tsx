@@ -207,7 +207,7 @@ export function InicioView({
         <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-5" />
 
         {/* Fila 2: las cinco cifras. */}
-        <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-3 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">
+        <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-10 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">
           <HabitStat d={d} store={habitProgress} />
           <JournalStat d={d} />
           <GastosStat d={d} delta={delta} prevName={prevName} />
