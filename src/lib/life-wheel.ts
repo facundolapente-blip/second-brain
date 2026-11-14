@@ -6,16 +6,19 @@ import { isISODate } from "./dates.ts";
  * cambios contra otra rueda, puntos de la telaraña y cuándo toca la próxima.
  */
 
-/** Las 8 áreas de su Notion, en el orden de la telaraña (Salud arriba, en el sentido del reloj). */
+/**
+ * Las 8 áreas de su Notion, en el orden de la telaraña (Salud arriba, en el sentido del reloj).
+ * `color` es de la paleta de la app (`--p-{color}-chip`, con versión clara y oscura).
+ */
 export const WHEEL_AREAS = [
-  { key: "Salud", short: "Salud" },
-  { key: "Finanzas", short: "Finanzas" },
-  { key: "Amor", short: "Amor" },
-  { key: "Entorno físico", short: "Entorno" },
-  { key: "Desarrollo profesional", short: "D. profesional" },
-  { key: "Desarrollo personal", short: "D. personal" },
-  { key: "Ocio", short: "Ocio" },
-  { key: "Relaciones", short: "Relaciones" },
+  { key: "Salud", short: "Salud", color: "green" },
+  { key: "Finanzas", short: "Finanzas", color: "teal" },
+  { key: "Amor", short: "Amor", color: "pink" },
+  { key: "Entorno físico", short: "Entorno", color: "yellow" },
+  { key: "Desarrollo profesional", short: "D. profesional", color: "blue" },
+  { key: "Desarrollo personal", short: "D. personal", color: "purple" },
+  { key: "Ocio", short: "Ocio", color: "orange" },
+  { key: "Relaciones", short: "Relaciones", color: "red" },
 ] as const;
 
 export type WheelScores = Record<string, number>;
@@ -78,6 +81,48 @@ export function radarAt(i: number, cx: number, cy: number, d: number): { x: numb
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Rueda de pétalos: a qué distancia del centro llega un puntaje. Arranca en el borde del
+ * círculo del medio (`r0`, ahí va el promedio) y llega a `r` con un 10; así un 1 también se ve.
+ */
+export function petalRadius(score: number, r0: number, r: number): number {
+  return round1(r0 + (Math.min(10, Math.max(0, score)) / 10) * (r - r0));
+}
+
+/** Ángulos de la porción `i` (centrada en su área: Salud arriba) y el punto a distancia `d` con ángulo `a`. */
+const sliceAngles = (i: number, n: number) => {
+  const start = -Math.PI / 2 + ((i - 0.5) * 2 * Math.PI) / n;
+  return [start, start + (2 * Math.PI) / n] as const;
+};
+const at = (cx: number, cy: number, d: number, a: number) => `${round1(cx + Math.cos(a) * d)},${round1(cy + Math.sin(a) * d)}`;
+/** Cuánto se achica el ángulo para dejar una separación `gap` del mismo ancho de punta a punta. */
+const padAt = (gap: number, d: number) => (d > 0 ? Math.asin(Math.min(1, gap / 2 / d)) : 0);
+
+/**
+ * Camino SVG de la porción `i` de la rueda, entre las distancias `r0` y `r` del centro,
+ * con una separación de `gap` (en unidades del SVG) contra las vecinas. "" si no tiene alto
+ * o la separación se la come entera.
+ */
+export function wheelSlicePath(i: number, cx: number, cy: number, r0: number, r: number, gap = 0, n: number = WHEEL_AREAS.length): string {
+  if (r - r0 < 0.05) return "";
+  const [a0, a1] = sliceAngles(i, n);
+  const po = padAt(gap, r);
+  const pi = padAt(gap, r0);
+  if (a1 - a0 - 2 * po <= 0) return "";
+  const large = a1 - a0 - 2 * po > Math.PI ? 1 : 0;
+  const outer = `M${at(cx, cy, r, a0 + po)} A${round1(r)},${round1(r)} 0 ${large} 1 ${at(cx, cy, r, a1 - po)}`;
+  if (r0 <= 0 || a1 - a0 - 2 * pi <= 0) return `${outer} L${at(cx, cy, Math.max(0, r0), (a0 + a1) / 2)} Z`;
+  return `${outer} L${at(cx, cy, r0, a1 - pi)} A${round1(r0)},${round1(r0)} 0 ${large} 0 ${at(cx, cy, r0, a0 + pi)} Z`;
+}
+
+/** Arco (sin cerrar) de la porción `i` a la distancia `r`: el puntaje de la rueda con la que se compara. */
+export function wheelArcPath(i: number, cx: number, cy: number, r: number, gap = 0, n: number = WHEEL_AREAS.length): string {
+  const [a0, a1] = sliceAngles(i, n);
+  const p = padAt(gap, r);
+  if (r <= 0 || a1 - a0 - 2 * p <= 0) return "";
+  return `M${at(cx, cy, r, a0 + p)} A${round1(r)},${round1(r)} 0 ${a1 - a0 - 2 * p > Math.PI ? 1 : 0} 1 ${at(cx, cy, r, a1 - p)}`;
+}
 
 /** El mismo día, `n` meses después (un 31 cae en el último día del mes que no lo tiene). */
 export function addMonthsIso(iso: string, n: number): string {

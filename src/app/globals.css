@@ -1239,3 +1239,26 @@ dialog.sheet.closing-drag::backdrop {
 .rueda-flash {
   box-shadow: 0 0 0 2px var(--mod);
 }
+
+/* Rueda de pétalos: cada porción (con su rótulo) se toca para leer lo escrito sobre esa área. */
+.rueda-petal {
+  cursor: pointer;
+  outline: none;
+}
+.rueda-petal .rueda-petal-bg {
+  transition: fill-opacity var(--dur-quick, 140ms) ease-out;
+}
+@media (hover: hover) {
+  .rueda-petal:hover .rueda-petal-bg {
+    fill-opacity: 0.26;
+  }
+}
+.rueda-petal:focus-visible .rueda-petal-bg {
+  fill-opacity: 0.26;
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+.rueda-petal:focus-visible .rueda-petal-label {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

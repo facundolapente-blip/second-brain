@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsIso, joinWheelNote, noteByArea, splitWheelNote, formatDelta, formatScore, nextWheelDate, normalizeScore, notionArea, notionDate, parseScores, radarPoints, scoreDelta, wheelAverage } from "@/lib/life-wheel";
+import { addMonthsIso, petalRadius, WHEEL_AREAS, wheelArcPath, wheelSlicePath, joinWheelNote, noteByArea, splitWheelNote, formatDelta, formatScore, nextWheelDate, normalizeScore, notionArea, notionDate, parseScores, radarPoints, scoreDelta, wheelAverage } from "@/lib/life-wheel";
 
 describe("rueda de la vida", () => {
   const jun26 = { Salud: 7, Finanzas: 6, Amor: 7, "Entorno físico": 9, "Desarrollo profesional": 8, "Desarrollo personal": 8.5, Ocio: 8, Relaciones: 8 };
@@ -75,5 +75,43 @@ describe("texto por área", () => {
   });
   it("sin nada escrito", () => {
     expect(joinWheelNote({ intro: " ", byArea: { Salud: "" } })).toBe("");
+  });
+});
+
+describe("rueda de pétalos", () => {
+  const nums = (path: string) => (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  it("cada área tiene su color de la paleta, sin repetir", () => {
+    expect(new Set(WHEEL_AREAS.map((a) => a.color)).size).toBe(WHEEL_AREAS.length);
+    expect(WHEEL_AREAS[0]).toMatchObject({ key: "Salud", color: "green" });
+  });
+  it("el puntaje arranca en el círculo del medio y llega al borde con 10", () => {
+    expect(petalRadius(0, 20, 100)).toBe(20);
+    expect(petalRadius(5, 20, 100)).toBe(60);
+    expect(petalRadius(10, 20, 100)).toBe(100);
+    expect(petalRadius(12, 20, 100)).toBe(100);
+    expect(petalRadius(-1, 20, 100)).toBe(20);
+  });
+  it("porción entre dos radios, centrada en su área", () => {
+    expect(wheelSlicePath(0, 100, 100, 10, 50, 0, 4)).toBe("M64.6,64.6 A50,50 0 0 1 135.4,64.6 L107.1,92.9 A10,10 0 0 0 92.9,92.9 Z");
+    // Salud arriba: la porción es simétrica respecto del centro.
+    const [x0, , , , , , , x1] = nums(wheelSlicePath(0, 100, 100, 20, 80, 3));
+    expect(x0 + x1).toBeCloseTo(200, 0);
+    expect(x0).toBeLessThan(100);
+  });
+  it("la separación tiene el mismo ancho adentro y afuera", () => {
+    // Con 4 porciones, el borde izquierdo de la de arriba es la recta a −135°: cada punta queda a gap/2 de ella.
+    const g = 6;
+    const p = nums(wheelSlicePath(0, 0, 0, 10, 50, g, 4));
+    const dist = (x: number, y: number) => Math.abs(x * Math.sin((-3 * Math.PI) / 4) - y * Math.cos((-3 * Math.PI) / 4));
+    expect(dist(p[0], p[1])).toBeCloseTo(g / 2, 0);
+    expect(dist(p[p.length - 2], p[p.length - 1])).toBeCloseTo(g / 2, 0);
+  });
+  it("sin alto no dibuja nada; sin centro, termina en punta", () => {
+    expect(wheelSlicePath(0, 100, 100, 20, 20)).toBe("");
+    expect(wheelSlicePath(0, 100, 100, 0, 50, 0, 4)).toBe("M64.6,64.6 A50,50 0 0 1 135.4,64.6 L100,100 Z");
+  });
+  it("arco de la rueda con la que se compara", () => {
+    expect(wheelArcPath(0, 100, 100, 50, 0, 4)).toBe("M64.6,64.6 A50,50 0 0 1 135.4,64.6");
+    expect(wheelArcPath(0, 100, 100, 0)).toBe("");
   });
 });
