@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsIso, splitWheelNote, formatDelta, formatScore, nextWheelDate, normalizeScore, notionArea, notionDate, parseScores, radarPoints, scoreDelta, wheelAverage } from "@/lib/life-wheel";
+import { addMonthsIso, joinWheelNote, noteByArea, splitWheelNote, formatDelta, formatScore, nextWheelDate, normalizeScore, notionArea, notionDate, parseScores, radarPoints, scoreDelta, wheelAverage } from "@/lib/life-wheel";
 
 describe("rueda de la vida", () => {
   const jun26 = { Salud: 7, Finanzas: 6, Amor: 7, "Entorno físico": 9, "Desarrollo profesional": 8, "Desarrollo personal": 8.5, Ocio: 8, Relaciones: 8 };
@@ -61,5 +61,19 @@ describe("lo escrito en una rueda", () => {
   it("sin áreas, todo junto", () => {
     expect(splitWheelNote("Una nota corta")).toEqual([{ area: null, blocks: [{ title: null, text: "Una nota corta" }] }]);
     expect(splitWheelNote("")).toEqual([]);
+  });
+});
+
+describe("texto por área", () => {
+  it("separa y vuelve a juntar sin perder nada", () => {
+    const note = "Algo general.\n\n1. Salud.\nBien.\n\n5. Desarrollo profesional.\nTrabajo\nSin empleo.\n\nFacultad\nPoca motivación.";
+    const by = noteByArea(note);
+    expect(by.intro).toBe("Algo general.");
+    expect(by.byArea["Desarrollo profesional"]).toBe("Trabajo\nSin empleo.\n\nFacultad\nPoca motivación.");
+    expect(joinWheelNote(by)).toBe(note);
+    expect(noteByArea(joinWheelNote(by))).toEqual(by);
+  });
+  it("sin nada escrito", () => {
+    expect(joinWheelNote({ intro: " ", byArea: { Salud: "" } })).toBe("");
   });
 });

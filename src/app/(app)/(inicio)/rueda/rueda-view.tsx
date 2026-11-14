@@ -18,6 +18,8 @@ import {
   nextWheelDate,
   radarAt,
   radarPoints,
+  joinWheelNote,
+  noteByArea,
   scoreDelta,
   splitWheelNote,
   WHEEL_AREAS,
@@ -68,9 +70,19 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
   // Leer lo que escribió en una rueda (doble clic en la fecha, o "Leer" en el menú).
   const readSheet = useRef<SheetHandle>(null);
   const [reading, setReading] = useState<WheelDTO | null>(null);
-  const openRead = (w: WheelDTO) => {
+  const openRead = (w: WheelDTO, area?: string) => {
     setReading(w);
     readSheet.current?.open();
+    if (area) {
+      // Después de dibujar la hoja: ir al bloque de esa área y marcarlo un momento.
+      setTimeout(() => {
+        const el = document.getElementById(areaAnchor(area));
+        if (!el) return;
+        el.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        el.classList.add("rueda-flash");
+        setTimeout(() => el.classList.remove("rueda-flash"), 1400);
+      }, 120);
+    }
   };
 
   const sel = list.find((w) => w.id === selectedId) ?? list[0] ?? null;
@@ -167,9 +179,13 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
                   </div>
                 )}
               </div>
-              {view === "radar" ? <Radar cur={sel.scores} cmp={cmp?.scores ?? null} /> : <Bars cur={sel.scores} cmp={cmp?.scores ?? null} avg={avg} avgDelta={avgDelta} />}
+              {view === "radar" ? (
+                <Radar cur={sel.scores} cmp={cmp?.scores ?? null} onArea={sel.note ? (a) => openRead(sel, a) : undefined} />
+              ) : (
+                <Bars cur={sel.scores} cmp={cmp?.scores ?? null} avg={avg} avgDelta={avgDelta} onArea={sel.note ? (a) => openRead(sel, a) : undefined} />
+              )}
               <Legend sel={sel} cmp={cmp} avg={avg} cmpAvg={cmpAvg} />
-              {view === "radar" && <ScoreList cur={sel.scores} cmp={cmp?.scores ?? null} />}
+              {view === "radar" && <ScoreList cur={sel.scores} cmp={cmp?.scores ?? null} onArea={sel.note ? (a) => openRead(sel, a) : undefined} />}
               {sel.note && (
                 <button type="button" onClick={() => openRead(sel)} className="tap-tint grid gap-1.5 rounded-xl bg-surface-2 px-3 py-2.5 text-left">
                   <span className="line-clamp-3 text-[13.5px] text-muted">{notePreview(sel.note)}</span>
@@ -223,7 +239,7 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
         )}
       </Sheet>
 
-      <Sheet ref={sheet} title={editing ? `Rueda del ${dayMonthYear(editing.date)}` : "Nueva rueda"}>
+      <Sheet ref={sheet} title={editing ? `Rueda del ${dayMonthYear(editing.date)}` : "Nueva rueda"} wide>
         <WheelForm
           key={formKey}
           editing={editing}
@@ -242,7 +258,7 @@ export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string
 }
 
 /** Telaraña: la rueda elegida llena, la de comparar con borde naranja. */
-function Radar({ cur, cmp }: { cur: WheelScores; cmp: WheelScores | null }) {
+function Radar({ cur, cmp, onArea }: { cur: WheelScores; cmp: WheelScores | null; onArea?: (area: string) => void }) {
   const cx0 = 160;
   const cy0 = 140;
   const r = 96;
@@ -270,10 +286,26 @@ function Radar({ cur, cmp }: { cur: WheelScores; cmp: WheelScores | null }) {
       {WHEEL_AREAS.map((a, i) => {
         const p = radarAt(i, cx0, cy0, r + 20);
         const anchor = Math.abs(p.x - cx0) < 4 ? "middle" : p.x > cx0 ? "start" : "end";
-        return (
-          <text key={a.key} x={p.x} y={p.y + 4} textAnchor={anchor} fontSize={12} fill="var(--muted)" fontFamily="var(--font-ui-sans)">
+        const label = (
+          <text x={p.x} y={p.y + 4} textAnchor={anchor} fontSize={12} fill={onArea ? "var(--text)" : "var(--muted)"} fontFamily="var(--font-ui-sans)" textDecoration={onArea ? "underline" : undefined} className={onArea ? "[text-decoration-color:var(--line-strong)] [text-underline-offset:3px]" : undefined}>
             {a.short}
           </text>
+        );
+        if (!onArea) return <g key={a.key}>{label}</g>;
+        return (
+          <g
+            key={a.key}
+            role="button"
+            tabIndex={0}
+            aria-label={`Leer lo que escribiste sobre ${a.key}`}
+            onClick={() => onArea(a.key)}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onArea(a.key))}
+            className="cursor-pointer outline-none [&:focus-visible_text]:fill-[var(--mod)] [&:hover_text]:fill-[var(--mod)]"
+          >
+            {/* Zona de toque más grande que la palabra. */}
+            <rect x={anchor === "middle" ? p.x - 44 : anchor === "start" ? p.x - 6 : p.x - 88} y={p.y - 12} width={94} height={24} fill="transparent" />
+            {label}
+          </g>
         );
       })}
     </svg>
@@ -300,18 +332,20 @@ function Legend({ sel, cmp, avg, cmpAvg }: { sel: WheelDTO; cmp: WheelDTO | null
 }
 
 /** Puntaje de cada área y cuánto cambió contra la de comparar (dos columnas). */
-function ScoreList({ cur, cmp }: { cur: WheelScores; cmp: WheelScores | null }) {
+function ScoreList({ cur, cmp, onArea }: { cur: WheelScores; cmp: WheelScores | null; onArea?: (area: string) => void }) {
   return (
     <ul className="grid gap-x-6 sm:grid-cols-2">
       {WHEEL_AREAS.map((a) => {
         const d = scoreDelta(cur, cmp, a.key);
         return (
-          <li key={a.key} className="flex items-center justify-between border-b border-line py-1.5 text-[13.5px]">
-            <span>{a.key}</span>
-            <span className="font-mono tabular">
-              {cur[a.key] !== undefined ? formatScore(cur[a.key]) : "–"}
-              {d !== null && <span className={cx("ml-1.5", tone(d))}>{formatDelta(d)}</span>}
-            </span>
+          <li key={a.key} className="border-b border-line">
+            <AreaRow area={a.key} onArea={onArea} className="flex w-full items-center justify-between py-1.5 text-[13.5px]">
+              <span>{a.key}</span>
+              <span className="font-mono tabular">
+                {cur[a.key] !== undefined ? formatScore(cur[a.key]) : "–"}
+                {d !== null && <span className={cx("ml-1.5", tone(d))}>{formatDelta(d)}</span>}
+              </span>
+            </AreaRow>
           </li>
         );
       })}
@@ -320,7 +354,7 @@ function ScoreList({ cur, cmp }: { cur: WheelScores; cmp: WheelScores | null }) 
 }
 
 /** Barras: el promedio grande y cada área con la otra rueda de fondo. */
-function Bars({ cur, cmp, avg, avgDelta }: { cur: WheelScores; cmp: WheelScores | null; avg: number | null; avgDelta: number | null }) {
+function Bars({ cur, cmp, avg, avgDelta, onArea }: { cur: WheelScores; cmp: WheelScores | null; avg: number | null; avgDelta: number | null; onArea?: (area: string) => void }) {
   return (
     <div className="grid gap-3">
       <div className="flex items-baseline gap-2">
@@ -335,6 +369,7 @@ function Bars({ cur, cmp, avg, avgDelta }: { cur: WheelScores; cmp: WheelScores 
           const d = scoreDelta(cur, cmp, a.key);
           return (
             <li key={a.key}>
+              <AreaRow area={a.key} onArea={onArea} className="block w-full py-0.5">
               <div className="flex items-center justify-between text-[13.5px]">
                 <span>{a.key}</span>
                 <span className="font-mono tabular">
@@ -346,6 +381,7 @@ function Bars({ cur, cmp, avg, avgDelta }: { cur: WheelScores; cmp: WheelScores 
                 {p !== undefined && <span className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--p-orange-chip)_38%,var(--surface-2))]" style={{ width: `${p * 10}%` }} />}
                 {v !== undefined && <span className="absolute top-[2px] left-0 h-1 rounded-full bg-[var(--mod)]" style={{ width: `${v * 10}%` }} />}
               </div>
+              </AreaRow>
             </li>
           );
         })}
@@ -409,7 +445,9 @@ function WheelForm({ editing, last, today, onSaved }: { editing: WheelDTO | null
   const [scores, setScores] = useState<Record<string, string>>(() =>
     Object.fromEntries(WHEEL_AREAS.map((a) => [a.key, editing?.scores[a.key] !== undefined ? formatScore(editing.scores[a.key]) : ""])),
   );
-  const [note, setNote] = useState(editing?.note ?? "");
+  // Lo escrito va por área (como en su Notion), debajo del puntaje de cada una; lo general, al final.
+  const [texts, setTexts] = useState(() => noteByArea(editing?.note));
+  const setAreaText = (key: string, v: string) => setTexts((t) => ({ ...t, byArea: { ...t.byArea, [key]: v } }));
   const [error, setError] = useState<string | null>(null);
   const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
   const step = (key: string, by: number) => {
@@ -437,7 +475,8 @@ function WheelForm({ editing, last, today, onSaved }: { editing: WheelDTO | null
         }
         if (!Object.keys(parsed).length) return setError("Poné el puntaje de al menos un área.");
         if (!date || date > today) return setError("Elegí una fecha (hoy o antes).");
-        const w: WheelDTO = { id: editing?.id ?? `nueva-${Date.now()}`, date, scores: parsed, note: note.trim() || null };
+        const note = joinWheelNote(texts);
+        const w: WheelDTO = { id: editing?.id ?? `nueva-${Date.now()}`, date, scores: parsed, note: note || null };
         onSaved(w);
         quiet(
           saveWheel(editing?.id ?? null, { date, scores: parsed, note: w.note }).then((r) => {
@@ -483,21 +522,31 @@ function WheelForm({ editing, last, today, onSaved }: { editing: WheelDTO | null
                 <div className="h-1.5 rounded-full bg-surface-2">
                   {v !== null && !Number.isNaN(v) && <div className="h-full rounded-full bg-[var(--mod)]" style={{ width: `${Math.min(10, Math.max(0, v)) * 10}%` }} />}
                 </div>
+                <textarea
+                  value={texts.byArea[a.key] ?? ""}
+                  onChange={(e) => setAreaText(a.key, e.target.value)}
+                  aria-label={`Qué escribiste sobre ${a.key}`}
+                  lang="es"
+                  spellCheck
+                  rows={2}
+                  placeholder={`Cómo estás en ${a.key.toLowerCase()} y por qué ese puntaje…`}
+                  className={cx(AREA_TEXT, "max-h-80 min-h-16 [field-sizing:content]")}
+                />
               </li>
             );
           })}
         </ul>
       </div>
       <label className="grid gap-1.5 text-[13px] font-medium">
-        Notas de esta rueda <span className="font-normal text-muted">(opcional)</span>
+        Notas generales <span className="font-normal text-muted">(opcional)</span>
         <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          value={texts.intro}
+          onChange={(e) => setTexts((t) => ({ ...t, intro: e.target.value }))}
           rows={3}
           lang="es"
           spellCheck
           placeholder="Qué cambió, qué querés mejorar…"
-          className="rounded-[4px] border border-line-strong bg-surface px-3 py-2 text-[16px] outline-none focus:border-fg/50 pointer-fine:text-[15px]"
+          className={cx(AREA_TEXT, "min-h-20 [field-sizing:content] max-h-80")}
         />
       </label>
       {error && <p className="text-[13px] text-danger">{error}</p>}
@@ -517,7 +566,7 @@ function WheelReading({ w, before, onEdit }: { w: WheelDTO; before: WheelDTO | n
   const parts = splitWheelNote(w.note);
   const avg = wheelAverage(w.scores);
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-3">
       <p className="font-mono text-[12px] text-muted tabular">
         Promedio {avg !== null ? formatScore(avg) : "–"}
         {before ? ` · contra ${dayMonthYear(before.date)}` : ""}
@@ -527,20 +576,24 @@ function WheelReading({ w, before, onEdit }: { w: WheelDTO; before: WheelDTO | n
         const score = p.area ? w.scores[p.area] : undefined;
         const d = p.area ? scoreDelta(w.scores, before?.scores, p.area) : null;
         return (
-          <section key={i} className="grid gap-2">
-            {p.area && (
-              <h3 className="flex items-baseline gap-2 border-b border-line pb-1.5">
-                <span className="text-[16px] font-semibold">{p.area}</span>
-                {score !== undefined && <span className="ml-auto text-[16px] font-semibold tabular">{formatScore(score)}</span>}
-                {d !== null && <span className={cx("w-10 text-right font-mono text-[12px] tabular", tone(d))}>{formatDelta(d)}</span>}
-              </h3>
-            )}
-            {p.blocks.map((b, k) => (
-              <div key={k} className="grid gap-1">
-                {b.title && <p className="kicker">{b.title}</p>}
-                {b.text && <p className="max-w-[68ch] text-[15px] leading-relaxed whitespace-pre-line">{b.text}</p>}
-              </div>
-            ))}
+          <section key={i} id={p.area ? areaAnchor(p.area) : undefined} className="scroll-mt-3 overflow-hidden rounded-2xl border border-line bg-surface transition-shadow duration-500">
+            <h3 className="flex items-center gap-2 border-b border-line bg-[color-mix(in_oklab,var(--mod)_9%,var(--surface))] px-4 py-2.5">
+              <span className="text-[15.5px] font-semibold">{p.area ?? "Notas generales"}</span>
+              {score !== undefined && (
+                <span className="ml-auto inline-flex h-7 min-w-9 items-center justify-center rounded-full bg-[var(--mod)] px-2 text-[14px] font-semibold text-on-accent tabular">
+                  {formatScore(score)}
+                </span>
+              )}
+              {d !== null && <span className={cx("w-10 text-right font-mono text-[12px] tabular", tone(d))}>{formatDelta(d)}</span>}
+            </h3>
+            <div className="grid gap-3 px-4 py-3.5">
+              {p.blocks.map((b, k) => (
+                <div key={k} className="grid gap-1">
+                  {b.title && <p className="kicker">{b.title}</p>}
+                  {b.text && <p className="max-w-[68ch] text-[15px] leading-relaxed whitespace-pre-line">{b.text}</p>}
+                </div>
+              ))}
+            </div>
           </section>
         );
       })}
@@ -553,3 +606,17 @@ function WheelReading({ w, before, onEdit }: { w: WheelDTO; before: WheelDTO | n
 
 /** El principio de lo escrito, sin el rótulo de la primera área ("1. Salud."). */
 const notePreview = (note: string) => note.replace(/^\s*\d+\.[^\n]*\n/, "").trim();
+
+const AREA_TEXT = "w-full rounded-[10px] border border-line-strong bg-surface px-3 py-2 text-[16px] leading-relaxed outline-none focus:border-fg/50 pointer-fine:text-[14.5px]";
+
+const areaAnchor = (area: string) => `rueda-area-${WHEEL_AREAS.findIndex((a) => a.key === area)}`;
+
+/** Un área que, si la rueda tiene algo escrito, se toca para leer esa parte. */
+function AreaRow({ area, onArea, className, children }: { area: string; onArea?: (area: string) => void; className?: string; children: React.ReactNode }) {
+  if (!onArea) return <div className={className}>{children}</div>;
+  return (
+    <button type="button" onClick={() => onArea(area)} title={`Leer lo que escribiste sobre ${area}`} className={cx("tap-tint rounded-md text-left hover:bg-surface-2", className)}>
+      {children}
+    </button>
+  );
+}

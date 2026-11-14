@@ -161,3 +161,27 @@ export function splitWheelNote(note: string | null | undefined): WheelNotePart[]
 
 /** "Trabajo", "Dj/Productor", "Familia": rótulo corto, sin punto final. */
 const isSubtitle = (line: string) => line.length > 0 && line.length <= 32 && line.split(/\s+/).length <= 4 && /^[A-ZÁÉÍÓÚÑ]/.test(line) && !/[.,;:!?]$/.test(line);
+
+export type WheelNoteByArea = { intro: string; byArea: Record<string, string> };
+
+/** Lo escrito como un texto por área (con sus rótulos, "Trabajo" …) y lo general aparte. */
+export function noteByArea(note: string | null | undefined): WheelNoteByArea {
+  const out: WheelNoteByArea = { intro: "", byArea: {} };
+  for (const p of splitWheelNote(note)) {
+    const text = p.blocks.map((b) => [b.title, b.text].filter(Boolean).join("\n")).join("\n\n");
+    if (p.area) out.byArea[p.area] = out.byArea[p.area] ? `${out.byArea[p.area]}\n\n${text}` : text;
+    else out.intro = out.intro ? `${out.intro}\n\n${text}` : text;
+  }
+  return out;
+}
+
+/** Lo vuelve a juntar como en su Notion: lo general arriba y "1. Salud." … con su texto. */
+export function joinWheelNote({ intro, byArea }: WheelNoteByArea): string {
+  const parts: string[] = [];
+  if (intro.trim()) parts.push(intro.trim());
+  WHEEL_AREAS.forEach((a, i) => {
+    const t = byArea[a.key]?.trim();
+    if (t) parts.push(`${i + 1}. ${a.key}.\n${t}`);
+  });
+  return parts.join("\n\n");
+}

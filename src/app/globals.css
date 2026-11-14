@@ -1234,3 +1234,8 @@ dialog.sheet.closing-drag::backdrop {
     animation: dp-fade-out 120ms ease-in forwards;
   }
 }
+
+/* Rueda de la vida: el bloque del área que se tocó se marca un momento al llegar. */
+.rueda-flash {
+  box-shadow: 0 0 0 2px var(--mod);
+}

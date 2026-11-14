@@ -78,7 +78,7 @@ export function BottomTab({
     >
       <TabMark active={active} />
       <Ico size={22} weight={active ? "fill" : "regular"} className={cx("transition-colors duration-[var(--dur-quick)]", active ? "text-fg" : "text-muted")} />
-      <span className={cx("text-[11.5px] transition-colors duration-[var(--dur-quick)]", active ? "font-semibold text-fg" : "text-muted")}>{label}</span>
+      <span className={cx("text-[11.5px]", active ? "font-semibold text-fg" : "text-fg/72")}>{label}</span>
     </Link>
   );
 }
