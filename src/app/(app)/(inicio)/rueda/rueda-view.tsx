@@ -1,0 +1,466 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { ChartPolar, ClockCounterClockwise, DotsThreeVertical, Minus, NotePencil, Plus, Trash, Eye } from "@phosphor-icons/react";
+import { PageHeader } from "@/components/page-header";
+import { TintedCard } from "@/components/tinted-card";
+import { PillSwitch } from "@/components/pill-switch";
+import { Button, cx, Input, Sheet, type SheetHandle } from "@/components/ui";
+import { quiet } from "@/components/safe-action";
+import { notifyDeleted, notifyError } from "@/components/undo-toast";
+import { showContextMenu } from "@/components/context-menu";
+import { useHoldMenu } from "@/components/hold-menu";
+import { haptic } from "@/components/haptics";
+import { formatLong } from "@/lib/dates";
+import {
+  formatDelta,
+  formatScore,
+  nextWheelDate,
+  radarAt,
+  radarPoints,
+  scoreDelta,
+  WHEEL_AREAS,
+  wheelAverage,
+  type WheelScores,
+} from "@/lib/life-wheel";
+import { deleteWheel, saveWheel } from "@/lib/offline/wheel";
+import type { WheelDTO } from "@/lib/wheels";
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+/** "jun 2026" */
+const monthYear = (iso: string) => `${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+/** "8 jun 2026" */
+const dayMonthYear = (iso: string) => `${Number(iso.slice(8, 10))} ${monthYear(iso)}`;
+
+type View = "radar" | "barras";
+
+const tone = (d: number | null) => (d === null || d === 0 ? "text-muted" : d > 0 ? "text-[var(--st-done-fg)]" : "text-danger");
+
+/**
+ * Rueda de la vida (pedido de Facu, 2026-11-14). Arriba la rueda elegida (la última, si no)
+ * en dos vistas: telaraña con la otra rueda encima y barras, las dos con el puntaje de cada
+ * área y cuánto cambió; "Comparar con" elige contra cuál de las anteriores. Abajo, todas
+ * las ruedas. La app avisa en Inicio a los 9 meses de la última.
+ */
+export function RuedaView({ wheels, today }: { wheels: WheelDTO[]; today: string }) {
+  // Lo guardado o borrado se ve al toque; cuando llega lo del servidor, manda eso.
+  const [list, setList] = useState(wheels);
+  const [prev, setPrev] = useState(wheels);
+  if (prev !== wheels) {
+    setPrev(wheels);
+    setList(wheels);
+  }
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [compareId, setCompareId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("radar");
+  const pickView = (v: View) => setView(v);
+
+  const sheet = useRef<SheetHandle>(null);
+  const [editing, setEditing] = useState<WheelDTO | null>(null);
+  const [formKey, setFormKey] = useState(0);
+  const openForm = (w: WheelDTO | null) => {
+    setEditing(w);
+    setFormKey((k) => k + 1);
+    sheet.current?.open();
+  };
+
+  const sel = list.find((w) => w.id === selectedId) ?? list[0] ?? null;
+  const older = sel ? list.filter((w) => w.id !== sel.id && w.date <= sel.date) : [];
+  const cmp = (compareId ? list.find((w) => w.id === compareId && w.id !== sel?.id) : null) ?? older[0] ?? null;
+  const avg = sel ? wheelAverage(sel.scores) : null;
+  const cmpAvg = cmp ? wheelAverage(cmp.scores) : null;
+  const avgDelta = avg !== null && cmpAvg !== null ? Math.round((avg - cmpAvg) * 10) / 10 : null;
+  const latest = list[0];
+  const next = latest ? nextWheelDate(latest.date) : null;
+  const due = next !== null && next <= today;
+
+  function remove(w: WheelDTO) {
+    setList((l) => l.filter((x) => x.id !== w.id));
+    if (selectedId === w.id) setSelectedId(null);
+    quiet(
+      deleteWheel(w.id)
+        .then(() => notifyDeleted("Rueda borrada"))
+        .catch((e) => {
+          setList(wheels);
+          throw e;
+        }),
+    );
+  }
+  function wheelMenu(e: React.MouseEvent, w: WheelDTO) {
+    showContextMenu(
+      e,
+      [
+        { label: "Ver esta rueda", icon: <Eye size={15} />, onSelect: () => (setSelectedId(w.id), setCompareId(null)) },
+        { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => openForm(w) },
+        { label: "Borrar", icon: <Trash size={15} />, danger: true, onSelect: () => remove(w) },
+      ],
+      `Rueda del ${dayMonthYear(w.date)}`,
+    );
+  }
+
+  return (
+    <>
+      <PageHeader title="Rueda de la vida" kicker="Herramientas" wide />
+      <main className="mx-auto grid max-w-6xl gap-4 px-4 pt-2 pb-16 lg:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+        <TintedCard
+          tone="inicio"
+          icon={ChartPolar}
+          title="Rueda de la vida"
+          meta={sel ? `${dayMonthYear(sel.date)} · promedio ${avg !== null ? formatScore(avg) : "–"}${next ? ` · próxima ${dayMonthYear(next)}` : ""}` : "Todavía no hiciste ninguna"}
+          action={
+            <button type="button" onClick={() => openForm(null)} className="tcard-pill press">
+              <Plus size={13} weight="bold" aria-hidden /> Nueva rueda
+            </button>
+          }
+          className="lg:col-span-7"
+          bodyClassName="gap-3!"
+        >
+          {due && (
+            <button
+              type="button"
+              onClick={() => openForm(null)}
+              className="flex items-center gap-2 rounded-xl bg-[var(--st-skip-bg)] px-3 py-2.5 text-left text-[13.5px] text-[var(--st-skip-fg)]"
+            >
+              <ClockCounterClockwise size={17} aria-hidden className="shrink-0" />
+              Ya pasaron 9 meses desde la última rueda ({dayMonthYear(latest!.date)}). Te toca hacer una nueva.
+            </button>
+          )}
+          {sel ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <PillSwitch
+                  label="Vista"
+                  value={view}
+                  onChange={pickView}
+                  options={[
+                    { value: "radar", label: "Telaraña" },
+                    { value: "barras", label: "Barras" },
+                  ]}
+                />
+                {older.length > 0 && (
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label="Comparar con">
+                    <span className="text-[12px] text-muted">Comparar con</span>
+                    {older.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        aria-pressed={cmp?.id === w.id}
+                        onClick={() => (haptic("select"), setCompareId(w.id))}
+                        className={cx(
+                          "press min-h-8 rounded-full border px-2.5 text-[12px] whitespace-nowrap",
+                          cmp?.id === w.id ? "border-transparent bg-[var(--p-orange-chip)] text-[var(--p-orange-chip-fg)]" : "border-line-strong text-fg hover:bg-surface-2",
+                        )}
+                      >
+                        {monthYear(w.date)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {view === "radar" ? <Radar cur={sel.scores} cmp={cmp?.scores ?? null} /> : <Bars cur={sel.scores} cmp={cmp?.scores ?? null} avg={avg} avgDelta={avgDelta} />}
+              <Legend sel={sel} cmp={cmp} avg={avg} cmpAvg={cmpAvg} />
+              {view === "radar" && <ScoreList cur={sel.scores} cmp={cmp?.scores ?? null} />}
+              {sel.note && <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[13.5px] whitespace-pre-line">{sel.note}</p>}
+            </>
+          ) : (
+            <div className="grid justify-items-start gap-3 py-2">
+              <p className="text-[14px] text-muted">Puntuá de 0 a 10 cómo estás en cada área de tu vida. Cada 9 meses hacés otra y ves qué cambió.</p>
+              <Button variant="accent" onClick={() => openForm(null)}>
+                Hacer mi primera rueda
+              </Button>
+            </div>
+          )}
+        </TintedCard>
+
+        <TintedCard tone="inicio" icon={ClockCounterClockwise} title="Tus ruedas" meta={`${list.length} ${list.length === 1 ? "rueda" : "ruedas"}`} className="lg:col-span-5" bodyClassName="p-0! gap-0!">
+          {list.length === 0 ? (
+            <p className="px-4 py-4 text-[13.5px] text-muted">Las ruedas que hagas van a quedar acá.</p>
+          ) : (
+            <ul className="grid">
+              {list.map((w, i) => (
+                <HistoryRow
+                  key={w.id}
+                  w={w}
+                  before={list[i + 1] ?? null}
+                  selected={w.id === sel?.id}
+                  onSelect={() => (setSelectedId(w.id), setCompareId(null))}
+                  onMenu={(e) => wheelMenu(e, w)}
+                />
+              ))}
+            </ul>
+          )}
+        </TintedCard>
+      </main>
+
+      <Sheet ref={sheet} title={editing ? `Rueda del ${dayMonthYear(editing.date)}` : "Nueva rueda"}>
+        <WheelForm
+          key={formKey}
+          editing={editing}
+          last={editing ? (list.find((w) => w.date < editing.date) ?? null) : (latest ?? null)}
+          today={today}
+          onSaved={(w) => {
+            setList((l) => [w, ...l.filter((x) => x.id !== w.id)].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)));
+            setSelectedId(w.id);
+            setCompareId(null);
+            sheet.current?.close();
+          }}
+        />
+      </Sheet>
+    </>
+  );
+}
+
+/** Telaraña: la rueda elegida llena, la de comparar con borde naranja. */
+function Radar({ cur, cmp }: { cur: WheelScores; cmp: WheelScores | null }) {
+  const cx0 = 160;
+  const cy0 = 140;
+  const r = 96;
+  const rings = [2, 4, 6, 8, 10];
+  const n = WHEEL_AREAS.length;
+  const ring = (v: number) => WHEEL_AREAS.map((_, i) => radarAt(i, cx0, cy0, (v / 10) * r)).map((p) => `${p.x},${p.y}`).join(" ");
+  return (
+    <svg viewBox="0 0 320 280" className="mx-auto w-full max-w-[26rem]" role="img" aria-label="Telaraña de la rueda">
+      <g fill="none" stroke="var(--line)">
+        {rings.map((v) => (
+          <polygon key={v} points={ring(v)} />
+        ))}
+        {Array.from({ length: n }, (_, i) => {
+          const p = radarAt(i, cx0, cy0, r);
+          return <line key={i} x1={cx0} y1={cy0} x2={p.x} y2={p.y} />;
+        })}
+      </g>
+      {cmp && <polygon points={radarPoints(cmp, cx0, cy0, r)} fill="color-mix(in oklab, var(--p-orange-chip) 14%, transparent)" stroke="var(--p-orange-chip)" strokeWidth={1.5} />}
+      <polygon points={radarPoints(cur, cx0, cy0, r)} fill="color-mix(in oklab, var(--mod) 24%, transparent)" stroke="var(--mod)" strokeWidth={2.2} />
+      {WHEEL_AREAS.map((a, i) => {
+        if (cur[a.key] === undefined) return null;
+        const p = radarAt(i, cx0, cy0, (cur[a.key] / 10) * r);
+        return <circle key={a.key} cx={p.x} cy={p.y} r={3.2} fill="var(--mod)" />;
+      })}
+      {WHEEL_AREAS.map((a, i) => {
+        const p = radarAt(i, cx0, cy0, r + 20);
+        const anchor = Math.abs(p.x - cx0) < 4 ? "middle" : p.x > cx0 ? "start" : "end";
+        return (
+          <text key={a.key} x={p.x} y={p.y + 4} textAnchor={anchor} fontSize={12} fill="var(--muted)" fontFamily="var(--font-ui-sans)">
+            {a.short}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function Legend({ sel, cmp, avg, cmpAvg }: { sel: WheelDTO; cmp: WheelDTO | null; avg: number | null; cmpAvg: number | null }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden className="h-2.5 w-3.5 rounded-[3px] border-[1.5px] border-[var(--mod)] bg-[color-mix(in_oklab,var(--mod)_30%,transparent)]" />
+        {monthYear(sel.date)}
+        {avg !== null && <span className="font-mono tabular">· {formatScore(avg)}</span>}
+      </span>
+      {cmp && (
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="h-2.5 w-3.5 rounded-[3px] border-[1.5px] border-[var(--p-orange-chip)] bg-[color-mix(in_oklab,var(--p-orange-chip)_15%,transparent)]" />
+          {monthYear(cmp.date)}
+          {cmpAvg !== null && <span className="font-mono tabular">· {formatScore(cmpAvg)}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Puntaje de cada área y cuánto cambió contra la de comparar (dos columnas). */
+function ScoreList({ cur, cmp }: { cur: WheelScores; cmp: WheelScores | null }) {
+  return (
+    <ul className="grid gap-x-6 sm:grid-cols-2">
+      {WHEEL_AREAS.map((a) => {
+        const d = scoreDelta(cur, cmp, a.key);
+        return (
+          <li key={a.key} className="flex items-center justify-between border-b border-line py-1.5 text-[13.5px]">
+            <span>{a.key}</span>
+            <span className="font-mono tabular">
+              {cur[a.key] !== undefined ? formatScore(cur[a.key]) : "–"}
+              {d !== null && <span className={cx("ml-1.5", tone(d))}>{formatDelta(d)}</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Barras: el promedio grande y cada área con la otra rueda de fondo. */
+function Bars({ cur, cmp, avg, avgDelta }: { cur: WheelScores; cmp: WheelScores | null; avg: number | null; avgDelta: number | null }) {
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[32px] leading-none font-semibold tabular">{avg !== null ? formatScore(avg) : "–"}</span>
+        {avgDelta !== null && <span className={cx("font-mono text-[13px] tabular", tone(avgDelta))}>{formatDelta(avgDelta)}</span>}
+        <span className="text-[12.5px] text-muted">promedio de 10</span>
+      </div>
+      <ul className="grid gap-2.5">
+        {WHEEL_AREAS.map((a) => {
+          const v = cur[a.key];
+          const p = cmp?.[a.key];
+          const d = scoreDelta(cur, cmp, a.key);
+          return (
+            <li key={a.key}>
+              <div className="flex items-center justify-between text-[13.5px]">
+                <span>{a.key}</span>
+                <span className="font-mono tabular">
+                  {v !== undefined ? formatScore(v) : "–"}
+                  {d !== null && <span className={cx("ml-1.5", tone(d))}>{formatDelta(d)}</span>}
+                </span>
+              </div>
+              <div className="relative mt-1 h-2 rounded-full bg-surface-2">
+                {p !== undefined && <span className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--p-orange-chip)_38%,var(--surface-2))]" style={{ width: `${p * 10}%` }} />}
+                {v !== undefined && <span className="absolute top-[2px] left-0 h-1 rounded-full bg-[var(--mod)]" style={{ width: `${v * 10}%` }} />}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function HistoryRow({
+  w,
+  before,
+  selected,
+  onSelect,
+  onMenu,
+}: {
+  w: WheelDTO;
+  before: WheelDTO | null;
+  selected: boolean;
+  onSelect: () => void;
+  onMenu: (e: React.MouseEvent) => void;
+}) {
+  const avg = wheelAverage(w.scores);
+  const prevAvg = before ? wheelAverage(before.scores) : null;
+  const d = avg !== null && prevAvg !== null ? Math.round((avg - prevAvg) * 10) / 10 : null;
+  const hold = useHoldMenu(onMenu);
+  return (
+    <li {...hold} className={cx("flex items-center gap-2 border-b border-line last:border-b-0", selected && "bg-[color-mix(in_oklab,var(--mod)_8%,var(--surface))]")}>
+      <button type="button" onClick={onSelect} aria-current={selected ? "true" : undefined} className="tap-tint flex min-h-14 min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left">
+        <span className="grid min-w-0 flex-1 gap-0.5">
+          <span className="text-[14px] font-medium">{dayMonthYear(w.date)}</span>
+          {w.note && <span className="truncate text-[12.5px] text-muted">{w.note}</span>}
+        </span>
+        <span className="text-right">
+          <span className="block text-[17px] font-semibold tabular">{avg !== null ? formatScore(avg) : "–"}</span>
+          {d !== null && <span className={cx("block font-mono text-[11.5px] tabular", tone(d))}>{formatDelta(d)}</span>}
+        </span>
+      </button>
+      <button type="button" onClick={onMenu} aria-label={`Opciones de la rueda del ${dayMonthYear(w.date)}`} className="mr-2 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg">
+        <DotsThreeVertical size={20} weight="bold" />
+      </button>
+    </li>
+  );
+}
+
+/** Completar o cambiar una rueda: un puntaje por área (de a 0,5 con − y +, o escrito), fecha y notas. */
+function WheelForm({ editing, last, today, onSaved }: { editing: WheelDTO | null; last: WheelDTO | null; today: string; onSaved: (w: WheelDTO) => void }) {
+  const [date, setDate] = useState(editing?.date ?? today);
+  const [scores, setScores] = useState<Record<string, string>>(() =>
+    Object.fromEntries(WHEEL_AREAS.map((a) => [a.key, editing?.scores[a.key] !== undefined ? formatScore(editing.scores[a.key]) : ""])),
+  );
+  const [note, setNote] = useState(editing?.note ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
+  const step = (key: string, by: number) => {
+    haptic("tap");
+    setError(null);
+    setScores((s) => {
+      const cur = num(s[key]);
+      const base = cur === null || Number.isNaN(cur) ? (last?.scores[key] ?? 5) : cur;
+      const v = Math.min(10, Math.max(0, Math.round((base + (cur === null ? 0 : by)) * 2) / 2));
+      return { ...s, [key]: formatScore(v) };
+    });
+  };
+  const filled = WHEEL_AREAS.filter((a) => scores[a.key].trim() !== "").length;
+  return (
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const parsed: WheelScores = {};
+        for (const a of WHEEL_AREAS) {
+          const v = num(scores[a.key]);
+          if (v === null) continue;
+          if (Number.isNaN(v) || v < 0 || v > 10) return setError(`${a.key}: tiene que ser un número de 0 a 10.`);
+          parsed[a.key] = Math.round(v * 10) / 10;
+        }
+        if (!Object.keys(parsed).length) return setError("Poné el puntaje de al menos un área.");
+        if (!date || date > today) return setError("Elegí una fecha (hoy o antes).");
+        const w: WheelDTO = { id: editing?.id ?? `nueva-${Date.now()}`, date, scores: parsed, note: note.trim() || null };
+        onSaved(w);
+        quiet(
+          saveWheel(editing?.id ?? null, { date, scores: parsed, note: w.note }).then((r) => {
+            if ("error" in r && r.error) notifyError(r.error);
+          }),
+        );
+      }}
+    >
+      <label className="grid gap-1.5 text-[13px] font-medium">
+        Fecha
+        <Input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} required className="max-w-48" />
+      </label>
+      <div className="grid gap-1">
+        <div className="flex items-center justify-between text-[12.5px] text-muted">
+          <span>De 0 a 10 · {filled} de {WHEEL_AREAS.length} áreas</span>
+          {last && <span>Antes: {dayMonthYear(last.date)}</span>}
+        </div>
+        <ul className="grid">
+          {WHEEL_AREAS.map((a) => {
+            const v = num(scores[a.key]);
+            return (
+              <li key={a.key} className="grid gap-1.5 border-b border-line py-2.5 last:border-b-0">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 text-[14.5px] font-medium">{a.key}</span>
+                  {last?.scores[a.key] !== undefined && <span className="font-mono text-[11.5px] text-muted tabular">antes {formatScore(last.scores[a.key])}</span>}
+                  <span className="flex items-center rounded-full border border-line-strong">
+                    <button type="button" onClick={() => step(a.key, -0.5)} aria-label={`Bajar ${a.key}`} className="inline-flex size-10 items-center justify-center rounded-full text-muted hover:text-fg">
+                      <Minus size={15} weight="bold" />
+                    </button>
+                    <input
+                      value={scores[a.key]}
+                      onChange={(e) => (setError(null), setScores((s) => ({ ...s, [a.key]: e.target.value.replace(/[^\d,.]/g, "").slice(0, 4) })))}
+                      inputMode="decimal"
+                      aria-label={`Puntaje de ${a.key}`}
+                      placeholder="–"
+                      className="w-12 bg-transparent text-center font-mono text-[16px] font-medium tabular outline-none placeholder:text-faint"
+                    />
+                    <button type="button" onClick={() => step(a.key, 0.5)} aria-label={`Subir ${a.key}`} className="inline-flex size-10 items-center justify-center rounded-full text-muted hover:text-fg">
+                      <Plus size={15} weight="bold" />
+                    </button>
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-surface-2">
+                  {v !== null && !Number.isNaN(v) && <div className="h-full rounded-full bg-[var(--mod)]" style={{ width: `${Math.min(10, Math.max(0, v)) * 10}%` }} />}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <label className="grid gap-1.5 text-[13px] font-medium">
+        Notas de esta rueda <span className="font-normal text-muted">(opcional)</span>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          lang="es"
+          spellCheck
+          placeholder="Qué cambió, qué querés mejorar…"
+          className="rounded-[4px] border border-line-strong bg-surface px-3 py-2 text-[16px] outline-none focus:border-fg/50 pointer-fine:text-[15px]"
+        />
+      </label>
+      {error && <p className="text-[13px] text-danger">{error}</p>}
+      <Button type="submit" variant="accent">
+        {editing ? "Guardar cambios" : "Guardar rueda"}
+      </Button>
+      {editing && <p className="text-center text-[12px] text-muted">{formatLong(editing.date, today)}</p>}
+    </form>
+  );
+}

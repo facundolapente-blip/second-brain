@@ -2,6 +2,8 @@
 
 import { useSafeTransition } from "@/components/safe-action";
 import { QuoteCard } from "./quote-card";
+import { MementoCard } from "./memento-card";
+import type { MementoConfig } from "@/lib/memento";
 import type { ValueNote } from "@/lib/values";
 import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
@@ -17,6 +19,7 @@ import {
   CalendarBlank,
   CalendarCheck,
   ChartLineUp,
+  ChartPolar,
   Check,
   ClipboardText,
   CreditCard,
@@ -131,11 +134,16 @@ export function InicioView({
   notes,
   reserve,
   latestNotes,
+  memento,
+  wheelDue,
 }: {
   d: Dashboard;
   notes: ValueNote[];
   reserve: ReserveSummary;
   latestNotes: NotesSummary;
+  memento: MementoConfig | null;
+  /** Ya pasaron 9 meses de la última Rueda de la vida (null si no toca). */
+  wheelDue: { last: string; next: string } | null;
 }) {
   const prevName = monthName(shiftMonth(d.gastos.month, -1));
   const delta = d.gastos.spentPrevSame ? (d.gastos.spentMonth - d.gastos.spentPrevSame) / d.gastos.spentPrevSame : null;
@@ -164,6 +172,16 @@ export function InicioView({
           </Link>
         )}
 
+        {wheelDue && (
+          <Link
+            href="/rueda"
+            className="flex items-center gap-2.5 rounded-2xl bg-[var(--st-skip-bg)] px-4 py-3 text-[13.5px] text-[var(--st-skip-fg)] transition-opacity hover:opacity-85 max-lg:order-first lg:col-span-12"
+          >
+            <ChartPolar size={18} className="shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1">Te toca la Rueda de la vida: la última fue el {formatLong(wheelDue.last, d.today)}.</span>
+          </Link>
+        )}
+
         {/* Fila 1: saludo y nota del día. */}
         <div className="flex min-w-0 flex-col justify-center gap-1.5 pb-1 max-lg:order-1 lg:col-span-5 lg:gap-2.5 lg:px-1 lg:pt-1.5 lg:pb-2">
           <div className="flex items-center gap-2 max-lg:-ml-0.5">
@@ -179,7 +197,9 @@ export function InicioView({
             <HeaderLink href="/analisis" label="Análisis" icon={ChartLineUp} />
           </div>
         </div>
-        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-7" />
+        {/* La nota ocupa dos filas: a su izquierda, el saludo arriba y el Memento mori abajo. */}
+        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-7 lg:row-span-2" />
+        <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-5" />
 
         {/* Fila 2: las cinco cifras. */}
         <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-3 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">

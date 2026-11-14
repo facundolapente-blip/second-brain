@@ -11,5 +11,7 @@ import "./journal";
 import "./checkin";
 import "./values";
 import "./notes";
+import "./wheel";
+import "./memento";
 
 export { flushActions, pendingActions, subscribePending } from "./queue";

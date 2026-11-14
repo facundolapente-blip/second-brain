@@ -34,7 +34,9 @@ export type TrashKind =
   | "budgetLine"
   | "objective"
   | "photo"
-  | "note";
+  | "note"
+  | "lifeWheel"
+  | "focusSession";
 
 export type Module = "gastos" | "habitos" | "journal" | "plan" | "notas";
 
@@ -59,6 +61,8 @@ const MODULE: Record<TrashKind, Module> = {
   objective: "plan",
   photo: "journal",
   note: "notas",
+  lifeWheel: "journal",
+  focusSession: "plan",
 };
 
 export const KIND_LABEL: Record<TrashKind, string> = {
@@ -82,6 +86,8 @@ export const KIND_LABEL: Record<TrashKind, string> = {
   objective: "Objetivo",
   photo: "Foto",
   note: "Nota",
+  lifeWheel: "Rueda de la vida",
+  focusSession: "Sesión de enfoque",
 };
 
 // ─── Actividad ──────────────────────────────────────────────────────────────
@@ -250,6 +256,14 @@ async function snapshot(kind: TrashKind, id: string, db: Db): Promise<Snapshot |
       const l = await db.budgetLine.findUnique({ where: { id } });
       return l ? { label: l.name, data: { row: l } } : null;
     }
+    case "lifeWheel": {
+      const w = await db.lifeWheel.findUnique({ where: { id } });
+      return w ? { label: `Rueda del ${w.date.toISOString().slice(0, 10)}`, data: { row: w } } : null;
+    }
+    case "focusSession": {
+      const f = await db.focusSession.findUnique({ where: { id } });
+      return f ? { label: `${f.minutes} min de enfoque${f.title ? ` · ${f.title}` : ""}`, data: { row: f } } : null;
+    }
     case "note": {
       const n = await db.note.findUnique({ where: { id }, include: { attachments: true } });
       if (!n) return null;
@@ -293,6 +307,8 @@ async function remove(kind: TrashKind, id: string, db: Db) {
     step: () => db.planStep.deleteMany({ where: { id } }),
     minorGoal: () => db.planMinorGoal.deleteMany({ where: { id } }),
     budgetLine: () => db.budgetLine.deleteMany({ where: { id } }),
+    lifeWheel: () => db.lifeWheel.deleteMany({ where: { id } }),
+    focusSession: () => db.focusSession.deleteMany({ where: { id } }),
     photo: () => db.attachment.deleteMany({ where: { id } }),
     note: () => db.note.deleteMany({ where: { id } }),
     objective: async () => {
@@ -544,6 +560,12 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       return null;
     case "budgetLine":
       await db.budgetLine.create({ data: row });
+      return null;
+    case "lifeWheel":
+      await db.lifeWheel.create({ data: row });
+      return null;
+    case "focusSession":
+      await db.focusSession.create({ data: row });
       return null;
     case "note":
       await db.note.create({ data: row });

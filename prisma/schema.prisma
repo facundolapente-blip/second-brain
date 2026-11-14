@@ -168,45 +168,45 @@ model Account {
 
 /// Categoría de gasto o de ingreso. Un movimiento sin categoría es "Sin clasificar".
 model Category {
-  id           String                 @id @default(cuid())
-  name         String
+  id            String                 @id @default(cuid())
+  name          String
   /// expense | income
-  kind         String                 @default("expense")
+  kind          String                 @default("expense")
   /// Nombre del ícono (ver src/lib/finance-icons.tsx).
-  icon         String                 @default("Tag")
-  color        String                 @default("stone")
-  order        Int                    @default(0)
-  archivedAt   DateTime?
+  icon          String                 @default("Tag")
+  color         String                 @default("stone")
+  order         Int                    @default(0)
+  archivedAt    DateTime?
   /// "Ajuste de saldo": corrige el saldo de una cuenta sin contar como gasto ni ingreso.
-  isAdjustment Boolean                @default(false)
+  isAdjustment  Boolean                @default(false)
   /// "De trabajo": sus movimientos no cuentan en los gastos ni ingresos personales,
   /// aunque salgan de una cuenta personal (compras y ventas de discos, por ejemplo).
-  isBusiness   Boolean                @default(false)
+  isBusiness    Boolean                @default(false)
   /// "Plata de otra persona" (Gastos mamá / Ingresos mamá): mueve el saldo pero en los
   /// números cuenta solo la diferencia del mes entre lo que entró y lo que se gastó.
-  isPassThrough Boolean               @default(false)
-  transactions Transaction[]
-  templates    TxTemplate[]
-  schedules    ScheduledTransaction[]
-  budget       CategoryBudget?
+  isPassThrough Boolean                @default(false)
+  transactions  Transaction[]
+  templates     TxTemplate[]
+  schedules     ScheduledTransaction[]
+  budget        CategoryBudget?
 
   @@unique([name, kind])
 }
 
 /// Presupuesto mensual de una categoría de gasto: lo mismo todos los meses.
 model CategoryBudget {
-  id         String   @id @default(cuid())
-  categoryId String   @unique
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  amount     Decimal  @db.Decimal(14, 2)
+  id            String    @id @default(cuid())
+  categoryId    String    @unique
+  category      Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  amount        Decimal   @db.Decimal(14, 2)
   /// Moneda del presupuesto: los gastos en otra moneda se pasan con la cotización de hoy.
-  currency   String   @default("UYU")
+  currency      String    @default("UYU")
   /// "Pasar lo que sobra al mes siguiente": lo que no se gastó se suma al mes que viene.
-  rollover   Boolean  @default(false)
+  rollover      Boolean   @default(false)
   /// Primer mes (día 1) desde que se activó el arrastre; null si no tiene.
   rolloverSince DateTime? @db.Date
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 /// Presupuesto puntual (un viaje, las vacaciones, una mudanza): un monto total
@@ -231,44 +231,43 @@ model BudgetProject {
 /// En una transferencia sale `amount` de `account` y entra `toAmount` en
 /// `toAccount` (distintos si las cuentas tienen distinta moneda; iguales si no).
 model Transaction {
-  id          String                @id @default(cuid())
+  id               String                @id @default(cuid())
   /// expense | income | transfer
-  kind        String
+  kind             String
   /// Día del movimiento (YYYY-MM-DD en America/Montevideo).
-  date        DateTime              @db.Date
+  date             DateTime              @db.Date
   /// Lo que se ve en la lista ("Dominos", "Psiquiatra"). Vacío = "Sin título".
-  title       String?
-  amount      Decimal               @db.Decimal(14, 2)
-  accountId   String
-  account     Account               @relation("TxAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  title            String?
+  amount           Decimal               @db.Decimal(14, 2)
+  accountId        String
+  account          Account               @relation("TxAccount", fields: [accountId], references: [id], onDelete: Restrict)
   /// Solo en gastos e ingresos. Null = sin clasificar.
-  categoryId  String?
-  category    Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  category         Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   /// Solo en transferencias.
-  toAccountId String?
-  toAccount   Account?              @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
-  toAmount    Decimal?              @db.Decimal(14, 2)
-  note        String?
+  toAccountId      String?
+  toAccount        Account?              @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+  toAmount         Decimal?              @db.Decimal(14, 2)
+  note             String?
   /// Presupuesto puntual al que se asignó (viaje, vacaciones...).
-  projectId   String?
-  project     BudgetProject?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId        String?
+  project          BudgetProject?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   /// Si lo generó una orden permanente o un movimiento programado.
-  scheduleId  String?
-  schedule    ScheduledTransaction? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  scheduleId       String?
+  schedule         ScheduledTransaction? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   /// De dónde vino: null = cargado a mano; "import:<app>" = importado.
-  source      String?
+  source           String?
   /// Id en el sistema de origen, para no duplicar al reimportar.
-  externalId  String?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @default(now()) @updatedAt
-
-  @@unique([source, externalId])
+  externalId       String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @default(now()) @updatedAt
   /// Compra en cuotas: todas las cuotas comparten el grupo; cada una va en su mes.
   installmentGroup String?
   installmentNo    Int?
   installmentCount Int?
-  attachments Attachment[]
+  attachments      Attachment[]
 
+  @@unique([source, externalId])
   @@index([installmentGroup])
   @@index([date])
   @@index([accountId])
@@ -416,32 +415,32 @@ model AppSetting {
 
 /// Cómo estuvo el día, en pocos toques desde Inicio. Uno por día; todo opcional.
 model DailyCheckin {
-  id         String   @id @default(cuid())
-  date       DateTime @unique @db.Date
+  id          String   @id @default(cuid())
+  date        DateTime @unique @db.Date
   /// Ánimo del 1 (muy mal) al 5 (muy bien), la misma escala que el journal.
-  mood       Int?
+  mood        Int?
   /// Energía del 1 al 5.
-  energy     Int?
+  energy      Int?
   /// Estrés del 1 (nada) al 5 (mucho).
-  stress     Int?
+  stress      Int?
   /// Horas dormidas la noche anterior, en minutos.
-  sleepMin   Int?
+  sleepMin    Int?
   /// Peso en gramos.
-  weightG    Int?
+  weightG     Int?
   /// Pasos del día (del reloj por intervals.icu, o importados de Google Fit, Samsung Health o un CSV).
-  steps      Int?
+  steps       Int?
   /// Estrés promedio medido por el reloj (Huawei, de 1 a 99). Aparte de `stress`, que es la sensación del check-in.
   stressScore Int?
   /// Pulso mínimo y máximo del día que midió el reloj (latidos por minuto).
-  hrMin      Int?
-  hrMax      Int?
+  hrMin       Int?
+  hrMax       Int?
   /// Distancia del día que midió el reloj, en metros.
-  distanceM  Int?
+  distanceM   Int?
   /// Calorías de actividad del día (reloj), en kcal.
-  activeKcal Int?
-  note       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  activeKcal  Int?
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ─── Login (Better Auth) ────────────────────────────────────────────────────
@@ -584,54 +583,54 @@ model PlanSubtask {
 /// misma tarjeta semana a semana en vez de crear otra). No se muestra en el Plan:
 /// solo sostiene los números de semanas pasadas (revisión, análisis, resúmenes).
 model PlanBlockLog {
-  id         String   @id @default(cuid())
-  blockId    String?
-  date       DateTime @db.Date
-  title      String
-  categoryId String?
-  done       Boolean  @default(false)
+  id          String   @id @default(cuid())
+  blockId     String?
+  date        DateTime @db.Date
+  title       String
+  categoryId  String?
+  done        Boolean  @default(false)
   /// La meta del trimestre del bloque (para la tarjeta de semanas de Objetivos).
   keyResultId String?
-  createdAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@index([date])
   @@index([blockId])
 }
 
 model PlanBlock {
-  id         String        @id @default(cuid())
-  title      String
-  categoryId String?
-  category   PlanCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  date       DateTime      @db.Date
+  id              String         @id @default(cuid())
+  title           String
+  categoryId      String?
+  category        PlanCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  date            DateTime       @db.Date
   /// "HH:MM" en hora de Montevideo; sin hora = todo el día.
-  startTime  String?
-  endTime    String?
+  startTime       String?
+  endTime         String?
   /// Lugar en la columna del día de un bloque sin hora, en minutos (para quedar
   /// entre los que tienen hora); null = arriba de todo.
-  sortKey    Float?
-  priority   Int           @default(0)
-  done       Boolean       @default(false)
-  place      String?
-  notes      String?
+  sortKey         Float?
+  priority        Int            @default(0)
+  done            Boolean        @default(false)
+  place           String?
+  notes           String?
   /// Tarea de la que sale este bloque.
-  taskId     String?
-  task       PlanTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskId          String?
+  task            PlanTask?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
   /// Hábito vinculado: marcar el bloque como hecho marca el hábito ese día.
-  habitId    String?
-  habit      Habit?        @relation(fields: [habitId], references: [id], onDelete: SetNull)
+  habitId         String?
+  habit           Habit?         @relation(fields: [habitId], references: [id], onDelete: SetNull)
   /// Meta del trimestre a la que empuja (acción de la semana de un objetivo).
-  keyResultId String?
-  keyResult   PlanKeyResult? @relation(fields: [keyResultId], references: [id], onDelete: SetNull)
+  keyResultId     String?
+  keyResult       PlanKeyResult? @relation(fields: [keyResultId], references: [id], onDelete: SetNull)
   /// La tarea de un objetivo que se agendó con este bloque (tildar uno tilda el otro).
-  step        PlanStep?
-  source     String?
-  externalId String?
+  step            PlanStep?
+  source          String?
+  externalId      String?
   /// Para source = "gcal": el `updated` del evento de Google que se vio por última vez
   /// (si Google tiene uno más nuevo, el cambio se trae; si no, manda lo de la app).
   externalUpdated String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@unique([source, externalId])
   @@index([date])
@@ -666,17 +665,17 @@ model PlanObjective {
 
 /// Resultado clave de un objetivo, con progreso hacia una meta.
 model PlanKeyResult {
-  id          String         @id @default(cuid())
+  id          String          @id @default(cuid())
   objectiveId String?
-  objective   PlanObjective? @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  objective   PlanObjective?  @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
   title       String
   /// activity (Actividad) | habit (Hábito)
-  kind        String         @default("activity")
+  kind        String          @default("activity")
   /// todo (Sin empezar) | doing (Haciendo) | done (Completado) | closed (Finalizado sin completar)
-  status      String         @default("todo")
+  status      String          @default("todo")
   /// Trimestres en los que corre: Q1, Q2, Q3, Q4.
-  quarters    String[]       @default([])
-  deadline    DateTime?      @db.Date
+  quarters    String[]        @default([])
+  deadline    DateTime?       @db.Date
   progress    Float?
   goal        Float?
   /// Se mide solo: habit (cumplimiento de un hábito), account (saldo de una
@@ -686,9 +685,9 @@ model PlanKeyResult {
   source      String?
   externalId  String?
   /// Año del plan (el de su objetivo; los sueltos lo llevan igual).
-  year        Int            @default(2026)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  year        Int             @default(2026)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   /// Acciones de la semana (bloques del Plan) que empujan esta meta.
   blocks      PlanBlock[]
   /// Árbol de objetivos (2026-10-25): el objetivo más chico del que sale; null = cuelga del objetivo.
@@ -856,4 +855,38 @@ model BudgetLine {
   updatedAt  DateTime @updatedAt
 
   @@index([list])
+}
+
+/// Rueda de la vida (2026-11-14, la hacía en Notion cada ~9 meses): un puntaje de 0 a 10
+/// (con medios, 8,5) por área. `scores` = { "Salud": 7, "Finanzas": 6, … }; las áreas viven
+/// en `lib/life-wheel.ts` (`WHEEL_AREAS`), así una rueda vieja con otra área igual se ve.
+model LifeWheel {
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date
+  scores     Json
+  note       String?
+  source     String?
+  externalId String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([date])
+}
+
+/// Sesión del temporizador de enfoque (pomodoro, 2026-11-14): cuánto duró, qué se hizo y,
+/// si se arrancó desde una tarea o un bloque del Plan, cuál (con el nombre de ese momento).
+model FocusSession {
+  id        String   @id @default(cuid())
+  day       DateTime @db.Date
+  startedAt DateTime
+  endedAt   DateTime
+  minutes   Int
+  note      String?
+  taskId    String?
+  blockId   String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([day])
 }
