@@ -51,6 +51,7 @@ export function RitualRow({
   data,
   checkin,
   plan,
+  notes,
   summary,
   links,
 }: {
@@ -60,6 +61,8 @@ export function RitualRow({
   checkin: React.ReactNode;
   /** "Plan de hoy" (va a la derecha, debajo de la tarea prioritaria; pedido de Facu 2026-11-14). */
   plan: React.ReactNode;
+  /** La tarjeta de Notas (izquierda, al final; se estira y se llena con las notas que entran). */
+  notes: React.ReactNode;
   /** La frase del resumen de siempre ("Llevás 2 de 6 hábitos…"). */
   summary: React.ReactNode;
   /** Las píldoras Revisión semanal / Análisis. */
@@ -146,9 +149,15 @@ export function RitualRow({
   // Mismo árbol en todos los estados (saludo y "¿Cómo estás?" a la izquierda, siempre en el
   // mismo lugar): cambiar de estado no vuelve a montar el check-in ni pierde lo que se guarda.
   return (
-    <section aria-label="Ritual de la mañana" className="grid gap-3.5 max-lg:order-1 lg:col-span-12 lg:grid-cols-12 lg:gap-5">
-      <div className="grid min-w-0 content-start gap-3.5 lg:col-span-7">
-        <div className="flex min-w-0 flex-col gap-1.5 lg:gap-2 lg:px-1 lg:pt-1.5">
+    <section aria-label="Ritual de la mañana" className="max-lg:contents lg:col-span-12 lg:grid lg:grid-cols-12 lg:items-stretch lg:gap-5">
+      {/* Dos columnas en la compu; las dos terminan con una tarjeta que se estira (Notas a la
+          izquierda, que se llena con las notas que entran, y Plan de hoy a la derecha), así no
+          queda un hueco al lado de la más corta (pedido de Facu, 2026-11-15). En el celular la
+          sección y las columnas se disuelven (`contents`) y cada pieza va a la grilla de Inicio
+          con su `order`: saludo, ¿Cómo estás?, tarea prioritaria y Plan de hoy arriba (order 1);
+          Notas en su lugar de siempre (order 9). */}
+      <div className="min-w-0 max-lg:contents lg:col-span-7 lg:flex lg:flex-col lg:gap-5">
+        <div className="flex min-w-0 flex-col gap-1.5 max-lg:order-1 lg:gap-2 lg:px-1 lg:pt-1.5">
           <div className="flex items-center gap-2 max-lg:-ml-0.5">
             <MenuButton />
             <p className="kicker truncate">{formatLong(d.today)}</p>
@@ -159,13 +168,12 @@ export function RitualRow({
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5 lg:mt-2">{links}</div>
         </div>
-        {checkin}
+        <div className="min-w-0 max-lg:order-1 lg:contents">{checkin}</div>
+        <div className="min-w-0 max-lg:order-9 lg:contents">{notes}</div>
       </div>
-      {/* A la derecha la tarea prioritaria y debajo "Plan de hoy", que se estira hasta el alto de
-          la columna de la izquierda (el "Hoy" propio del ritual se sacó: repetía el Plan de hoy). */}
-      <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-5 lg:gap-5">
-        {side}
-        {plan}
+      <div className="min-w-0 max-lg:contents lg:col-span-5 lg:flex lg:flex-col lg:gap-5">
+        <div className="min-w-0 max-lg:order-1 lg:contents">{side}</div>
+        <div className="min-w-0 max-lg:order-1 lg:contents">{plan}</div>
       </div>
     </section>
   );

@@ -204,6 +204,7 @@ export function InicioView({
             />
           }
           plan={<PlanToday d={d} />}
+          notes={<NotesCard s={latestNotes} today={d.today} />}
           summary={<Summary d={d} />}
           links={
             <>
@@ -212,6 +213,7 @@ export function InicioView({
             </>
           }
         />
+
         {/* Memento mori (7) y la Nota del día (5), debajo del ritual. */}
         <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-7" />
         <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-5" />
@@ -225,16 +227,16 @@ export function InicioView({
           <ReserveStat reserve={reserve} prevName={prevName} month={d.gastos.month} />
         </section>
 
-        {/* Hábitos (7) junto a Notas (5, se estira hasta el alto de Hábitos). "Plan de hoy" subió al ritual. */}
+        {/* Hábitos (7) junto a Journal y Tu semana (5, una debajo de la otra; Tu semana se estira).
+            "Plan de hoy" y Notas subieron al ritual. En `lg` (1024–1279) todo a lo ancho. */}
         <HabitsToday d={d} store={habitProgress} />
-        <div className="contents lg:col-span-6 lg:flex xl:col-span-5 lg:min-w-0 lg:flex-col lg:gap-5">
-          <NotesCard s={latestNotes} today={d.today} />
+        <div className="contents xl:col-span-5 xl:flex xl:min-w-0 xl:flex-col xl:gap-5">
+          <JournalCard d={d} />
+          <WeekMix d={d} />
         </div>
 
         <GastosCard d={d} delta={delta} prevName={prevName} />
-        {/* Journal (5) junto a Tu semana (7); Constancia a lo ancho. */}
-        <JournalCard d={d} />
-        <WeekMix d={d} />
+        {/* Constancia a lo ancho. */}
         <Constancia d={d} />
       </main>
     </>
@@ -580,7 +582,7 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       action={{ href: "/habitos", label: "Ver todo" }}
       progress={due ? barDone / due : null}
       id="habitos-hoy"
-      className={cx("scroll-mt-20 max-lg:order-4 lg:col-span-6 xl:col-span-7", celebrate && barSeen && "ini-glow")}
+      className={cx("scroll-mt-20 max-lg:order-4 lg:col-span-12 xl:col-span-7", celebrate && barSeen && "ini-glow")}
       bodyClassName="ini-habits-body"
     >
       <span ref={barRef} aria-hidden className="block h-0" />
@@ -1023,7 +1025,7 @@ function WeekMix({ d }: { d: Dashboard }) {
       title="Tu semana"
       meta={rangeLabel(d.week[0].date, d.week[d.week.length - 1].date)}
       action={{ href: "/semana", label: "Revisión" }}
-      className="max-lg:order-10 lg:col-span-12 xl:col-span-7"
+      className="max-lg:order-10 lg:col-span-12 xl:flex-1"
     >
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full min-w-[18rem] table-fixed border-separate border-spacing-y-1 text-center">
@@ -1386,7 +1388,7 @@ function JournalCard({ d }: { d: Dashboard }) {
       title="Journal"
       meta={j.last ? `Última entrada · ${j.last.date === d.today ? "hoy" : formatShort(j.last.date)}` : "Todavía no hay entradas"}
       action={{ href: "/journal", label: "Entradas" }}
-      className="max-lg:order-8 lg:col-span-12 xl:col-span-5"
+      className="max-lg:order-8 lg:col-span-12"
     >
       <div className="grid grid-cols-3">
         <JournalNum value={j.streak} label={j.streak === 1 ? "día de racha" : "días de racha"} />
@@ -1439,7 +1441,7 @@ function NotesCard({ s, today }: { s: NotesSummary; today: string }) {
       title="Notas"
       meta={`${s.laterVideos} ${s.laterVideos === 1 ? "video" : "videos"} para ver`}
       action={{ href: "/notas", label: "Ver todas" }}
-      className="max-lg:order-9 lg:flex-1"
+      className="lg:flex-1"
       bodyClassName="gap-2.5!"
     >
       <Link
