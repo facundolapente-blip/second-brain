@@ -275,12 +275,15 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
   const fresh = rows.filter((r) => !have.has(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`));
   const changed = rows.flatMap((r) => {
     const l = have.get(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`);
-    // Lo que se marcó en la app manda: HabitNow no lo pisa.
-    return l && l.source !== "app" && (l.status !== r.status || l.value !== r.value)
+    // Lo que se marcó en la app (o lo tildó el Journal al escribir) manda: HabitNow no lo pisa.
+    return l && l.source !== "app" && l.source !== "journal" && (l.status !== r.status || l.value !== r.value)
       ? [{ id: l.id, status: r.status, value: r.value }]
       : [];
   });
-  const kept = rows.filter((r) => have.get(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`)?.source === "app").length;
+  const kept = rows.filter((r) => {
+    const src = have.get(`${r.habitId}|${r.date.toISOString().slice(0, 10)}`)?.source;
+    return src === "app" || src === "journal";
+  }).length;
   for (let i = 0; i < fresh.length; i += 1000) {
     await prisma.habitLog.createMany({ data: fresh.slice(i, i + 1000).map((r) => ({ ...r, source: "habitnow" })) });
   }

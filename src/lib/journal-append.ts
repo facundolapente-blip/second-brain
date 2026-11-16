@@ -5,6 +5,7 @@ import { logActivity } from "./trash";
 import { toDbDate } from "./dates";
 import { QUARTER_REVIEW_TAG, REVIEW_TAG } from "./review-logic";
 import { BODY_MAX, isMood } from "./journal-logic";
+import { syncJournalHabit } from "./journal-habit-link";
 
 /**
  * Suma un texto al final de la entrada de un día (la primera, sin contar las
@@ -40,5 +41,7 @@ export async function appendToJournal(day: string, text: string, via: string): P
   }
   revalidatePath("/journal", "layout");
   revalidatePath("/");
+  // Lo que llega por WhatsApp o "Compartir" también tilda el hábito de journaling de ese día.
+  await syncJournalHabit(day);
   return { id, created, words: body.split(/\s+/).filter(Boolean).length };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
@@ -9,6 +10,7 @@ import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from 
 import { QUARTER_REVIEW_TAG, REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
 import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
 import { appendToJournal } from "./journal-append";
+import { syncJournalHabit } from "./journal-habit-link";
 
 function refrescar() {
   revalidatePath("/journal", "layout");
@@ -103,6 +105,8 @@ export async function saveEntry(id: string, input: EntryInput): Promise<SaveResu
       } else if (prev.mood !== mood) {
         await syncCheckinMood(input.date, prev.mood, mood);
       }
+      // Escribir tilda el hábito de journaling de ese día (y si cambió de día, lo saca del otro).
+      after(() => syncJournalHabit(input.date, prevDate));
     }
     refrescar();
     return { ok: true, savedAt: e.updatedAt.toISOString() };
@@ -224,6 +228,7 @@ export async function moveEntryDate(id: string, date: string): Promise<{ ok: tru
   if (from === date) return { ok: true };
   await prisma.journalEntry.update({ where: { id }, data: { date: toDbDate(date) } });
   await moveCheckinMood(id, from, date, prev.mood, prev.mood);
+  await syncJournalHabit(date, from);
   refrescar();
   return { ok: true };
 }
@@ -235,7 +240,9 @@ export async function moveEntryDate(id: string, date: string): Promise<{ ok: tru
 export async function deleteEntry(id: string): Promise<{ ok: true }> {
   await exigirSesion();
   if (!validId(id)) throw new Error("Entrada inválida");
+  const was = await prisma.journalEntry.findUnique({ where: { id }, select: { date: true } });
   await trashAndDelete("journal", id);
+  if (was) await syncJournalHabit(fromDbDate(was.date));
   refrescar();
   return { ok: true };
 }
