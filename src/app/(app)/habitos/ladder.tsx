@@ -14,7 +14,6 @@ import {
   snoozeWeek,
   stepBack,
   stepProgress,
-  suggestSteps,
   type Ladder,
   type LadderStep,
 } from "@/lib/habit-ladder";
@@ -809,14 +808,6 @@ export function LadderSettings({
   actions: LadderActions;
 }) {
   const path = useRef<LadderPathHandle>(null);
-  const [planning, setPlanning] = useState(false);
-  const [goal, setGoal] = useState("");
-  const [edited, setEdited] = useState<LadderStep[] | null>(null);
-  const [neverTwice, setNeverTwice] = useState(true);
-  const steps =
-    edited ??
-    suggestSteps(goal, { frequency: h.frequency, target: h.target, unit: h.unit, isQuit: h.isQuit, timesPerWeek: h.timesPerWeek });
-  const ready = cleanSteps(steps);
   const ladder = h.ladder;
   const cur = ladder ? Math.min(ladder.current, ladder.steps.length - 1) : 0;
 
@@ -837,41 +828,10 @@ export function LadderSettings({
             Ver el camino <CaretRight size={14} aria-hidden />
           </Button>
         </div>
-      ) : planning ? (
-        <div className="reveal grid gap-3">
-          <LadderPlanner
-            goal={goal}
-            onGoal={setGoal}
-            steps={steps}
-            onSteps={setEdited}
-            neverTwice={neverTwice}
-            onNeverTwice={setNeverTwice}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="accent"
-              disabled={!goal.trim() || !ready.length}
-              onClick={() => {
-                actions.start(h, { goal: goal.trim(), steps: ready, neverTwice });
-                setPlanning(false);
-              }}
-            >
-              Empezar escalón 1
-            </Button>
-            <Button variant="outline" onClick={() => setPlanning(false)}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
       ) : (
-        <div className="grid gap-3">
-          <p className="text-[14px] leading-relaxed text-muted">
-            Si todavía cuesta, armalo por escalones: empezás con algo chico y subís cuando lo cumplís.
-          </p>
-          <Button variant="outline" onClick={() => setPlanning(true)}>
-            Construir de a poco
-          </Button>
-        </div>
+        <p className="text-[14px] leading-relaxed text-muted">
+          Para armarlo por escalones, elegí &quot;Construir de a poco&quot; en Editar.
+        </p>
       )}
 
       <button

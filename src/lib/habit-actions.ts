@@ -121,6 +121,27 @@ function ruleChanged(a: RuleFields, b: RuleFields): boolean {
   );
 }
 
+/** La escalera que manda el formulario (JSON { goal, steps }), desde el escalón 0. */
+function ladderFromForm(fd: FormData, stepStart: string): { ok: true; ladder: Ladder | null } | { ok: false; error: string } {
+  const raw = texto(fd, "ladder", 20_000);
+  if (!raw) return { ok: true, ladder: null };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "No se pudo leer la escalera." };
+  }
+  const p = (parsed && typeof parsed === "object" ? parsed : {}) as { goal?: unknown; steps?: unknown };
+  const checked = checkSteps(p.steps);
+  if (!checked.ok) return checked;
+  const goal = typeof p.goal === "string" ? p.goal.trim().slice(0, LADDER_GOAL_MAX) : "";
+  return {
+    ok: true,
+    ladder: { goal: goal || checked.steps[checked.steps.length - 1].title, steps: checked.steps, current: 0, stepStart, snoozeUntil: null, history: [] },
+  };
+}
+
+
 /**
  * Crea o edita un hábito. Al editar, si cambia cuándo toca o la meta y el form
  * manda `desde = "hoy"`, la configuración vieja queda como pista cerrada hasta
@@ -212,26 +233,28 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     ) {
       await lockHabitConfig(id);
     }
+    // Pasar a "en construcción" un hábito que ya existe (desde el mismo formulario).
+    if (!parseLadder(before.ladder)) {
+      const fromForm = ladderFromForm(fd, today);
+      if (!fromForm.ok) return fromForm;
+      if (fromForm.ladder) {
+        const fresh = await prisma.habit.findUnique({ where: { id } });
+        if (fresh) {
+          await writeLadder(fresh, fromForm.ladder, { neverTwice: nt === "1" });
+          await logActivity("updated", "habit", id, `${fresh.name}: en construcción`);
+        }
+      }
+    }
     refrescar();
     return { ok: true, id };
   }
   // Crear un hábito ya "en construcción": la escalera viene como JSON ({ goal, steps }).
-  let ladder: Ladder | null = null;
-  const ladderRaw = texto(fd, "ladder", 20_000);
-  if (ladderRaw) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(ladderRaw);
-    } catch {
-      return { ok: false, error: "No se pudo leer la escalera." };
-    }
-    const p = (parsed && typeof parsed === "object" ? parsed : {}) as { goal?: unknown; steps?: unknown };
-    const checked = checkSteps(p.steps);
-    if (!checked.ok) return checked;
-    const goal = typeof p.goal === "string" ? p.goal.trim().slice(0, LADDER_GOAL_MAX) : "";
-    ladder = { goal: goal || checked.steps[checked.steps.length - 1].title, steps: checked.steps, current: 0, stepStart: startDate, snoozeUntil: null, history: [] };
+  const fromForm = ladderFromForm(fd, startDate);
+  if (!fromForm.ok) return fromForm;
+  const ladder = fromForm.ladder;
+  if (ladder) {
     // De cantidad: arranca con la meta del primer escalón.
-    const first = checked.steps[0].target;
+    const first = ladder.steps[0].target;
     if (first && (data.target > 1 || data.unit)) data.target = first;
   }
   const last = await prisma.habit.aggregate({ _max: { order: true } });

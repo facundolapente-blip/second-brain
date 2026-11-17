@@ -32,6 +32,8 @@ export type Draft = {
   unit: string;
   priority: number;
   startDate: string;
+  /** Ya está en construcción (la escalera se cambia desde su camino). */
+  inLadder?: boolean;
 };
 
 function emptyDraft(today: string): Draft {
@@ -73,6 +75,7 @@ export function fromHabit(h: HabitDTO): Draft {
     unit: h.unit ?? "",
     priority: h.priority,
     startDate: h.startDate,
+    inLadder: !!h.ladder,
   };
 }
 
@@ -154,7 +157,8 @@ export function HabitFormBody({
       isQuit: draft.isQuit,
       timesPerWeek: draft.timesPerWeek,
     });
-  const ladderMode = isNew && mode === "ladder";
+  const canLadder = isNew || !draft.inLadder;
+  const ladderMode = canLadder && mode === "ladder";
   const readySteps = cleanSteps(steps);
   // Cambiar cuándo toca o la meta reescribiría cómo se leen los días ya marcados
   // (un "hecho" pasaría a "a medias"): antes de guardar se elige desde cuándo vale.
@@ -164,7 +168,7 @@ export function HabitFormBody({
     <form action={action} className="grid gap-5">
       {draft.id && <input type="hidden" name="id" value={draft.id} />}
       {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: goal.trim(), steps: readySteps })} />}
-      {isNew && <input type="hidden" name="neverTwice" value={ladderMode && neverTwice ? "1" : "0"} />}
+      {(isNew || ladderMode) && <input type="hidden" name="neverTwice" value={ladderMode && neverTwice ? "1" : "0"} />}
 
       <Field label="Nombre">
         <Input
@@ -353,14 +357,14 @@ export function HabitFormBody({
         />
       </Field>
 
-      {isNew && (
+      {canLadder && (
         <div className="grid gap-2">
-          <span className="kicker">¿Cómo querés empezar?</span>
+          <span className="kicker">{isNew ? "¿Cómo querés empezar?" : "¿Lo querés construir de a poco?"}</span>
           <Segmented
             value={mode}
             onChange={(v) => setMode(v)}
             options={[
-              { value: "full", label: "Ya, completo" },
+              { value: "full", label: isNew ? "Ya, completo" : "Como está" },
               { value: "ladder", label: "Construir de a poco" },
             ]}
           />
@@ -402,7 +406,7 @@ export function HabitFormBody({
         </div>
       ) : (
         <Button type="submit" variant="accent" disabled={pending || (ladderMode && (!goal.trim() || !readySteps.length))} className="w-full">
-          {pending ? "Guardando..." : draft.id ? "Guardar cambios" : ladderMode ? "Empezar escalón 1" : "Crear hábito"}
+          {pending ? "Guardando..." : ladderMode ? (draft.id ? "Guardar y empezar escalón 1" : "Empezar escalón 1") : draft.id ? "Guardar cambios" : "Crear hábito"}
         </Button>
       )}
     </form>
