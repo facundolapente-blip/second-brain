@@ -14,6 +14,7 @@ import {
   ArrowSquareOut,
   Check,
   CheckCircle,
+  Copy,
   CircleNotch,
   FolderSimple,
   MagnifyingGlass,
@@ -371,26 +372,68 @@ export function NotesView({
   const [held, setHeld] = useState<string | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const holdStart = useRef<{ x: number; y: number } | null>(null);
+  // Mantener apretado ~0,45 s sin mover el dedo abre el menú de la nota al soltar (con
+  // "Copiar el texto"; pedido de Facu, 2026-11-16). Si el dedo se mueve, es arrastrar.
+  const menuTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const menuPending = useRef<{ id: string; el: HTMLElement } | null>(null);
+  const menuFiredAt = useRef(0);
+  const cancelMenu = () => {
+    clearTimeout(menuTimer.current);
+    menuPending.current = null;
+  };
   const holdProps = (id: string) => ({
     onTouchStartCapture: (e: React.TouchEvent) => {
+      if (e.touches.length !== 1) return cancelMenu();
       const t = e.touches[0];
+      const el = e.currentTarget as HTMLElement;
       holdStart.current = { x: t.clientX, y: t.clientY };
       clearTimeout(holdTimer.current);
       holdTimer.current = setTimeout(() => setHeld(id), 250);
+      cancelMenu();
+      menuTimer.current = setTimeout(() => {
+        menuPending.current = { id, el };
+        haptic("threshold");
+      }, 450);
     },
     onTouchMoveCapture: (e: React.TouchEvent) => {
       const st = holdStart.current;
       const t = e.touches[0];
-      if (st && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 8)
+      if (st && Math.hypot(t.clientX - st.x, t.clientY - st.y) > 8) {
         clearTimeout(holdTimer.current);
+        cancelMenu();
+      }
     },
-    onTouchEndCapture: () => {
+    onTouchEndCapture: (e: React.TouchEvent) => {
       clearTimeout(holdTimer.current);
       setHeld(null);
+      const pending = menuPending.current;
+      cancelMenu();
+      const st = holdStart.current;
+      const n = pending && visible.find((x) => x.id === pending.id);
+      if (pending && n && st) {
+        menuFiredAt.current = performance.now();
+        e.preventDefault();
+        // El menú compartido espera un evento de mouse: alcanza con la posición y el elemento.
+        contextMenu({ target: pending.el, currentTarget: pending.el, clientX: st.x, clientY: st.y, preventDefault() {}, stopPropagation() {} } as unknown as React.MouseEvent, n);
+      }
     },
     onTouchCancelCapture: () => {
       clearTimeout(holdTimer.current);
       setHeld(null);
+      cancelMenu();
+    },
+    // El toque que sigue al menú no abre la nota, y el `contextmenu` de Android no lo abre dos veces.
+    onClickCapture: (e: React.MouseEvent) => {
+      if (performance.now() - menuFiredAt.current < 800) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    onContextMenuCapture: (e: React.MouseEvent) => {
+      if (performance.now() - menuFiredAt.current < 1500) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     },
   });
   function reorder(ids: string[], moved: { id: string; to: number }) {
@@ -461,6 +504,26 @@ export function NotesView({
     });
   }
 
+  function copyText(n: NoteDTO) {
+    const text = noteText(n);
+    const done = () => (haptic("success"), notifyInfo("Texto copiado"));
+    const fallback = () => {
+      // Sin permiso del portapapeles: un campo escondido y copiar.
+      const t = document.createElement("textarea");
+      t.value = text;
+      t.setAttribute("readonly", "");
+      t.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+      document.body.appendChild(t);
+      t.select();
+      const ok = document.execCommand("copy");
+      t.remove();
+      if (ok) done();
+      else notifyError("No se pudo copiar.");
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  }
+
   function contextMenu(e: React.MouseEvent, n: NoteDTO) {
     showContextMenu(
       e,
@@ -477,6 +540,15 @@ export function NotesView({
                 icon: <ArrowSquareOut size={15} />,
                 onSelect: () =>
                   window.open(n.url!, "_blank", "noopener,noreferrer"),
+              },
+            ]
+          : []),
+        ...(noteText(n)
+          ? [
+              {
+                label: "Copiar el texto",
+                icon: <Copy size={15} />,
+                onSelect: () => copyText(n),
               },
             ]
           : []),
@@ -1261,4 +1333,12 @@ function Empty({
       )}
     </div>
   );
+}
+
+/** Lo que copia "Copiar el texto": título, texto y link (sin repetir el link si es el título). */
+function noteText(n: NoteDTO): string {
+  return [n.title, n.body, n.url]
+    .map((x) => x?.trim())
+    .filter((x, i, all): x is string => !!x && all.indexOf(x) === i)
+    .join("\n\n");
 }
