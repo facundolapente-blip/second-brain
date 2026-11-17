@@ -9,6 +9,8 @@ import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
+import { suggestSteps, type LadderStep } from "@/lib/habit-ladder";
+import { cleanSteps, LadderPlanner } from "./ladder";
 
 /** `hasHistory`: si el hábito ya tiene marcas (cambiar la meta ofrece empezar una pista nueva). */
 export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO, hasHistory?: boolean) => void };
@@ -136,6 +138,24 @@ export function HabitFormBody({
   }, [state]);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  // Alta "de a poco": la meta y los escalones que propone la app (se rehacen al cambiar
+  // la meta o cómo se mide, hasta que se toquen a mano).
+  const isNew = !draft.id;
+  const [mode, setMode] = useState<"full" | "ladder">("full");
+  const [goal, setGoal] = useState("");
+  const [edited, setEdited] = useState<LadderStep[] | null>(null);
+  const [neverTwice, setNeverTwice] = useState(true);
+  const steps =
+    edited ??
+    suggestSteps(goal, {
+      frequency: draft.frequency,
+      target: effectiveTarget(draft),
+      unit: draft.kind === "count" ? draft.unit || null : null,
+      isQuit: draft.isQuit,
+      timesPerWeek: draft.timesPerWeek,
+    });
+  const ladderMode = isNew && mode === "ladder";
+  const readySteps = cleanSteps(steps);
   // Cambiar cuándo toca o la meta reescribiría cómo se leen los días ya marcados
   // (un "hecho" pasaría a "a medias"): antes de guardar se elige desde cuándo vale.
   const askTrack = !!draft.id && hasHistory && initial.startDate < today && rulesDiffer(initial, draft);
@@ -143,6 +163,8 @@ export function HabitFormBody({
   return (
     <form action={action} className="grid gap-5">
       {draft.id && <input type="hidden" name="id" value={draft.id} />}
+      {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: goal.trim(), steps: readySteps })} />}
+      {isNew && <input type="hidden" name="neverTwice" value={ladderMode && neverTwice ? "1" : "0"} />}
 
       <Field label="Nombre">
         <Input
@@ -331,6 +353,32 @@ export function HabitFormBody({
         />
       </Field>
 
+      {isNew && (
+        <div className="grid gap-2">
+          <span className="kicker">¿Cómo querés empezar?</span>
+          <Segmented
+            value={mode}
+            onChange={(v) => setMode(v)}
+            options={[
+              { value: "full", label: "Ya, completo" },
+              { value: "ladder", label: "Construir de a poco" },
+            ]}
+          />
+          {ladderMode && (
+            <div className="reveal pt-1">
+              <LadderPlanner
+                goal={goal}
+                onGoal={setGoal}
+                steps={steps}
+                onSteps={setEdited}
+                neverTwice={neverTwice}
+                onNeverTwice={setNeverTwice}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
 
       {askTrack ? (
@@ -353,8 +401,8 @@ export function HabitFormBody({
           </Button>
         </div>
       ) : (
-        <Button type="submit" variant="accent" disabled={pending} className="w-full">
-          {pending ? "Guardando..." : draft.id ? "Guardar cambios" : "Crear hábito"}
+        <Button type="submit" variant="accent" disabled={pending || (ladderMode && (!goal.trim() || !readySteps.length))} className="w-full">
+          {pending ? "Guardando..." : draft.id ? "Guardar cambios" : ladderMode ? "Empezar escalón 1" : "Crear hábito"}
         </Button>
       )}
     </form>

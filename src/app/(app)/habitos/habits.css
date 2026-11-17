@@ -23,7 +23,7 @@
 /* Apretado: se pone en pointerdown sin pasar por React (data-pressed), en 80 ms. */
 .habit-check[data-pressed]:not(:disabled) {
   scale: 0.92;
-  border-color: color-mix(in oklab, currentColor 55%, var(--line-strong));
+  border-color: color-mix(in oklab, currentColor 55%, var(--border-strong));
   transition-duration: 80ms, 80ms, 80ms, 80ms;
   transition-timing-function: var(--ease-out);
 }
@@ -125,3 +125,253 @@
   .cat-grid > li:nth-child(3n) { border-right-width: 1px; }
   .cat-grid > li:nth-child(4n) { border-right-width: 0; }
 }
+
+/* ─── Hábitos en construcción (ladder.tsx) ───────────────────────────────────
+   Recuadro verde suave del módulo (data-tone="habitos" pone --mod), cada hábito
+   en su tarjeta blanca; el día después de fallar, amarillo (--st-skip-*). */
+.lad-box {
+  --lad-bg: color-mix(in oklab, var(--mod) 9%, var(--surface));
+  --lad-line: color-mix(in oklab, var(--mod) 22%, transparent);
+  --lad-fg: color-mix(in oklab, var(--mod) 70%, black);
+  --lad-strong: color-mix(in oklab, var(--mod) 92%, black);
+  --lad-soft: color-mix(in oklab, var(--mod) 22%, var(--surface));
+  display: grid;
+  gap: 8px;
+  border-radius: 22px;
+  border: 1px solid var(--lad-line);
+  background: var(--lad-bg);
+  padding: 12px 10px 10px;
+}
+[data-tone="habitos"]:not(.lad-box) {
+  --lad-line: color-mix(in oklab, var(--mod) 22%, transparent);
+  --lad-fg: color-mix(in oklab, var(--mod) 70%, black);
+  --lad-strong: color-mix(in oklab, var(--mod) 92%, black);
+  --lad-soft: color-mix(in oklab, var(--mod) 22%, var(--surface));
+}
+:root[data-theme="oscuro"] .lad-box,
+:root[data-theme="oscuro"] [data-tone="habitos"]:not(.lad-box) {
+  --lad-bg: color-mix(in oklab, var(--mod) 13%, var(--surface));
+  --lad-line: color-mix(in oklab, var(--mod) 30%, transparent);
+  --lad-fg: color-mix(in oklab, var(--mod) 42%, white);
+  --lad-strong: color-mix(in oklab, var(--mod) 70%, white);
+  --lad-soft: color-mix(in oklab, var(--mod) 30%, var(--surface));
+}
+@media (min-width: 1024px) {
+  .lad-box { padding: 14px 12px 12px; }
+}
+.lad-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lad-fg);
+}
+.lad-item {
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--lad-line);
+  background: var(--surface);
+  transition: background-color var(--dur-state, 0.3s) var(--ease-out, ease), border-color var(--dur-state, 0.3s) var(--ease-out, ease);
+}
+.lad-item[data-alert] {
+  border-color: color-mix(in oklab, var(--st-skip-line) 60%, transparent);
+  background: var(--st-skip-bg);
+}
+.lad-sub { font-size: 13px; line-height: 1.25; color: var(--muted); }
+.lad-item[data-alert] .lad-sub { color: var(--st-skip-fg); }
+.lad-alert-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--st-skip-fg);
+}
+.lad-alert-fig {
+  display: grid;
+  gap: 1px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--st-skip-fg);
+}
+.lad-alert-fig b { font-size: 20px; font-weight: 750; color: var(--text); }
+.lad-ready {
+  display: grid;
+  gap: 10px;
+  margin: 0 10px 10px;
+  border-radius: 12px;
+  background: var(--lad-bg, color-mix(in oklab, var(--mod) 9%, var(--surface)));
+  padding: 11px 12px 12px;
+}
+.lad-struggle {
+  border-top: 1px dashed var(--lad-line);
+  padding: 8px 14px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.lad-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lad-fg);
+}
+.lad-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.lad-warn {
+  margin-top: 3px;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 6px;
+  background: var(--st-skip-bg);
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--st-skip-fg);
+}
+
+/* Escalerita: barras de alto creciente. */
+.lad-stairs { display: inline-flex; flex-shrink: 0; align-items: flex-end; gap: 3px; }
+.lad-stairs > span {
+  width: 7px;
+  border-radius: 2px;
+  background: var(--lad-soft);
+}
+.lad-stairs > span[data-on] { background: color-mix(in oklab, var(--lad-strong) 55%, var(--surface)); }
+.lad-stairs > span[data-now] { background: var(--lad-strong); }
+.lad-stairs > span[data-next] {
+  background: transparent;
+  outline: 1.5px dashed var(--lad-strong);
+  outline-offset: -1.5px;
+}
+
+/* Puntitos de la ventana del escalón. */
+.lad-dots { display: inline-flex; gap: 3px; }
+.lad-dots > span { width: 8px; height: 8px; border-radius: 999px; border: 1.5px solid var(--lad-strong); }
+.lad-dots > span[data-on] { background: var(--lad-strong); }
+
+/* El camino: escalones en vertical, unidos por una línea. */
+.lad-path { display: grid; }
+.lad-path-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+.lad-path-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  bottom: 2px;
+  left: 13px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.lad-path-step[data-state="past"]::before { background: var(--st-done-line); }
+.lad-path-dot {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lad-path-step[data-state="past"] .lad-path-dot { border-color: var(--hc-done, var(--st-done-line)); background: var(--st-done-line); color: #fff; }
+:root[data-theme="oscuro"] .lad-path-step[data-state="past"] .lad-path-dot { background: color-mix(in oklab, var(--st-done-line) 72%, black); }
+.lad-path-step[data-state="now"] .lad-path-dot {
+  border-color: var(--lad-strong);
+  color: var(--lad-fg);
+  box-shadow: 0 0 0 4px var(--lad-soft);
+}
+.lad-path-step[data-state="next"] > div p:first-child { color: var(--muted); }
+.lad-chip {
+  border-radius: 999px;
+  background: var(--lad-strong);
+  padding: 1px 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--surface);
+}
+
+/* Editor de escalones. */
+.lad-propose {
+  display: grid;
+  gap: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--lad-line);
+  background: color-mix(in oklab, var(--mod) 7%, var(--surface));
+  padding: 12px;
+}
+.lad-step-n {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--lad-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lad-fg);
+}
+.lad-icon-btn {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--muted);
+}
+.lad-icon-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.lad-icon-btn:disabled { opacity: 0.35; }
+.lad-add {
+  display: inline-flex;
+  min-height: 40px;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px dashed var(--lad-line);
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lad-fg);
+}
+.lad-add:disabled { opacity: 0.4; }
+.lad-switch {
+  position: relative;
+  display: inline-flex;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color var(--dur-state, 0.3s) var(--ease-out, ease);
+}
+.lad-switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: translate var(--dur-state, 0.3s) var(--ease-out, ease);
+}
+.lad-switch[data-on] { background: var(--lad-strong); }
+.lad-switch[data-on] > span { translate: 18px 0; }
+:root[data-theme="oscuro"] .lad-switch[data-on] > span { background: #141413; }

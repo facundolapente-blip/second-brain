@@ -63,13 +63,22 @@ export function listNames(names: string[], max = 3): string {
   return `${clean.slice(0, max).join(", ")} y ${clean.length - max} más`;
 }
 
-/** Hábitos de hoy sin marcar (`open`: nombres, en el orden de la lista) de los que tocan (`total`). */
-export function habitsMessage(open: string[], done: number, total: number): PushPayload | null {
+/**
+ * Hábitos de hoy sin marcar (`open`: nombres, en el orden de la lista) de los que tocan (`total`).
+ * `important`: los de "Nunca dos seguidos" que fallaron ayer (y siguen sin hacer): van primero,
+ * con "Hoy importa: …".
+ */
+export function habitsMessage(open: string[], done: number, total: number, important: string[] = []): PushPayload | null {
   if (!open.length) return null;
   const n = open.length;
+  const key = important.filter((x) => open.includes(x));
+  const rest = open.filter((x) => !key.includes(x));
+  const body = key.length
+    ? `Hoy importa: ${listNames(key, 3)}${rest.length ? ` · también ${listNames(rest, 3)}` : ""} · llevás ${done} de ${total}`
+    : `${listNames(open, 4)} · llevás ${done} de ${total}`;
   return {
     title: n === 1 ? "Te falta 1 hábito hoy" : `Te faltan ${n} hábitos hoy`,
-    body: `${listNames(open, 4)} · llevás ${done} de ${total}`,
+    body,
     url: "/habitos",
     tag: "aviso-habitos",
   };

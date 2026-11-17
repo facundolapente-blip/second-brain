@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { fromDbDate, formatShort } from "./dates";
 import { moneyCents } from "./format";
@@ -500,7 +500,8 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       await db.savingsGoal.create({ data: { ...row, accountId: await orNull(exists.account, row.accountId) } });
       return null;
     case "habit": {
-      await db.habit.create({ data: { ...row, categoryId: await orNull(exists.habitCategory, row.categoryId) } });
+      // `ladder` (Json opcional) vacío vuelve como DbNull: Prisma no acepta null en un Json.
+      await db.habit.create({ data: { ...row, ladder: row.ladder ?? Prisma.DbNull, categoryId: await orNull(exists.habitCategory, row.categoryId) } });
       const tracks = (data.tracks as never[]) ?? [];
       if (tracks.length) await db.habitTrack.createMany({ data: tracks });
       const logs = (data.logs as never[]) ?? [];

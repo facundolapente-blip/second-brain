@@ -10,6 +10,7 @@ import type { MementoConfig } from "@/lib/memento";
 import type { ValueNote } from "@/lib/values";
 import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
+import { LadderBox, useLadders } from "../habitos/ladder";
 import { dayProgress } from "@/lib/habit-logic";
 import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
@@ -554,9 +555,13 @@ function FootStat({ label, value, unit, sub, size = "text-[28px]" }: { label: st
 /** La misma lista que Hoy en Hábitos: filas, orden, toques y hoja del día. */
 function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
   const { logs, mark } = useHabitLogs(d.habits.packed);
-  const { sorted, reorder } = useHabitOrder(d.habits.list, d.habits.manualOrder);
+  // Los "en construcción" van en su recuadro arriba de la lista (como en Hoy).
+  const { habits: withLadders, actions: ladderActions } = useLadders(d.habits.list, d.today);
+  const { sorted, reorder } = useHabitOrder(withLadders, d.habits.manualOrder);
   const sticky = useStickyDay(d.today, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today)).map((h) => h.id));
-  const visible = sorted.filter((h) => sticky.has(h.id));
+  const shown = sorted.filter((h) => sticky.has(h.id));
+  const building = shown.filter((h) => h.ladder);
+  const visible = building.length ? shown.filter((h) => !h.ladder) : shown;
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
   const complete = due > 0 && done >= due;
   const celebrate = useJustCompleted(complete, d.today);
@@ -586,6 +591,17 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       bodyClassName="ini-habits-body"
     >
       <span ref={barRef} aria-hidden className="block h-0" />
+      <LadderBox
+        habits={building}
+        all={withLadders}
+        logs={logs}
+        day={d.today}
+        today={d.today}
+        mark={mark}
+        onOpenDay={(h) => daySheet.current?.show(h, d.today)}
+        actions={ladderActions}
+        className="mt-2.5 mb-2"
+      />
       {visible.length > 0 ? (
         <HabitDayRows
           habits={visible}
@@ -598,7 +614,7 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
           celebrate={celebrate}
           rowClassName="bg-surface py-1.5 lg:py-[9px]"
         />
-      ) : (
+      ) : building.length ? null : (
         <p className="py-3 text-[14px] text-muted">No hay hábitos para hoy.</p>
       )}
       {/* Al pie, donde se tildó el último: "Día completo · N de N". Se abre con el alto

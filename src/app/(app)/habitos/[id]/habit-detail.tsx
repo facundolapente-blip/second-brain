@@ -19,6 +19,7 @@ import {
   Lock,
   Medal,
   PencilSimple,
+  Stairs,
   Plus,
   Trash,
   Trophy,
@@ -51,6 +52,7 @@ import {
   type DaySheetHandle,
 } from "../habit-ui";
 import { fromHabit, HabitFormBody, hasMarks } from "../habit-form";
+import { LadderSettings, useLadders } from "../ladder";
 
 export type DetailTab = "calendario" | "estadisticas" | "editar";
 
@@ -151,6 +153,7 @@ export function HabitDetail({
           <div className="grid gap-3.5 lg:gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
             <EditTab
               habit={habit}
+              ladder={<LadderPanel habit={habit} logs={all} today={today} />}
               categories={categories}
               today={today}
               hasHistory={hasMarks(logs, habit.startDate)}
@@ -768,6 +771,18 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
 
 // ─── Editar ─────────────────────────────────────────────────────────────────
 
+/** De a poco: escalones y "Nunca dos seguidos" (con los cambios al instante, ver ladder.tsx). */
+function LadderPanel({ habit, logs, today }: { habit: HabitDTO; logs: Record<string, LogMap>; today: string }) {
+  const list = useMemo(() => [habit], [habit]);
+  const { habits, actions } = useLadders(list, today);
+  const h = habits[0];
+  return (
+    <Panel icon={Stairs} title="De a poco" meta={h.ladder ? "En construcción" : undefined}>
+      <LadderSettings habit={h} logs={logs} today={today} actions={actions} />
+    </Panel>
+  );
+}
+
 function EditTab({
   habit,
   categories,
@@ -775,8 +790,11 @@ function EditTab({
   hasHistory,
   onSaved,
   aside,
+  ladder,
 }: {
   habit: HabitDTO;
+  /** "Construir de a poco" y "Nunca dos seguidos". */
+  ladder?: React.ReactNode;
   categories: CategoryDTO[];
   today: string;
   hasHistory: boolean;
@@ -794,7 +812,8 @@ function EditTab({
         </div>
         <HabitFormBody initial={fromHabit(habit)} categories={categories} today={today} hasHistory={hasHistory} onSaved={onSaved} />
       </Panel>
-      <div className="grid content-start gap-3.5 lg:gap-5 xl:grid-rows-[auto_1fr] xl:content-stretch">
+      <div className="grid content-start gap-3.5 lg:gap-5 xl:grid-rows-[auto_auto_1fr] xl:content-stretch">
+        {!habit.archived && ladder}
         <Panel icon={Archive} title={habit.archived ? "Restaurar o eliminar" : "Archivar o eliminar"}>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
             <Button

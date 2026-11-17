@@ -80,6 +80,11 @@ model Habit {
   priority     Int            @default(1)
   /// Hábito de dejar algo (No fumar): muestra los días limpios.
   isQuit       Boolean        @default(false)
+  /// Hábito en construcción: la escalera de escalones hasta la meta (`Ladder` en
+  /// lib/habit-ladder.ts). null = hábito normal.
+  ladder       Json?
+  /// "Nunca dos seguidos": destaca el día después de fallar y cuenta recuperaciones.
+  neverTwice   Boolean        @default(false)
   /// Inicio de la pista actual: la tarjeta, la racha y el puntaje cuentan desde acá.
   /// Las pistas anteriores están en HabitTrack.
   startDate    DateTime       @db.Date

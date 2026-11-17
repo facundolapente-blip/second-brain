@@ -15,6 +15,7 @@ import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { TodayFacts, TodayPanel, todayStats } from "./today-panel";
 import { TintedCard } from "@/components/tinted-card";
+import { LadderBox, useLadders } from "./ladder";
 import { useSwipe } from "@/components/swipe";
 
 const PAST = 30;
@@ -46,10 +47,15 @@ export function TodayView({
   );
 
   // Orden fijo (el arrastrado, o prioridad y nombre): al tildar, la fila no cambia de lugar.
-  const { sorted, reorder } = useHabitOrder(habits, manualOrder);
+  // Los "en construcción" con sus cambios de escalón al instante (ver ladder.tsx).
+  const { habits: withLadders, actions: ladderActions } = useLadders(habits, today);
+  const { sorted, reorder } = useHabitOrder(withLadders, manualOrder);
   // Los que tocan hoy, y los que ya se vieron aunque al destildarlos dejen de tocar.
   const sticky = useStickyDay(selected, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected)).map((h) => h.id));
   const visible = sorted.filter((h) => sticky.has(h.id));
+  // Los que se están construyendo de a poco van en su recuadro, arriba de la lista común.
+  const building = visible.filter((h) => h.ladder);
+  const common = building.length ? visible.filter((h) => !h.ladder) : visible;
   // Otro día en la tira: la lista entra desde ese lado (al cargar, nada).
   const daySlide = useSlide(selected);
   // Un día con menos hábitos no achica la página (ver useKeepHeight).
@@ -141,12 +147,24 @@ export function TodayView({
             }
           />
 
+          <LadderBox
+            habits={building}
+            all={withLadders}
+            logs={logs}
+            day={selected}
+            today={today}
+            mark={mark}
+            onOpenDay={(h) => daySheet.current?.show(h, selected)}
+            actions={ladderActions}
+          />
+
+          {(common.length > 0 || building.length === 0) && (
           <section aria-label="Hábitos del día" className="hh-list overflow-hidden rounded-[22px] border bg-surface">
-            {visible.length > 0 && (
+            {common.length > 0 && (
               <div className="flex items-baseline justify-between gap-3 px-4 pt-3.5 pb-1 lg:px-6 lg:pt-4">
                 <span className="kicker">{selected === today ? "Para hoy" : `Para ${dayName.toLowerCase()}`}</span>
                 <span className="font-mono text-[11.5px] text-muted tabular">
-                  {visible.length} {visible.length === 1 ? "hábito" : "hábitos"}
+                  {common.length} {common.length === 1 ? "hábito" : "hábitos"}
                 </span>
               </div>
             )}
@@ -154,11 +172,11 @@ export function TodayView({
               <div key={selected} ref={keepRef} style={keepStyle} className={cx("px-3.5 lg:px-6", daySlide)}>
                 {habits.length === 0 ? (
                   <EmptyState onCreate={() => form.current?.create()} />
-                ) : visible.length === 0 ? (
+                ) : common.length === 0 ? (
                   <p className="py-16 text-center text-[15px] text-muted">No hay hábitos para este día.</p>
                 ) : (
                   <HabitDayRows
-                    habits={visible}
+                    habits={common}
                     logs={logs}
                     day={selected}
                     today={today}
@@ -170,10 +188,11 @@ export function TodayView({
                   />
                 )}
                 {/* Cambiar de día no es "completar" (useJustCompleted mira el día elegido). */}
-                {visible.length > 0 && <DayComplete {...progress} celebrate={celebrate} />}
+                {common.length > 0 && <DayComplete {...progress} celebrate={celebrate} />}
               </div>
             </div>
           </section>
+          )}
         </div>
 
         {habits.length > 0 && (

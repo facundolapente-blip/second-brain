@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { addDays, diffDays, fromDbDate, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
 import { dayProgress } from "./habit-logic";
+import { habitNeverTwice } from "./habit-ladder";
 import { getCardSummaries } from "./finance";
 import { moneyWhole } from "./format";
 import { isFreeBlock, sortBlocks } from "./plan-logic";
@@ -60,7 +61,9 @@ export async function buildReminder(kind: ReminderKind, today = todayISO()): Pro
           manual ? a.order - b.order || a.name.localeCompare(b.name, "es") : b.priority - a.priority || a.name.localeCompare(b.name, "es"),
         )
         .map((h) => h.name);
-      return habitsMessage(open, done, total);
+      // "Nunca dos seguidos": los que fallaron ayer van primero ("Hoy importa").
+      const important = habits.filter((h) => h.neverTwice && habitNeverTwice(h, logs[h.id] ?? {}, today).failedYesterday).map((h) => h.name);
+      return habitsMessage(open, done, total, important);
     }
     case "deadlines": {
       const tasks = await prisma.planTask.findMany({

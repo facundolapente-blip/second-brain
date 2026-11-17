@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
@@ -9,6 +10,19 @@ import { isPaletteKey } from "./palette";
 import type { LogStatus } from "./habit-logic";
 import { HABIT_CONFIG_LOCKED } from "./importers/habitnow";
 import { syncLinkedBlocks } from "./plan-habit-link";
+import {
+  advance,
+  cleanStep,
+  LADDER_GOAL_MAX,
+  LADDER_MAX_STEPS,
+  LADDER_TITLE_MAX,
+  LADDER_WINDOW_MAX,
+  parseLadder,
+  snoozeWeek,
+  stepBack,
+  type Ladder,
+  type LadderStep,
+} from "./habit-ladder";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false, error: string };
 
@@ -157,6 +171,9 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
 
   if (id && before) {
     const today = todayISO();
+    // Al editar, la escalera se cambia con sus acciones; "Nunca dos seguidos" sí viene del formulario.
+    const nt = fd.get("neverTwice");
+    if (nt === "1" || nt === "0") await prisma.habit.update({ where: { id }, data: { neverTwice: nt === "1" } });
     const newTrack = texto(fd, "desde") === "hoy" && ruleChanged(before, data) && toDbDate(today) > before.startDate;
     if (newTrack) data.startDate = toDbDate(today);
     // La pista actual no puede arrancar antes de que termine la anterior.
@@ -198,8 +215,40 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     refrescar();
     return { ok: true, id };
   }
+  // Crear un hábito ya "en construcción": la escalera viene como JSON ({ goal, steps }).
+  let ladder: Ladder | null = null;
+  const ladderRaw = texto(fd, "ladder", 20_000);
+  if (ladderRaw) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(ladderRaw);
+    } catch {
+      return { ok: false, error: "No se pudo leer la escalera." };
+    }
+    const p = (parsed && typeof parsed === "object" ? parsed : {}) as { goal?: unknown; steps?: unknown };
+    const checked = checkSteps(p.steps);
+    if (!checked.ok) return checked;
+    const goal = typeof p.goal === "string" ? p.goal.trim().slice(0, LADDER_GOAL_MAX) : "";
+    ladder = { goal: goal || checked.steps[checked.steps.length - 1].title, steps: checked.steps, current: 0, stepStart: startDate, snoozeUntil: null, history: [] };
+    // De cantidad: arranca con la meta del primer escalón.
+    const first = checked.steps[0].target;
+    if (first && (data.target > 1 || data.unit)) data.target = first;
+  }
   const last = await prisma.habit.aggregate({ _max: { order: true } });
-  const created = await prisma.habit.create({ data: { ...data, order: (last._max.order ?? 0) + 1 } });
+  const created = await prisma.habit.create({
+    data: {
+      ...data,
+      order: (last._max.order ?? 0) + 1,
+      ...(ladder ? { ladder: ladder as unknown as Prisma.InputJsonValue } : {}),
+      // Sin el campo, un hábito en construcción arranca con "Nunca dos seguidos".
+      neverTwice: fd.get("neverTwice") === "1" || (ladder !== null && fd.get("neverTwice") === null),
+    },
+  });
+  if (ladder) {
+    // La configuración es de la app: la importación de HabitNow no la pisa.
+    await lockHabitConfig(created.id);
+    await logActivity("created", "habit", created.id, `${created.name} (en construcción)`);
+  }
   refrescar();
   return { ok: true, id: created.id };
 }
@@ -307,4 +356,166 @@ export async function deleteCategory(id: string) {
   await exigirSesion();
   await trashAndDelete("habitCategory", id);
   refrescar();
+}
+
+// ─── Hábitos en construcción ────────────────────────────────────────────────
+
+export type LadderResult = { ok: true } | { ok: false; error: string };
+
+/** Valida los escalones que mandó la pantalla: 1 a 8, títulos de hasta 80, need ≤ window ≤ 30. */
+function checkSteps(raw: unknown): { ok: true; steps: LadderStep[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: "Poné al menos un escalón." };
+  if (raw.length > LADDER_MAX_STEPS) return { ok: false, error: `Como mucho ${LADDER_MAX_STEPS} escalones.` };
+  const steps: LadderStep[] = [];
+  for (const [i, r] of raw.entries()) {
+    const title = r && typeof r === "object" && typeof (r as { title?: unknown }).title === "string" ? (r as { title: string }).title.trim() : "";
+    if (!title) return { ok: false, error: `Ponele un nombre al escalón ${i + 1}.` };
+    if (title.length > LADDER_TITLE_MAX) return { ok: false, error: `El escalón ${i + 1} es muy largo (hasta ${LADDER_TITLE_MAX} letras).` };
+    const step = cleanStep(r);
+    if (!step) return { ok: false, error: `En el escalón ${i + 1}, los días hechos van de 1 a los días que mira (hasta ${LADDER_WINDOW_MAX}).` };
+    steps.push(step);
+  }
+  return { ok: true, steps };
+}
+
+const isQuantity = (h: { target: number; unit: string | null }) => h.target > 1 || !!h.unit;
+
+type HabitRow = NonNullable<Awaited<ReturnType<typeof prisma.habit.findUnique>>>;
+
+/**
+ * Guarda la escalera y, si el escalón actual tiene meta numérica y el hábito es de
+ * cantidad, cambia `Habit.target` como "pista nueva desde hoy" de `saveHabit`: la
+ * configuración vieja queda cerrada hasta ayer, así las estadísticas siguen justas.
+ */
+async function writeLadder(habit: HabitRow, ladder: Ladder | null, extra: { neverTwice?: boolean } = {}) {
+  const today = todayISO();
+  const step = ladder?.steps[ladder.current];
+  const newTarget = step?.target && isQuantity(habit) && step.target !== habit.target ? step.target : null;
+  const data: Prisma.HabitUpdateInput = {
+    ladder: ladder ? (ladder as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+    ...extra,
+  };
+  if (newTarget === null) {
+    await prisma.habit.update({ where: { id: habit.id }, data });
+    return;
+  }
+  const todayDb = toDbDate(today);
+  if (todayDb > habit.startDate) {
+    await prisma.$transaction([
+      prisma.habitTrack.create({
+        data: {
+          habitId: habit.id,
+          startDate: habit.startDate,
+          endDate: toDbDate(addDays(today, -1)),
+          frequency: habit.frequency,
+          weekdays: habit.weekdays,
+          timesPerWeek: habit.timesPerWeek,
+          weekStart: habit.weekStart,
+          target: habit.target,
+        },
+      }),
+      prisma.habit.update({ where: { id: habit.id }, data: { ...data, target: newTarget, startDate: todayDb } }),
+    ]);
+  } else {
+    await prisma.habit.update({ where: { id: habit.id }, data: { ...data, target: newTarget } });
+  }
+  await lockHabitConfig(habit.id);
+}
+
+async function loadLadder(habitId: string): Promise<{ habit: HabitRow; ladder: Ladder | null } | { error: string }> {
+  const habit = await prisma.habit.findUnique({ where: { id: habitId } });
+  if (!habit) return { error: "No existe ese hábito." };
+  return { habit, ladder: parseLadder(habit.ladder) };
+}
+
+/** Pone un hábito "en construcción": escalones, escalón 0 desde hoy y "Nunca dos seguidos". */
+export async function startLadder(habitId: string, input: { goal: string; steps: LadderStep[]; neverTwice: boolean }): Promise<LadderResult> {
+  await exigirSesion();
+  const r = await loadLadder(habitId);
+  if ("error" in r) return { ok: false, error: r.error };
+  const checked = checkSteps(input?.steps);
+  if (!checked.ok) return checked;
+  const goal = typeof input.goal === "string" ? input.goal.trim().slice(0, LADDER_GOAL_MAX) : "";
+  const ladder: Ladder = {
+    goal: goal || checked.steps[checked.steps.length - 1].title,
+    steps: checked.steps,
+    current: 0,
+    stepStart: todayISO(),
+    snoozeUntil: null,
+    history: [],
+  };
+  await writeLadder(r.habit, ladder, { neverTwice: !!input.neverTwice });
+  await logActivity("updated", "habit", habitId, `${r.habit.name}: en construcción`);
+  refrescar();
+  return { ok: true };
+}
+
+async function moveLadder(habitId: string, fn: (l: Ladder, today: string) => Ladder, label: (l: Ladder) => string): Promise<LadderResult> {
+  await exigirSesion();
+  const r = await loadLadder(habitId);
+  if ("error" in r) return { ok: false, error: r.error };
+  if (!r.ladder) return { ok: false, error: "Ese hábito no está en construcción." };
+  const next = fn(r.ladder, todayISO());
+  if (next === r.ladder) return { ok: true };
+  await writeLadder(r.habit, next);
+  await logActivity("updated", "habit", habitId, `${r.habit.name}: ${label(next)}`);
+  refrescar();
+  return { ok: true };
+}
+
+/** Sube al escalón siguiente (no pasa de la meta). */
+export async function advanceLadder(habitId: string): Promise<LadderResult> {
+  return moveLadder(habitId, advance, (l) => `subió a "${l.steps[l.current].title}"`);
+}
+
+/** Baja al escalón anterior. */
+export async function stepBackLadder(habitId: string): Promise<LadderResult> {
+  return moveLadder(habitId, stepBack, (l) => `volvió a "${l.steps[l.current].title}"`);
+}
+
+/** "Me quedo una semana más": no ofrece subir por 7 días. */
+export async function stayLadder(habitId: string): Promise<LadderResult> {
+  await exigirSesion();
+  const r = await loadLadder(habitId);
+  if ("error" in r) return { ok: false, error: r.error };
+  if (!r.ladder) return { ok: false, error: "Ese hábito no está en construcción." };
+  await prisma.habit.update({ where: { id: habitId }, data: { ladder: snoozeWeek(r.ladder, todayISO()) as unknown as Prisma.InputJsonValue } });
+  refrescar();
+  return { ok: true };
+}
+
+/** Cambia los escalones; el actual se mantiene si sigue existiendo (si no, pasa al último). */
+export async function saveLadderSteps(habitId: string, steps: LadderStep[]): Promise<LadderResult> {
+  await exigirSesion();
+  const r = await loadLadder(habitId);
+  if ("error" in r) return { ok: false, error: r.error };
+  if (!r.ladder) return { ok: false, error: "Ese hábito no está en construcción." };
+  const checked = checkSteps(steps);
+  if (!checked.ok) return checked;
+  const current = Math.min(r.ladder.current, checked.steps.length - 1);
+  const stepStart = current === r.ladder.current ? r.ladder.stepStart : todayISO();
+  await writeLadder(r.habit, { ...r.ladder, steps: checked.steps, current, stepStart });
+  await logActivity("updated", "habit", habitId, `${r.habit.name}: escalones editados`);
+  refrescar();
+  return { ok: true };
+}
+
+/** Deja de estar en construcción: queda como hábito normal con su configuración de ahora (mantiene "Nunca dos seguidos"). */
+export async function endLadder(habitId: string): Promise<LadderResult> {
+  await exigirSesion();
+  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { name: true } });
+  if (!habit) return { ok: false, error: "No existe ese hábito." };
+  await prisma.habit.update({ where: { id: habitId }, data: { ladder: Prisma.DbNull } });
+  await logActivity("updated", "habit", habitId, `${habit.name}: terminó la construcción`);
+  refrescar();
+  return { ok: true };
+}
+
+/** Prende o apaga "Nunca dos seguidos" en cualquier hábito. */
+export async function setNeverTwice(habitId: string, on: boolean): Promise<LadderResult> {
+  await exigirSesion();
+  const res = await prisma.habit.updateMany({ where: { id: habitId }, data: { neverTwice: !!on } });
+  if (!res.count) return { ok: false, error: "No existe ese hábito." };
+  refrescar();
+  return { ok: true };
 }

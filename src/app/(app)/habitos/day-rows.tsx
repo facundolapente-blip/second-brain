@@ -9,6 +9,7 @@ import { Sortable, SortableItem } from "@/components/sortable";
 import { cx } from "@/components/ui";
 import { haptic } from "@/components/haptics";
 import { HabitBadge, type MarkFn } from "./habit-ui";
+import { NeverTwiceLine } from "./ladder";
 import "./habits.css";
 
 /**
@@ -72,9 +73,7 @@ export function HabitDayRows({
   const tap = useCallback((h: HabitDTO, log: DayLog | undefined) => {
     setLastId(h.id);
     const { mark, onOpen, day } = latest.current;
-    if (h.target > 1 || !!h.unit) return onOpen(h);
-    // Un toque: tilde verde; dos: cruz roja; tres: vuelve a blanco.
-    mark(h.id, day, nextStatus(log), 1);
+    tapHabit(h, log, day, mark, onOpen);
   }, []);
   const open = useCallback((h: HabitDTO) => {
     setLastId(h.id);
@@ -105,6 +104,16 @@ export function HabitDayRows({
 }
 
 const NO_LOGS: LogMap = {};
+
+/**
+ * Lo que hace tocar el círculo de un hábito (filas comunes y "En construcción"):
+ * los de cantidad abren la hoja del día; los demás rotan tilde → cruz → blanco.
+ */
+export function tapHabit(h: HabitDTO, log: DayLog | undefined, day: string, mark: MarkFn, onOpen: (h: HabitDTO) => void) {
+  if (h.target > 1 || !!h.unit) return onOpen(h);
+  // Un toque: tilde verde; dos: cruz roja; tres: vuelve a blanco.
+  mark(h.id, day, nextStatus(log), 1);
+}
 
 const HabitRow = memo(function HabitRow({
   habit: h,
@@ -156,6 +165,8 @@ const HabitRow = memo(function HabitRow({
             <HabitBadge habit={h} compact />
             <WeekCount habit={h} logs={hLogs} day={day} today={today} />
           </span>
+          {/* "Nunca dos seguidos": el día después de fallar, una línea amarilla. */}
+          {h.neverTwice && day === today && <NeverTwiceLine habit={h} logs={hLogs} today={today} />}
         </span>
       </button>
       <CheckButton state={state} disabled={isFuture} burst={burst} onTap={() => onTap(h, log)} />
@@ -219,7 +230,7 @@ function unpress(e: React.PointerEvent<HTMLElement>) {
   delete e.currentTarget.dataset.pressed;
 }
 
-function CheckButton({ state, onTap, disabled, burst }: { state: string; onTap: () => void; disabled?: boolean; burst?: boolean }) {
+export function CheckButton({ state, onTap, disabled, burst }: { state: string; onTap: () => void; disabled?: boolean; burst?: boolean }) {
   const [tapped, setTapped] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const prev = useRef(state);

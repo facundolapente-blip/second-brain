@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "./prisma";
 import { dayOfInstant, fromDbDate, todayISO } from "./dates";
 import { HABITS_PLAN_LINKED_KEY, type DayLog, type Frequency, type LogMap, type PastTrack } from "./habit-logic";
+import { parseLadder, type Ladder } from "./habit-ladder";
 
 export type CategoryDTO = { id: string; name: string; icon: string; color: string; habitCount: number };
 
@@ -32,6 +33,10 @@ export type HabitDTO = {
   tracks: PastTrack[];
   /** Atado al Plan (Gym): los días con un bloque de su mismo nombre (`withPlanDays`). */
   planDays?: string[];
+  /** Hábito en construcción: la escalera hasta la meta (null = hábito normal). */
+  ladder: Ladder | null;
+  /** "Nunca dos seguidos": destaca el día después de fallar. */
+  neverTwice: boolean;
 };
 
 /** Categorías con las que arranca la app, las mismas que había en HabitNow. */
@@ -92,6 +97,8 @@ function toDTO(h: HabitRow): HabitDTO {
     startDate: fromDbDate(h.startDate),
     archived: h.archivedAt !== null,
     archivedOn: h.archivedAt ? dayOfInstant(h.archivedAt) : null,
+    ladder: parseLadder(h.ladder),
+    neverTwice: h.neverTwice,
     tracks: h.tracks.map((t) => ({
       startDate: fromDbDate(t.startDate),
       endDate: fromDbDate(t.endDate),

@@ -1,0 +1,211 @@
+import { describe, expect, it } from "vitest";
+import {
+  advance,
+  goalKindOf,
+  habitNeverTwice,
+  neverTwiceStats,
+  parseLadder,
+  snoozeWeek,
+  stepBack,
+  stepProgress,
+  suggestSteps,
+  type Ladder,
+} from "@/lib/habit-ladder";
+import { addDays } from "@/lib/dates";
+import type { LogMap } from "@/lib/habit-logic";
+
+const plain = { frequency: "daily", target: 1, unit: null, isQuit: false };
+
+describe("sugerencias de escalones", () => {
+  it("cantidad con horas: 15, 30, 45 min y 1 hora", () => {
+    const goal = "Dejar el celular 1 hora antes de dormir";
+    expect(goalKindOf(goal, plain)).toBe("amount");
+    const s = suggestSteps(goal, plain);
+    expect(s.map((x) => x.title)).toEqual([
+      "Dejar el celular 15 min antes de dormir",
+      "Dejar el celular 30 min antes de dormir",
+      "Dejar el celular 45 min antes de dormir",
+      goal,
+    ]);
+    expect(s.map((x) => [x.need, x.window])).toEqual([
+      [7, 10],
+      [7, 10],
+      [10, 14],
+      [10, 14],
+    ]);
+    expect(s.every((x) => !x.target)).toBe(true);
+  });
+  it("páginas, con meta numérica si el hábito es de cantidad", () => {
+    const s = suggestSteps("Leer 20 páginas", { frequency: "daily", target: 20, unit: "páginas", isQuit: false });
+    expect(s.map((x) => x.title)).toEqual(["Leer 5 páginas", "Leer 10 páginas", "Leer 15 páginas", "Leer 20 páginas"]);
+    expect(s.map((x) => x.target)).toEqual([5, 10, 15, 20]);
+  });
+  it("veces por semana: 1, 2, 3 y 4", () => {
+    const goal = "Gym 4 veces por semana";
+    expect(goalKindOf(goal, plain)).toBe("frequency");
+    const s = suggestSteps(goal, plain);
+    expect(s.map((x) => x.title)).toEqual(["Gym 1 vez por semana", "Gym 2 veces por semana", "Gym 3 veces por semana", goal]);
+    expect(s.map((x) => x.need)).toEqual([2, 4, 6, 8]);
+    expect(s.every((x) => x.window === 14)).toBe(true);
+  });
+  it("dejar algo", () => {
+    expect(goalKindOf("No fumar", plain)).toBe("quit");
+    expect(goalKindOf("Fumar menos", { ...plain, isQuit: true })).toBe("quit");
+    expect(suggestSteps("No fumar", plain).map((x) => x.title)).toEqual(["Algunos días (2 por semana)", "4 días por semana", "Todos los días"]);
+  });
+  it("sin números: versión mínima, media y la meta", () => {
+    expect(goalKindOf("Meditar", plain)).toBe("plain");
+    const s = suggestSteps("Meditar", plain);
+    expect(s.length).toBeGreaterThanOrEqual(3);
+    expect(s[0].title.startsWith("Versión mínima:")).toBe(true);
+    expect(s[s.length - 1].title).toBe("Meditar");
+  });
+  it("siempre de 3 a 5 escalones y el último es la meta", () => {
+    for (const g of ["Correr 5 km", "Meditar 10 min", "Leer 2 páginas", "Agua 7 veces por semana", "Estirar"]) {
+      const s = suggestSteps(g, plain);
+      expect(s.length).toBeGreaterThanOrEqual(3);
+      expect(s.length).toBeLessThanOrEqual(5);
+      expect(s[s.length - 1].title).toBe(g);
+      for (const x of s) expect(x.need).toBeLessThanOrEqual(x.window);
+    }
+  });
+});
+
+const base: Ladder = {
+  goal: "Leer 20 páginas",
+  steps: [
+    { title: "Leer 5 páginas", need: 7, window: 10 },
+    { title: "Leer 10 páginas", need: 7, window: 10 },
+    { title: "Leer 20 páginas", need: 10, window: 14 },
+  ],
+  current: 0,
+  stepStart: "2026-11-01",
+};
+
+describe("progreso del escalón", () => {
+  it("cuenta en la ventana y avisa cuando se puede subir", () => {
+    const done = new Set(["2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14"]);
+    const p = stepProgress(base, (d) => done.has(d), "2026-11-15");
+    expect(p.total).toBe(10);
+    expect(p.days[0].date).toBe("2026-11-06");
+    expect(p.done).toBe(7);
+    expect(p.ready).toBe(true);
+    expect(p.daysLeft).toBe(0);
+    expect(p.atGoal).toBe(false);
+  });
+  it("no cuenta días de antes del escalón", () => {
+    const p = stepProgress({ ...base, stepStart: "2026-11-13" }, () => true, "2026-11-15");
+    expect(p.total).toBe(3);
+    expect(p.done).toBe(3);
+    expect(p.ready).toBe(false);
+    expect(p.daysLeft).toBe(4);
+  });
+  it("pospuesto una semana no ofrece subir", () => {
+    const l = snoozeWeek(base, "2026-11-15");
+    expect(l.snoozeUntil).toBe("2026-11-22");
+    expect(stepProgress(l, () => true, "2026-11-20").ready).toBe(false);
+    expect(stepProgress(l, () => true, "2026-11-23").ready).toBe(true);
+  });
+  it("cuesta: 14 días o más y menos de la mitad", () => {
+    expect(stepProgress(base, () => false, "2026-11-14").struggling).toBe(true);
+    expect(stepProgress(base, () => false, "2026-11-13").struggling).toBe(false);
+    expect(stepProgress(base, (d) => d >= "2026-11-10", "2026-11-14").struggling).toBe(false);
+  });
+  it("en la meta no hay que subir", () => {
+    const p = stepProgress({ ...base, current: 2 }, () => true, "2026-11-30");
+    expect(p.atGoal).toBe(true);
+    expect(p.ready).toBe(false);
+  });
+});
+
+describe("subir y bajar", () => {
+  it("sube guardando el tramo y no pasa de la meta", () => {
+    const a = advance({ ...base, snoozeUntil: "2026-11-20" }, "2026-11-15");
+    expect(a.current).toBe(1);
+    expect(a.stepStart).toBe("2026-11-15");
+    expect(a.snoozeUntil).toBeNull();
+    expect(a.history).toEqual([{ step: 0, from: "2026-11-01", to: "2026-11-14" }]);
+    const b = advance(advance(a, "2026-11-20"), "2026-11-25");
+    expect(b.current).toBe(2);
+    expect(b.history).toHaveLength(2);
+  });
+  it("baja sin pasar del primero", () => {
+    expect(stepBack(base, "2026-11-15")).toBe(base);
+    const back = stepBack({ ...base, current: 2 }, "2026-11-15");
+    expect(back.current).toBe(1);
+  });
+  it("lee lo guardado", () => {
+    expect(parseLadder(JSON.stringify(base))).toEqual({ ...base, snoozeUntil: null });
+    expect(parseLadder({ ...base, current: 9 })?.current).toBe(2);
+    expect(parseLadder({ ...base, steps: [] })).toBeNull();
+    expect(parseLadder({ ...base, steps: [{ title: "x", need: 9, window: 5 }] })).toBeNull();
+    expect(parseLadder(null)).toBeNull();
+  });
+});
+
+describe("nunca dos seguidos", () => {
+  const map = (m: Record<string, "done" | "failed" | "open" | null>) => (d: string) => m[d] ?? null;
+  it("ayer falló: hoy importa; recuperaciones", () => {
+    const st = map({
+      "2026-11-01": "done",
+      "2026-11-02": "failed",
+      "2026-11-03": "done",
+      "2026-11-04": "failed",
+      "2026-11-05": "open",
+    });
+    const r = neverTwiceStats(st, "2026-11-01", "2026-11-05");
+    expect(r.failedYesterday).toBe(true);
+    expect(r.failedTwice).toBe(false);
+    expect(r.recoveries).toBe(1);
+    expect(r.daysWithoutTwo).toBe(5);
+  });
+  it("dos seguidos reinician los días sin dos", () => {
+    const st = map({
+      "2026-11-01": "failed",
+      "2026-11-02": "failed",
+      "2026-11-03": "done",
+      "2026-11-04": "done",
+      "2026-11-05": "done",
+    });
+    const r = neverTwiceStats(st, "2026-11-01", "2026-11-05");
+    expect(r.failedYesterday).toBe(false);
+    expect(r.daysWithoutTwo).toBe(3);
+    expect(r.recoveries).toBe(1);
+  });
+  it("ayer y anteayer fallaron", () => {
+    const st = map({ "2026-11-03": "failed", "2026-11-04": "failed", "2026-11-05": "open" });
+    const r = neverTwiceStats(st, "2026-11-01", "2026-11-05");
+    expect(r.failedTwice).toBe(true);
+    expect(r.failedYesterday).toBe(true);
+  });
+  it("hecho hoy después de fallar ya cuenta como recuperación", () => {
+    const r = neverTwiceStats(map({ "2026-11-04": "failed", "2026-11-05": "done" }), "2026-11-04", "2026-11-05");
+    expect(r.failedYesterday).toBe(false);
+    expect(r.recoveries).toBe(1);
+  });
+  it("con días que no tocan en el medio, siguen siendo seguidos", () => {
+    const r = neverTwiceStats(map({ "2026-11-02": "failed", "2026-11-04": "failed", "2026-11-06": "open" }), "2026-11-01", "2026-11-06");
+    expect(r.failedTwice).toBe(true);
+  });
+  it("con las marcas de un hábito diario", () => {
+    const h = { id: "h", frequency: "daily" as const, weekdays: [], timesPerWeek: 1, weekStart: 1, target: 1, startDate: "2026-11-01" };
+    const logs: LogMap = {};
+    for (let d = "2026-11-01"; d <= "2026-11-10"; d = addDays(d, 1)) logs[d] = { s: "done", v: 1 };
+    logs["2026-11-05"] = { s: "failed", v: 0 };
+    delete logs["2026-11-09"]; // pasado sin marcar: falló
+    delete logs["2026-11-10"];
+    const r = habitNeverTwice(h, logs, "2026-11-10");
+    expect(r.recoveries).toBe(1);
+    expect(r.failedYesterday).toBe(true);
+    expect(r.daysWithoutTwo).toBe(10);
+  });
+});
+
+describe("aviso de hábitos sin marcar", () => {
+  it("los de nunca dos seguidos que fallaron ayer van primero", async () => {
+    const { habitsMessage } = await import("@/lib/reminder-logic");
+    const m = habitsMessage(["Leer", "Meditar", "Gym"], 1, 4, ["Gym"]);
+    expect(m?.body).toBe("Hoy importa: Gym · también Leer y Meditar · llevás 1 de 4");
+    expect(habitsMessage(["Leer"], 0, 1)?.body).toBe("Leer · llevás 0 de 1");
+  });
+});
