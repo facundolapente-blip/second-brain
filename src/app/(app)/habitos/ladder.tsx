@@ -810,6 +810,7 @@ export function LadderSettings({
   const path = useRef<LadderPathHandle>(null);
   const ladder = h.ladder;
   const cur = ladder ? Math.min(ladder.current, ladder.steps.length - 1) : 0;
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   return (
     <div className="grid gap-4" data-tone="habitos">
@@ -827,6 +828,31 @@ export function LadderSettings({
           <Button variant="outline" onClick={() => path.current?.show(h.id)}>
             Ver el camino <CaretRight size={14} aria-hidden />
           </Button>
+          {confirmEnd ? (
+            <div className="reveal grid gap-2 rounded-[12px] bg-surface-2 p-3">
+              <p className="text-[13.5px] leading-snug">
+                Vuelve a ser un hábito común, con la meta y la frecuencia que tiene hoy. Las marcas no cambian.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    actions.end(h);
+                    setConfirmEnd(false);
+                  }}
+                >
+                  Sí, sacar la construcción
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirmEnd(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="ghost" onClick={() => setConfirmEnd(true)}>
+              Sacar la construcción
+            </Button>
+          )}
         </div>
       ) : (
         <p className="text-[14px] leading-relaxed text-muted">
