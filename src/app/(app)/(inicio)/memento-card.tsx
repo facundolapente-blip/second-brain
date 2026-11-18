@@ -42,7 +42,7 @@ export function MementoCard({ config, today, className }: { config: MementoConfi
         meta={s ? `semana ${nf.format(s.lived)} de ${nf.format(s.total)}` : undefined}
         action={edit}
         className={className}
-        bodyClassName="gap-3! lg:grid! lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-x-8!"
+        bodyClassName="gap-3!"
       >
         {s && local ? (
           <>

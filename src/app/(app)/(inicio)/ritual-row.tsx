@@ -51,7 +51,8 @@ export function RitualRow({
   data,
   checkin,
   plan,
-  notes,
+  habits,
+  aside,
   summary,
   links,
 }: {
@@ -62,7 +63,9 @@ export function RitualRow({
   /** "Plan de hoy" (va a la derecha, debajo de la tarea prioritaria; pedido de Facu 2026-11-14). */
   plan: React.ReactNode;
   /** La tarjeta de Notas (izquierda, al final; se estira y se llena con las notas que entran). */
-  notes: React.ReactNode;
+  habits: React.ReactNode;
+  /** Lo que sigue en la columna derecha de la compu, debajo de Plan de hoy. */
+  aside: React.ReactNode;
   /** La frase del resumen de siempre ("Llevás 2 de 6 hábitos…"). */
   summary: React.ReactNode;
   /** Las píldoras Revisión semanal / Análisis. */
@@ -169,11 +172,12 @@ export function RitualRow({
           <div className="mt-1 flex flex-wrap gap-1.5 lg:mt-2">{links}</div>
         </div>
         <div className="min-w-0 max-lg:order-1 lg:contents">{checkin}</div>
-        <div className="min-w-0 max-lg:order-9 lg:contents">{notes}</div>
+        <div className="min-w-0 max-lg:order-4 lg:contents">{habits}</div>
       </div>
       <div className="min-w-0 max-lg:contents lg:col-span-5 lg:flex lg:flex-col lg:gap-5">
         <div className="min-w-0 max-lg:order-1 lg:contents">{side}</div>
         <div className="min-w-0 max-lg:order-1 lg:contents">{plan}</div>
+        {aside}
       </div>
     </section>
   );

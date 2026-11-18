@@ -188,7 +188,8 @@ export function InicioView({
           </Link>
         )}
 
-        {/* Fila 1: el ritual de la mañana (saludo y "¿Cómo estás?"; tarea prioritaria y Plan de hoy). */}
+        {/* Arriba, dos columnas que terminan juntas. Izquierda: saludo, "¿Cómo estás?" y Hábitos de hoy.
+            Derecha: tarea prioritaria, Plan de hoy, Memento mori, Nota del día y Journal. */}
         <RitualRow
           key={`ritual-${d.today}`}
           d={d}
@@ -206,7 +207,14 @@ export function InicioView({
             />
           }
           plan={<PlanToday d={d} />}
-          notes={<NotesCard s={latestNotes} today={d.today} />}
+          habits={<HabitsToday d={d} store={habitProgress} />}
+          aside={
+            <>
+              <MementoCard config={memento} today={d.today} className="max-lg:order-2" />
+              <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2" />
+              <JournalCard d={d} />
+            </>
+          }
           summary={<Summary d={d} />}
           links={
             <>
@@ -215,10 +223,6 @@ export function InicioView({
             </>
           }
         />
-
-        {/* Memento mori (7) y la Nota del día (5), debajo del ritual. */}
-        <MementoCard config={memento} today={d.today} className="max-lg:order-2 lg:col-span-7" />
-        <QuoteCard day={d.today} hour={d.hour} notes={notes} className="max-lg:order-2 lg:col-span-5" />
 
         {/* Fila 2: las cinco cifras. */}
         <section aria-label="Resumen" className="grid grid-cols-2 gap-2.5 max-lg:order-10 lg:col-span-12 lg:grid-cols-6 lg:gap-4 xl:grid-cols-5">
@@ -229,13 +233,9 @@ export function InicioView({
           <ReserveStat reserve={reserve} prevName={prevName} month={d.gastos.month} />
         </section>
 
-        {/* Hábitos (7) junto a Journal y Tu semana (5, una debajo de la otra; Tu semana se estira).
-            "Plan de hoy" y Notas subieron al ritual. En `lg` (1024–1279) todo a lo ancho. */}
-        <HabitsToday d={d} store={habitProgress} />
-        <div className="contents xl:col-span-5 xl:flex xl:min-w-0 xl:flex-col xl:gap-5">
-          <JournalCard d={d} />
-          <WeekMix d={d} />
-        </div>
+        {/* Notas (7) junto a Tu semana (5). En `lg` (1024–1279), a lo ancho. */}
+        <NotesCard s={latestNotes} today={d.today} />
+        <WeekMix d={d} />
 
         <GastosCard d={d} delta={delta} prevName={prevName} />
         {/* Constancia a lo ancho. */}
@@ -589,7 +589,7 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
       action={{ href: "/habitos", label: "Ver todo" }}
       progress={due ? barDone / due : null}
       id="habitos-hoy"
-      className={cx("scroll-mt-20 max-lg:order-4 lg:col-span-12 xl:col-span-7", celebrate && barSeen && "ini-glow")}
+      className={cx("scroll-mt-20 lg:flex-1", celebrate && barSeen && "ini-glow")}
       bodyClassName="ini-habits-body"
     >
       <span ref={barRef} aria-hidden className="block h-0" />
@@ -1043,7 +1043,7 @@ function WeekMix({ d }: { d: Dashboard }) {
       title="Tu semana"
       meta={rangeLabel(d.week[0].date, d.week[d.week.length - 1].date)}
       action={{ href: "/semana", label: "Revisión" }}
-      className="max-lg:order-10 lg:col-span-12 xl:flex-1"
+      className="max-lg:order-10 lg:col-span-12 xl:col-span-5"
     >
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full min-w-[18rem] table-fixed border-separate border-spacing-y-1 text-center">
@@ -1459,7 +1459,7 @@ function NotesCard({ s, today }: { s: NotesSummary; today: string }) {
       title="Notas"
       meta={`${s.laterVideos} ${s.laterVideos === 1 ? "video" : "videos"} para ver`}
       action={{ href: "/notas", label: "Ver todas" }}
-      className="lg:flex-1"
+      className="max-lg:order-9 lg:col-span-12 xl:col-span-7"
       bodyClassName="gap-2.5!"
     >
       <Link
@@ -1476,14 +1476,14 @@ function NotesCard({ s, today }: { s: NotesSummary; today: string }) {
         </span>
       </Link>
       {s.latest.length ? (
-        // En la compu la tarjeta se estira hasta el alto de Hábitos: la lista llena ese lugar con
-        // las notas que entran enteras (filas fijas de 56 px; las que no entran van a filas de
-        // alto 0 y no se ven). En el celular, las 3 últimas (pedido de Facu, 2026-11-14).
-        <ul className="grid gap-0.5 lg:min-h-0 lg:flex-1 lg:basis-0 lg:auto-rows-[0px] lg:grid-rows-[repeat(auto-fill,56px)] lg:overflow-hidden">
+        // Desde xl la tarjeta se estira hasta el alto de Tu semana: la lista llena ese
+        // lugar con las notas que entran enteras (filas fijas de 56 px; las que no entran van a
+        // filas de alto 0 y no se ven). Más angosto, las 3 últimas.
+        <ul className="grid gap-0.5 xl:min-h-0 xl:flex-1 xl:basis-0 xl:auto-rows-[0px] xl:grid-rows-[repeat(auto-fill,56px)] xl:overflow-hidden">
           {s.latest.map((n, i) => {
             const sec = sectionOf(n.section);
             return (
-              <li key={n.id} className={cx("min-w-0 lg:overflow-hidden", i >= 3 && "max-lg:hidden")}>
+              <li key={n.id} className={cx("min-w-0 xl:overflow-hidden", i >= 3 && "max-xl:hidden")}>
                 <Link href={`/notas?seccion=${sec.id}`} className="tap-tint flex min-w-0 items-center gap-3 rounded-xl px-1 py-2 hover:bg-surface-2">
                   <span style={tone(sec.color)} className="chip-solid inline-flex size-8 shrink-0 items-center justify-center rounded-lg">
                     <sec.icon size={16} weight="fill" aria-hidden />
