@@ -5,7 +5,7 @@ import { usePendingActions } from "@/lib/offline/queue";
 import { useSafeTransition } from "@/components/safe-action";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BatteryHigh, Brain, CaretDown, Check, Fire, Footprints, Heartbeat, Minus, Moon, Path, Plus, Scales, Smiley, Waves } from "@phosphor-icons/react";
+import { ArrowRight, BatteryHigh, Brain, CaretDown, CaretRight, Check, Fire, Footprints, Heartbeat, Minus, Moon, MoonStars, Path, Plus, Scales, Smiley, SunHorizon, Waves } from "@phosphor-icons/react";
 import { saveCheckin } from "@/lib/offline/checkin";
 import {
   ENERGY_LABELS,
@@ -17,18 +17,19 @@ import {
   watchValues,
   type CheckinDTO,
   type CheckinPatch,
+  type NightMood,
   type WatchDay,
   type WatchSlot,
 } from "@/lib/checkin-logic";
 import { STEPS_GOAL, stressLevel } from "@/lib/health-logic";
-import { MOODS } from "@/lib/journal-logic";
+import { moodInfo, MOODS } from "@/lib/journal-logic";
 import { tone } from "@/lib/palette";
 import { cx } from "@/components/ui";
 import { useTick } from "@/components/motion";
 import { TintedCard } from "@/components/tinted-card";
 import { haptic } from "@/components/haptics";
 import { HOLD_CLASS, useHoldRepeat } from "../habitos/hold-repeat";
-import { MoodIcon } from "../journal/journal-ui";
+import { MoodIcon, useWrite } from "../journal/journal-ui";
 
 /**
  * Check-in del día: ánimo, energía, estrés, sueño y peso en pocos toques.
@@ -39,6 +40,7 @@ export function CheckinCard({
   yesterday,
   lastWeightG,
   watch,
+  night,
   className,
 }: {
   today: CheckinDTO;
@@ -46,6 +48,8 @@ export function CheckinCard({
   lastWeightG: number | null;
   /** Lo que mandó el reloj (solo para leer); no cuenta en "N de 5". */
   watch: { today: WatchDay | null; yesterday: WatchDay | null };
+  /** El ánimo que quedó en el journal (solo para leer); tampoco cuenta en "N de 5". */
+  night: { today: NightMood; yesterday: NightMood };
   className?: string;
 }) {
   const [day, setDay] = useState<"today" | "yesterday">("today");
@@ -82,8 +86,9 @@ export function CheckinCard({
   // Datos del reloj: los que vinieron hoy o ayer (fila fija al cambiar de día).
   const watchSlots = watchSlotsFor([watch.today, watch.yesterday]);
   const hasWatch = watchSlots.length > 0;
+  const morning = moodInfo(cur.mood)?.label;
   const summary = [
-    MOODS.find((m) => m.value === cur.mood)?.label,
+    morning ? `A la mañana: ${morning.toLowerCase()}` : null,
     cur.energy ? `Energía ${ENERGY_LABELS[cur.energy - 1].toLowerCase()}` : null,
     cur.stress ? `Estrés ${STRESS_LABELS[cur.stress - 1].toLowerCase()}` : null,
     cur.sleepMin !== null ? formatSleep(cur.sleepMin) : null,
@@ -158,7 +163,7 @@ export function CheckinCard({
       tone="inicio"
       icon={Smiley}
       className={cx("ini-check", className)}
-      bodyClassName={cx("pt-[18px]!", !open && !summary && !hasWatch && "hidden!")}
+      bodyClassName="pt-[18px]!"
       title={
         <button
           type="button"
@@ -193,10 +198,15 @@ export function CheckinCard({
         />
       }
     >
-      {!open && summary && (
-        <button type="button" onClick={() => setOpen(true)} className="reveal truncate text-left text-[13.5px] text-muted">
-          {summary}
-        </button>
+      {!open && (
+        <div key={day} className={cx("reveal grid min-w-0 gap-2", daySwap && "swap")}>
+          {summary && (
+            <button type="button" onClick={() => setOpen(true)} className="truncate text-left text-[13.5px] text-muted">
+              {summary}
+            </button>
+          )}
+          <NightMoodRow date={cur.date} night={night[day]} />
+        </div>
       )}
       {/* Plegado y la fila del reloj juntos: el espacio entre los dos va dentro del plegado,
           así plegado no queda un hueco doble. */}
@@ -208,7 +218,7 @@ export function CheckinCard({
         key={day}
         className={cx("grid grid-cols-2 gap-x-[18px] gap-y-[18px]", hasWatch && "pb-4", daySwap && "swap")}
       >
-        <Row icon={<Smiley size={15} aria-hidden />} label="Ánimo" hint={MOODS.find((m) => m.value === cur.mood)?.label} className="col-span-2">
+        <Row icon={<SunHorizon size={15} aria-hidden />} label="Ánimo a la mañana" hint={morning} className="col-span-2">
           <div className="grid grid-cols-5 gap-1.5">
             {MOODS.map((m) => {
               const on = cur.mood === m.value;
@@ -237,6 +247,7 @@ export function CheckinCard({
               );
             })}
           </div>
+          <NightMoodRow date={cur.date} night={night[day]} />
         </Row>
 
         <Row icon={<BatteryHigh size={15} aria-hidden />} label="Energía" hint={cur.energy ? ENERGY_LABELS[cur.energy - 1] : undefined}>
@@ -265,6 +276,46 @@ export function CheckinCard({
       )}
       </div>
     </TintedCard>
+  );
+}
+
+/**
+ * El ánimo de la noche, solo para leer: sale de la entrada del journal de ese día y tocarlo
+ * lleva a esa entrada (si todavía no hay ninguna, la crea).
+ */
+function NightMoodRow({ date, night }: { date: string; night: NightMood }) {
+  const { pending, write } = useWrite();
+  const info = moodInfo(night.mood);
+  const rowClass =
+    "tap-tint flex min-h-11 w-full min-w-0 items-center gap-2 rounded-xl bg-surface-2 py-1 pr-2.5 pl-3 text-left transition-colors hover:text-fg";
+  const content = (
+    <>
+      <MoonStars size={15} aria-hidden className="shrink-0 text-muted" />
+      <span className="shrink-0 text-[12.5px] font-medium text-fg">A la noche</span>
+      {info ? (
+        <span style={tone(info.color)} className="flex min-w-0 items-center gap-1.5">
+          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-tone text-tone-fg">
+            <MoodIcon mood={info.value} size={17} weight="fill" />
+          </span>
+          <span className="truncate text-[13px] font-medium text-fg">{info.label}</span>
+        </span>
+      ) : (
+        <span className="min-w-0 text-[12px] leading-tight text-muted">Se completa cuando escribís el journal</span>
+      )}
+      <CaretRight size={13} weight="bold" aria-hidden className="ml-auto shrink-0 text-muted" />
+    </>
+  );
+  const label = info ? `Ánimo a la noche: ${info.label}. Abrir la entrada del journal` : "Ánimo a la noche: sin cargar. Abrir el journal de ese día";
+  if (night.entryId)
+    return (
+      <Link href={`/journal/${night.entryId}`} aria-label={label} className={rowClass}>
+        {content}
+      </Link>
+    );
+  return (
+    <button type="button" aria-label={label} disabled={pending} onClick={() => write(date)} className={rowClass}>
+      {content}
+    </button>
   );
 }
 

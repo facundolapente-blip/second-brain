@@ -1,14 +1,15 @@
 /**
- * Hábitos en construcción (pedido de Facu, 2026-11-17): un hábito se arma de a poco
- * con una escalera de escalones chicos hasta la meta, y "Nunca dos seguidos": en vez
- * de mirar la racha rota, el día después de fallar es "el que importa".
+ * Hábitos en construcción (pedido de Facu, 2026-11-17): un hábito se arma de a poco,
+ * un paso por cada día por semana ("No fumar": 1 día, después 2, 3... hasta 7), y
+ * "Nunca dos seguidos": en vez de mirar la racha rota, el día después de fallar es
+ * "el que importa".
  *
- * Todo va **por semanas** (pedido de Facu: "4 de 14 días" no se entendía): cada
- * escalón dice cuántos días por semana (`perWeek`) y cuántas semanas seguidas hay que
- * cumplirlo para subir (`weeks`). El escalón **cambia el hábito de verdad**: con
- * `perWeek` el hábito pasa a ser de "N veces por semana" (7 = todos los días) y con
- * `target` (hábitos de cantidad) cambia la meta; así la racha y el puntaje se miden
- * contra el escalón y no contra la meta final.
+ * Todo va **por semanas**: cada paso dice cuántos días por semana (`perWeek`) y cuántas
+ * semanas seguidas hay que cumplirlo para subir (`weeks`). El paso **cambia el hábito
+ * de verdad**: con `perWeek` el hábito pasa a ser de "N veces por semana" (7 = todos
+ * los días) y con `target` (escaleras viejas de cantidad) cambia la meta; así la racha
+ * y el puntaje se miden contra el paso y no contra la meta final. La app nunca sube
+ * sola: pregunta.
  *
  * Lógica pura (sin base ni React): la usan el servidor, las pantallas y las pruebas.
  * Se guarda en `Habit.ladder` (Json) y `Habit.neverTwice`.
@@ -163,128 +164,67 @@ export function stepConfig(
   return Object.keys(out).length ? out : null;
 }
 
-// ─── Sugerencias (sin IA, por reglas) ──────────────────────────────────────
+// ─── El plan: de cuántos días a cuántos ────────────────────────────────────
 
-export type GoalKind = "amount" | "frequency" | "quit" | "plain";
+/** Días por semana con que se arranca, a los que se quiere llegar y semanas seguidas para subir. */
+export type LadderPlan = { from: number; to: number; weeks: number };
 
-type HabitShape = { frequency: string; target: number; unit: string | null; isQuit: boolean; timesPerWeek?: number | null; weekdays?: number[] };
+/** "1 día por semana", "3 días por semana", "Todos los días". */
+export const stepTitle = (n: number) => (n >= 7 ? "Todos los días" : `${n} ${n === 1 ? "día" : "días"} por semana`);
+/** El texto corto del paso: "4 días", "todos los días". */
+export const daysShort = (n: number) => (n >= 7 ? "todos los días" : `${n} ${n === 1 ? "día" : "días"}`);
 
-/** "4 veces por semana", "3 x semana", "2 por semana", "1 vez a la semana". */
-const FREQ_RE = /(\d+)\s*(?:veces|vez|x|d[ií]as)?\s*(?:por|a la|x|\/|cada)\s*semana/i;
-/** Un número con su unidad: "1 hora", "20 páginas", "10 min", "1,5 km". */
-const AMOUNT_RE = /(\d+(?:[.,]\d+)?)\s*([a-záéíóúñ]+\.?)?/i;
-const HOUR_UNITS = /^(horas?|hs?\.?)$/i;
-const MIN_UNITS = /^(minutos?|mins?\.?)$/i;
-
-export function goalKindOf(goal: string, habit: HabitShape): GoalKind {
-  const g = goal.trim();
-  if (FREQ_RE.test(g)) return "frequency";
-  if (habit.isQuit || /^no\b/i.test(g)) return "quit";
-  if (/\d/.test(g)) return "amount";
-  if (habit.frequency === "weekly") return "frequency";
-  if (habit.target > 1) return "amount";
-  return "plain";
+/** Un paso por cada número de días, de `from` a `to`. */
+export function planSteps(from: number, to: number, weeks: number): LadderStep[] {
+  const a = clamp(Math.round(from), 1, 7);
+  const b = clamp(Math.round(to), a, 7);
+  const w = clamp(Math.round(weeks), 1, LADDER_WEEKS_MAX);
+  return Array.from({ length: b - a + 1 }, (_, i) => ({ title: stepTitle(a + i), perWeek: a + i, weeks: w }));
 }
 
-const W = LADDER_DEFAULT_WEEKS;
+/** Hasta cuántos días se propone llegar: los que pide el hábito, al menos 2. */
+export const planTarget = (h: WeeklyShape) => Math.max(2, habitPerWeek(h));
 
-/** Escalones con la frecuencia del hábito (cantidad o sin números): 2 semanas cada uno. */
-function withRules(titles: { title: string; target?: number | null }[]): LadderStep[] {
-  return titles.map((t) => {
-    const step: LadderStep = { title: t.title.slice(0, LADDER_TITLE_MAX), weeks: W };
-    if (t.target) step.target = t.target;
-    return step;
-  });
-}
-
-const isQuantity = (h: HabitShape) => h.target > 1 || !!h.unit;
-const pct = [0.25, 0.5, 0.75, 1];
-
-function minutesText(min: number): string {
-  if (min >= 60 && min % 60 === 0) return min === 60 ? "1 hora" : `${min / 60} horas`;
-  return `${min} min`;
-}
-
-function plainSteps(goal: string): { title: string }[] {
-  const g = goal.trim() || "el hábito";
-  return [{ title: `Versión mínima: ${g} 2 minutos` }, { title: `Media versión: ${g}, la mitad` }, { title: g }];
-}
-
-function amountSteps(goal: string, habit: HabitShape): { title: string; target?: number | null }[] | null {
-  const m = AMOUNT_RE.exec(goal);
-  const qty = isQuantity(habit);
-  const targets = pct.map((p) => (qty ? Math.max(1, Math.round(habit.target * p)) : null));
-  if (!m) {
-    if (!qty) return null;
-    const unit = habit.unit ? ` ${habit.unit}` : "";
-    const vals = [...new Set(targets as number[])];
-    if (vals.length < 3) return null;
-    return vals.map((v, i) => ({ title: i === vals.length - 1 ? goal : `${goal} · ${v}${unit}`, target: v }));
+/**
+ * El plan de una escalera, o null si no es de días por semana: las viejas de cantidad
+ * o de texto siguen andando, numeradas 1, 2, 3 y con su título.
+ */
+export function ladderPlan(ladder: Pick<Ladder, "steps" | "current">): LadderPlan | null {
+  const days: number[] = [];
+  for (const s of ladder.steps) {
+    if (!s.perWeek || s.target) return null;
+    if (days.length && s.perWeek <= days[days.length - 1]) return null;
+    days.push(s.perWeek);
   }
-  const n = Number(m[1].replace(",", "."));
-  const unit = (m[2] ?? "").trim();
-  if (!(n > 0)) return null;
-  let texts: string[];
-  if (HOUR_UNITS.test(unit) || MIN_UNITS.test(unit)) {
-    const total = HOUR_UNITS.test(unit) ? Math.round(n * 60) : Math.round(n);
-    const mins = pct.map((p) => Math.max(1, total >= 20 ? Math.round((total * p) / 5) * 5 : Math.round(total * p)));
-    texts = mins.map((x, i) => (i === mins.length - 1 ? m[0].trim() : minutesText(x)));
-  } else {
-    const vals = pct.map((p) => Math.max(1, Math.round(n * p)));
-    texts = vals.map((x, i) => (i === vals.length - 1 ? m[0].trim() : `${x}${unit ? ` ${unit}` : ""}`));
-  }
-  const out: { title: string; target?: number | null }[] = [];
-  texts.forEach((t, i) => {
-    if (out.some((o) => o.title.toLowerCase() === goal.replace(m[0], t).toLowerCase())) return;
-    out.push({ title: goal.replace(m[0], t), target: targets[i] });
-  });
-  // Con números chicos ("2 páginas") los escalones se repiten: con menos de 3 no sirve.
-  if (out.length < 3) return null;
-  out[out.length - 1] = { title: goal, target: qty ? habit.target : null };
-  return out;
+  const cur = ladder.steps[clamp(ladder.current, 0, ladder.steps.length - 1)];
+  return { from: days[0], to: days[days.length - 1], weeks: cur.weeks };
 }
 
-function frequencySteps(goal: string, habit: HabitShape): LadderStep[] | null {
-  const m = FREQ_RE.exec(goal);
-  const total = m ? Number(m[1]) : (habit.timesPerWeek ?? 0);
-  if (!(total >= 1) || total > 7) return null;
-  if (total < 3) return null;
-  const n = Math.min(5, total);
-  const counts = [...new Set(Array.from({ length: n }, (_, i) => Math.max(1, Math.round((total * (i + 1)) / n))))];
-  const freq = (k: number) => `${k} ${k === 1 ? "vez" : "veces"} por semana`;
-  return counts.map((k, i) => ({
-    title: (i === counts.length - 1 ? goal : m ? goal.replace(m[0], freq(k)) : `${goal} · ${freq(k)}`).slice(0, LADDER_TITLE_MAX),
-    perWeek: k,
-    weeks: W,
-  }));
+/** Lo que se ve en cada barra: los días del paso o, sin plan, su número. */
+export function stepLabels(ladder: Pick<Ladder, "steps" | "current">): number[] {
+  return ladderPlan(ladder) ? ladder.steps.map((s) => s.perWeek as number) : ladder.steps.map((_, i) => i + 1);
+}
+
+/** Cómo se nombra un paso en una frase corta: "4 días" o, sin plan, su título. */
+export function stepShort(ladder: Pick<Ladder, "steps" | "current">, i: number): string {
+  const s = ladder.steps[i];
+  return ladderPlan(ladder) ? daysShort(s.perWeek as number) : s.title;
+}
+
+/** Cómo se nombra un paso entero: "4 días por semana" o, sin plan, su título. */
+export function stepLong(ladder: Pick<Ladder, "steps" | "current">, i: number): string {
+  const s = ladder.steps[i];
+  return ladderPlan(ladder) ? daysText(s.perWeek as number) : s.title;
 }
 
 /**
- * Escalones sugeridos para llegar a `goal` (3 a 5; el último es la meta), todos con
- * 2 semanas seguidas para subir. Ejemplos: "Dejar el celular 1 hora antes de dormir"
- * → 15/30/45 min y 1 hora; "Leer 20 páginas" → 5/10/15/20; "Gym 4 veces por semana"
- * → 1, 2, 3 y 4 días por semana; "No fumar" → 2, 4 y 7 días por semana sin hacerlo;
- * "Meditar" → versión mínima, media y la meta.
+ * Los pasos con otro destino o con otras semanas: lo ya subido queda igual y se rearma
+ * desde el paso actual (nunca para abajo), así el paso en el que está no cambia.
  */
-export function suggestSteps(goal: string, habit: HabitShape): LadderStep[] {
-  const g = goal.trim().slice(0, LADDER_GOAL_MAX) || "El hábito";
-  const kind = goalKindOf(g, habit);
-  if (kind === "frequency") {
-    const s = frequencySteps(g, habit);
-    if (s) return s;
-  }
-  if (kind === "quit") {
-    return [
-      { title: "2 días por semana sin hacerlo", perWeek: 2, weeks: W },
-      { title: "4 días por semana sin hacerlo", perWeek: 4, weeks: W },
-      { title: g, perWeek: 7, weeks: W },
-    ];
-  }
-  if (kind === "amount" || kind === "frequency") {
-    const s = amountSteps(g, habit);
-    if (s) return withRules(s);
-  }
-  return withRules(plainSteps(g));
+export function replanSteps(ladder: Ladder, to: number, weeks: number): LadderStep[] {
+  const cur = clamp(ladder.current, 0, ladder.steps.length - 1);
+  const days = ladder.steps[cur].perWeek ?? 1;
+  return [...ladder.steps.slice(0, cur), ...planSteps(days, Math.max(days, to), weeks)];
 }
 
 // ─── Progreso del escalón, por semanas ─────────────────────────────────────

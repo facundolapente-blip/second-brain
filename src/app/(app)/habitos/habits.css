@@ -236,36 +236,26 @@
   color: var(--st-skip-fg);
 }
 
-/* Escalerita: barras de alto creciente. */
-.lad-stairs { display: inline-flex; flex-shrink: 0; align-items: flex-end; gap: 3px; }
-.lad-stairs > span {
-  width: 7px;
-  border-radius: 2px;
-  background: var(--lad-soft);
+/* La escalera: una barra por paso, cada una más alta. Las hechas y la actual llenas,
+   la actual con aro y las que faltan punteadas. */
+.lad-bars { display: grid; height: 76px; align-items: end; gap: 6px; }
+.lad-bars > span {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  padding-bottom: 4px;
+  border: 1px dashed var(--lad-line);
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: color-mix(in oklab, var(--lad-soft) 40%, transparent);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--lad-fg);
 }
-.lad-stairs > span[data-on] { background: color-mix(in oklab, var(--lad-strong) 55%, var(--surface)); }
-.lad-stairs > span[data-now] { background: var(--lad-strong); }
-.lad-stairs > span[data-next] {
-  background: transparent;
-  outline: 1.5px dashed var(--lad-strong);
-  outline-offset: -1.5px;
-}
-
-/* Los 7 días de la semana en curso: punto con la inicial debajo. */
-.lad-week { display: inline-grid; grid-template-columns: repeat(7, 16px); gap: 3px; }
-.lad-week > span {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  line-height: 1;
-  color: var(--muted);
-}
-.lad-week > span > i { width: 10px; height: 10px; border-radius: 999px; border: 1.5px solid var(--lad-strong); }
-.lad-week > span[data-on] > i { background: var(--lad-strong); }
-.lad-week > span[data-future] > i { border-color: var(--lad-soft); border-style: dashed; }
-.lad-week > span[data-today] { font-weight: 700; color: var(--lad-fg); }
+.lad-bars > span[data-on] { border-color: transparent; background: var(--lad-strong); color: var(--surface); }
+.lad-bars > span[data-now] { outline: 2px solid var(--lad-strong); outline-offset: 2px; }
 
 /* Gráfico semana a semana del camino (barras de 0 a 7 días). */
 .lad-chart {
@@ -323,54 +313,7 @@
   color: var(--muted);
 }
 
-/* El camino: escalones en vertical, unidos por una línea. */
-.lad-path { display: grid; }
-.lad-path-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
-.lad-path-step:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  top: 30px;
-  bottom: 2px;
-  left: 13px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--border);
-}
-.lad-path-step[data-state="past"]::before { background: var(--st-done-line); }
-.lad-path-dot {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1.5px solid var(--border-strong);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.lad-path-step[data-state="past"] .lad-path-dot { border-color: var(--hc-done, var(--st-done-line)); background: var(--st-done-line); color: #fff; }
-:root[data-theme="oscuro"] .lad-path-step[data-state="past"] .lad-path-dot { background: color-mix(in oklab, var(--st-done-line) 72%, black); }
-.lad-path-step[data-state="now"] .lad-path-dot {
-  border-color: var(--lad-strong);
-  color: var(--lad-fg);
-  box-shadow: 0 0 0 4px var(--lad-soft);
-}
-.lad-path-step[data-state="next"] > div p:first-child { color: var(--muted); }
-.lad-chip {
-  border-radius: 999px;
-  background: var(--lad-strong);
-  padding: 1px 8px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--surface);
-}
-
-/* Editor de escalones. */
+/* El plan: selectores con − y + y "Tu camino". */
 .lad-propose {
   display: grid;
   gap: 8px;
@@ -379,21 +322,8 @@
   background: color-mix(in oklab, var(--mod) 7%, var(--surface));
   padding: 12px;
 }
-.lad-step-n {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--lad-soft);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--lad-fg);
-}
 .lad-icon-btn {
+  position: relative;
   display: inline-flex;
   width: 36px;
   height: 36px;
@@ -402,22 +332,12 @@
   border-radius: 999px;
   color: var(--muted);
 }
-.lad-icon-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
-.lad-icon-btn:disabled { opacity: 0.35; }
-.lad-add {
-  display: inline-flex;
-  min-height: 40px;
-  width: fit-content;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  border: 1px dashed var(--lad-line);
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--lad-fg);
+/* 36 px a la vista, 44 para el dedo. */
+.lad-icon-btn::after { content: ""; position: absolute; inset: -4px; }
+@media (hover: hover) {
+  .lad-icon-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 }
-.lad-add:disabled { opacity: 0.4; }
+.lad-icon-btn:disabled { opacity: 0.35; }
 .lad-switch {
   position: relative;
   display: inline-flex;

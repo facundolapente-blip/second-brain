@@ -112,6 +112,8 @@ export async function getDailyMetrics(from: string, to: string): Promise<{ days:
     prisma.journalEntry.findMany({
       where: { date: range },
       select: { date: true, title: true, body: true, mood: true, tags: true, _count: { select: { attachments: true } } },
+      // Sin check-in, el ánimo del día es el de la primera entrada que lo tenga (igual que en Salud).
+      orderBy: { createdAt: "asc" },
     }),
     prisma.account.findMany({ select: { id: true, currency: true } }),
     prisma.transaction.findMany({

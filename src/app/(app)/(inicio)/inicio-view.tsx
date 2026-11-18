@@ -10,7 +10,7 @@ import type { MementoConfig } from "@/lib/memento";
 import type { ValueNote } from "@/lib/values";
 import { HabitDayRows, useJustCompleted, useStickyDay } from "../habitos/day-rows";
 import { DaySheet, useHabitLogs, useHabitOrder, type DaySheetHandle } from "../habitos/habit-ui";
-import { LadderBox, useLadders } from "../habitos/ladder";
+import { ladderAsks, LadderBox, useLadders } from "../habitos/ladder";
 import { dayProgress } from "@/lib/habit-logic";
 import { showsOn } from "@/lib/habit-logic";
 import Link from "next/link";
@@ -202,6 +202,7 @@ export function InicioView({
               yesterday={d.checkin.yesterday}
               lastWeightG={d.checkin.lastWeightG}
               watch={d.checkin.watch}
+              night={d.checkin.night}
             />
           }
           plan={<PlanToday d={d} />}
@@ -560,8 +561,9 @@ function HabitsToday({ d, store }: { d: Dashboard; store: ProgressStore }) {
   const { sorted, reorder } = useHabitOrder(withLadders, d.habits.manualOrder);
   const sticky = useStickyDay(d.today, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, d.today)).map((h) => h.id));
   const shown = sorted.filter((h) => sticky.has(h.id));
-  const building = shown.filter((h) => h.ladder);
-  const visible = building.length ? shown.filter((h) => !h.ladder) : shown;
+  // También los que esperan una respuesta ("¿subís?") aunque hoy no toquen (no suman en las cifras del día).
+  const building = sorted.filter((h) => h.ladder && (sticky.has(h.id) || ladderAsks(h, logs[h.id] ?? {}, d.today)));
+  const visible = shown.filter((h) => !h.ladder);
   const { done, total: due } = dayProgress(d.habits.list, logs, d.today, d.today);
   const complete = due > 0 && done >= due;
   const celebrate = useJustCompleted(complete, d.today);

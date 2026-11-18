@@ -17,6 +17,21 @@ export type CheckinDTO = {
 
 export type CheckinPatch = Partial<Omit<CheckinDTO, "date">>;
 
+/**
+ * El ánimo de la noche: el de la entrada del journal de ese día. `entryId` es a dónde lleva
+ * tocarlo (null si ese día todavía no hay ninguna entrada).
+ */
+export type NightMood = { mood: number | null; entryId: string | null };
+
+/**
+ * Entradas de un día, de la más vieja a la más nueva: la última con ánimo y, si ninguna
+ * tiene, la primera (la misma que abre "Escribir" ese día).
+ */
+export function nightMoodOf(entries: { id: string; mood: number | null }[]): NightMood {
+  const last = entries.findLast((e) => e.mood !== null);
+  return last ? { mood: last.mood, entryId: last.id } : { mood: null, entryId: entries[0]?.id ?? null };
+}
+
 export const ENERGY_LABELS = ["Sin pilas", "Baja", "Normal", "Buena", "A full"];
 export const STRESS_LABELS = ["Nada", "Poco", "Algo", "Bastante", "Mucho"];
 

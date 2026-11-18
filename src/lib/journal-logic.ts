@@ -67,13 +67,21 @@ export function excerpt(body: string, max = 280): string {
   return `${cut.slice(0, sp > max * 0.6 ? sp : max)}…`;
 }
 
-/** Una entrada cuenta como vacía si no tiene nada escrito ni elegido. */
 /**
- * Sin título, texto ni etiquetas. El ánimo solo no cuenta: vive también en el
- * check-in del día (ánimo unificado), así que no se pierde al descartarla.
+ * Sin título, texto ni etiquetas: no cuenta como "escrito" (rachas, listas, hábito de
+ * journaling). El ánimo solo no alcanza para que cuente, pero sí para guardarla: ver
+ * `isDiscardableEntry`.
  */
 export function isEmptyEntry(e: { title: string | null; body: string; tags: string[] }) {
   return !e.title?.trim() && !e.body.trim() && e.tags.length === 0;
+}
+
+/**
+ * Se puede borrar al salir del editor: vacía y sin ánimo. Con ánimo se queda (sin verse en
+ * las listas), porque el de la noche solo está en la entrada.
+ */
+export function isDiscardableEntry(e: { title: string | null; body: string; tags: string[]; mood: number | null }) {
+  return isEmptyEntry(e) && e.mood === null;
 }
 
 /**

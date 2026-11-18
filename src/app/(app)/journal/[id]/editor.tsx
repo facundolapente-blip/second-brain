@@ -12,7 +12,7 @@ import { Button, cx, IconButton, Sheet, type SheetHandle } from "@/components/ui
 import { addDays, formatLong, formatRelative } from "@/lib/dates";
 import { DatePicker } from "@/components/date-picker";
 import { deleteEntry, discardIfEmpty, saveEntry, type EntryInput } from "@/lib/offline/journal";
-import { isEmptyEntry, MOODS, normalizeTag, TAGS_MAX, TITLE_MAX, wordCount } from "@/lib/journal-logic";
+import { isDiscardableEntry, MOODS, normalizeTag, TAGS_MAX, TITLE_MAX, wordCount } from "@/lib/journal-logic";
 import type { EntryDTO } from "@/lib/journal";
 import { tone } from "@/lib/palette";
 import { MoodIcon, StarToggle, useWrite } from "../journal-ui";
@@ -160,10 +160,10 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   }, [entry.body, entry.title]);
 
   // Al salir por cualquier lado (Atrás del navegador, el menú, otro enlace), una
-  // entrada vacía se descarta. Con un retraso corto: el modo estricto de React
+  // entrada vacía y sin ánimo se descarta. Con un retraso corto: el modo estricto de React
   // desmonta y vuelve a montar al abrir, y eso no es salir (el nuevo montaje lo cancela).
   // Y recién cuando terminó la fila de guardados: si no, con red lenta se borraba
-  // antes de que el último guardado pasara el ánimo al check-in.
+  // antes de que llegara el último guardado.
   useEffect(() => {
     const id = entry.id;
     const pendingLeave = leaveTimers.get(id);
@@ -174,7 +174,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
     const current = data;
     const photos = photoCount;
     return () => {
-      const empty = isEmptyEntry({ ...current.current, title: current.current.title || null }) && photos.current === 0;
+      const empty = isDiscardableEntry({ ...current.current, title: current.current.title || null }) && photos.current === 0;
       if (!empty) return;
       const job: { timer?: ReturnType<typeof setTimeout> } = {};
       job.timer = setTimeout(() => {
@@ -199,7 +199,7 @@ export function Editor({ entry, allTags, today }: { entry: EntryDTO; allTags: st
   function goBack() {
     startLeaving(async () => {
       await flush();
-      if (isEmptyEntry({ ...data.current, title: data.current.title || null }) && photoCount.current === 0) await discardIfEmpty(entry.id);
+      if (isDiscardableEntry({ ...data.current, title: data.current.title || null }) && photoCount.current === 0) await discardIfEmpty(entry.id);
       leave();
     });
   }

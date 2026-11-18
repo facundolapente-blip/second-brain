@@ -2,18 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   advance,
   becameReady,
-  goalKindOf,
+  daysShort,
   habitNeverTwice,
+  ladderPlan,
   ladderWeeks,
   neverTwiceStats,
   parseLadder,
+  planSteps,
+  planTarget,
+  replanSteps,
   snoozeWeek,
   spanWeeks,
   stepBack,
   stepConfig,
+  stepLabels,
+  stepLong,
   stepProgress,
   stepRuleText,
-  suggestSteps,
+  stepShort,
   type Ladder,
 } from "@/lib/habit-ladder";
 import { addDays } from "@/lib/dates";
@@ -21,51 +27,59 @@ import type { LogMap } from "@/lib/habit-logic";
 
 const plain = { frequency: "daily", target: 1, unit: null, isQuit: false };
 
-describe("sugerencias de escalones", () => {
-  it("cantidad con horas: 15, 30, 45 min y 1 hora, 2 semanas cada uno", () => {
-    const goal = "Dejar el celular 1 hora antes de dormir";
-    expect(goalKindOf(goal, plain)).toBe("amount");
-    const s = suggestSteps(goal, plain);
-    expect(s.map((x) => x.title)).toEqual([
-      "Dejar el celular 15 min antes de dormir",
-      "Dejar el celular 30 min antes de dormir",
-      "Dejar el celular 45 min antes de dormir",
-      goal,
-    ]);
-    expect(s.every((x) => x.weeks === 2 && !x.perWeek && !x.target)).toBe(true);
+describe("el plan de días por semana", () => {
+  it("un paso por cada número de días, de 1 a 7", () => {
+    const s = planSteps(1, 7, 2);
+    expect(s.map((x) => x.perWeek)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(s[0]).toEqual({ title: "1 día por semana", perWeek: 1, weeks: 2 });
+    expect(s[2].title).toBe("3 días por semana");
+    expect(s[6].title).toBe("Todos los días");
   });
-  it("páginas, con meta numérica si el hábito es de cantidad", () => {
-    const s = suggestSteps("Leer 20 páginas", { frequency: "daily", target: 20, unit: "páginas", isQuit: false });
-    expect(s.map((x) => x.title)).toEqual(["Leer 5 páginas", "Leer 10 páginas", "Leer 15 páginas", "Leer 20 páginas"]);
-    expect(s.map((x) => x.target)).toEqual([5, 10, 15, 20]);
+  it("respeta los límites", () => {
+    expect(planSteps(3, 2, 20).map((x) => [x.perWeek, x.weeks])).toEqual([[3, 8]]);
+    expect(planSteps(0, 9, 0)).toHaveLength(7);
   });
-  it("veces por semana: 1, 2, 3 y 4 días por semana", () => {
-    const goal = "Gym 4 veces por semana";
-    expect(goalKindOf(goal, plain)).toBe("frequency");
-    const s = suggestSteps(goal, plain);
-    expect(s.map((x) => x.title)).toEqual(["Gym 1 vez por semana", "Gym 2 veces por semana", "Gym 3 veces por semana", goal]);
-    expect(s.map((x) => x.perWeek)).toEqual([1, 2, 3, 4]);
+  it("hasta dónde se propone llegar: lo del hábito, al menos 2", () => {
+    expect(planTarget({ frequency: "daily" })).toBe(7);
+    expect(planTarget({ frequency: "weekly", timesPerWeek: 4 })).toBe(4);
+    expect(planTarget({ frequency: "weekly", timesPerWeek: 1 })).toBe(2);
+    expect(planTarget({ frequency: "weekdays", weekdays: [1, 3, 5] })).toBe(3);
   });
-  it("dejar algo: 2, 4 y todos los días sin hacerlo", () => {
-    expect(goalKindOf("No fumar", plain)).toBe("quit");
-    expect(goalKindOf("Fumar menos", { ...plain, isQuit: true })).toBe("quit");
-    const s = suggestSteps("No fumar", plain);
-    expect(s.map((x) => x.perWeek)).toEqual([2, 4, 7]);
-    expect(s[2].title).toBe("No fumar");
+  it("lee el plan de una escalera", () => {
+    const l = { steps: planSteps(2, 5, 3), current: 1 };
+    expect(ladderPlan(l)).toEqual({ from: 2, to: 5, weeks: 3 });
+    expect(stepLabels(l)).toEqual([2, 3, 4, 5]);
+    expect(stepShort(l, 1)).toBe("3 días");
+    expect(stepLong(l, 1)).toBe("3 días por semana");
   });
-  it("sin números: versión mínima, media y la meta", () => {
-    expect(goalKindOf("Meditar", plain)).toBe("plain");
-    const s = suggestSteps("Meditar", plain);
-    expect(s[0].title.startsWith("Versión mínima:")).toBe(true);
-    expect(s[s.length - 1].title).toBe("Meditar");
+  it("textos cortos", () => {
+    expect(daysShort(1)).toBe("1 día");
+    expect(daysShort(4)).toBe("4 días");
+    expect(daysShort(7)).toBe("todos los días");
+    expect(stepShort({ steps: planSteps(6, 7, 2), current: 0 }, 1)).toBe("todos los días");
   });
-  it("siempre de 3 a 5 escalones y el último es la meta", () => {
-    for (const g of ["Correr 5 km", "Meditar 10 min", "Leer 2 páginas", "Agua 7 veces por semana", "Estirar"]) {
-      const s = suggestSteps(g, plain);
-      expect(s.length).toBeGreaterThanOrEqual(3);
-      expect(s.length).toBeLessThanOrEqual(5);
-      expect(s[s.length - 1].title).toBe(g);
-    }
+  it("las escaleras viejas de cantidad o de texto no tienen plan: van numeradas y con su título", () => {
+    const text = { steps: [{ title: "Versión mínima", weeks: 2 }, { title: "Meditar", weeks: 2 }], current: 0 };
+    expect(ladderPlan(text)).toBeNull();
+    expect(stepLabels(text)).toEqual([1, 2]);
+    expect(stepShort(text, 1)).toBe("Meditar");
+    expect(stepLong(text, 1)).toBe("Meditar");
+    expect(ladderPlan({ steps: [{ title: "Leer 5", perWeek: 3, target: 5, weeks: 2 }], current: 0 })).toBeNull();
+    expect(ladderPlan({ steps: [{ title: "a", perWeek: 4, weeks: 2 }, { title: "b", perWeek: 2, weeks: 2 }], current: 0 })).toBeNull();
+  });
+  it("cambiar el plan no toca lo ya subido ni el paso actual", () => {
+    const l: Ladder = { goal: "x", steps: planSteps(1, 7, 2), current: 2, stepStart: "2026-11-02" };
+    const s = replanSteps(l, 5, 3);
+    expect(s.map((x) => x.perWeek)).toEqual([1, 2, 3, 4, 5]);
+    expect(s.map((x) => x.weeks)).toEqual([2, 2, 3, 3, 3]);
+    expect(s[l.current].perWeek).toBe(3);
+    // Nunca por debajo del paso en el que está.
+    expect(replanSteps(l, 1, 2).map((x) => x.perWeek)).toEqual([1, 2, 3]);
+  });
+  it("con saltos (2, 4, 7) el paso actual sigue en su lugar", () => {
+    const steps = [2, 4, 7].map((n) => ({ title: String(n), perWeek: n, weeks: 2 }));
+    const s = replanSteps({ goal: "x", steps, current: 1, stepStart: "2026-11-02" }, 6, 2);
+    expect(s.map((x) => x.perWeek)).toEqual([2, 4, 5, 6]);
   });
   it("textos por semana", () => {
     expect(stepRuleText({ title: "x", perWeek: 3, weeks: 2 }, plain, false)).toBe("3 días por semana · 2 semanas seguidas para subir");
@@ -269,14 +283,15 @@ describe("aviso de hábitos sin marcar", () => {
   });
 });
 
-describe("aviso de escalones", () => {
+describe("aviso de subir de paso", () => {
   it("uno o varios", async () => {
     const { ladderMessage } = await import("@/lib/reminder-logic");
     expect(ladderMessage([])).toBeNull();
-    expect(ladderMessage([{ name: "Gym", weeks: 2, next: "Gym 3 veces", rule: "3 días por semana" }])).toMatchObject({
-      title: "Gym: ¿subís de escalón?",
-      body: "Cumpliste 2 semanas seguidas. El próximo: Gym 3 veces (3 días por semana).",
+    expect(ladderMessage([{ name: "Gym", weeks: 2, next: "4 días por semana" }])).toMatchObject({
+      title: "Gym: ¿subís un paso?",
+      body: "Cumpliste 2 semanas seguidas. ¿Pasás a 4 días por semana?",
     });
-    expect(ladderMessage([{ name: "Gym", weeks: 2, next: "a", rule: "b" }, { name: "Leer", weeks: 2, next: "a", rule: "b" }])?.body).toBe("Gym y Leer");
+    expect(ladderMessage([{ name: "Gym", weeks: 1, next: "todos los días" }])?.body).toBe("Cumpliste 1 semana. ¿Pasás a todos los días?");
+    expect(ladderMessage([{ name: "Gym", weeks: 2, next: "a" }, { name: "Leer", weeks: 2, next: "a" }])?.body).toBe("Gym y Leer");
   });
 });

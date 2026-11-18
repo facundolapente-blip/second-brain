@@ -4,13 +4,13 @@ import { prisma } from "./prisma";
 import { logActivity } from "./trash";
 import { toDbDate } from "./dates";
 import { QUARTER_REVIEW_TAG, REVIEW_TAG } from "./review-logic";
-import { BODY_MAX, isMood } from "./journal-logic";
+import { BODY_MAX } from "./journal-logic";
 import { syncJournalHabit } from "./journal-habit-link";
 
 /**
  * Suma un texto al final de la entrada de un día (la primera, sin contar las
  * reflexiones de semana y trimestre), como un párrafo nuevo; si ese día no hay
- * entrada, la crea con el ánimo del check-in. Sin sesión: la llaman
+ * entrada, la crea sin ánimo (el de la entrada es el de la noche). Sin sesión: la llaman
  * `shareToJournal` (que la exige) y el bot de WhatsApp (que valida firma y número).
  */
 export async function appendToJournal(day: string, text: string, via: string): Promise<{ id: string; created: boolean; words: number }> {
@@ -30,10 +30,7 @@ export async function appendToJournal(day: string, text: string, via: string): P
     }
     id = existing.id;
   } else {
-    const checkin = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(day) }, select: { mood: true } });
-    const entry = await prisma.journalEntry.create({
-      data: { date: toDbDate(day), body: clean, mood: isMood(checkin?.mood) ? checkin.mood : null },
-    });
+    const entry = await prisma.journalEntry.create({ data: { date: toDbDate(day), body: clean } });
     await logActivity("created", "journal", entry.id, `Entrada del ${day} (${via})`);
     id = entry.id;
     body = clean;

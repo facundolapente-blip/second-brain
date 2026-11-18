@@ -1,24 +1,26 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, CaretRight, Check, Plus, X } from "@phosphor-icons/react";
-import { diffDays, formatShort, weekday } from "@/lib/dates";
+import { CaretRight, Minus, Plus, Stairs } from "@phosphor-icons/react";
+import { addDays, diffDays, formatShort } from "@/lib/dates";
 import { dayState, isDone, type LogMap } from "@/lib/habit-logic";
 import {
   advance,
+  daysShort,
   habitNeverTwice,
-  habitPerWeek,
-  LADDER_DEFAULT_WEEKS,
-  LADDER_GOAL_MAX,
-  LADDER_MAX_STEPS,
   LADDER_WEEKS_MAX,
   ladderDoneFn,
+  ladderPlan,
   ladderWeeks,
+  replanSteps,
   snoozeWeek,
   spanWeeks,
   stepBack,
+  stepLabels,
   stepProgress,
   stepRuleText,
+  stepShort,
+  stepTitle,
   weeksText,
   type Ladder,
   type LadderStep,
@@ -39,18 +41,19 @@ import {
 import { useSafeTransition } from "@/components/safe-action";
 import { notifyError } from "@/components/undo-toast";
 import { haptic } from "@/components/haptics";
-import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
+import { Button, cx, Sheet, type SheetHandle } from "@/components/ui";
+import { TintedCard } from "@/components/tinted-card";
 import { CheckButton, tapHabit } from "./day-rows";
 import type { MarkFn } from "./habit-ui";
 import "./habits.css";
 
 /*
- * Hábitos en construcción ("de a poco"): el hábito sube por escalones hasta la meta.
- * Todo va por semanas: cada escalón pide unos días por semana y se sube después de
- * cumplirlo unas semanas seguidas. Acá van las piezas de pantalla: el recuadro
- * "En construcción" de Hoy e Inicio, la hoja "El camino" (con el gráfico semana a
- * semana), el editor de escalones y la línea de "Nunca dos seguidos". Las reglas
- * viven en lib/habit-ladder.ts.
+ * Hábitos en construcción ("de a poco"): el hábito sube de a un paso hasta la meta.
+ * Cada paso pide unos días por semana y se sube después de cumplirlo unas semanas
+ * seguidas; la app pregunta, nunca sube sola. Acá van las piezas de pantalla: la
+ * escalera, el recuadro "En construcción" de Hoy e Inicio, la hoja "El camino", los
+ * selectores del plan y la línea de "Nunca dos seguidos". Las reglas viven en
+ * lib/habit-ladder.ts.
  */
 
 type Result = { ok: boolean; error?: string };
@@ -69,7 +72,7 @@ export type LadderActions = {
 };
 
 /**
- * Los cambios de escalón se ven al instante: cada acción deja un parche sobre el
+ * Los cambios de paso se ven al instante: cada acción deja un parche sobre el
  * hábito hasta que llega la versión nueva del servidor (o, sin señal, mientras la
  * pantalla siga abierta). Si el servidor la rechaza, el parche se va con aviso.
  */
@@ -157,7 +160,7 @@ export function useLadders(habits: HabitDTO[], today: string): { habits: HabitDT
 
 // ─── Cuentas de un hábito en construcción ──────────────────────────────────
 
-/** ¿Ese día está hecho? Con la meta del escalón si la tiene (si no, la del hábito). */
+/** ¿Ese día está hecho? Con la meta del paso si la tiene (si no, la del hábito). */
 function doneFn(h: HabitDTO, logs: LogMap) {
   const step = h.ladder?.steps[Math.min(h.ladder.current, h.ladder.steps.length - 1)];
   return ladderDoneFn({ target: step?.target ?? h.target }, logs);
@@ -174,10 +177,20 @@ export function neverTwiceOf(h: HabitDTO, logs: LogMap, today: string) {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 /** "2 de 3 días" (o "1 de 1 día"). */
 const ofDays = (done: number, need: number) => `${done} de ${need} ${need === 1 ? "día" : "días"}`;
-/** Iniciales de los días: L M M J V S D (sin la X de miércoles). */
-const INITIAL = ["D", "L", "M", "M", "J", "V", "S"];
-
 type Prog = ReturnType<typeof stepProgress>;
+
+/** Sostuvo el último paso las semanas que pide: llegó a la meta. */
+const reachedGoal = (p: Prog) => p.atGoal && p.streak >= p.weeksNeeded;
+
+/**
+ * ¿Espera una respuesta? (subir, o pasar a sus hábitos.) Esos van en el recuadro aunque
+ * hoy no toquen: si no, el pedido quedaría escondido el resto de la semana.
+ */
+export function ladderAsks(h: HabitDTO, logs: LogMap, today: string) {
+  if (!h.ladder) return false;
+  const p = stepProgress(h.ladder, doneFn(h, logs), today, optsOf(h));
+  return p.ready || reachedGoal(p);
+}
 
 /** Número de la semana en curso dentro de las seguidas que pide ("Semana 2 de 2"). */
 function weekNumber(p: Prog) {
@@ -185,48 +198,56 @@ function weekNumber(p: Prog) {
   return Math.max(1, Math.min(p.weeksNeeded, curMet ? p.streak : p.streak + 1));
 }
 
-/** La línea chica debajo de los días: cómo van las semanas seguidas. */
-function weekLine(p: Prog) {
-  if (p.atGoal) {
-    return p.streak > 0
-      ? `Semana ${Math.min(p.streak, p.weeksNeeded)} de ${p.weeksNeeded} en la meta`
-      : `Es la meta: ${weeksText(p.weeksNeeded)} y pasa a tus hábitos`;
-  }
-  if (p.streak > 0) return `Semana ${Math.min(p.streak, p.weeksNeeded)} de ${p.weeksNeeded} cumplida`;
-  return `Cumplí ${weeksText(p.weeksNeeded)} para subir`;
+/** "Semana 1 de 2 para pasar a 4 días". */
+function weekLine(p: Prog, ladder: Ladder) {
+  if (p.atGoal) return `Semana ${weekNumber(p)} de ${p.weeksNeeded} en la meta`;
+  // Dijo "Todavía no": cumplió, pero se le vuelve a preguntar más adelante.
+  if (p.streak >= p.weeksNeeded && ladder.snoozeUntil) return `Te volvemos a preguntar el ${formatShort(addDays(ladder.snoozeUntil, 1))}`;
+  return `Semana ${weekNumber(p)} de ${p.weeksNeeded} para pasar a ${stepShort(ladder, p.step + 1)}`;
 }
 
-// ─── Escalerita y días de la semana ─────────────────────────────────────────
+/** "3 días por semana · llevás 2" (la primera semana, si arrancó a mitad, lo que toca en esos días). */
+function subLine(p: Prog, ladder: Ladder) {
+  const plan = ladderPlan(ladder);
+  const base = plan ? stepTitle(p.perWeek) : ladder.steps[p.step].title;
+  if (p.ready || reachedGoal(p)) return `${base} · cumplido`;
+  if (plan && p.thisWeek.need !== p.perWeek) return `Esta semana: ${daysShort(p.thisWeek.need)} · llevás ${p.thisWeek.done}`;
+  return `${base} · llevás ${p.thisWeek.done}`;
+}
 
-/** Barras de alto creciente, una por escalón: las de abajo y la actual llenas; la próxima, punteada si toca subir. */
-export function Stairs({ total, current, nextDashed, className }: { total: number; current: number; nextDashed?: boolean; className?: string }) {
-  const n = Math.max(1, total);
+/** "2 semanas seguidas cumplidas" / "1 semana cumplida". */
+const weeksDone = (n: number) => `${weeksText(n)} ${n === 1 ? "cumplida" : "cumplidas"}`;
+
+/** "Volver a 2 días" (sin plan, "Volver al paso anterior"). */
+const backText = (ladder: Ladder, cur: number) => (ladderPlan(ladder) ? `Volver a ${stepShort(ladder, cur - 1)}` : "Volver al paso anterior");
+
+/** "Subir a 4 días" (sin plan, "Subir al paso 3"). */
+const upText = (ladder: Ladder, cur: number) => (ladderPlan(ladder) ? `Subir a ${stepShort(ladder, cur + 1)}` : `Subir al paso ${cur + 2}`);
+
+// ─── La escalera ────────────────────────────────────────────────────────────
+
+/** Una barra por paso, cada una más alta: las hechas y la actual llenas, la actual con aro, las que faltan punteadas. */
+export function LadderBars({ labels, current }: { labels: number[]; current: number }) {
+  const n = Math.max(1, labels.length);
   return (
-    <span role="img" aria-label={`Escalón ${current + 1} de ${n}`} className={cx("lad-stairs", className)}>
-      {Array.from({ length: n }, (_, i) => (
+    <div
+      role="img"
+      aria-label={`Paso ${current + 1} de ${n}`}
+      className="lad-bars"
+      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+    >
+      {labels.map((label, i) => (
         <span
           key={i}
+          className="figure"
           data-on={i <= current || undefined}
           data-now={i === current || undefined}
-          data-next={nextDashed && i === current + 1 ? "" : undefined}
-          style={{ height: `${n === 1 ? 100 : 34 + (66 * i) / (n - 1)}%` }}
-        />
-      ))}
-    </span>
-  );
-}
-
-/** Los 7 días de la semana en curso: hecho lleno, pasado sin hacer vacío, futuro tenue. */
-function WeekDots({ days, today, done, need }: { days: Prog["thisWeek"]["days"]; today: string; done: number; need: number }) {
-  return (
-    <span role="img" aria-label={`Esta semana: ${ofDays(done, need)}`} className="lad-week">
-      {days.map((d) => (
-        <span key={d.date} data-on={d.done || undefined} data-future={d.future || undefined} data-today={d.date === today || undefined}>
-          <i />
-          {INITIAL[weekday(d.date)]}
+          style={{ height: `${n === 1 ? 100 : 30 + (70 * i) / (n - 1)}%` }}
+        >
+          {label}
         </span>
       ))}
-    </span>
+    </div>
   );
 }
 
@@ -313,17 +334,15 @@ function LadderItem({
   const ladder = h.ladder!;
   const steps = ladder.steps;
   const cur = Math.min(ladder.current, steps.length - 1);
-  const step = steps[cur];
   const prog = stepProgress(ladder, doneFn(h, logs), today, optsOf(h));
   const nt = h.neverTwice ? neverTwiceOf(h, logs, today) : null;
   const alert = !!nt?.failedYesterday && day === today;
-  const isLast = cur >= steps.length - 1;
-  // En el último escalón no hay "subir": sostenido las semanas que pide, llegó a la meta.
-  const goalMet = prog.atGoal && prog.streak >= prog.weeksNeeded;
+  const goalMet = reachedGoal(prog);
   const log = logs[day];
   const state = log?.s === "skipped" ? "skipped" : dayState(h, logs, day, today);
   const [confirmBack, setConfirmBack] = useState(false);
-  const next = steps[cur + 1];
+  const labels = stepLabels(ladder);
+  const sub = subLine(prog, ladder);
 
   return (
     <li className="lad-item" data-alert={alert || undefined}>
@@ -348,19 +367,13 @@ function LadderItem({
         <button
           type="button"
           onClick={onPath}
-          aria-label={`${h.name}: ${step?.title ?? ""}. Ver el camino`}
+          aria-label={`${h.name}: ${sub}. Ver el camino`}
           className="tap-tint -my-1 -ml-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 pl-1.5 text-left lg:gap-4"
         >
           <HabitAvatar icon={h.icon} color={h.color} className="size-9 lg:size-[42px]" />
           <span className="grid min-w-0 gap-0.5">
-            <span className="line-clamp-2 text-[16px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">
-              {step?.title || h.name}
-            </span>
-            <span className="lad-sub">
-              {h.name !== step?.title && <span className="max-sm:hidden">{h.name} · </span>}
-              Escalón {cur + 1} de {steps.length}
-              {prog.ready || goalMet ? " · logrado" : ` · esta semana ${ofDays(prog.thisWeek.done, prog.thisWeek.need)}`}
-            </span>
+            <span className="line-clamp-2 text-[16px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
+            <span className="lad-sub">{sub}</span>
           </span>
         </button>
         <CheckButton state={state} disabled={day > today} onTap={() => tapHabit(h, log, day, mark, onOpenDay)} />
@@ -368,55 +381,36 @@ function LadderItem({
 
       {goalMet ? (
         <div className="lad-ready">
-          <p className="lad-kicker">Llegaste a la meta · {weeksText(prog.streak)}</p>
-          <p className="text-[14px] leading-snug text-fg">
-            {ladder.goal ? <>“{ladder.goal}” ya es parte de tus días.</> : "Ya es parte de tus días."} Puede pasar a tus hábitos de
-            siempre.
-          </p>
+          <p className="lad-kicker">Llegaste a la meta</p>
+          <LadderBars labels={labels} current={cur} />
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="accent" onClick={() => actions.end(h)}>
               Pasar a mis hábitos
             </Button>
-            <Button size="sm" variant="outline" onClick={onPath}>
-              Ver el camino
-            </Button>
           </div>
         </div>
-      ) : prog.ready && !isLast && next ? (
+      ) : prog.ready ? (
         <div className="lad-ready">
-          <p className="lad-kicker">
-            Escalón {cur + 1} logrado · {weeksText(prog.streak)}
-          </p>
-          <div className="flex items-end gap-3">
-            <Stairs total={steps.length} current={cur} nextDashed className="h-9" />
-            <p className="grid min-w-0 gap-0.5 text-[14px] leading-snug text-fg">
-              <span>
-                ¿Subís al escalón {cur + 2}? <b className="font-medium">{next.title}</b>
-              </span>
-              <span className="text-[12.5px] text-muted">{stepRuleText(next, h, cur + 1 === steps.length - 1)}</span>
-            </p>
-          </div>
+          <p className="lad-kicker">{weeksDone(prog.streak)}</p>
+          <LadderBars labels={labels} current={cur} />
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="accent" onClick={() => actions.advance(h)}>
-              Subir
+              {upText(ladder, cur)}
             </Button>
             <Button size="sm" variant="outline" onClick={() => actions.stay(h)}>
-              Una semana más
+              Todavía no
             </Button>
           </div>
         </div>
       ) : (
-        <div className="grid gap-1 px-3.5 pb-2.5 lg:px-4">
+        <div className="grid gap-2 px-3.5 pb-2 lg:px-4">
+          <LadderBars labels={labels} current={cur} />
           <div className="flex items-center justify-between gap-3">
-            <WeekDots days={prog.thisWeek.days} today={today} done={prog.thisWeek.done} need={prog.thisWeek.need} />
-            <span className="flex items-center gap-2.5">
-              <Stairs total={steps.length} current={cur} className="h-6 max-[380px]:hidden" />
-              <button type="button" onClick={onPath} className="lad-link">
-                Ver el camino <CaretRight size={12} weight="bold" aria-hidden />
-              </button>
-            </span>
+            <p className="min-w-0 text-[12.5px] leading-snug text-muted">{weekLine(prog, ladder)}</p>
+            <button type="button" onClick={onPath} className="lad-link shrink-0">
+              Ver el camino <CaretRight size={12} weight="bold" aria-hidden />
+            </button>
           </div>
-          <p className="text-[12.5px] leading-snug text-muted">{weekLine(prog)}</p>
         </div>
       )}
 
@@ -424,7 +418,7 @@ function LadderItem({
         <div className="lad-struggle">
           {confirmBack ? (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>¿Volver a “{steps[cur - 1]?.title}”? No se pierde lo hecho.</span>
+              <span>¿{backText(ladder, cur)}? No se pierde lo hecho.</span>
               <button
                 type="button"
                 className="lad-link"
@@ -441,9 +435,9 @@ function LadderItem({
             </span>
           ) : (
             <span className="flex flex-wrap items-center gap-x-2">
-              <span>Este escalón está costando ·</span>
+              <span>Este paso está costando ·</span>
               <button type="button" className="lad-link" onClick={() => setConfirmBack(true)}>
-                Volver al anterior
+                {backText(ladder, cur)}
               </button>
             </span>
           )}
@@ -527,12 +521,15 @@ function LadderPath({
   const prog = stepProgress(ladder, isDoneDay, today, opts);
   const allWeeks = ladderWeeks(ladder, isDoneDay, today, opts);
   const nt = neverTwiceOf(h, logs, today);
-  const goalMet = prog.atGoal && prog.streak >= prog.weeksNeeded;
+  const goalMet = reachedGoal(prog);
+  const plan = ladderPlan(ladder);
+  const labels = stepLabels(ladder);
   const since = ladder.history?.[0]?.from ?? ladder.stepStart;
   const ago = Math.max(0, diffDays(today, since));
   const doneDays = useMemo(() => Object.keys(logs).filter((d) => d >= since && d <= today && isDone(h, logs[d])).length, [logs, since, today, h]);
   const [editing, setEditing] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const goal = plan ? stepTitle(plan.to) : ladder.goal;
 
   return (
     <div className="grid gap-5" data-tone="habitos">
@@ -541,7 +538,7 @@ function LadderPath({
         <div className="grid min-w-0 gap-0.5">
           <p className="truncate text-[17px] font-semibold tracking-[-0.01em]">{h.name}</p>
           <p className="text-[13px] leading-snug text-muted">
-            {ladder.goal ? `Meta: ${ladder.goal}` : "Sin meta escrita"} ·{" "}
+            {goal ? `Meta: ${goal}` : "Sin meta escrita"} ·{" "}
             {ago === 0
               ? "empezaste hoy"
               : ago === 1
@@ -553,119 +550,147 @@ function LadderPath({
         </div>
       </div>
 
+      <div className="grid gap-2">
+        <LadderBars labels={labels} current={cur} />
+        <p className="text-[13px] leading-snug text-muted">
+          {goalMet ? "Llegaste a la meta" : prog.ready ? weeksDone(prog.streak) : weekLine(prog, ladder)}
+        </p>
+      </div>
 
-      {editing ? (
-        <StepsEditor
-          initial={steps}
-          habit={h}
-          onCancel={() => setEditing(false)}
-          onSave={(next) => {
-            actions.saveSteps(h, next);
-            setEditing(false);
+      {prog.ready && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="accent" onClick={() => actions.advance(h)}>
+            {upText(ladder, cur)}
+          </Button>
+          <Button variant="outline" onClick={() => actions.stay(h)}>
+            Todavía no
+          </Button>
+        </div>
+      )}
+      {goalMet && (
+        <Button
+          variant="accent"
+          onClick={() => {
+            actions.end(h);
+            onClose();
           }}
-        />
-      ) : (
-        <>
-          <ol className="lad-path" aria-label="Escalones">
-            {steps.map((s, i) => {
-              const past = i < cur;
-              const now = i === cur;
-              const isLast = i === steps.length - 1;
+        >
+          Pasar a mis hábitos
+        </Button>
+      )}
+
+      {cur > 0 && (
+        <div className="grid gap-1.5">
+          <p className="lad-kicker">Ya lograste</p>
+          <ul className="grid gap-1 text-[14px] leading-snug">
+            {steps.slice(0, cur).map((s, i) => {
               const hist = ladder.history?.filter((x) => x.step === i).at(-1);
               return (
-                <li key={i} className="lad-path-step" data-state={past ? "past" : now ? "now" : "next"}>
-                  <span className="lad-path-dot" aria-hidden>
-                    {past ? <Check size={13} weight="bold" /> : i + 1}
-                  </span>
-                  <div className="grid min-w-0 gap-1 pb-4">
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] leading-snug font-medium">
-                      <span className="min-w-0">{s.title}</span>
-                      {now && <span className="lad-chip">estás acá</span>}
-                    </p>
-                    <p className="text-[13px] leading-snug text-muted">
-                      {past ? (hist ? `Logrado en ${plural(spanWeeks(hist.from, hist.to), "semana", "semanas")}` : "Logrado") : stepRuleText(s, h, isLast)}
-                    </p>
-                    {now && (
-                      <div className="grid gap-1.5 pt-0.5">
-                        <p className="text-[13px] leading-snug text-fg">
-                          {prog.ready || goalMet
-                            ? `Logrado · ${weeksText(prog.streak)}`
-                            : `Semana ${weekNumber(prog)} de ${prog.weeksNeeded}${isLast ? " en la meta" : ""} · esta semana ${ofDays(prog.thisWeek.done, prog.thisWeek.need)}`}
-                        </p>
-                        <WeekDots days={prog.thisWeek.days} today={today} done={prog.thisWeek.done} need={prog.thisWeek.need} />
-                      </div>
-                    )}
-                  </div>
+                <li key={i}>
+                  {plan ? stepTitle(s.perWeek as number) : s.title}
+                  <span className="text-muted"> · logrado{hist ? ` en ${plural(spanWeeks(hist.from, hist.to), "semana", "semanas")}` : ""}</span>
                 </li>
               );
             })}
-          </ol>
+          </ul>
+        </div>
+      )}
 
-          {allWeeks.length > 1 && <WeekChart weeks={allWeeks} />}
+      {allWeeks.length > 1 && <WeekChart weeks={allWeeks} labels={labels} />}
 
-          <div className="grid grid-cols-3 gap-2">
-            <PathFig value={nt.daysWithoutTwo} label="sin fallar dos seguidos" />
-            <PathFig value={nt.recoveries} label={nt.recoveries === 1 ? "vez que volviste" : "veces que volviste"} />
-            <PathFig value={doneDays} label={doneDays === 1 ? "día hecho" : "días hechos"} />
-          </div>
+      <div className="grid grid-cols-3 gap-2">
+        <PathFig value={nt.daysWithoutTwo} label="sin fallar dos seguidos" />
+        <PathFig value={nt.recoveries} label={nt.recoveries === 1 ? "vez que volviste" : "veces que volviste"} />
+        <PathFig value={doneDays} label={doneDays === 1 ? "día hecho" : "días hechos"} />
+      </div>
 
-          {prog.ready && cur < steps.length - 1 && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="accent" onClick={() => actions.advance(h)}>
-                Subir al escalón {cur + 2}
-              </Button>
-              <Button variant="outline" onClick={() => actions.stay(h)}>
-                Una semana más
-              </Button>
-            </div>
+      {plan && editing && (
+        <PlanEditor
+          min={prog.perWeek}
+          to={plan.to}
+          weeks={plan.weeks}
+          onCancel={() => setEditing(false)}
+          onSave={(to, weeks) => {
+            actions.saveSteps(h, replanSteps(ladder, to, weeks));
+            setEditing(false);
+          }}
+        />
+      )}
+
+      {((plan && !editing) || cur > 0) && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {plan && !editing && (
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              Cambiar el plan
+            </Button>
           )}
-          {goalMet && (
-            <Button
-              variant="accent"
+          {cur > 0 && (
+            <Button variant="outline" onClick={() => actions.back(h)}>
+              {backText(ladder, cur)}
+            </Button>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-center">
+        {confirmEnd ? (
+          <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-muted">
+            <span>Pasa a tus hábitos como está ahora.</span>
+            <button
+              type="button"
+              className="lad-link"
               onClick={() => {
                 actions.end(h);
                 onClose();
               }}
             >
-              Pasar a mis hábitos
-            </Button>
-          )}
+              Sí, dejar de construirlo
+            </button>
+            <button type="button" className="lad-link" onClick={() => setConfirmEnd(false)}>
+              No
+            </button>
+          </span>
+        ) : (
+          <button type="button" className="min-h-11 text-[13px] text-muted underline-offset-2 hover:underline" onClick={() => setConfirmEnd(true)}>
+            Dejar de construirlo
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button variant="outline" onClick={() => setEditing(true)}>
-              Editar escalones
-            </Button>
-            <Button variant="outline" disabled={cur === 0} onClick={() => actions.back(h)}>
-              Volver al escalón anterior
-            </Button>
-          </div>
-
-          <div className="flex justify-center">
-            {confirmEnd ? (
-              <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-muted">
-                <span>Pasa a tus hábitos como está ahora.</span>
-                <button
-                  type="button"
-                  className="lad-link"
-                  onClick={() => {
-                    actions.end(h);
-                    onClose();
-                  }}
-                >
-                  Sí, dejar de construirlo
-                </button>
-                <button type="button" className="lad-link" onClick={() => setConfirmEnd(false)}>
-                  No
-                </button>
-              </span>
-            ) : (
-              <button type="button" className="min-h-11 text-[13px] text-muted underline-offset-2 hover:underline" onClick={() => setConfirmEnd(true)}>
-                Dejar de construirlo
-              </button>
-            )}
-          </div>
-        </>
-      )}
+/** "Cambiar el plan": hasta dónde llegar (nunca menos que el paso actual) y cada cuántas semanas subir. */
+function PlanEditor({
+  min,
+  to: initialTo,
+  weeks: initialWeeks,
+  onSave,
+  onCancel,
+}: {
+  min: number;
+  to: number;
+  weeks: number;
+  onSave: (to: number, weeks: number) => void;
+  onCancel: () => void;
+}) {
+  const [to, setTo] = useState(initialTo);
+  const [weeks, setWeeks] = useState(initialWeeks);
+  return (
+    <div className="lad-propose reveal">
+      <p className="lad-kicker">Cambiar el plan</p>
+      <div className="grid divide-y divide-line">
+        <PlanStepper label="Querés llegar a" unit={to === 1 ? "día por semana" : "días por semana"} value={to} min={min} max={7} onChange={setTo} />
+        <PlanStepper label="Subís después de" unit={weeksUnit(weeks)} value={weeks} min={1} max={LADDER_WEEKS_MAX} onChange={setWeeks} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="accent" onClick={() => onSave(to, weeks)}>
+          Guardar
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCancel}>
+          Cancelar
+        </Button>
+      </div>
     </div>
   );
 }
@@ -686,10 +711,10 @@ const dm = (iso: string) => `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 7
 
 /**
  * Una barra por semana con los días hechos (de 0 a 7) y una raya con lo que pedía el
- * escalón de esa semana. Verde lleno si se cumplió, suave si no, la en curso punteada.
- * Donde cambia el escalón, una línea y "E2". Las últimas 12 semanas.
+ * paso de esa semana. Verde lleno si se cumplió, suave si no, la en curso punteada.
+ * Donde cambia el paso, una línea y sus días. Las últimas 12 semanas.
  */
-function WeekChart({ weeks }: { weeks: (LadderWeek & { step: number })[] }) {
+function WeekChart({ weeks, labels }: { weeks: (LadderWeek & { step: number })[]; labels: number[] }) {
   const shown = weeks.slice(-CHART_WEEKS);
   const offset = weeks.length - shown.length;
   const n = shown.length;
@@ -713,7 +738,7 @@ function WeekChart({ weeks }: { weeks: (LadderWeek & { step: number })[] }) {
               key={w.start}
               className="lad-chart-col"
               data-change={change || undefined}
-              title={`Semana del ${formatShort(w.start)}: ${ofDays(w.done, w.need)} · escalón ${w.step + 1}`}
+              title={`Semana del ${formatShort(w.start)}: ${ofDays(w.done, w.need)} · paso ${w.step + 1}`}
             >
               <span
                 className="lad-chart-bar"
@@ -722,7 +747,7 @@ function WeekChart({ weeks }: { weeks: (LadderWeek & { step: number })[] }) {
                 style={{ height: `${(Math.min(7, w.done) / 7) * 100}%` }}
               />
               <span className="lad-chart-need" style={{ bottom: `${(Math.min(7, w.need) / 7) * 100}%` }} />
-              {change && <span className="lad-chart-step">E{w.step + 1}</span>}
+              {change && <span className="lad-chart-step">{labels[w.step]}</span>}
             </div>
           );
         })}
@@ -734,7 +759,7 @@ function WeekChart({ weeks }: { weeks: (LadderWeek & { step: number })[] }) {
           </span>
         ))}
       </div>
-      <p className="text-[12px] leading-snug text-muted">La barra son los días hechos; la raya, lo que pedía el escalón esa semana.</p>
+      <p className="text-[12px] leading-snug text-muted">La barra son los días hechos; la raya, lo que pedía el paso esa semana.</p>
       <details className="text-[13px]">
         <summary className="min-h-11 cursor-pointer content-center text-muted">Ver como tabla</summary>
         <table className="w-full text-left tabular">
@@ -743,7 +768,7 @@ function WeekChart({ weeks }: { weeks: (LadderWeek & { step: number })[] }) {
               <th className="py-1 font-medium">Semana</th>
               <th className="py-1 font-medium">Días hechos</th>
               <th className="py-1 font-medium">Pedía</th>
-              <th className="py-1 font-medium">Escalón</th>
+              <th className="py-1 font-medium">Paso</th>
             </tr>
           </thead>
           <tbody>
@@ -765,217 +790,105 @@ function WeekChart({ weeks }: { weeks: (LadderWeek & { step: number })[] }) {
   );
 }
 
-// ─── Editor de escalones ────────────────────────────────────────────────────
-
-/** Lo que el editor necesita del hábito: cuántos días pide hoy y si es de cantidad. */
-export type StepsHabit = { frequency: string; weekdays?: number[]; timesPerWeek?: number | null; target: number; unit?: string | null };
-
-const isQuantity = (h: StepsHabit) => h.target > 1 || !!h.unit;
-const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
-
-/**
- * Lista de escalones para cambiar: título, días por semana, semanas seguidas para
- * subir (el último es la meta), la meta numérica en hábitos de cantidad, y
- * subir/bajar/quitar. Controlado (`steps` + `onChange`): lo usan el alta y "El camino".
- */
-export function StepsList({ steps, onChange, habit }: { steps: LadderStep[]; onChange: (s: LadderStep[]) => void; habit: StepsHabit }) {
-  const set = (i: number, patch: Partial<LadderStep>) => onChange(steps.map((s, j) => (j === i ? { ...s, ...patch } : s)));
-  const move = (i: number, d: -1 | 1) => {
-    const j = i + d;
-    if (j < 0 || j >= steps.length) return;
-    const next = [...steps];
-    [next[i], next[j]] = [next[j], next[i]];
-    onChange(next);
-  };
-  const qty = isQuantity(habit);
-  const base = habitPerWeek(habit);
-  const selectClass = cx(inputClass, "h-9! w-auto! px-2! pr-1!");
-  return (
-    <div className="grid gap-2">
-      <ol className="grid gap-2">
-        {steps.map((s, i) => {
-          const isLast = i === steps.length - 1;
-          return (
-            <li key={i} className="grid gap-2 rounded-[14px] border border-line bg-surface p-2.5">
-              <div className="flex items-center gap-2">
-                <span className="lad-step-n" aria-hidden>
-                  {i + 1}
-                </span>
-                <input
-                  value={s.title}
-                  onChange={(e) => set(i, { title: e.target.value })}
-                  aria-label={`Escalón ${i + 1}: qué hacer`}
-                  placeholder="Qué hacer en este escalón"
-                  maxLength={80}
-                  lang="es"
-                  spellCheck
-                  className={cx(inputClass, "h-10! min-w-0 flex-1")}
-                />
-              </div>
-              <div className="flex flex-wrap items-end gap-x-3 gap-y-2 pl-9 text-[13px] text-muted">
-                <label className="grid gap-1">
-                  <span>Días por semana</span>
-                  <select
-                    value={s.perWeek ?? ""}
-                    onChange={(e) => set(i, { perWeek: e.target.value ? Number(e.target.value) : null })}
-                    className={selectClass}
-                  >
-                    <option value="">Como el hábito ({base >= 7 ? "todos" : base})</option>
-                    {DAY_OPTIONS.map((n) => (
-                      <option key={n} value={n}>
-                        {n === 7 ? "Todos los días" : n}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {qty && (
-                  <label className="grid gap-1">
-                    <span>Meta{habit.unit ? ` (${habit.unit})` : ""}</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      value={s.target ?? ""}
-                      placeholder={String(habit.target)}
-                      onChange={(e) => {
-                        const v = Math.round(Number(e.target.value));
-                        set(i, { target: e.target.value && v >= 1 ? v : null });
-                      }}
-                      className={cx(inputClass, "tabular h-9! w-20! px-2! text-center")}
-                    />
-                  </label>
-                )}
-                {isLast ? (
-                  <span className="pb-2 font-medium text-[var(--lad-fg)]">La meta</span>
-                ) : (
-                  <label className="grid gap-1">
-                    <span>Semanas seguidas para subir</span>
-                    <select value={s.weeks} onChange={(e) => set(i, { weeks: Number(e.target.value) })} className={selectClass}>
-                      {Array.from({ length: LADDER_WEEKS_MAX }, (_, k) => k + 1).map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                <span className="ml-auto flex items-center">
-                  <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Subir el escalón ${i + 1}`} className="lad-icon-btn">
-                    <ArrowUp size={16} />
-                  </button>
-                  <button type="button" onClick={() => move(i, 1)} disabled={isLast} aria-label={`Bajar el escalón ${i + 1}`} className="lad-icon-btn">
-                    <ArrowDown size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onChange(steps.filter((_, j) => j !== i))}
-                    disabled={steps.length <= 1}
-                    aria-label={`Quitar el escalón ${i + 1}`}
-                    className="lad-icon-btn"
-                  >
-                    <X size={16} />
-                  </button>
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      <button
-        type="button"
-        onClick={() => {
-          const last = steps.at(-1);
-          onChange([...steps, { title: "", perWeek: last?.perWeek ?? null, weeks: LADDER_DEFAULT_WEEKS, target: last?.target ?? null }]);
-        }}
-        disabled={steps.length >= LADDER_MAX_STEPS}
-        className="lad-add"
-      >
-        <Plus size={14} weight="bold" aria-hidden /> Agregar escalón
-      </button>
-    </div>
-  );
-}
-
-/** Escalones con título: los vacíos no se guardan. */
-export function cleanSteps(steps: LadderStep[]) {
-  return steps.map((s) => ({ ...s, title: s.title.trim() })).filter((s) => s.title);
-}
-
-function StepsEditor({
-  initial,
-  habit,
-  onSave,
-  onCancel,
-}: {
-  initial: LadderStep[];
-  habit: StepsHabit;
-  onSave: (s: LadderStep[]) => void;
-  onCancel: () => void;
-}) {
-  const [steps, setSteps] = useState(initial);
-  const clean = cleanSteps(steps);
-  return (
-    <div className="grid gap-3">
-      <StepsList steps={steps} onChange={setSteps} habit={habit} />
-      <div className="flex flex-wrap gap-2">
-        <Button variant="accent" disabled={!clean.length} onClick={() => onSave(clean)}>
-          Guardar escalones
-        </Button>
-        <Button variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Empezar a construir un hábito ──────────────────────────────────────────
 
-/** Meta + escalones propuestos (editables) + "Nunca dos seguidos": alta y editar. */
+const weeksUnit = (n: number) => (n === 1 ? "semana cumplida" : "semanas seguidas cumplidas");
+
+/** Un número con − y +: los selectores del plan. */
+function PlanStepper({
+  label,
+  unit,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex items-center justify-between gap-3 py-1.5">
+      <span className="grid min-w-0 gap-0.5">
+        <span className="text-[15px] font-medium">{label}</span>
+        <span className="text-[12.5px] leading-snug text-muted">{unit}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          aria-label={`${label}: menos`}
+          disabled={value <= min}
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="lad-icon-btn border border-line-strong"
+        >
+          <Minus size={15} aria-hidden />
+        </button>
+        <span aria-live="polite" className="figure w-8 text-center text-[22px] font-[750]">
+          {value}
+        </span>
+        <button
+          type="button"
+          aria-label={`${label}: más`}
+          disabled={value >= max}
+          onClick={() => onChange(Math.min(max, value + 1))}
+          className="lad-icon-btn border border-line-strong"
+        >
+          <Plus size={15} aria-hidden />
+        </button>
+      </span>
+    </div>
+  );
+}
+
+/** De cuántos días por semana a cuántos, cada cuántas semanas se sube, y "Nunca dos seguidos": alta y editar. */
 export function LadderPlanner({
-  goal,
-  onGoal,
-  steps,
-  onSteps,
-  habit,
+  name,
+  from,
+  to,
+  weeks,
+  onFrom,
+  onTo,
+  onWeeks,
   neverTwice,
   onNeverTwice,
 }: {
-  goal: string;
-  onGoal: (v: string) => void;
-  steps: LadderStep[];
-  onSteps: (s: LadderStep[]) => void;
-  habit: StepsHabit;
+  name: string;
+  from: number;
+  to: number;
+  weeks: number;
+  onFrom: (v: number) => void;
+  onTo: (v: number) => void;
+  onWeeks: (v: number) => void;
   neverTwice: boolean;
   onNeverTwice: (v: boolean) => void;
 }) {
+  const total = (to - from) * weeks;
+  const labels = Array.from({ length: to - from + 1 }, (_, i) => from + i);
   return (
-    <div className="grid gap-4" data-tone="habitos">
-      <label className="grid gap-1.5">
-        <span className="kicker">Tu meta</span>
-        <input
-          value={goal}
-          onChange={(e) => onGoal(e.target.value)}
-          placeholder="Dormir sin el celular, correr 5 km..."
-          maxLength={LADDER_GOAL_MAX}
-          required
-          lang="es"
-          spellCheck
-          className={inputClass}
-        />
-      </label>
-      <div className="lad-propose">
-        <p className="lad-kicker">La app te propone</p>
-        <p className="text-[13px] leading-snug text-muted">
-          Cambiá lo que quieras. Subís de escalón cuando lo cumplís las semanas seguidas que pide. Mientras estés en un escalón, el
-          hábito te pide lo de ese escalón: sus días por semana{isQuantity(habit) ? " y su meta" : ""}.
-        </p>
-        <StepsList steps={steps} onChange={onSteps} habit={habit} />
-      </div>
-      <label className="flex min-h-11 items-center gap-2.5 text-[14px]">
-        <input type="checkbox" checked={neverTwice} onChange={(e) => onNeverTwice(e.target.checked)} className="size-4 accent-[var(--accent)]" />
-        Nunca dos seguidos: avisarme el día después de fallar
-      </label>
+    <div data-tone="habitos">
+      <TintedCard as="div" tone="habitos" icon={Stairs} title="Construir de a poco" meta={name.trim() || undefined}>
+        <div className="grid gap-3">
+          <div className="grid divide-y divide-line">
+            <PlanStepper label="Empezás con" unit={from === 1 ? "día por semana" : "días por semana"} value={from} min={1} max={to - 1} onChange={onFrom} />
+            <PlanStepper label="Querés llegar a" unit="días por semana" value={to} min={from + 1} max={7} onChange={onTo} />
+            <PlanStepper label="Subís después de" unit={weeksUnit(weeks)} value={weeks} min={1} max={LADDER_WEEKS_MAX} onChange={onWeeks} />
+          </div>
+          <div className="lad-propose">
+            <p className="lad-kicker">Tu camino</p>
+            <LadderBars labels={labels} current={0} />
+            <p className="text-[12.5px] leading-snug text-muted">
+              Si cumplís todas las semanas, llegás en {total === 1 ? "1 semana" : `unas ${total} semanas`}.
+            </p>
+          </div>
+          <label className="flex min-h-11 items-center gap-2.5 text-[14px]">
+            <input type="checkbox" checked={neverTwice} onChange={(e) => onNeverTwice(e.target.checked)} className="size-4 accent-[var(--accent)]" />
+            Nunca dos seguidos: avisarme el día después de fallar
+          </label>
+        </div>
+      </TintedCard>
     </div>
   );
 }
@@ -1004,18 +917,14 @@ export function LadderSettings({
     <div className="grid gap-4" data-tone="habitos">
       {ladder ? (
         <div className="grid gap-3">
-          <div className="flex items-center gap-3">
-            <Stairs total={ladder.steps.length} current={cur} className="h-8" />
-            <p className="min-w-0 text-[14px] leading-snug">
-              <span className="lad-kicker block">
-                Escalón {cur + 1} de {ladder.steps.length}
-              </span>
-              {ladder.steps[cur]?.title}
-              {ladder.steps[cur] && (
-                <span className="block text-[12.5px] text-muted">{stepRuleText(ladder.steps[cur], h, cur === ladder.steps.length - 1)}</span>
-              )}
-            </p>
-          </div>
+          <p className="grid gap-0.5 text-[14px] leading-snug">
+            <span className="lad-kicker">
+              Paso {cur + 1} de {ladder.steps.length}
+            </span>
+            {!ladderPlan(ladder) && <span>{ladder.steps[cur]?.title}</span>}
+            {ladder.steps[cur] && <span className="text-[13px] text-muted">{stepRuleText(ladder.steps[cur], h, cur === ladder.steps.length - 1)}</span>}
+          </p>
+          <LadderBars labels={stepLabels(ladder)} current={cur} />
           <Button variant="outline" onClick={() => path.current?.show(h.id)}>
             Ver el camino <CaretRight size={14} aria-hidden />
           </Button>
@@ -1047,7 +956,7 @@ export function LadderSettings({
         </div>
       ) : (
         <p className="text-[14px] leading-relaxed text-muted">
-          Para armarlo por escalones, elegí &quot;Construir de a poco&quot; en Editar.
+          Para armarlo paso a paso, elegí &quot;Construir de a poco&quot; en Editar.
         </p>
       )}
 

@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { fromDbDate, toDbDate } from "./dates";
-import { emptyCheckin, type CheckinDTO, type WatchDay } from "./checkin-logic";
+import { emptyCheckin, nightMoodOf, type CheckinDTO, type NightMood, type WatchDay } from "./checkin-logic";
+import { QUARTER_REVIEW_TAG, REVIEW_TAG } from "./review-logic";
 
 type Row = Awaited<ReturnType<typeof prisma.dailyCheckin.findMany>>[number];
 
@@ -37,6 +38,16 @@ export function toWatchDay(r: Row): WatchDay | null {
 export async function getCheckinDay(date: string): Promise<{ checkin: CheckinDTO; watch: WatchDay | null }> {
   const r = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(date) } });
   return r ? { checkin: toCheckinDTO(r), watch: toWatchDay(r) } : { checkin: emptyCheckin(date), watch: null };
+}
+
+/** El ánimo que quedó en el journal ese día. Las reflexiones de semana y trimestre no son la entrada del día. */
+export async function getNightMood(date: string): Promise<NightMood> {
+  const entries = await prisma.journalEntry.findMany({
+    where: { date: toDbDate(date), NOT: { tags: { hasSome: [REVIEW_TAG, QUARTER_REVIEW_TAG] } } },
+    select: { id: true, mood: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return nightMoodOf(entries);
 }
 
 /** Último peso cargado (para sugerirlo). */

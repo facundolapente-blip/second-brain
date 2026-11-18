@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { addDays, diffDays, fromDbDate, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
 import { dayProgress } from "./habit-logic";
-import { daysText, habitNeverTwice, ladderDoneFn, stepPerWeek, stepProgress } from "./habit-ladder";
+import { habitNeverTwice, ladderDoneFn, stepLong, stepProgress } from "./habit-ladder";
 import { getCardSummaries } from "./finance";
 import { moneyWhole } from "./format";
 import { isFreeBlock, sortBlocks } from "./plan-logic";
@@ -51,8 +51,7 @@ export async function buildReminder(kind: ReminderKind, today = todayISO(), opts
         if (!l || h.archived) return [];
         const p = stepProgress(l, ladderDoneFn(h, logs[h.id] ?? {}), today, h);
         if (!p.ready) return [];
-        const next = l.steps[p.step + 1];
-        return next ? [{ h, id: `escalon-${h.id}-${p.step}-${l.stepStart}`, weeks: p.streak, next: next.title, rule: daysText(stepPerWeek(next, h)) }] : [];
+        return l.steps[p.step + 1] ? [{ h, id: `escalon-${h.id}-${p.step}-${l.stepStart}`, weeks: p.streak, next: stepLong(l, p.step + 1) }] : [];
       });
       if (!ready.length) return null;
       const seen = new Set((await prisma.actionReceipt.findMany({ where: { id: { in: ready.map((r) => r.id) } }, select: { id: true } })).map((r) => r.id));
@@ -60,7 +59,7 @@ export async function buildReminder(kind: ReminderKind, today = todayISO(), opts
       if (opts.commit && fresh.length) {
         await prisma.actionReceipt.createMany({ data: fresh.map((r) => ({ id: r.id, name: "aviso.escalon" })), skipDuplicates: true });
       }
-      return ladderMessage(fresh.map((r) => ({ name: r.h.name, weeks: r.weeks, next: r.next, rule: r.rule })));
+      return ladderMessage(fresh.map((r) => ({ name: r.h.name, weeks: r.weeks, next: r.next })));
     }
     case "habitos": {
       // La misma cuenta que Hoy e Inicio (`dayProgress`, con `showsOn` y sin salteados).

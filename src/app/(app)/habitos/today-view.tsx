@@ -15,7 +15,7 @@ import { HabitForm, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
 import { TodayFacts, TodayPanel, todayStats } from "./today-panel";
 import { TintedCard } from "@/components/tinted-card";
-import { LadderBox, useLadders } from "./ladder";
+import { ladderAsks, LadderBox, useLadders } from "./ladder";
 import { useSwipe } from "@/components/swipe";
 
 const PAST = 30;
@@ -54,8 +54,10 @@ export function TodayView({
   const sticky = useStickyDay(selected, sorted.filter((h) => showsOn(h, logs[h.id] ?? {}, selected)).map((h) => h.id));
   const visible = sorted.filter((h) => sticky.has(h.id));
   // Los que se están construyendo de a poco van en su recuadro, arriba de la lista común.
-  const building = visible.filter((h) => h.ladder);
-  const common = building.length ? visible.filter((h) => !h.ladder) : visible;
+  // Mirando hoy, también los que esperan una respuesta ("¿subís?") aunque hoy no toquen:
+  // un semanal con la semana cumplida no aparece, y el pedido quedaría escondido.
+  const building = sorted.filter((h) => h.ladder && (sticky.has(h.id) || (selected === today && ladderAsks(h, logs[h.id] ?? {}, today))));
+  const common = visible.filter((h) => !h.ladder);
   // Otro día en la tira: la lista entra desde ese lado (al cargar, nada).
   const daySlide = useSlide(selected);
   // Un día con menos hábitos no achica la página (ver useKeepHeight).

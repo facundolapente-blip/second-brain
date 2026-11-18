@@ -9,8 +9,8 @@ import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { suggestSteps, type LadderStep } from "@/lib/habit-ladder";
-import { cleanSteps, LadderPlanner } from "./ladder";
+import { daysText, LADDER_DEFAULT_WEEKS, planSteps, planTarget, stepTitle } from "@/lib/habit-ladder";
+import { LadderPlanner } from "./ladder";
 
 /** `hasHistory`: si el hábito ya tiene marcas (cambiar la meta ofrece empezar una pista nueva). */
 export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO, hasHistory?: boolean) => void };
@@ -141,26 +141,18 @@ export function HabitFormBody({
   }, [state]);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
-  // Alta "de a poco": la meta y los escalones que propone la app (se rehacen al cambiar
-  // la meta o cómo se mide, hasta que se toquen a mano).
+  // "De a poco": de cuántos días por semana a cuántos. Hasta que se toque, se llega a lo
+  // que pide el hábito (sigue a la frecuencia de arriba).
   const isNew = !draft.id;
   const [mode, setMode] = useState<"full" | "ladder">("full");
-  const [goal, setGoal] = useState("");
-  const [edited, setEdited] = useState<LadderStep[] | null>(null);
+  const [pickedFrom, setFrom] = useState(1);
+  const [pickedTo, setTo] = useState<number | null>(null);
+  const [planWeeks, setPlanWeeks] = useState(LADDER_DEFAULT_WEEKS);
   const [neverTwice, setNeverTwice] = useState(true);
-  const steps =
-    edited ??
-    suggestSteps(goal, {
-      frequency: draft.frequency,
-      target: effectiveTarget(draft),
-      unit: draft.kind === "count" ? draft.unit || null : null,
-      isQuit: draft.isQuit,
-      timesPerWeek: draft.timesPerWeek,
-      weekdays: draft.weekdays,
-    });
+  const planTo = pickedTo ?? planTarget(draft);
+  const planFrom = Math.min(pickedFrom, planTo - 1);
   const canLadder = isNew || !draft.inLadder;
   const ladderMode = canLadder && mode === "ladder";
-  const readySteps = cleanSteps(steps);
   // Cambiar cuándo toca o la meta reescribiría cómo se leen los días ya marcados
   // (un "hecho" pasaría a "a medias"): antes de guardar se elige desde cuándo vale.
   const askTrack = !!draft.id && hasHistory && initial.startDate < today && rulesDiffer(initial, draft);
@@ -168,7 +160,7 @@ export function HabitFormBody({
   return (
     <form action={action} className="grid gap-5">
       {draft.id && <input type="hidden" name="id" value={draft.id} />}
-      {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: goal.trim(), steps: readySteps })} />}
+      {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: stepTitle(planTo), steps: planSteps(planFrom, planTo, planWeeks) })} />}
       {(isNew || ladderMode) && <input type="hidden" name="neverTwice" value={ladderMode && neverTwice ? "1" : "0"} />}
 
       <Field label="Nombre">
@@ -372,17 +364,13 @@ export function HabitFormBody({
           {ladderMode && (
             <div className="reveal pt-1">
               <LadderPlanner
-                goal={goal}
-                onGoal={setGoal}
-                steps={steps}
-                onSteps={setEdited}
-                habit={{
-                  frequency: draft.frequency,
-                  weekdays: draft.weekdays,
-                  timesPerWeek: draft.timesPerWeek,
-                  target: effectiveTarget(draft),
-                  unit: draft.kind === "count" ? draft.unit || null : null,
-                }}
+                name={draft.name}
+                from={planFrom}
+                to={planTo}
+                weeks={planWeeks}
+                onFrom={setFrom}
+                onTo={setTo}
+                onWeeks={setPlanWeeks}
                 neverTwice={neverTwice}
                 onNeverTwice={setNeverTwice}
               />
@@ -413,8 +401,8 @@ export function HabitFormBody({
           </Button>
         </div>
       ) : (
-        <Button type="submit" variant="accent" disabled={pending || (ladderMode && (!goal.trim() || !readySteps.length))} className="w-full">
-          {pending ? "Guardando..." : ladderMode ? (draft.id ? "Guardar y empezar escalón 1" : "Empezar escalón 1") : draft.id ? "Guardar cambios" : "Crear hábito"}
+        <Button type="submit" variant="accent" disabled={pending} className="w-full">
+          {pending ? "Guardando..." : ladderMode ? `${draft.id ? "Guardar y empezar" : "Empezar"} con ${daysText(planFrom)}` : draft.id ? "Guardar cambios" : "Crear hábito"}
         </Button>
       )}
     </form>

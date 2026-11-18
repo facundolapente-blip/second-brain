@@ -771,7 +771,7 @@ function StreakChallenge({ habit, best }: { habit: HabitDTO; best: number }) {
 
 // ─── Editar ─────────────────────────────────────────────────────────────────
 
-/** De a poco: escalones y "Nunca dos seguidos" (con los cambios al instante, ver ladder.tsx). */
+/** De a poco: los pasos y "Nunca dos seguidos" (con los cambios al instante, ver ladder.tsx). */
 function LadderPanel({ habit, logs, today }: { habit: HabitDTO; logs: Record<string, LogMap>; today: string }) {
   const list = useMemo(() => [habit], [habit]);
   const { habits, actions } = useLadders(list, today);

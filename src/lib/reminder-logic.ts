@@ -23,7 +23,7 @@ export const REMINDER_INFO: Record<ReminderKind, { label: string; hint: string }
   tarjetas: { label: "Tarjeta por vencer", hint: "El resumen sin pagar: 5, 3 y 1 día antes, el día que vence y si ya venció." },
   deadlines: { label: "Deadlines", hint: "Tareas abiertas que vencen mañana u hoy, y las vencidas." },
   habitos: { label: "Hábitos sin marcar", hint: "A la noche, cuántos hábitos de hoy te faltan marcar." },
-  escalones: { label: "Hábitos en construcción", hint: "Cuando cumpliste las semanas de un escalón y podés subir al siguiente (una vez por escalón)." },
+  escalones: { label: "Hábitos en construcción", hint: "Cuando cumpliste las semanas de un paso y podés subir al siguiente (una vez por paso)." },
 };
 
 export const DEFAULT_PREFS: ReminderPrefs = {
@@ -185,22 +185,22 @@ export function deviceLabel(ua: string | null | undefined): string {
 }
 
 /**
- * Hábitos en construcción listos para subir: `weeks` = semanas seguidas cumplidas,
- * `next` = el escalón al que puede subir y `rule` lo que pide ("3 días por semana").
+ * Hábitos en construcción listos para subir: `weeks` = semanas seguidas cumplidas y
+ * `next` = el paso al que puede subir ("4 días por semana").
  */
-export function ladderMessage(items: { name: string; weeks: number; next: string; rule: string }[]): PushPayload | null {
+export function ladderMessage(items: { name: string; weeks: number; next: string }[]): PushPayload | null {
   if (!items.length) return null;
   if (items.length === 1) {
     const it = items[0];
     return {
-      title: `${it.name}: ¿subís de escalón?`,
-      body: `Cumpliste ${it.weeks === 1 ? "1 semana" : `${it.weeks} semanas seguidas`}. El próximo: ${it.next} (${it.rule}).`,
+      title: `${it.name}: ¿subís un paso?`,
+      body: `Cumpliste ${it.weeks === 1 ? "1 semana" : `${it.weeks} semanas seguidas`}. ¿Pasás a ${it.next}?`,
       url: "/habitos",
       tag: "aviso-escalones",
     };
   }
   return {
-    title: `${items.length} hábitos listos para subir de escalón`,
+    title: `${items.length} hábitos listos para subir un paso`,
     body: listNames(items.map((i) => i.name)),
     url: "/habitos",
     tag: "aviso-escalones",

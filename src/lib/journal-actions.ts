@@ -8,7 +8,7 @@ import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
 import { QUARTER_REVIEW_TAG, REVIEW_TAG, REVIEW_TEMPLATE } from "./review-logic";
-import { BODY_MAX, isEmptyEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
+import { BODY_MAX, isDiscardableEntry, isMood, normalizeTags, TITLE_MAX } from "./journal-logic";
 import { appendToJournal } from "./journal-append";
 import { syncJournalHabit } from "./journal-habit-link";
 
@@ -21,22 +21,13 @@ function validId(id: unknown): id is string {
 }
 
 /**
- * Borra entradas que se crearon y quedaron sin nada escrito hace más de una hora.
- * Las que solo tienen ánimo se borran si ese ánimo ya está en el check-in del día.
+ * Borra entradas que se crearon y quedaron sin nada hace más de una hora. Las que tienen
+ * ánimo se quedan: ese ánimo (el de la noche) no está guardado en ningún otro lado.
  */
 async function limpiarVacias() {
-  const empty = await prisma.journalEntry.findMany({
-    where: { title: null, body: "", tags: { isEmpty: true }, attachments: { none: {} }, updatedAt: { lt: new Date(Date.now() - 3_600_000) } },
-    select: { id: true, date: true, mood: true },
+  await prisma.journalEntry.deleteMany({
+    where: { title: null, body: "", mood: null, tags: { isEmpty: true }, attachments: { none: {} }, updatedAt: { lt: new Date(Date.now() - 3_600_000) } },
   });
-  if (!empty.length) return;
-  const withMood = empty.filter((e) => e.mood !== null);
-  const checkins = withMood.length
-    ? await prisma.dailyCheckin.findMany({ where: { date: { in: withMood.map((e) => e.date) } }, select: { date: true, mood: true } })
-    : [];
-  const moodOf = new Map(checkins.map((c) => [+c.date, c.mood]));
-  const ids = empty.filter((e) => e.mood === null || moodOf.get(+e.date) === e.mood).map((e) => e.id);
-  if (ids.length) await prisma.journalEntry.deleteMany({ where: { id: { in: ids } } });
 }
 
 /**
@@ -56,12 +47,8 @@ export async function writeOnDay(date?: string, nueva = false) {
     if (existing) redirect(`/journal/${existing.id}`);
   }
   await limpiarVacias();
-  // Si ese día ya hay ánimo en el check-in, la entrada arranca con ese.
-  const checkin = await prisma.dailyCheckin.findUnique({ where: { date: toDbDate(day) }, select: { mood: true } });
-  const created = await prisma.journalEntry.create({
-    data: { date: toDbDate(day), mood: isMood(checkin?.mood) ? checkin.mood : null },
-    select: { id: true },
-  });
+  // Arranca sin ánimo: el de la entrada es el de la noche, aparte del check-in de la mañana.
+  const created = await prisma.journalEntry.create({ data: { date: toDbDate(day) }, select: { id: true } });
   await logActivity("created", "journal", created.id, `Entrada del ${day}`);
   redirect(`/journal/${created.id}`);
 }
@@ -99,12 +86,8 @@ export async function saveEntry(id: string, input: EntryInput): Promise<SaveResu
     });
     if (prev) {
       const prevDate = fromDbDate(prev.date);
-      if (prevDate !== input.date) {
-        // Cambió de día: el ánimo se va con la entrada (uno solo por día).
-        await moveCheckinMood(id, prevDate, input.date, prev.mood, mood);
-      } else if (prev.mood !== mood) {
-        await syncCheckinMood(input.date, prev.mood, mood);
-      }
+      // Inicio muestra el ánimo de la noche: se entera si cambió o si la entrada cambió de día.
+      if (prevDate !== input.date || prev.mood !== mood) revalidatePath("/");
       // Escribir tilda el hábito de journaling de ese día (y si cambió de día, lo saca del otro).
       after(() => syncJournalHabit(input.date, prevDate));
     }
@@ -117,53 +100,6 @@ export async function saveEntry(id: string, input: EntryInput): Promise<SaveResu
 }
 
 /**
- * El ánimo elegido en el journal pasa al check-in de ese día (uno solo por día).
- * Si se saca, se borra del check-in solo si era el mismo.
- */
-async function syncCheckinMood(date: string, prev: number | null, mood: number | null) {
-  if (date > todayISO()) return;
-  const d = toDbDate(date);
-  if (mood === null) {
-    if (prev !== null) await clearCheckinMood(d, prev);
-  } else {
-    await prisma.dailyCheckin.upsert({ where: { date: d }, create: { date: d, mood }, update: { mood } });
-  }
-  revalidatePath("/");
-}
-
-/** Saca el ánimo del check-in de ese día si era ese; si el check-in queda sin ningún dato, sobra. */
-async function clearCheckinMood(d: Date, mood: number) {
-  await prisma.dailyCheckin.updateMany({ where: { date: d, mood }, data: { mood: null } });
-  // Si el check-in quedó sin ningún dato, sobra (si no, contaría como check-in cargado).
-  await prisma.dailyCheckin.deleteMany({
-    where: { date: d, mood: null, energy: null, stress: null, sleepMin: null, weightG: null, steps: null, stressScore: null, hrMin: null, hrMax: null, distanceM: null, activeKcal: null, note: null },
-  });
-}
-
-/**
- * La entrada pasó de `from` a `to`: el día viejo pierde el ánimo del check-in
- * solo si era el de esta entrada y no queda otra entrada ese día con el mismo;
- * el día nuevo lo toma si su check-in no tenía ánimo.
- */
-async function moveCheckinMood(id: string, from: string, to: string, prevMood: number | null, mood: number | null) {
-  const today = todayISO();
-  if (prevMood !== null && from <= today) {
-    const other = await prisma.journalEntry.findFirst({
-      where: { date: toDbDate(from), mood: prevMood, id: { not: id } },
-      select: { id: true },
-    });
-    if (!other) await clearCheckinMood(toDbDate(from), prevMood);
-  }
-  if (mood !== null && to <= today) {
-    const d = toDbDate(to);
-    const checkin = await prisma.dailyCheckin.findUnique({ where: { date: d }, select: { mood: true } });
-    if (!checkin) await prisma.dailyCheckin.create({ data: { date: d, mood } });
-    else if (checkin.mood === null) await prisma.dailyCheckin.update({ where: { date: d }, data: { mood } });
-  }
-  revalidatePath("/");
-}
-
-/**
  * Lo compartido desde otra app va a la entrada de hoy (al final del texto) o a
  * una nueva si hoy todavía no hay. Devuelve la entrada para subirle fotos.
  */
@@ -173,12 +109,12 @@ export async function shareToJournal(text: string): Promise<{ id: string }> {
   return { id };
 }
 
-/** Al salir del editor sin haber escrito nada, la entrada no queda guardada. */
+/** Al salir del editor sin haber escrito ni elegido nada, la entrada no queda guardada. */
 export async function discardIfEmpty(id: string) {
   await exigirSesion();
   if (!validId(id)) return;
   const e = await prisma.journalEntry.findUnique({ where: { id }, include: { _count: { select: { attachments: true } } } });
-  if (e && isEmptyEntry(e) && e._count.attachments === 0) {
+  if (e && isDiscardableEntry(e) && e._count.attachments === 0) {
     await prisma.journalEntry.delete({ where: { id } });
     refrescar();
   }
@@ -222,14 +158,14 @@ export async function moveEntryDate(id: string, date: string): Promise<{ ok: tru
   await exigirSesion();
   if (!validId(id)) return { ok: false, error: "Entrada inválida." };
   if (!isISODate(date)) return { ok: false, error: "Fecha inválida." };
-  const prev = await prisma.journalEntry.findUnique({ where: { id }, select: { date: true, mood: true } });
+  const prev = await prisma.journalEntry.findUnique({ where: { id }, select: { date: true } });
   if (!prev) return { ok: false, error: "Esta entrada ya no existe." };
   const from = fromDbDate(prev.date);
   if (from === date) return { ok: true };
   await prisma.journalEntry.update({ where: { id }, data: { date: toDbDate(date) } });
-  await moveCheckinMood(id, from, date, prev.mood, prev.mood);
   await syncJournalHabit(date, from);
   refrescar();
+  revalidatePath("/");
   return { ok: true };
 }
 
@@ -244,6 +180,7 @@ export async function deleteEntry(id: string): Promise<{ ok: true }> {
   await trashAndDelete("journal", id);
   if (was) await syncJournalHabit(fromDbDate(was.date));
   refrescar();
+  revalidatePath("/");
   return { ok: true };
 }
 

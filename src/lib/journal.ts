@@ -285,7 +285,7 @@ export async function getRangeEntries(from: string, to: string) {
 export async function getStats(month: string) {
   const today = todayISO();
   const { from, to } = monthBounds(month);
-  const [days, all, checkins] = await Promise.all([
+  const [days, all, checkins, entryMoods] = await Promise.all([
     writtenDays(),
     prisma.journalEntry.findMany({
       where: NOT_EMPTY,
@@ -296,6 +296,12 @@ export async function getStats(month: string) {
       where: { date: { gte: toDbDate(from), lte: toDbDate(to) }, mood: { not: null } },
       select: { date: true, mood: true },
     }),
+    // Aparte de `all`: una entrada con ánimo y sin texto no cuenta como escrita, pero su ánimo sí.
+    prisma.journalEntry.findMany({
+      where: { date: { gte: toDbDate(from), lte: toDbDate(to) }, mood: { not: null } },
+      select: { date: true, mood: true },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    }),
   ]);
   let words = 0;
   const inMonth: { words: number }[] = [];
@@ -304,6 +310,7 @@ export async function getStats(month: string) {
   // Ánimo del mes, uno por día como en Análisis e Inicio: el del check-in o, si no hay, el de la primera entrada con ánimo.
   const dayMood = new Map<string, number>();
   for (const c of checkins) if (c.mood !== null) dayMood.set(fromDbDate(c.date), c.mood);
+  for (const e of entryMoods) if (e.mood !== null && !dayMood.has(fromDbDate(e.date))) dayMood.set(fromDbDate(e.date), e.mood);
   let longest: { id: string; date: string; title: string | null; words: number } | null = null;
   for (const e of all) {
     const w = wordCount(e.body) + wordCount(e.title ?? "");
@@ -313,10 +320,7 @@ export async function getStats(month: string) {
     perMonth.set(m, (perMonth.get(m) ?? 0) + 1);
     perMonthWords.set(m, (perMonthWords.get(m) ?? 0) + w);
     if (!longest || w > longest.words) longest = { id: e.id, date: iso, title: e.title, words: w };
-    if (iso >= from && iso <= to) {
-      inMonth.push({ words: w });
-      if (e.mood !== null && !dayMood.has(iso)) dayMood.set(iso, e.mood);
-    }
+    if (iso >= from && iso <= to) inMonth.push({ words: w });
   }
   const perMonthDays = new Map<string, number>();
   // Días escritos por día de la semana, lunes primero (no entradas: dos el mismo día cuentan una vez).

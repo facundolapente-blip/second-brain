@@ -393,15 +393,15 @@ export type LadderResult = { ok: true } | { ok: false; error: string };
 
 /** Valida los escalones que mandó la pantalla: 1 a 8, títulos de hasta 80, need ≤ window ≤ 30. */
 function checkSteps(raw: unknown): { ok: true; steps: LadderStep[] } | { ok: false; error: string } {
-  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: "Poné al menos un escalón." };
-  if (raw.length > LADDER_MAX_STEPS) return { ok: false, error: `Como mucho ${LADDER_MAX_STEPS} escalones.` };
+  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: "Poné al menos un paso." };
+  if (raw.length > LADDER_MAX_STEPS) return { ok: false, error: `Como mucho ${LADDER_MAX_STEPS} pasos.` };
   const steps: LadderStep[] = [];
   for (const [i, r] of raw.entries()) {
     const title = r && typeof r === "object" && typeof (r as { title?: unknown }).title === "string" ? (r as { title: string }).title.trim() : "";
-    if (!title) return { ok: false, error: `Ponele un nombre al escalón ${i + 1}.` };
-    if (title.length > LADDER_TITLE_MAX) return { ok: false, error: `El escalón ${i + 1} es muy largo (hasta ${LADDER_TITLE_MAX} letras).` };
+    if (!title) return { ok: false, error: `Ponele un nombre al paso ${i + 1}.` };
+    if (title.length > LADDER_TITLE_MAX) return { ok: false, error: `El paso ${i + 1} es muy largo (hasta ${LADDER_TITLE_MAX} letras).` };
     const step = cleanStep(r);
-    if (!step) return { ok: false, error: `Revisá el escalón ${i + 1}: días por semana de 1 a 7 y semanas seguidas de 1 a 8.` };
+    if (!step) return { ok: false, error: `Revisá el paso ${i + 1}: días por semana de 1 a 7 y semanas seguidas de 1 a 8.` };
     steps.push(step);
   }
   return { ok: true, steps };
@@ -526,7 +526,7 @@ export async function saveLadderSteps(habitId: string, steps: LadderStep[]): Pro
   const current = Math.min(r.ladder.current, checked.steps.length - 1);
   const stepStart = current === r.ladder.current ? r.ladder.stepStart : todayISO();
   await writeLadder(r.habit, { ...r.ladder, steps: checked.steps, current, stepStart });
-  await logActivity("updated", "habit", habitId, `${r.habit.name}: escalones editados`);
+  await logActivity("updated", "habit", habitId, `${r.habit.name}: plan cambiado`);
   refrescar();
   return { ok: true };
 }

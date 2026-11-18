@@ -12,7 +12,7 @@ import {
   todayISO,
   weekday,
 } from "@/lib/dates";
-import { bestStreak, currentStreak, excerpt, greeting, isEmptyEntry, isMood, normalizeTag, normalizeTags, wordCount } from "@/lib/journal-logic";
+import { bestStreak, currentStreak, excerpt, greeting, isDiscardableEntry, isEmptyEntry, isMood, normalizeTag, normalizeTags, wordCount } from "@/lib/journal-logic";
 import { parseValueNotes } from "@/lib/values";
 import { montevideoNow, msToNextSlot, pickForSlot, quoteSlot } from "@/lib/quotes";
 import {
@@ -21,6 +21,7 @@ import {
   formatPulse,
   formatSleep,
   formatWeight,
+  nightMoodOf,
   parseWeight,
   watchSlotsFor,
   watchStressLevel,
@@ -91,6 +92,20 @@ describe("dates", () => {
 });
 
 describe("journal", () => {
+  it("isDiscardableEntry: una entrada con solo ánimo no se borra al salir, pero sigue sin contar como escrita", () => {
+    const empty = { title: null, body: " ", tags: [] };
+    expect(isDiscardableEntry({ ...empty, mood: null })).toBe(true);
+    expect(isDiscardableEntry({ ...empty, mood: 2 })).toBe(false);
+    expect(isEmptyEntry({ ...empty })).toBe(true);
+    expect(isDiscardableEntry({ ...empty, body: "hola", mood: null })).toBe(false);
+  });
+
+  it("nightMoodOf: la última entrada del día con ánimo; si ninguna tiene, lleva a la primera", () => {
+    expect(nightMoodOf([])).toEqual({ mood: null, entryId: null });
+    expect(nightMoodOf([{ id: "a", mood: null }, { id: "b", mood: null }])).toEqual({ mood: null, entryId: "a" });
+    expect(nightMoodOf([{ id: "a", mood: 2 }, { id: "b", mood: 5 }, { id: "c", mood: null }])).toEqual({ mood: 5, entryId: "b" });
+  });
+
   it("isEmptyEntry: sin título, texto ni etiquetas (el ánimo solo no cuenta)", () => {
     expect(isEmptyEntry({ title: null, body: "", tags: [] })).toBe(true);
     expect(isEmptyEntry({ title: "  ", body: " \n\t ", tags: [] })).toBe(true);
