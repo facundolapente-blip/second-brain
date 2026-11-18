@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { addDays, diffDays, fromDbDate, toDbDate, todayISO, TZ } from "./dates";
 import { getHabitsWithLogs } from "./habits";
 import { dayProgress } from "./habit-logic";
-import { habitNeverTwice } from "./habit-ladder";
+import { daysText, habitNeverTwice, ladderDoneFn, stepPerWeek, stepProgress } from "./habit-ladder";
 import { getCardSummaries } from "./finance";
 import { moneyWhole } from "./format";
 import { isFreeBlock, sortBlocks } from "./plan-logic";
@@ -14,6 +14,7 @@ import {
   deadlinesMessage,
   dueKinds,
   habitsMessage,
+  ladderMessage,
   morningMessage,
   normalizePrefs,
   REMINDER_KINDS,
@@ -40,8 +41,27 @@ export function hourInMontevideo(now = new Date()): number {
 }
 
 /** El texto de un aviso con los datos de hoy, o null si no hay nada que avisar. */
-export async function buildReminder(kind: ReminderKind, today = todayISO()): Promise<PushPayload | null> {
+export async function buildReminder(kind: ReminderKind, today = todayISO(), opts: { commit?: boolean } = {}): Promise<PushPayload | null> {
   switch (kind) {
+    case "escalones": {
+      // Una vez por escalón: el recibo "escalon-<hábito>-<escalón>-<inicio>" queda al mandarlo.
+      const { habits, logs } = await getHabitsWithLogs();
+      const ready = habits.flatMap((h) => {
+        const l = h.ladder;
+        if (!l || h.archived) return [];
+        const p = stepProgress(l, ladderDoneFn(h, logs[h.id] ?? {}), today, h);
+        if (!p.ready) return [];
+        const next = l.steps[p.step + 1];
+        return next ? [{ h, id: `escalon-${h.id}-${p.step}-${l.stepStart}`, weeks: p.streak, next: next.title, rule: daysText(stepPerWeek(next, h)) }] : [];
+      });
+      if (!ready.length) return null;
+      const seen = new Set((await prisma.actionReceipt.findMany({ where: { id: { in: ready.map((r) => r.id) } }, select: { id: true } })).map((r) => r.id));
+      const fresh = ready.filter((r) => !seen.has(r.id));
+      if (opts.commit && fresh.length) {
+        await prisma.actionReceipt.createMany({ data: fresh.map((r) => ({ id: r.id, name: "aviso.escalon" })), skipDuplicates: true });
+      }
+      return ladderMessage(fresh.map((r) => ({ name: r.h.name, weeks: r.weeks, next: r.next, rule: r.rule })));
+    }
     case "habitos": {
       // La misma cuenta que Hoy e Inicio (`dayProgress`, con `showsOn` y sin salteados).
       const [{ habits, logs }, manual] = await Promise.all([
@@ -137,7 +157,7 @@ export async function runReminders(opts: { dryRun?: boolean; hour?: number } = {
         throw e;
       }
     }
-    const payload = await buildReminder(kind, today);
+    const payload = await buildReminder(kind, today, { commit: !opts.dryRun });
     if (!payload) {
       run.results.push({ kind, status: "nada que avisar" });
       continue;

@@ -4,7 +4,7 @@
  * junta `reminders.ts`; el envío, `push.ts`; los crons, `/api/cron/avisos`.
  */
 
-export const REMINDER_KINDS = ["manana", "tarjetas", "deadlines", "habitos"] as const;
+export const REMINDER_KINDS = ["manana", "tarjetas", "deadlines", "habitos", "escalones"] as const;
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
 export type ReminderPrefs = Record<ReminderKind, { on: boolean; hour: number }>;
 
@@ -23,6 +23,7 @@ export const REMINDER_INFO: Record<ReminderKind, { label: string; hint: string }
   tarjetas: { label: "Tarjeta por vencer", hint: "El resumen sin pagar: 5, 3 y 1 día antes, el día que vence y si ya venció." },
   deadlines: { label: "Deadlines", hint: "Tareas abiertas que vencen mañana u hoy, y las vencidas." },
   habitos: { label: "Hábitos sin marcar", hint: "A la noche, cuántos hábitos de hoy te faltan marcar." },
+  escalones: { label: "Hábitos en construcción", hint: "Cuando cumpliste las semanas de un escalón y podés subir al siguiente (una vez por escalón)." },
 };
 
 export const DEFAULT_PREFS: ReminderPrefs = {
@@ -30,6 +31,7 @@ export const DEFAULT_PREFS: ReminderPrefs = {
   tarjetas: { on: true, hour: 10 },
   deadlines: { on: true, hour: 20 },
   habitos: { on: true, hour: 21 },
+  escalones: { on: true, hour: 9 },
 };
 
 /** Lo guardado (JSON de `AppSetting "avisos"`), completado y acotado. */
@@ -180,4 +182,27 @@ export function deviceLabel(ua: string | null | undefined): string {
               ? "Safari"
               : "";
   return browser ? `${os} · ${browser}` : os;
+}
+
+/**
+ * Hábitos en construcción listos para subir: `weeks` = semanas seguidas cumplidas,
+ * `next` = el escalón al que puede subir y `rule` lo que pide ("3 días por semana").
+ */
+export function ladderMessage(items: { name: string; weeks: number; next: string; rule: string }[]): PushPayload | null {
+  if (!items.length) return null;
+  if (items.length === 1) {
+    const it = items[0];
+    return {
+      title: `${it.name}: ¿subís de escalón?`,
+      body: `Cumpliste ${it.weeks === 1 ? "1 semana" : `${it.weeks} semanas seguidas`}. El próximo: ${it.next} (${it.rule}).`,
+      url: "/habitos",
+      tag: "aviso-escalones",
+    };
+  }
+  return {
+    title: `${items.length} hábitos listos para subir de escalón`,
+    body: listNames(items.map((i) => i.name)),
+    url: "/habitos",
+    tag: "aviso-escalones",
+  };
 }

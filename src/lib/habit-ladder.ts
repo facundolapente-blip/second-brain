@@ -1,20 +1,32 @@
 /**
- * Hábitos en construcción (pedido de Facu, 2026-11-17): un hábito nuevo se arma de
- * a poco con una escalera de escalones chicos hasta la meta, y "Nunca dos seguidos":
- * en vez de mirar la racha rota, el día después de fallar es "el que importa".
+ * Hábitos en construcción (pedido de Facu, 2026-11-17): un hábito se arma de a poco
+ * con una escalera de escalones chicos hasta la meta, y "Nunca dos seguidos": en vez
+ * de mirar la racha rota, el día después de fallar es "el que importa".
+ *
+ * Todo va **por semanas** (pedido de Facu: "4 de 14 días" no se entendía): cada
+ * escalón dice cuántos días por semana (`perWeek`) y cuántas semanas seguidas hay que
+ * cumplirlo para subir (`weeks`). El escalón **cambia el hábito de verdad**: con
+ * `perWeek` el hábito pasa a ser de "N veces por semana" (7 = todos los días) y con
+ * `target` (hábitos de cantidad) cambia la meta; así la racha y el puntaje se miden
+ * contra el escalón y no contra la meta final.
  *
  * Lógica pura (sin base ni React): la usan el servidor, las pantallas y las pruebas.
  * Se guarda en `Habit.ladder` (Json) y `Habit.neverTwice`.
  */
-import { addDays, diffDays, isISODate } from "./dates.ts";
-import { habitDayMark, isDone as logIsDone, type HabitRule, type LogMap, type PastTrack } from "./habit-logic.ts";
+import { addDays, diffDays, isISODate, startOfWeek } from "./dates.ts";
+import { habitDayMark, isDone as logIsDone, type Frequency, type HabitRule, type LogMap, type PastTrack } from "./habit-logic.ts";
 
-/** need de window días para poder subir (ej. 7 de 10). target: meta numérica del escalón en hábitos de cantidad. */
-export type LadderStep = { title: string; need: number; window: number; target?: number | null };
+/**
+ * perWeek: días por semana de este escalón (1 a 7; null = los que ya pide el hábito).
+ * target: meta numérica del escalón en hábitos de cantidad. weeks: semanas seguidas
+ * cumpliéndolo para poder subir (en la meta no se usa).
+ */
+export type LadderStep = { title: string; perWeek?: number | null; target?: number | null; weeks: number };
 
 /**
  * current = índice del escalón actual. stepStart = día en que arrancó ese escalón.
  * history = escalones ya pasados con sus fechas (from/to inclusive).
+ * why = para qué lo hace; cue = cuándo y dónde ("después de cenar, en el living").
  */
 export type Ladder = {
   goal: string;
@@ -23,27 +35,47 @@ export type Ladder = {
   stepStart: string;
   snoozeUntil?: string | null;
   history?: { step: number; from: string; to: string }[];
+  why?: string | null;
+  cue?: string | null;
 };
 
 export const LADDER_MAX_STEPS = 8;
 export const LADDER_TITLE_MAX = 80;
 export const LADDER_GOAL_MAX = 200;
-export const LADDER_WINDOW_MAX = 30;
+export const LADDER_NOTE_MAX = 200;
+export const LADDER_WEEKS_MAX = 8;
+/** Semanas seguidas que se proponen para subir de escalón. */
+export const LADDER_DEFAULT_WEEKS = 2;
 
 const int = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-/** Un escalón válido (título no vacío, 1 ≤ need ≤ window ≤ 30) o null. */
+/**
+ * Un escalón válido o null. Acepta el formato viejo (`need` de `window` días): los de
+ * 14 días sin meta numérica eran de frecuencia ("2 por semana" = 4 de 14) y pasan a
+ * días por semana; los demás quedan con la frecuencia del hábito.
+ */
 export function cleanStep(raw: unknown): LadderStep | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  const title = typeof r.title === "string" ? r.title.trim().slice(0, LADDER_TITLE_MAX) : "";
-  const need = int(r.need);
-  const window = int(r.window);
-  if (!title || need === null || window === null) return null;
-  if (need < 1 || window < need || window > LADDER_WINDOW_MAX) return null;
+  const title = text(r.title, LADDER_TITLE_MAX);
+  if (!title) return null;
   const t = int(r.target);
-  const step: LadderStep = { title, need, window };
-  if (t !== null && t >= 1) step.target = Math.min(100_000, t);
+  const target = t !== null && t >= 1 ? Math.min(100_000, t) : null;
+  let perWeek = int(r.perWeek);
+  let weeks = int(r.weeks);
+  if (weeks === null) {
+    // Formato viejo.
+    const need = int(r.need);
+    const window = int(r.window);
+    if (need === null || window === null || need < 1 || window < need) return null;
+    weeks = window >= 14 ? 2 : 1;
+    if (perWeek === null && window === 14 && target === null) perWeek = clamp(Math.round(need / 2), 1, 7);
+  }
+  const step: LadderStep = { title, weeks: clamp(weeks, 1, LADDER_WEEKS_MAX) };
+  if (perWeek !== null && perWeek >= 1) step.perWeek = clamp(perWeek, 1, 7);
+  if (target !== null) step.target = target;
   return step;
 }
 
@@ -62,14 +94,16 @@ export function parseLadder(raw: unknown): Ladder | null {
   const steps = Array.isArray(r.steps) ? r.steps.map(cleanStep).filter((s): s is LadderStep => !!s).slice(0, LADDER_MAX_STEPS) : [];
   if (!steps.length) return null;
   if (!isISODate(r.stepStart)) return null;
-  const goal = typeof r.goal === "string" ? r.goal.trim().slice(0, LADDER_GOAL_MAX) : "";
+  const goal = text(r.goal, LADDER_GOAL_MAX);
   const cur = int(r.current) ?? 0;
   const ladder: Ladder = {
     goal: goal || steps[steps.length - 1].title,
     steps,
-    current: Math.max(0, Math.min(steps.length - 1, cur)),
+    current: clamp(cur, 0, steps.length - 1),
     stepStart: r.stepStart,
     snoozeUntil: isISODate(r.snoozeUntil) ? r.snoozeUntil : null,
+    why: text(r.why, LADDER_NOTE_MAX) || null,
+    cue: text(r.cue, LADDER_NOTE_MAX) || null,
   };
   if (Array.isArray(r.history)) {
     ladder.history = r.history.flatMap((h) => {
@@ -82,11 +116,64 @@ export function parseLadder(raw: unknown): Ladder | null {
   return ladder;
 }
 
+// ─── Lo que pide cada escalón ──────────────────────────────────────────────
+
+type WeeklyShape = { frequency: string; weekdays?: number[]; timesPerWeek?: number | null };
+
+/** Días por semana que pide el hábito como está (todos los días = 7). */
+export function habitPerWeek(h: WeeklyShape): number {
+  if (h.frequency === "weekly") return clamp(h.timesPerWeek ?? 1, 1, 7);
+  if (h.frequency === "weekdays") return clamp(h.weekdays?.length || 1, 1, 7);
+  return 7;
+}
+
+/** Días por semana de un escalón (los del hábito si el escalón no dice). */
+export function stepPerWeek(step: LadderStep, h: WeeklyShape): number {
+  return step.perWeek ?? habitPerWeek(h);
+}
+
+export const daysText = (n: number) => (n >= 7 ? "todos los días" : `${n} ${n === 1 ? "día" : "días"} por semana`);
+export const weeksText = (n: number) => (n === 1 ? "1 semana" : `${n} semanas seguidas`);
+
+/** "3 días por semana · 2 semanas seguidas para subir" (o "· la meta"). */
+export function stepRuleText(step: LadderStep, h: WeeklyShape, isLast: boolean): string {
+  const days = daysText(stepPerWeek(step, h));
+  const cap = days.charAt(0).toUpperCase() + days.slice(1);
+  return isLast ? `${cap} · la meta` : `${cap} · ${weeksText(step.weeks)} para subir`;
+}
+
+/**
+ * La configuración que el escalón le pone al hábito: con `perWeek` pasa a ser de
+ * "N veces por semana" (7 = todos los días); con `target`, cambia la meta si el
+ * hábito es de cantidad. Devuelve solo lo que cambia (null = nada).
+ */
+export function stepConfig(
+  step: LadderStep,
+  h: { frequency: string; timesPerWeek: number; target: number; unit?: string | null; weekdays?: number[] },
+): { frequency?: Frequency; timesPerWeek?: number; weekdays?: number[]; target?: number } | null {
+  const out: { frequency?: Frequency; timesPerWeek?: number; weekdays?: number[]; target?: number } = {};
+  if (step.perWeek) {
+    if (step.perWeek >= 7) {
+      if (h.frequency !== "daily") {
+        out.frequency = "daily";
+        out.weekdays = [];
+      }
+    } else if (h.frequency !== "weekly" || h.timesPerWeek !== step.perWeek) {
+      out.frequency = "weekly";
+      out.timesPerWeek = step.perWeek;
+      out.weekdays = [];
+    }
+  }
+  const quantity = h.target > 1 || !!h.unit;
+  if (step.target && quantity && step.target !== h.target) out.target = step.target;
+  return Object.keys(out).length ? out : null;
+}
+
 // ─── Sugerencias (sin IA, por reglas) ──────────────────────────────────────
 
 export type GoalKind = "amount" | "frequency" | "quit" | "plain";
 
-type HabitShape = { frequency: string; target: number; unit: string | null; isQuit: boolean; timesPerWeek?: number | null };
+type HabitShape = { frequency: string; target: number; unit: string | null; isQuit: boolean; timesPerWeek?: number | null; weekdays?: number[] };
 
 /** "4 veces por semana", "3 x semana", "2 por semana", "1 vez a la semana". */
 const FREQ_RE = /(\d+)\s*(?:veces|vez|x|d[ií]as)?\s*(?:por|a la|x|\/|cada)\s*semana/i;
@@ -105,12 +192,12 @@ export function goalKindOf(goal: string, habit: HabitShape): GoalKind {
   return "plain";
 }
 
-/** Condición para subir: 7 de 10 en los primeros; 10 de 14 en el anteúltimo y en la meta (que no tiene condición: ahí se queda). */
+const W = LADDER_DEFAULT_WEEKS;
+
+/** Escalones con la frecuencia del hábito (cantidad o sin números): 2 semanas cada uno. */
 function withRules(titles: { title: string; target?: number | null }[]): LadderStep[] {
-  const n = titles.length;
-  return titles.map((t, i) => {
-    const late = i >= n - 2;
-    const step: LadderStep = { title: t.title.slice(0, LADDER_TITLE_MAX), need: late ? 10 : 7, window: late ? 14 : 10 };
+  return titles.map((t) => {
+    const step: LadderStep = { title: t.title.slice(0, LADDER_TITLE_MAX), weeks: W };
     if (t.target) step.target = t.target;
     return step;
   });
@@ -170,21 +257,20 @@ function frequencySteps(goal: string, habit: HabitShape): LadderStep[] | null {
   if (total < 3) return null;
   const n = Math.min(5, total);
   const counts = [...new Set(Array.from({ length: n }, (_, i) => Math.max(1, Math.round((total * (i + 1)) / n))))];
-  const text = (k: number) => `${k} ${k === 1 ? "vez" : "veces"} por semana`;
-  // Para subir: dos semanas cumpliendo ese escalón (días hechos en 14).
+  const freq = (k: number) => `${k} ${k === 1 ? "vez" : "veces"} por semana`;
   return counts.map((k, i) => ({
-    title: (i === counts.length - 1 ? goal : m ? goal.replace(m[0], text(k)) : `${goal} · ${text(k)}`).slice(0, LADDER_TITLE_MAX),
-    need: Math.min(14, 2 * k),
-    window: 14,
+    title: (i === counts.length - 1 ? goal : m ? goal.replace(m[0], freq(k)) : `${goal} · ${freq(k)}`).slice(0, LADDER_TITLE_MAX),
+    perWeek: k,
+    weeks: W,
   }));
 }
 
 /**
- * Escalones sugeridos para llegar a `goal` (3 a 5; el último es la meta). Se pueden
- * editar todos. Ejemplos: "Dejar el celular 1 hora antes de dormir" → 15/30/45 min
- * y 1 hora; "Leer 20 páginas" → 5/10/15/20; "Gym 4 veces por semana" → 1, 2, 3 y 4
- * veces; "No fumar" → algunos días, 4 por semana, todos; "Meditar" → versión mínima,
- * media y la meta.
+ * Escalones sugeridos para llegar a `goal` (3 a 5; el último es la meta), todos con
+ * 2 semanas seguidas para subir. Ejemplos: "Dejar el celular 1 hora antes de dormir"
+ * → 15/30/45 min y 1 hora; "Leer 20 páginas" → 5/10/15/20; "Gym 4 veces por semana"
+ * → 1, 2, 3 y 4 días por semana; "No fumar" → 2, 4 y 7 días por semana sin hacerlo;
+ * "Meditar" → versión mínima, media y la meta.
  */
 export function suggestSteps(goal: string, habit: HabitShape): LadderStep[] {
   const g = goal.trim().slice(0, LADDER_GOAL_MAX) || "El hábito";
@@ -194,11 +280,10 @@ export function suggestSteps(goal: string, habit: HabitShape): LadderStep[] {
     if (s) return s;
   }
   if (kind === "quit") {
-    // En días sin hacerlo, de 14: 2 por semana → 4; 4 por semana → 8; todos → 10 de 14.
     return [
-      { title: "Algunos días (2 por semana)", need: 4, window: 14 },
-      { title: "4 días por semana", need: 8, window: 14 },
-      { title: "Todos los días", need: 10, window: 14 },
+      { title: "2 días por semana sin hacerlo", perWeek: 2, weeks: W },
+      { title: "4 días por semana sin hacerlo", perWeek: 4, weeks: W },
+      { title: g, perWeek: 7, weeks: W },
     ];
   }
   if (kind === "amount" || kind === "frequency") {
@@ -208,52 +293,127 @@ export function suggestSteps(goal: string, habit: HabitShape): LadderStep[] {
   return withRules(plainSteps(g));
 }
 
-// ─── Progreso del escalón ──────────────────────────────────────────────────
+// ─── Progreso del escalón, por semanas ─────────────────────────────────────
+
+export type LadderWeek = {
+  /** Primer día de la semana (según `weekStart` del hábito). */
+  start: string;
+  done: number;
+  /** Días que pedía esa semana (la primera, si el escalón arrancó a mitad, prorrateada). */
+  need: number;
+  /** true cumplida · false no se cumplió · null es la semana en curso y todavía no llegó. */
+  met: boolean | null;
+};
 
 export type StepProgress = {
   step: number;
-  total: number;
-  done: number;
-  need: number;
-  window: number;
-  days: { date: string; done: boolean }[];
-  ready: boolean;
-  struggling: boolean;
   atGoal: boolean;
-  daysLeft: number;
+  /** Días por semana de este escalón. */
+  perWeek: number;
+  /** Semanas seguidas que pide para subir. */
+  weeksNeeded: number;
+  /** Semanas cumplidas seguidas hasta ahora (la en curso cuenta si ya se cumplió). */
+  streak: number;
+  weeksLeft: number;
+  /** La semana en curso, día por día (future = todavía no llegó). */
+  thisWeek: { done: number; need: number; days: { date: string; done: boolean; future: boolean }[] };
+  weeks: LadderWeek[];
+  ready: boolean;
+  /** Las dos últimas semanas terminadas de este escalón no se cumplieron. */
+  struggling: boolean;
 };
 
+export type ProgressOpts = { weekStart?: number; frequency: string; weekdays?: number[]; timesPerWeek?: number | null };
+
+/** Semanas de [from, today] con lo hecho y lo que pedía cada una (`needOf(día)` = días de una semana completa). */
+export function weeksBetween(from: string, today: string, isDone: (d: string) => boolean, needOf: (d: string) => number, weekStart = 1): LadderWeek[] {
+  const out: LadderWeek[] = [];
+  if (from > today) return out;
+  for (let ws = startOfWeek(from, weekStart); ws <= today; ws = addDays(ws, 7)) {
+    const we = addDays(ws, 6);
+    const a = from > ws ? from : ws;
+    let done = 0;
+    for (let d = a; d <= we && d <= today; d = addDays(d, 1)) if (isDone(d)) done++;
+    const full = needOf(a);
+    // Semana que arrancó a mitad: lo que tocaba en los días que tuvo.
+    const avail = diffDays(we, a) + 1;
+    const need = avail >= 7 ? full : Math.max(1, Math.min(avail, Math.ceil((full * avail) / 7)));
+    const current = we >= today;
+    out.push({ start: ws, done, need, met: done >= need ? true : current ? null : false });
+  }
+  return out;
+}
+
 /**
- * Cómo va el escalón actual: los días desde max(inicio del escalón, hoy − window + 1)
- * hasta hoy. `ready` = llegó a need (y no está en la meta ni pospuesto); `struggling`
- * = pasaron 14 días o más del escalón y no llega a la mitad de lo que tocaba.
+ * Cómo va el escalón actual, por semanas desde que arrancó. `ready` = cumplió
+ * `weeks` semanas seguidas (y no está en la meta ni pospuesto).
  */
-export function stepProgress(ladder: Ladder, isDone: (date: string) => boolean, today: string): StepProgress {
+export function stepProgress(ladder: Ladder, isDone: (date: string) => boolean, today: string, opts: ProgressOpts): StepProgress {
   const last = ladder.steps.length - 1;
-  const idx = Math.max(0, Math.min(last, ladder.current));
+  const idx = clamp(ladder.current, 0, last);
   const step = ladder.steps[idx];
-  const winStart = addDays(today, -(step.window - 1));
-  const from = ladder.stepStart > winStart ? ladder.stepStart : winStart;
-  const days: { date: string; done: boolean }[] = [];
-  for (let d = from; d <= today; d = addDays(d, 1)) days.push({ date: d, done: isDone(d) });
-  const done = days.filter((d) => d.done).length;
+  const perWeek = stepPerWeek(step, opts);
+  const weekStart = opts.weekStart ?? 1;
+  const weeks = weeksBetween(ladder.stepStart, today, isDone, () => perWeek, weekStart);
+  let streak = 0;
+  for (let i = weeks.length - 1; i >= 0; i--) {
+    const w = weeks[i];
+    if (w.met === null) continue;
+    if (!w.met) break;
+    streak++;
+  }
+  const ws = startOfWeek(today, weekStart);
+  const days: { date: string; done: boolean; future: boolean }[] = [];
+  // Los días antes de que arrancara el escalón no cuentan: se ven como los que todavía no llegaron.
+  for (let d = ws; d <= addDays(ws, 6); d = addDays(d, 1)) days.push({ date: d, done: d <= today && d >= ladder.stepStart && isDone(d), future: d > today || d < ladder.stepStart });
+  const cur = weeks.at(-1);
   const atGoal = idx === last;
   const snoozed = !!ladder.snoozeUntil && today <= ladder.snoozeUntil;
-  const elapsed = diffDays(today, ladder.stepStart) + 1;
-  // Lo que tocaba en los días que van de la ventana (need repartido en window).
-  const expected = (step.need * days.length) / step.window;
+  const ended = weeks.filter((w) => w.met !== null && w.start < ws);
   return {
     step: idx,
-    total: days.length,
-    done,
-    need: step.need,
-    window: step.window,
-    days,
-    ready: done >= step.need && !atGoal && !snoozed,
-    struggling: elapsed >= 14 && done < expected / 2,
     atGoal,
-    daysLeft: Math.max(0, step.need - done),
+    perWeek,
+    weeksNeeded: step.weeks,
+    streak,
+    weeksLeft: Math.max(0, step.weeks - streak),
+    thisWeek: { done: cur?.done ?? 0, need: cur?.need ?? perWeek, days },
+    weeks,
+    ready: streak >= step.weeks && !atGoal && !snoozed,
+    struggling: ended.length >= 2 && ended.slice(-2).every((w) => w.met === false),
   };
+}
+
+/**
+ * Todas las semanas desde que empezó la escalera, con el escalón de cada una (para
+ * el gráfico del camino): lo hecho contra lo que pedía el escalón de esa semana.
+ */
+export function ladderWeeks(ladder: Ladder, isDone: (d: string) => boolean, today: string, opts: ProgressOpts): (LadderWeek & { step: number })[] {
+  const spans = [...(ladder.history ?? []), { step: ladder.current, from: ladder.stepStart, to: today }].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+  const first = spans[0].from;
+  const stepAt = (d: string) => {
+    let s = spans[0].step;
+    for (const x of spans) if (x.from <= d) s = x.step;
+    return clamp(s, 0, ladder.steps.length - 1);
+  };
+  const needOf = (d: string) => stepPerWeek(ladder.steps[stepAt(d)], opts);
+  return weeksBetween(first, today, isDone, needOf, opts.weekStart ?? 1).map((w) => {
+    const a = first > w.start ? first : w.start;
+    return { ...w, step: stepAt(a) };
+  });
+}
+
+/** Semanas (redondeadas, al menos 1) que duró un tramo de la historia. */
+export const spanWeeks = (from: string, to: string) => Math.max(1, Math.round((diffDays(to, from) + 1) / 7));
+
+/**
+ * El día en que se llegó a poder subir: hoy está listo y ayer no (para avisar una
+ * sola vez, sin repetir todos los días).
+ */
+export function becameReady(ladder: Ladder, isDone: (date: string) => boolean, today: string, opts: ProgressOpts): boolean {
+  if (!stepProgress(ladder, isDone, today, opts).ready) return false;
+  const y = addDays(today, -1);
+  return y < ladder.stepStart || !stepProgress(ladder, isDone, y, opts).ready;
 }
 
 /** Sube un escalón (no pasa de la meta): guarda el tramo en history y arranca hoy. */
@@ -267,7 +427,7 @@ export function stepBack(ladder: Ladder, today: string): Ladder {
 }
 
 function moveTo(ladder: Ladder, to: number, today: string): Ladder {
-  const next = Math.max(0, Math.min(ladder.steps.length - 1, to));
+  const next = clamp(to, 0, ladder.steps.length - 1);
   if (next === ladder.current) return ladder;
   const end = today > ladder.stepStart ? addDays(today, -1) : ladder.stepStart;
   return {
@@ -279,7 +439,7 @@ function moveTo(ladder: Ladder, to: number, today: string): Ladder {
   };
 }
 
-/** "Me quedo una semana más": no ofrece subir hasta dentro de 7 días. */
+/** "Una semana más": no ofrece subir hasta dentro de 7 días. */
 export function snoozeWeek(ladder: Ladder, today: string): Ladder {
   return { ...ladder, snoozeUntil: addDays(today, 7) };
 }

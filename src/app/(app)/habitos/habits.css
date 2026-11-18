@@ -251,10 +251,89 @@
   outline-offset: -1.5px;
 }
 
-/* Puntitos de la ventana del escalón. */
-.lad-dots { display: inline-flex; gap: 3px; }
-.lad-dots > span { width: 8px; height: 8px; border-radius: 999px; border: 1.5px solid var(--lad-strong); }
-.lad-dots > span[data-on] { background: var(--lad-strong); }
+/* Los 7 días de la semana en curso: punto con la inicial debajo. */
+.lad-week { display: inline-grid; grid-template-columns: repeat(7, 16px); gap: 3px; }
+.lad-week > span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1;
+  color: var(--muted);
+}
+.lad-week > span > i { width: 10px; height: 10px; border-radius: 999px; border: 1.5px solid var(--lad-strong); }
+.lad-week > span[data-on] > i { background: var(--lad-strong); }
+.lad-week > span[data-future] > i { border-color: var(--lad-soft); border-style: dashed; }
+.lad-week > span[data-today] { font-weight: 700; color: var(--lad-fg); }
+
+/* Cuándo y dónde, debajo del título del escalón. */
+.lad-cue {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--lad-fg);
+}
+.lad-item[data-alert] .lad-cue { color: var(--st-skip-fg); }
+
+/* Gráfico semana a semana del camino (barras de 0 a 7 días). */
+.lad-chart {
+  display: grid;
+  height: 96px;
+  gap: 3px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.lad-chart-col { position: relative; display: flex; align-items: flex-end; }
+.lad-chart-col[data-change]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  border-left: 1.5px dashed var(--lad-line);
+}
+.lad-chart-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--lad-soft);
+}
+.lad-chart-bar[data-met] { background: var(--st-done-line); }
+.lad-chart-bar[data-current] {
+  background: color-mix(in oklab, var(--lad-soft) 60%, transparent);
+  outline: 1.5px dashed var(--lad-strong);
+  outline-offset: -1.5px;
+}
+.lad-chart-need {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+  translate: 0 1px;
+}
+.lad-chart-step {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--lad-fg);
+}
+.lad-chart-label {
+  overflow: hidden;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  white-space: nowrap;
+  color: var(--muted);
+}
 
 /* El camino: escalones en vertical, unidos por una línea. */
 .lad-path { display: grid; }
