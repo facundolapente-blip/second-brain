@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, CaretRight, Check, Clock, PencilSimple, Plus, X } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, CaretRight, Check, Plus, X } from "@phosphor-icons/react";
 import { diffDays, formatShort, weekday } from "@/lib/dates";
 import { dayState, isDone, type LogMap } from "@/lib/habit-logic";
 import {
@@ -11,7 +11,6 @@ import {
   LADDER_DEFAULT_WEEKS,
   LADDER_GOAL_MAX,
   LADDER_MAX_STEPS,
-  LADDER_NOTE_MAX,
   LADDER_WEEKS_MAX,
   ladderDoneFn,
   ladderWeeks,
@@ -32,7 +31,6 @@ import {
   advanceLadder,
   endLadder,
   saveLadderSteps,
-  setLadderNotes,
   setNeverTwice as setNeverTwiceAction,
   startLadder,
   stayLadder,
@@ -57,7 +55,6 @@ import "./habits.css";
 
 type Result = { ok: boolean; error?: string };
 type Over = { ladder?: Ladder | null; neverTwice?: boolean };
-type Notes = { why: string | null; cue: string | null };
 
 const sigOf = (h: HabitDTO) => JSON.stringify([h.ladder ?? null, !!h.neverTwice]);
 
@@ -68,8 +65,7 @@ export type LadderActions = {
   end: (h: HabitDTO) => void;
   saveSteps: (h: HabitDTO, steps: LadderStep[]) => void;
   setNeverTwice: (h: HabitDTO, on: boolean) => void;
-  setNotes: (h: HabitDTO, notes: Notes) => void;
-  start: (h: HabitDTO, plan: { goal: string; steps: LadderStep[]; neverTwice: boolean; why?: string | null; cue?: string | null }) => void;
+  start: (h: HabitDTO, plan: { goal: string; steps: LadderStep[]; neverTwice: boolean }) => void;
 };
 
 /**
@@ -137,8 +133,6 @@ export function useLadders(habits: HabitDTO[], today: string): { habits: HabitDT
           () => saveLadderSteps(h.id, steps),
         ),
       setNeverTwice: (h, on) => run(h, () => ({ neverTwice: on }), () => setNeverTwiceAction(h.id, on)),
-      setNotes: (h, notes) =>
-        run(h, (c) => ({ ladder: c.ladder ? { ...c.ladder, why: notes.why, cue: notes.cue } : c.ladder }), () => setLadderNotes(h.id, notes)),
       start: (h, plan) =>
         run(
           h,
@@ -150,8 +144,6 @@ export function useLadders(habits: HabitDTO[], today: string): { habits: HabitDT
               stepStart: today,
               snoozeUntil: null,
               history: [],
-              why: plan.why ?? null,
-              cue: plan.cue ?? null,
             },
             neverTwice: plan.neverTwice,
           }),
@@ -339,7 +331,6 @@ function LadderItem({
         <div className="grid gap-2 px-3.5 pt-3 lg:px-4">
           <p className="lad-alert-kicker">Hoy es el que importa</p>
           <p className="text-[14px] leading-snug font-medium text-fg">Ayer no salió. Que no sean dos seguidos.</p>
-          {ladder.why && <p className="text-[13.5px] leading-snug text-fg">Acordate: {ladder.why}</p>}
           <div className="grid grid-cols-2 gap-2">
             <span className="lad-alert-fig">
               <b className="figure">{nt.daysWithoutTwo}</b>
@@ -365,12 +356,6 @@ function LadderItem({
             <span className="line-clamp-2 text-[16px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">
               {step?.title || h.name}
             </span>
-            {ladder.cue && (
-              <span className="lad-cue">
-                <Clock size={12} weight="bold" aria-hidden />
-                <span className="truncate">{ladder.cue}</span>
-              </span>
-            )}
             <span className="lad-sub">
               {h.name !== step?.title && <span className="max-sm:hidden">{h.name} · </span>}
               Escalón {cur + 1} de {steps.length}
@@ -568,7 +553,6 @@ function LadderPath({
         </div>
       </div>
 
-      <NotesBlock habit={h} actions={actions} />
 
       {editing ? (
         <StepsEditor
@@ -692,103 +676,6 @@ function PathFig({ value, label }: { value: number; label: string }) {
       <span className="figure text-[22px] font-[750]">{value}</span>
       <span className="text-[12px] leading-snug text-muted">{label}</span>
     </div>
-  );
-}
-
-/** "Para qué" y "Cuándo y dónde" del camino, con un lápiz para cambiarlos. */
-function NotesBlock({ habit: h, actions }: { habit: HabitDTO; actions: LadderActions }) {
-  const ladder = h.ladder!;
-  const [editing, setEditing] = useState(false);
-  const [why, setWhy] = useState(ladder.why ?? "");
-  const [cue, setCue] = useState(ladder.cue ?? "");
-  if (editing) {
-    return (
-      <div className="reveal grid gap-3 rounded-[14px] bg-surface-2 p-3">
-        <NotesFields why={why} onWhy={setWhy} cue={cue} onCue={setCue} />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="accent"
-            onClick={() => {
-              actions.setNotes(h, { why: why.trim() || null, cue: cue.trim() || null });
-              setEditing(false);
-            }}
-          >
-            Guardar
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setWhy(ladder.why ?? "");
-              setCue(ladder.cue ?? "");
-              setEditing(false);
-            }}
-          >
-            Cancelar
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  if (!ladder.why && !ladder.cue) {
-    return (
-      <button type="button" className="lad-add" onClick={() => setEditing(true)}>
-        <Plus size={14} weight="bold" aria-hidden /> Para qué lo hacés, cuándo y dónde
-      </button>
-    );
-  }
-  return (
-    <div className="flex items-start gap-2 rounded-[14px] bg-surface-2 py-2.5 pr-1.5 pl-3">
-      <dl className="grid min-w-0 flex-1 gap-1.5 text-[14px] leading-snug">
-        {ladder.why && (
-          <div>
-            <dt className="lad-kicker">Para qué</dt>
-            <dd>{ladder.why}</dd>
-          </div>
-        )}
-        {ladder.cue && (
-          <div>
-            <dt className="lad-kicker">Cuándo y dónde</dt>
-            <dd>{ladder.cue}</dd>
-          </div>
-        )}
-      </dl>
-      <button type="button" onClick={() => setEditing(true)} aria-label="Cambiar para qué, cuándo y dónde" className="lad-icon-btn">
-        <PencilSimple size={16} />
-      </button>
-    </div>
-  );
-}
-
-function NotesFields({ why, onWhy, cue, onCue }: { why: string; onWhy: (v: string) => void; cue: string; onCue: (v: string) => void }) {
-  return (
-    <>
-      <label className="grid gap-1.5">
-        <span className="kicker">¿Para qué lo hacés? (opcional)</span>
-        <input
-          value={why}
-          onChange={(e) => onWhy(e.target.value)}
-          placeholder="Para dormir mejor, para tener más energía..."
-          maxLength={LADDER_NOTE_MAX}
-          lang="es"
-          spellCheck
-          className={inputClass}
-        />
-      </label>
-      <label className="grid gap-1.5">
-        <span className="kicker">¿Cuándo y dónde? (opcional)</span>
-        <input
-          value={cue}
-          onChange={(e) => onCue(e.target.value)}
-          placeholder="Después de cenar, en el living"
-          maxLength={LADDER_NOTE_MAX}
-          lang="es"
-          spellCheck
-          className={inputClass}
-        />
-      </label>
-    </>
   );
 }
 
@@ -1044,17 +931,13 @@ function StepsEditor({
 
 // ─── Empezar a construir un hábito ──────────────────────────────────────────
 
-/** Meta + escalones propuestos (editables) + para qué / cuándo y dónde + "Nunca dos seguidos": alta y editar. */
+/** Meta + escalones propuestos (editables) + "Nunca dos seguidos": alta y editar. */
 export function LadderPlanner({
   goal,
   onGoal,
   steps,
   onSteps,
   habit,
-  why,
-  onWhy,
-  cue,
-  onCue,
   neverTwice,
   onNeverTwice,
 }: {
@@ -1063,10 +946,6 @@ export function LadderPlanner({
   steps: LadderStep[];
   onSteps: (s: LadderStep[]) => void;
   habit: StepsHabit;
-  why: string;
-  onWhy: (v: string) => void;
-  cue: string;
-  onCue: (v: string) => void;
   neverTwice: boolean;
   onNeverTwice: (v: boolean) => void;
 }) {
@@ -1093,7 +972,6 @@ export function LadderPlanner({
         </p>
         <StepsList steps={steps} onChange={onSteps} habit={habit} />
       </div>
-      <NotesFields why={why} onWhy={onWhy} cue={cue} onCue={onCue} />
       <label className="flex min-h-11 items-center gap-2.5 text-[14px]">
         <input type="checkbox" checked={neverTwice} onChange={(e) => onNeverTwice(e.target.checked)} className="size-4 accent-[var(--accent)]" />
         Nunca dos seguidos: avisarme el día después de fallar

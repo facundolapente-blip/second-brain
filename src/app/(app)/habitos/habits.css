@@ -267,18 +267,6 @@
 .lad-week > span[data-future] > i { border-color: var(--lad-soft); border-style: dashed; }
 .lad-week > span[data-today] { font-weight: 700; color: var(--lad-fg); }
 
-/* Cuándo y dónde, debajo del título del escalón. */
-.lad-cue {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-  font-size: 12.5px;
-  line-height: 1.25;
-  color: var(--lad-fg);
-}
-.lad-item[data-alert] .lad-cue { color: var(--st-skip-fg); }
-
 /* Gráfico semana a semana del camino (barras de 0 a 7 días). */
 .lad-chart {
   display: grid;

@@ -148,8 +148,6 @@ export function HabitFormBody({
   const [goal, setGoal] = useState("");
   const [edited, setEdited] = useState<LadderStep[] | null>(null);
   const [neverTwice, setNeverTwice] = useState(true);
-  const [why, setWhy] = useState("");
-  const [cue, setCue] = useState("");
   const steps =
     edited ??
     suggestSteps(goal, {
@@ -170,7 +168,7 @@ export function HabitFormBody({
   return (
     <form action={action} className="grid gap-5">
       {draft.id && <input type="hidden" name="id" value={draft.id} />}
-      {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: goal.trim(), steps: readySteps, why: why.trim() || null, cue: cue.trim() || null })} />}
+      {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: goal.trim(), steps: readySteps })} />}
       {(isNew || ladderMode) && <input type="hidden" name="neverTwice" value={ladderMode && neverTwice ? "1" : "0"} />}
 
       <Field label="Nombre">
@@ -385,10 +383,6 @@ export function HabitFormBody({
                   target: effectiveTarget(draft),
                   unit: draft.kind === "count" ? draft.unit || null : null,
                 }}
-                why={why}
-                onWhy={setWhy}
-                cue={cue}
-                onCue={setCue}
                 neverTwice={neverTwice}
                 onNeverTwice={setNeverTwice}
               />

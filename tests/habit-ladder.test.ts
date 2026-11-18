@@ -178,9 +178,8 @@ describe("subir y bajar", () => {
     expect(stepBack(base, "2026-11-15")).toBe(base);
     expect(stepBack({ ...base, current: 2 }, "2026-11-15").current).toBe(1);
   });
-  it("lee lo guardado, con para qué y cuándo", () => {
-    expect(parseLadder(JSON.stringify(base))).toEqual({ ...base, snoozeUntil: null, why: null, cue: null });
-    expect(parseLadder({ ...base, why: " Dormir mejor ", cue: "Después de cenar" })).toMatchObject({ why: "Dormir mejor", cue: "Después de cenar" });
+  it("lee lo guardado", () => {
+    expect(parseLadder(JSON.stringify(base))).toEqual({ ...base, snoozeUntil: null });
     expect(parseLadder({ ...base, current: 9 })?.current).toBe(2);
     expect(parseLadder({ ...base, steps: [] })).toBeNull();
     expect(parseLadder({ ...base, steps: [{ title: "x", perWeek: 9, weeks: 20 }] })?.steps[0]).toEqual({ title: "x", perWeek: 7, weeks: 8 });

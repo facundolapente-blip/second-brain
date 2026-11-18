@@ -26,7 +26,6 @@ export type LadderStep = { title: string; perWeek?: number | null; target?: numb
 /**
  * current = índice del escalón actual. stepStart = día en que arrancó ese escalón.
  * history = escalones ya pasados con sus fechas (from/to inclusive).
- * why = para qué lo hace; cue = cuándo y dónde ("después de cenar, en el living").
  */
 export type Ladder = {
   goal: string;
@@ -35,14 +34,11 @@ export type Ladder = {
   stepStart: string;
   snoozeUntil?: string | null;
   history?: { step: number; from: string; to: string }[];
-  why?: string | null;
-  cue?: string | null;
 };
 
 export const LADDER_MAX_STEPS = 8;
 export const LADDER_TITLE_MAX = 80;
 export const LADDER_GOAL_MAX = 200;
-export const LADDER_NOTE_MAX = 200;
 export const LADDER_WEEKS_MAX = 8;
 /** Semanas seguidas que se proponen para subir de escalón. */
 export const LADDER_DEFAULT_WEEKS = 2;
@@ -102,8 +98,6 @@ export function parseLadder(raw: unknown): Ladder | null {
     current: clamp(cur, 0, steps.length - 1),
     stepStart: r.stepStart,
     snoozeUntil: isISODate(r.snoozeUntil) ? r.snoozeUntil : null,
-    why: text(r.why, LADDER_NOTE_MAX) || null,
-    cue: text(r.cue, LADDER_NOTE_MAX) || null,
   };
   if (Array.isArray(r.history)) {
     ladder.history = r.history.flatMap((h) => {

@@ -16,7 +16,6 @@ import {
   LADDER_GOAL_MAX,
   LADDER_MAX_STEPS,
   LADDER_TITLE_MAX,
-  LADDER_NOTE_MAX,
   parseLadder,
   snoozeWeek,
   stepBack,
@@ -122,12 +121,6 @@ function ruleChanged(a: RuleFields, b: RuleFields): boolean {
   );
 }
 
-/** "Para qué" y "cuándo y dónde" (vacío = null). */
-function ladderNotes(p: { why?: unknown; cue?: unknown }): { why: string | null; cue: string | null } {
-  const t = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, LADDER_NOTE_MAX) : "") || null;
-  return { why: t(p.why), cue: t(p.cue) };
-}
-
 /** La escalera que manda el formulario (JSON { goal, steps }), desde el escalón 0. */
 function ladderFromForm(fd: FormData, stepStart: string): { ok: true; ladder: Ladder | null } | { ok: false; error: string } {
   const raw = texto(fd, "ladder", 20_000);
@@ -138,7 +131,7 @@ function ladderFromForm(fd: FormData, stepStart: string): { ok: true; ladder: La
   } catch {
     return { ok: false, error: "No se pudo leer la escalera." };
   }
-  const p = (parsed && typeof parsed === "object" ? parsed : {}) as { goal?: unknown; steps?: unknown; why?: unknown; cue?: unknown };
+  const p = (parsed && typeof parsed === "object" ? parsed : {}) as { goal?: unknown; steps?: unknown };
   const checked = checkSteps(p.steps);
   if (!checked.ok) return checked;
   const goal = typeof p.goal === "string" ? p.goal.trim().slice(0, LADDER_GOAL_MAX) : "";
@@ -151,7 +144,6 @@ function ladderFromForm(fd: FormData, stepStart: string): { ok: true; ladder: La
       stepStart,
       snoozeUntil: null,
       history: [],
-      ...ladderNotes(p),
     },
   };
 }
@@ -467,7 +459,7 @@ async function loadLadder(habitId: string): Promise<{ habit: HabitRow; ladder: L
 /** Pone un hábito "en construcción": escalones, escalón 0 desde hoy y "Nunca dos seguidos". */
 export async function startLadder(
   habitId: string,
-  input: { goal: string; steps: LadderStep[]; neverTwice: boolean; why?: string | null; cue?: string | null },
+  input: { goal: string; steps: LadderStep[]; neverTwice: boolean },
 ): Promise<LadderResult> {
   await exigirSesion();
   const r = await loadLadder(habitId);
@@ -482,7 +474,6 @@ export async function startLadder(
     stepStart: todayISO(),
     snoozeUntil: null,
     history: [],
-    ...ladderNotes(input ?? {}),
   };
   await writeLadder(r.habit, ladder, { neverTwice: !!input.neverTwice });
   await logActivity("updated", "habit", habitId, `${r.habit.name}: en construcción`);
@@ -547,18 +538,6 @@ export async function endLadder(habitId: string): Promise<LadderResult> {
   if (!habit) return { ok: false, error: "No existe ese hábito." };
   await prisma.habit.update({ where: { id: habitId }, data: { ladder: Prisma.DbNull } });
   await logActivity("updated", "habit", habitId, `${habit.name}: terminó la construcción`);
-  refrescar();
-  return { ok: true };
-}
-
-/** Cambia "para qué" y "cuándo y dónde" de un hábito en construcción. */
-export async function setLadderNotes(habitId: string, notes: { why?: string | null; cue?: string | null }): Promise<LadderResult> {
-  await exigirSesion();
-  const r = await loadLadder(habitId);
-  if ("error" in r) return { ok: false, error: r.error };
-  if (!r.ladder) return { ok: false, error: "Ese hábito no está en construcción." };
-  const next: Ladder = { ...r.ladder, ...ladderNotes(notes ?? {}) };
-  await prisma.habit.update({ where: { id: habitId }, data: { ladder: next as unknown as Prisma.InputJsonValue } });
   refrescar();
   return { ok: true };
 }
