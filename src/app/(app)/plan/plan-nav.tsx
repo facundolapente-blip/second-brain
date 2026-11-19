@@ -33,7 +33,7 @@ export function PlanNav() {
 export function PlanTabs() {
   const [pathname, pick] = useTabPath();
   return (
-    <div className="hidden gap-6 border-b border-line lg:flex">
+    <div className="hidden items-center gap-1.5 lg:flex">
       {TABS.map((t) => (
         <TopTab key={t.href} href={t.href} label={t.label} active={isActive(pathname, t.href)} onClick={pick(t.href)} />
       ))}

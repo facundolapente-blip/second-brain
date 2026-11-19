@@ -102,8 +102,8 @@ export function TopTab({
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "-mb-px border-b-[1.5px] pb-3 text-[14px] whitespace-nowrap transition-colors duration-[var(--dur-quick)]",
-        active ? "border-fg font-medium text-fg" : "border-transparent text-muted hover:text-fg",
+        "inline-flex h-9 items-center gap-1 rounded-full px-4 text-[14px] whitespace-nowrap transition-colors duration-[var(--dur-quick)]",
+        active ? "bg-accent font-semibold text-on-accent" : "border border-line text-muted hover:bg-surface-2 hover:text-fg",
       )}
     >
       {label}

@@ -79,7 +79,7 @@ export function GastosTabs() {
   const extra = TABS.filter((t) => !t.mobile);
   const current = extra.find((t) => isActive(pathname, t.href));
   return (
-    <div className="hidden items-end gap-6 border-b border-line lg:flex">
+    <div className="hidden items-center gap-1.5 lg:flex">
       {TABS.filter((t) => t.mobile).map((t) => (
         <TopTab key={t.href} href={t.href} label={t.label} active={isActive(pathname, t.href)} onClick={pick(t.href)} />
       ))}
@@ -91,8 +91,8 @@ export function GastosTabs() {
             onClick={toggle}
             aria-current={current ? "page" : undefined}
             className={cx(
-              "-mb-px inline-flex items-center gap-1 border-b-[1.5px] pb-3 text-[14px] whitespace-nowrap transition-colors",
-              current ? "border-fg font-medium text-fg" : "border-transparent text-muted hover:text-fg",
+              "inline-flex h-9 items-center gap-1 rounded-full px-4 text-[14px] whitespace-nowrap transition-colors",
+              current ? "bg-accent font-semibold text-on-accent" : "border border-line text-muted hover:bg-surface-2 hover:text-fg",
             )}
           >
             {current ? current.label : "Más"}
