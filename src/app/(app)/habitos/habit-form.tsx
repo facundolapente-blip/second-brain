@@ -9,8 +9,8 @@ import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { daysText, LADDER_DEFAULT_WEEKS, ladderPlan, planSteps, planTarget, stepTitle, type Ladder } from "@/lib/habit-ladder";
-import { LadderEditSection, LadderPlanner } from "./ladder";
+import { daysText, LADDER_DEFAULT_WEEKS, planSteps, planTarget, replanLadder, stepConfig, stepTitle, type Ladder, type LadderStep } from "@/lib/habit-ladder";
+import { ladderEditChanged, ladderEditOf, LadderEditSection, LadderPlanner, type LadderEdit } from "./ladder";
 import { draftsOf, newPartDraft, PartsEditor, partsPayload, type PartDraft } from "./parts";
 
 /** `hasHistory`: si el hábito ya tiene marcas (cambiar la meta ofrece empezar una pista nueva). */
@@ -161,13 +161,23 @@ export function HabitFormBody({
   const ladderMode = canLadder && mode === "ladder";
   // Ya en construcción: cambiar hasta dónde llegar y cada cuántas semanas subir, o sacarla.
   const editLadder = !isNew && draft.inLadder && draft.ladder ? draft.ladder : null;
-  const editPlan = editLadder ? ladderPlan(editLadder) : null;
-  const [editTo, setEditTo] = useState(editPlan?.to ?? 7);
-  const [editWeeks, setEditWeeks] = useState(editPlan?.weeks ?? LADDER_DEFAULT_WEEKS);
+  const [ladderEdit, setLadderEdit] = useState<LadderEdit | null>(() => (editLadder ? ladderEditOf(editLadder) : null));
   const [endingLadder, setEndingLadder] = useState(false);
+  // El paso con el que queda la construcción (empezarla o cambiarle el plan): también
+  // cambia cuándo toca el hábito (`stepConfig`), así que entra en la pregunta de la pista.
+  const ladderStep: LadderStep | null = ladderMode
+    ? planSteps(planFrom, planTo, planWeeks)[0]
+    : editLadder && ladderEdit && !endingLadder && ladderEditChanged(editLadder, ladderEdit)
+      ? (() => {
+          const l = replanLadder(editLadder, ladderEdit, today);
+          return l.steps[l.current];
+        })()
+      : null;
+  const final = withStep(draft, ladderStep);
+  const manualChange = rulesDiffer(initial, draft);
   // Cambiar cuándo toca o la meta reescribiría cómo se leen los días ya marcados
   // (un "hecho" pasaría a "a medias"): antes de guardar se elige desde cuándo vale.
-  const askTrack = !!draft.id && hasHistory && initial.startDate < today && rulesDiffer(initial, draft);
+  const askTrack = !!draft.id && hasHistory && initial.startDate < today && rulesDiffer(initial, final);
 
   return (
     <form action={action} className="grid gap-5">
@@ -405,10 +415,9 @@ export function HabitFormBody({
       {editLadder && (
         <LadderEditSection
           ladder={editLadder}
-          to={editTo}
-          weeks={editWeeks}
-          onTo={setEditTo}
-          onWeeks={setEditWeeks}
+          edit={ladderEdit ?? { from: 1, current: 1, to: 1, weeks: LADDER_DEFAULT_WEEKS }}
+          onEdit={setLadderEdit}
+          today={today}
           ending={endingLadder}
           onEnding={setEndingLadder}
         />
@@ -419,10 +428,13 @@ export function HabitFormBody({
       {askTrack ? (
         <div role="group" aria-labelledby="pista-titulo" className="reveal grid gap-3 rounded-2xl border border-line-strong bg-surface-2 p-4">
           <div className="grid gap-1">
-            <p id="pista-titulo" className="text-[14.5px] font-medium">Cambiaste cuándo toca o la meta. ¿Desde cuándo vale?</p>
+            <p id="pista-titulo" className="text-[14.5px] font-medium">
+              {manualChange ? "Cambiaste cuándo toca o la meta." : `Con este paso pasa a ${daysText(ladderStep?.perWeek ?? 7)}.`} ¿Desde cuándo vale?
+            </p>
             <p className="text-[13px] leading-relaxed text-muted">
-              Aplicado al historial, los días ya marcados se leen con la regla nueva (un hecho puede pasar a &quot;a medias&quot;
-              y cambiar la racha).
+              {manualChange
+                ? <>Aplicado al historial, los días ya marcados se leen con la regla nueva (un hecho puede pasar a &quot;a medias&quot; y cambiar la racha).</>
+                : "Unido a la pista actual, los días ya marcados se leen con la frecuencia nueva y la racha y el puntaje pueden cambiar."}
             </p>
           </div>
           <Button type="submit" name="desde" value="hoy" variant="accent" disabled={pending} className="h-auto min-h-11 py-2 whitespace-normal">
@@ -432,7 +444,7 @@ export function HabitFormBody({
             </span>
           </Button>
           <Button type="submit" name="desde" value="siempre" variant="outline" disabled={pending}>
-            Aplicar también al historial
+            {manualChange ? "Aplicar también al historial" : "Unirlo a la pista actual"}
           </Button>
         </div>
       ) : (
@@ -442,6 +454,14 @@ export function HabitFormBody({
       )}
     </form>
   );
+}
+
+/** El borrador con lo que le pone el paso de la construcción (lo mismo que hace `writeLadder`). */
+function withStep(d: Draft, step: LadderStep | null): Draft {
+  if (!step) return d;
+  const c = stepConfig(step, { frequency: d.frequency, timesPerWeek: d.timesPerWeek, target: effectiveTarget(d), unit: d.kind === "count" ? d.unit : null, weekdays: d.weekdays });
+  if (!c) return d;
+  return { ...d, ...c, kind: c.target ? "count" : d.kind };
 }
 
 function effectiveTarget(d: Draft) {

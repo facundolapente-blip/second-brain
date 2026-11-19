@@ -23,6 +23,8 @@ import {
   partsMark,
   partsStats,
   partStepLine,
+  partStepAt,
+  pickPartStep,
   replanPart,
   type HabitPart,
 } from "@/lib/habit-parts";
@@ -194,5 +196,18 @@ describe("cifras por parte", () => {
     expect(st).toMatchObject({ days: 10, complete: 5, partial: 5, none: 0 });
     expect(st.parts.map((p) => p.done)).toEqual([10, 10, 5]);
     expect(st.hardest).toBe("c");
+  });
+  it("Estás en: elegir el paso de una parte", () => {
+    const l = { ...newPartLadder({ from: 15, to: 60, by: 15, unit: "min", weeks: 2 }, "2026-11-02"), current: 1 };
+    // Mismo paso o un número que no está: nada.
+    expect(pickPartStep(l, 30, "2026-11-19")).toBe(l);
+    expect(pickPartStep(l, 20, "2026-11-19")).toBe(l);
+    expect(pickPartStep(l, null, "2026-11-19")).toBe(l);
+    const up = pickPartStep(l, 45, "2026-11-19");
+    expect(up.current).toBe(2);
+    expect(up.stepStart).toBe("2026-11-19");
+    expect(up.history).toEqual([{ step: 1, from: "2026-11-02", to: "2026-11-18" }]);
+    expect(partStepAt([10, 20, 30], 25)).toBe(20);
+    expect(partStepAt([10, 20, 30], 5)).toBe(10);
   });
 });

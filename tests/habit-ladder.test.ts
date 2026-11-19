@@ -11,6 +11,7 @@ import {
   planSteps,
   planTarget,
   parseReplan,
+  replanLadder,
   replanSteps,
   snoozeWeek,
   spanWeeks,
@@ -86,8 +87,16 @@ describe("el plan de días por semana", () => {
     const steps = [1, 2, 3, 4].map((n) => ({ title: String(n), perWeek: n, weeks: 2 }));
     const l: Ladder = { goal: "x", steps, current: 2, stepStart: "2026-11-02" };
     expect(parseReplan("", l)).toEqual({ ok: true, plan: null });
-    expect(parseReplan(JSON.stringify({ to: 6, weeks: 3 }), l)).toEqual({ ok: true, plan: { to: 6, weeks: 3 } });
-    expect(parseReplan(JSON.stringify({ to: 3, weeks: 1 }), l)).toEqual({ ok: true, plan: { to: 3, weeks: 1 } });
+    // El formato viejo ({ to, weeks }): desde y el paso quedan como están.
+    expect(parseReplan(JSON.stringify({ to: 6, weeks: 3 }), l)).toEqual({ ok: true, plan: { from: 1, current: 3, to: 6, weeks: 3 } });
+    expect(parseReplan(JSON.stringify({ to: 3, weeks: 1 }), l)).toEqual({ ok: true, plan: { from: 1, current: 3, to: 3, weeks: 1 } });
+    // El nuevo, con desde y el paso en el que está.
+    expect(parseReplan(JSON.stringify({ from: 2, current: 2, to: 5, weeks: 2 }), l)).toEqual({ ok: true, plan: { from: 2, current: 2, to: 5, weeks: 2 } });
+    expect(parseReplan(JSON.stringify({ from: 4, current: 4, to: 4, weeks: 2 }), l).ok).toBe(true);
+    expect(parseReplan(JSON.stringify({ from: 3, current: 2, to: 5, weeks: 2 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ from: 0, current: 2, to: 5, weeks: 2 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ from: 1, current: 6, to: 5, weeks: 2 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ from: 1, current: 2.5, to: 5, weeks: 2 }), l).ok).toBe(false);
     // Nunca menos que el paso actual, ni más de 7 días o de las semanas máximas.
     expect(parseReplan(JSON.stringify({ to: 2, weeks: 2 }), l).ok).toBe(false);
     expect(parseReplan(JSON.stringify({ to: 8, weeks: 2 }), l).ok).toBe(false);
@@ -98,6 +107,38 @@ describe("el plan de días por semana", () => {
     // Las escaleras viejas (sin plan) no se replanifican.
     const old: Ladder = { goal: "x", steps: [{ title: "a", target: 2, weeks: 1 }, { title: "b", target: 4, weeks: 1 }], current: 0, stepStart: "2026-11-02" };
     expect(parseReplan(JSON.stringify({ to: 5, weeks: 2 }), old).ok).toBe(false);
+  });
+  it("replanLadder: mismo desde y mismo paso es replanSteps (la cuenta sigue)", () => {
+    const l: Ladder = { goal: "x", steps: planSteps(1, 7, 2), current: 2, stepStart: "2026-11-02", snoozeUntil: "2026-11-20", history: [{ step: 0, from: "2026-10-01", to: "2026-10-14" }] };
+    const r = replanLadder(l, { from: 1, current: 3, to: 5, weeks: 3 }, "2026-11-19");
+    expect(r.steps.map((s) => s.perWeek)).toEqual([1, 2, 3, 4, 5]);
+    expect(r.current).toBe(2);
+    expect(r.stepStart).toBe("2026-11-02");
+    expect(r.snoozeUntil).toBe("2026-11-20");
+    expect(r.history).toEqual(l.history);
+  });
+  it("replanLadder: otro paso arranca hoy y el de antes queda en la historia", () => {
+    const history = [
+      { step: 0, from: "2026-10-01", to: "2026-10-14" },
+      { step: 1, from: "2026-10-15", to: "2026-11-01" },
+    ];
+    const l: Ladder = { goal: "x", steps: planSteps(1, 7, 2), current: 2, stepStart: "2026-11-02", snoozeUntil: "2026-11-20", history };
+    const up = replanLadder(l, { from: 1, current: 5, to: 7, weeks: 2 }, "2026-11-19");
+    expect(up.current).toBe(4);
+    expect(up.steps[up.current].perWeek).toBe(5);
+    expect(up.stepStart).toBe("2026-11-19");
+    expect(up.snoozeUntil).toBeNull();
+    expect(up.history).toEqual([...history, { step: 2, from: "2026-11-02", to: "2026-11-18" }]);
+    // Empezar en 2: el tramo de 1 día se va y los demás pasan a su paso nuevo (por días).
+    const from2 = replanLadder(l, { from: 2, current: 3, to: 6, weeks: 1 }, "2026-11-19");
+    expect(from2.steps.map((s) => s.perWeek)).toEqual([2, 3, 4, 5, 6]);
+    expect(from2.current).toBe(1);
+    expect(from2.stepStart).toBe("2026-11-02");
+    expect(from2.history).toEqual([{ step: 0, from: "2026-10-15", to: "2026-11-01" }]);
+    // Bajar a 1 empezando en 1 el mismo día que arrancó el paso: no deja un tramo vacío.
+    const same = replanLadder({ ...l, stepStart: "2026-11-19" }, { from: 1, current: 1, to: 7, weeks: 2 }, "2026-11-19");
+    expect(same.current).toBe(0);
+    expect(same.history).toEqual(history);
   });
   it("textos por semana", () => {
     expect(stepRuleText({ title: "x", perWeek: 3, weeks: 2 }, plain, false)).toBe("3 días por semana · 2 semanas seguidas para subir");

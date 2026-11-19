@@ -227,14 +227,19 @@ export function replanSteps(ladder: Ladder, to: number, weeks: number): LadderSt
   return [...ladder.steps.slice(0, cur), ...planSteps(days, Math.max(days, to), weeks)];
 }
 
+/** Lo que se puede cambiar en "Editar hábito": desde cuántos días, en cuántos está, hasta cuántos y semanas para subir. */
+export type LadderReplan = { from: number; current: number; to: number; weeks: number };
+
 /**
- * Lo que manda el formulario "Editar hábito" para cambiar el plan (JSON `{ to, weeks }`),
- * controlado contra la escalera: hace falta que tenga plan, `to` entre los días del paso
- * actual y 7, `weeks` de 1 a `LADDER_WEEKS_MAX`. Vacío = sin cambios (plan null).
+ * Lo que manda el formulario "Editar hábito" para cambiar el plan (JSON `{ from, current,
+ * to, weeks }`; el viejo `{ to, weeks }` también sirve: desde y el paso quedan como
+ * están), controlado contra la escalera: hace falta que tenga plan, 1 ≤ from ≤ current ≤
+ * to ≤ 7 y `weeks` de 1 a `LADDER_WEEKS_MAX`. Vacío = sin cambios (plan null).
  */
-export function parseReplan(raw: string | null | undefined, ladder: Ladder): { ok: true; plan: { to: number; weeks: number } | null } | { ok: false; error: string } {
+export function parseReplan(raw: string | null | undefined, ladder: Ladder): { ok: true; plan: LadderReplan | null } | { ok: false; error: string } {
   if (!raw || !raw.trim()) return { ok: true, plan: null };
-  if (!ladderPlan(ladder)) return { ok: false, error: "Esta construcción no tiene plan de días por semana." };
+  const plan = ladderPlan(ladder);
+  if (!plan) return { ok: false, error: "Esta construcción no tiene plan de días por semana." };
   let v: unknown;
   try {
     v = JSON.parse(raw);
@@ -242,12 +247,47 @@ export function parseReplan(raw: string | null | undefined, ladder: Ladder): { o
     return { ok: false, error: "No se pudo leer el plan." };
   }
   const r = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
-  const to = typeof r.to === "number" && Number.isInteger(r.to) ? r.to : null;
-  const weeks = typeof r.weeks === "number" && Number.isInteger(r.weeks) ? r.weeks : null;
-  const min = ladder.steps[clamp(ladder.current, 0, ladder.steps.length - 1)].perWeek ?? 1;
-  if (to === null || to < min || to > 7) return { ok: false, error: `Podés llegar a entre ${min} y 7 días por semana.` };
+  const n = (k: string) => (typeof r[k] === "number" && Number.isInteger(r[k]) ? (r[k] as number) : null);
+  const curDays = ladder.steps[clamp(ladder.current, 0, ladder.steps.length - 1)].perWeek ?? 1;
+  const from = r.from === undefined ? plan.from : n("from");
+  const current = r.current === undefined ? curDays : n("current");
+  const to = n("to");
+  const weeks = n("weeks");
+  if (from === null || from < 1 || from > 7) return { ok: false, error: "Podés empezar con entre 1 y 7 días por semana." };
+  if (current === null || current < from || current > 7) return { ok: false, error: `El paso en el que estás va de ${from} a 7 días por semana.` };
+  if (to === null || to < current || to > 7) return { ok: false, error: `Podés llegar a entre ${current} y 7 días por semana.` };
   if (weeks === null || weeks < 1 || weeks > LADDER_WEEKS_MAX) return { ok: false, error: `Las semanas para subir van de 1 a ${LADDER_WEEKS_MAX}.` };
-  return { ok: true, plan: { to, weeks } };
+  return { ok: true, plan: { from, current, to, weeks } };
+}
+
+/**
+ * La escalera con el plan nuevo de "Editar hábito".
+ * - Si no cambian ni desde cuántos días ni el paso en el que está, es `replanSteps`: lo ya
+ *   subido queda igual (también los saltos) y el paso sigue con su cuenta.
+ * - Si no, los pasos se rearman con `planSteps(from, to, weeks)` y la historia se lee por
+ *   días: cada tramo pasa al paso nuevo con los mismos días; los tramos de días que ya no
+ *   están en la escalera (por ejemplo, empezar en 3 en vez de 1) se dejan afuera.
+ * - Si cambia el paso en el que está, como al subir o bajar: el tramo de ahora queda en
+ *   la historia hasta ayer, el paso nuevo arranca hoy y se olvida el "todavía no".
+ *   Si es el mismo, sigue la cuenta de semanas desde cuando arrancó.
+ */
+export function replanLadder(ladder: Ladder, p: LadderReplan, today: string): Ladder {
+  const cur = clamp(ladder.current, 0, ladder.steps.length - 1);
+  const curDays = ladder.steps[cur].perWeek ?? 1;
+  const plan = ladderPlan(ladder);
+  if (plan && p.from === plan.from && p.current === curDays) return { ...ladder, steps: replanSteps(ladder, p.to, p.weeks) };
+  const steps = planSteps(p.from, Math.max(p.current, p.to), p.weeks);
+  const indexOf = (days: number | null | undefined) => steps.findIndex((s) => s.perWeek === days);
+  const daysOf = (i: number) => ladder.steps[clamp(i, 0, ladder.steps.length - 1)].perWeek;
+  const history = (ladder.history ?? []).flatMap((h) => {
+    const i = indexOf(daysOf(h.step));
+    return i < 0 ? [] : [{ ...h, step: i }];
+  });
+  const current = Math.max(0, indexOf(p.current));
+  if (p.current === curDays) return { ...ladder, steps, current, history };
+  const before = indexOf(curDays);
+  if (before >= 0 && today > ladder.stepStart) history.push({ step: before, from: ladder.stepStart, to: addDays(today, -1) });
+  return { ...ladder, steps, current, stepStart: today, snoozeUntil: null, history };
 }
 
 // ─── Progreso del escalón, por semanas ─────────────────────────────────────

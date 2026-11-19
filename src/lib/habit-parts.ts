@@ -209,6 +209,28 @@ export function replanPart(l: PartLadder, plan: PartPlan, today: string): PartLa
   return { goal: amountText(plan.to, unit), steps, current, stepStart: same ? l.stepStart : today, snoozeUntil: null, history: [], unit };
 }
 
+/**
+ * "Estás en" de una parte en "Editar hábito": la pone en el paso con ese número (después
+ * de `replanPart`). Si es otro paso, como al subir o bajar: el tramo de ahora queda en la
+ * historia hasta ayer y el paso nuevo arranca hoy. Un número que no está, o el mismo
+ * paso, no cambia nada.
+ */
+export function pickPartStep(l: PartLadder, value: number | null | undefined, today: string): PartLadder {
+  if (typeof value !== "number") return l;
+  const i = partLabels(l).indexOf(value);
+  if (i < 0 || i === l.current) return l;
+  const history = [...(l.history ?? [])];
+  if (today > l.stepStart) history.push({ step: l.current, from: l.stepStart, to: addDays(today, -1) });
+  return { ...l, current: i, stepStart: today, snoozeUntil: null, history };
+}
+
+/** El número del paso en el que quedaría con otro plan: el más alto que no pase de `at` (como `replanPart`). */
+export function partStepAt(labels: number[], at: number): number {
+  let out = labels[0];
+  for (const n of labels) if (n <= at) out = n;
+  return out;
+}
+
 /** ¿Esa parte se hizo ese día? */
 export function partDoneFn(partId: string, logs: LogMap): (d: string) => boolean {
   return (d) => {

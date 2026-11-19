@@ -18,6 +18,7 @@ import {
   partPlanOf,
   partProgress,
   partsStats,
+  partStepAt,
   partStepLine,
   partWeekLine,
   PARTS_MAX,
@@ -312,6 +313,8 @@ export type PartDraft = {
   weeks: number;
   /** Paso en el que va (si ya se estaba construyendo). */
   current?: number;
+  /** "Estás en": el número de ese paso (con otro plan, el más alto que no lo pase). */
+  at?: number;
 };
 
 let seq = 0;
@@ -336,6 +339,7 @@ export function draftsOf(parts: HabitPart[] | null | undefined): PartDraft[] {
       unit: plan?.unit ?? "min",
       weeks: plan?.weeks ?? LADDER_DEFAULT_WEEKS,
       current: p.ladder ? p.ladder.current : undefined,
+      at: p.ladder ? partLabels(p.ladder)[Math.min(p.ladder.current, p.ladder.steps.length - 1)] : undefined,
     };
   });
 }
@@ -347,7 +351,7 @@ export function partsPayload(drafts: PartDraft[]): string {
       id: d.id,
       name: d.name.trim(),
       moment: d.moment,
-      build: d.build ? { from: d.from, to: d.to, by: d.by, unit: d.unit, weeks: d.weeks } : null,
+      build: d.build ? { from: d.from, to: d.to, by: d.by, unit: d.unit, weeks: d.weeks, ...(d.at !== undefined && !partPlanError(d) ? { current: partStepAt(partNumbers(d.from, d.to, d.by), d.at) } : {}) } : null,
     })),
   );
 }
@@ -431,6 +435,9 @@ function PartEditor({
   const error = d.build ? partPlanError(plan) : null;
   const labels = d.build && !error ? partNumbers(d.from, d.to, d.by) : [];
   const weeksTotal = Math.max(0, labels.length - 1) * d.weeks;
+  // Ya se estaba construyendo: en qué paso está (con el plan de ahora).
+  const at = d.at !== undefined && labels.length ? partStepAt(labels, d.at) : undefined;
+  const atIndex = at !== undefined ? labels.indexOf(at) : -1;
   const units = PART_UNITS.includes(d.unit) ? PART_UNITS : [...PART_UNITS, d.unit];
   const unitWord = d.unit === "min" ? "minutos" : d.unit;
   return (
@@ -526,6 +533,20 @@ function PartEditor({
                 ))}
               </span>
             </div>
+            {at !== undefined && (
+              <PlanStepper
+                label="Estás en"
+                unit={unitWord}
+                value={at}
+                min={labels[0]}
+                max={labels[labels.length - 1]}
+                onChange={(v) => {
+                  // De paso en paso: − va al número de antes y + al de después.
+                  const i = labels.indexOf(at) + (v < at ? -1 : 1);
+                  onChange({ at: labels[Math.max(0, Math.min(labels.length - 1, i))] });
+                }}
+              />
+            )}
             <PlanStepper
               label="Subís después de"
               unit={d.weeks === 1 ? "semana cumplida" : "semanas seguidas cumplidas"}
@@ -540,10 +561,10 @@ function PartEditor({
           ) : (
             <div className="lad-propose">
               <p className="lad-kicker">El camino de esta parte</p>
-              <LadderBars labels={labels} current={Math.min(d.current ?? 0, labels.length - 1)} />
+              <LadderBars labels={labels} current={atIndex >= 0 ? atIndex : 0} />
               <p className="text-[12.5px] leading-snug text-muted">
                 {labels.join(" → ")} {d.unit}.
-                {d.current ? ` Vas por el paso ${Math.min(d.current, labels.length - 1) + 1}.` : ` Si cumplís todas las semanas, llegás en ${weeksTotal === 1 ? "1 semana" : `unas ${weeksTotal} semanas`}.`}
+                {atIndex > 0 ? ` Vas por el paso ${atIndex + 1}.` : atIndex === 0 ? "" : ` Si cumplís todas las semanas, llegás en ${weeksTotal === 1 ? "1 semana" : `unas ${weeksTotal} semanas`}.`}
               </p>
             </div>
           )}

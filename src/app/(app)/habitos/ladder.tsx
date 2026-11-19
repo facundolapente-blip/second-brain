@@ -12,6 +12,7 @@ import {
   ladderDoneFn,
   ladderPlan,
   ladderWeeks,
+  replanLadder,
   replanSteps,
   snoozeWeek,
   spanWeeks,
@@ -988,37 +989,53 @@ export function LadderSettings({
 
 /**
  * En "Editar hábito", si ya está en construcción: el paso en el que está, la escalera
- * con el plan nuevo y los selectores de destino y semanas (si la escalera tiene plan),
- * y "Sacar la construcción". Todo se manda con el formulario (campos ocultos
- * `ladderPlan` y `ladderEnd`, ver `saveHabit`).
+ * con el plan nuevo y los selectores (si la escalera tiene plan): desde cuántos días
+ * arranca, en qué paso está, hasta cuántos y cada cuántas semanas sube; y "Sacar la
+ * construcción". Todo se manda con el formulario (campos ocultos `ladderPlan` y
+ * `ladderEnd`, ver `saveHabit` y `replanLadder`).
  */
+export type LadderEdit = { from: number; current: number; to: number; weeks: number };
+
+/** El plan como está, para arrancar el formulario (null en las escaleras viejas sin plan). */
+export function ladderEditOf(ladder: Ladder): LadderEdit | null {
+  const plan = ladderPlan(ladder);
+  if (!plan) return null;
+  const cur = Math.min(ladder.current, ladder.steps.length - 1);
+  return { from: plan.from, current: ladder.steps[cur].perWeek as number, to: plan.to, weeks: plan.weeks };
+}
+
+/** ¿Cambió algo del plan? */
+export function ladderEditChanged(ladder: Ladder, e: LadderEdit): boolean {
+  const o = ladderEditOf(ladder);
+  return !!o && (o.from !== e.from || o.current !== e.current || o.to !== e.to || o.weeks !== e.weeks);
+}
+
 export function LadderEditSection({
   ladder,
-  to,
-  weeks,
-  onTo,
-  onWeeks,
+  edit,
+  onEdit,
+  today,
   ending,
   onEnding,
 }: {
   ladder: Ladder;
-  to: number;
-  weeks: number;
-  onTo: (v: number) => void;
-  onWeeks: (v: number) => void;
+  edit: LadderEdit;
+  onEdit: (e: LadderEdit) => void;
+  today: string;
   ending: boolean;
   onEnding: (v: boolean) => void;
 }) {
   const plan = ladderPlan(ladder);
-  const cur = Math.min(ladder.current, ladder.steps.length - 1);
-  const min = ladder.steps[cur].perWeek ?? 1;
-  const changed = !!plan && (to !== plan.to || weeks !== plan.weeks);
-  const shown = plan && !ending ? { ...ladder, steps: replanSteps(ladder, to, weeks) } : ladder;
+  const changed = !!plan && ladderEditChanged(ladder, edit);
+  const shown = plan && !ending && changed ? replanLadder(ladder, edit, today) : ladder;
+  const cur = Math.min(shown.current, shown.steps.length - 1);
   const total = shown.steps.length;
-  const stepText = plan ? stepTitle(ladder.steps[cur].perWeek as number) : ladder.steps[cur].title;
+  const stepText = plan ? stepTitle(shown.steps[cur].perWeek as number) : shown.steps[cur].title;
+  const { from, current, to, weeks } = edit;
+  const days = (n: number) => (n === 1 ? "día por semana" : "días por semana");
   return (
     <div data-tone="habitos">
-      {changed && !ending && <input type="hidden" name="ladderPlan" value={JSON.stringify({ to, weeks })} />}
+      {changed && !ending && <input type="hidden" name="ladderPlan" value={JSON.stringify(edit)} />}
       {ending && <input type="hidden" name="ladderEnd" value="1" />}
       <TintedCard as="div" tone="habitos" icon={Stairs} title="En construcción">
         <div className="grid gap-3">
@@ -1034,8 +1051,10 @@ export function LadderEditSection({
           </div>
           {plan && !ending && (
             <div className="grid divide-y divide-line">
-              <PlanStepper label="Querés llegar a" unit={to === 1 ? "día por semana" : "días por semana"} value={to} min={min} max={7} onChange={onTo} />
-              <PlanStepper label="Subís después de" unit={weeksUnit(weeks)} value={weeks} min={1} max={LADDER_WEEKS_MAX} onChange={onWeeks} />
+              <PlanStepper label="Empezás con" unit={days(from)} value={from} min={1} max={to} onChange={(v) => onEdit({ ...edit, from: v, current: Math.max(current, v) })} />
+              <PlanStepper label="Estás en" unit={days(current)} value={current} min={from} max={to} onChange={(v) => onEdit({ ...edit, current: v })} />
+              <PlanStepper label="Querés llegar a" unit={days(to)} value={to} min={current} max={7} onChange={(v) => onEdit({ ...edit, to: v })} />
+              <PlanStepper label="Subís después de" unit={weeksUnit(weeks)} value={weeks} min={1} max={LADDER_WEEKS_MAX} onChange={(v) => onEdit({ ...edit, weeks: v })} />
             </div>
           )}
           {ending ? (

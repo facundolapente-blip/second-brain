@@ -18,7 +18,7 @@ import {
   LADDER_TITLE_MAX,
   parseLadder,
   parseReplan,
-  replanSteps,
+  replanLadder,
   snoozeWeek,
   stepBack,
   stepConfig,
@@ -35,6 +35,7 @@ import {
   parseParts,
   parsePartsDay,
   PARTS_MAX,
+  pickPartStep,
   replanPart,
   orderParts,
   type HabitPart,
@@ -254,6 +255,8 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     const nt = fd.get("neverTwice");
     if (nt === "1" || nt === "0") await prisma.habit.update({ where: { id }, data: { neverTwice: nt === "1" } });
     const newTrack = texto(fd, "desde") === "hoy" && ruleChanged(before, data) && toDbDate(today) > before.startDate;
+    // Lo mismo para lo que cambia la construcción (el paso nuevo cambia cuántos días toca).
+    const trackMode = texto(fd, "desde") === "hoy" ? "new" : "merge";
     if (newTrack) data.startDate = toDbDate(today);
     // La pista actual no puede arrancar antes de que termine la anterior.
     const last = await prisma.habitTrack.findFirst({ where: { habitId: id }, orderBy: { endDate: "desc" } });
@@ -305,11 +308,14 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
       await prisma.habit.update({ where: { id }, data: { ladder: Prisma.DbNull } });
       await logActivity("updated", "habit", id, `${name}: terminó la construcción`);
     } else if (ladderBefore && replan?.ok && replan.plan) {
-      // Lo ya subido y el paso actual no cambian (replanSteps).
+      // Plan nuevo (desde, paso actual, destino y semanas; ver replanLadder). Si el paso
+      // cambia cuántos días toca, la pregunta de la pista decide: "hoy" = pista nueva,
+      // si no, se une a la actual.
       const fresh = await prisma.habit.findUnique({ where: { id } });
       if (fresh) {
-        await writeLadder(fresh, { ...ladderBefore, steps: replanSteps(ladderBefore, replan.plan.to, replan.plan.weeks) });
-        await logActivity("updated", "habit", id, `${fresh.name}: plan cambiado`);
+        const next = replanLadder(ladderBefore, replan.plan, today);
+        await writeLadder(fresh, next, {}, trackMode);
+        await logActivity("updated", "habit", id, `${fresh.name}: ${next.current !== ladderBefore.current || next.steps.length !== ladderBefore.steps.length ? "pasos cambiados" : "plan cambiado"}`);
       }
     }
     // Pasar a "en construcción" un hábito que ya existe (desde el mismo formulario).
@@ -319,7 +325,7 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
       if (fromForm.ladder) {
         const fresh = await prisma.habit.findUnique({ where: { id } });
         if (fresh) {
-          await writeLadder(fresh, fromForm.ladder, { neverTwice: nt === "1" });
+          await writeLadder(fresh, fromForm.ladder, { neverTwice: nt === "1" }, trackMode);
           await logActivity("updated", "habit", id, `${fresh.name}: en construcción`);
         }
       }
@@ -483,11 +489,13 @@ function checkSteps(raw: unknown): { ok: true; steps: LadderStep[] } | { ok: fal
 type HabitRow = NonNullable<Awaited<ReturnType<typeof prisma.habit.findUnique>>>;
 
 /**
- * Guarda la escalera y, si el escalón actual tiene meta numérica y el hábito es de
- * cantidad, cambia `Habit.target` como "pista nueva desde hoy" de `saveHabit`: la
- * configuración vieja queda cerrada hasta ayer, así las estadísticas siguen justas.
+ * Guarda la escalera y, si el escalón actual cambia la frecuencia o la meta del hábito,
+ * la aplica. Con `track = "new"` (subir y volver desde Hoy, siempre) es como "pista
+ * nueva desde hoy" de `saveHabit`: la configuración vieja queda cerrada hasta ayer, así
+ * las estadísticas siguen justas. Con `"merge"` ("Aplicar también al historial" en
+ * Editar hábito) se une a la pista actual, sin `HabitTrack`.
  */
-async function writeLadder(habit: HabitRow, ladder: Ladder | null, extra: { neverTwice?: boolean } = {}) {
+async function writeLadder(habit: HabitRow, ladder: Ladder | null, extra: { neverTwice?: boolean } = {}, track: "new" | "merge" = "new") {
   const today = todayISO();
   const step = ladder?.steps[ladder.current];
   const config = step ? stepConfig(step, habit) : null;
@@ -500,7 +508,7 @@ async function writeLadder(habit: HabitRow, ladder: Ladder | null, extra: { neve
     return;
   }
   const todayDb = toDbDate(today);
-  if (todayDb > habit.startDate) {
+  if (track === "new" && todayDb > habit.startDate) {
     await prisma.$transaction([
       prisma.habitTrack.create({
         data: {
@@ -667,7 +675,8 @@ function partsFromForm(raw: string, before: HabitPart[] | null, today: string): 
       const err = partPlanError(plan);
       if (err) return { ok: false, error: `Parte ${i + 1}: ${err}` };
       if (plan.to > 100_000) return { ok: false, error: `Parte ${i + 1}: el número es muy grande.` };
-      ladder = prev?.ladder ? replanPart(prev.ladder, plan, today) : newPartLadder(plan, today);
+      // "Estás en" (solo si ya se estaba construyendo): el número del paso elegido.
+      ladder = prev?.ladder ? pickPartStep(replanPart(prev.ladder, plan, today), typeof b.current === "number" ? b.current : null, today) : newPartLadder(plan, today);
     }
     out.push({ id, name, moment, since: prev?.since ?? today, ladder });
   }
