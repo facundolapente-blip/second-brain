@@ -44,9 +44,9 @@ import { notifyError } from "@/components/undo-toast";
 import { haptic } from "@/components/haptics";
 import { Button, cx, Sheet, type SheetHandle } from "@/components/ui";
 import { TintedCard } from "@/components/tinted-card";
-import { CheckButton, tapHabit } from "./day-rows";
+import { CheckButton, tapHabit, WeekCount } from "./day-rows";
 import { partsCircle } from "./parts";
-import type { MarkFn } from "./habit-ui";
+import { HabitBadge, type MarkFn } from "./habit-ui";
 import "./habits.css";
 
 /*
@@ -377,7 +377,11 @@ function LadderItem({
           <HabitAvatar icon={h.icon} color={h.color} className="size-9 lg:size-[42px]" />
           <span className="grid min-w-0 gap-0.5">
             <span className="line-clamp-2 text-[16px] leading-tight font-medium tracking-[-0.01em] lg:text-[16.5px]">{h.name}</span>
-            <span className="lad-sub">{sub}</span>
+            {/* Como las filas comunes: la frecuencia del paso y "1/3 esta semana". */}
+            <span className="flex min-w-0 items-center gap-2">
+              <HabitBadge habit={h} compact />
+              <WeekCount habit={h} logs={logs} day={day} today={today} />
+            </span>
           </span>
         </button>
         <CheckButton state={state} fill={pc?.fill} label={pc?.label} disabled={day > today} onTap={() => tapHabit(h, log, day, mark, onOpenDay)} />
