@@ -20,6 +20,7 @@ const WANTED = [
   { kind: "expense", name: "Merch", icon: "TShirt", color: "purple" },
   { kind: "expense", name: "Otros del negocio", icon: "Briefcase", color: "stone" },
   { kind: "income", name: "Venta de discos", icon: "VinylRecord", color: "teal" },
+  { kind: "income", name: "Seña de disco", icon: "HandCoins", color: "yellow" },
   { kind: "income", name: "Venta de merch", icon: "TShirt", color: "purple" },
   { kind: "income", name: "Otros ingresos del negocio", icon: "Briefcase", color: "stone" },
 ];
