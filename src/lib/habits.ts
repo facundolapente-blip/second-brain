@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { dayOfInstant, fromDbDate, todayISO } from "./dates";
 import { HABITS_PLAN_LINKED_KEY, type DayLog, type Frequency, type LogMap, type PastTrack } from "./habit-logic";
 import { parseLadder, type Ladder } from "./habit-ladder";
+import { parseParts, parsePartsDay, type HabitPart } from "./habit-parts";
 
 export type CategoryDTO = { id: string; name: string; icon: string; color: string; habitCount: number };
 
@@ -37,6 +38,8 @@ export type HabitDTO = {
   ladder: Ladder | null;
   /** "Nunca dos seguidos": destaca el día después de fallar. */
   neverTwice: boolean;
+  /** Hábito por partes: sus partes en el orden del día (null = sí o no, o cantidad). */
+  parts: HabitPart[] | null;
 };
 
 /** Categorías con las que arranca la app, las mismas que había en HabitNow. */
@@ -99,6 +102,7 @@ function toDTO(h: HabitRow): HabitDTO {
     archivedOn: h.archivedAt ? dayOfInstant(h.archivedAt) : null,
     ladder: parseLadder(h.ladder),
     neverTwice: h.neverTwice,
+    parts: parseParts(h.parts),
     tracks: h.tracks.map((t) => ({
       startDate: fromDbDate(t.startDate),
       endDate: fromDbDate(t.endDate),
@@ -116,11 +120,13 @@ async function logsFor(habitIds: string[]): Promise<Record<string, LogMap>> {
   if (habitIds.length === 0) return out;
   const logs = await prisma.habitLog.findMany({
     where: { habitId: { in: habitIds } },
-    select: { habitId: true, date: true, status: true, value: true, note: true },
+    select: { habitId: true, date: true, status: true, value: true, note: true, parts: true },
   });
   for (const l of logs) {
     const log: DayLog = { s: l.status as DayLog["s"], v: l.value };
     if (l.note) log.n = l.note;
+    const parts = parsePartsDay(l.parts);
+    if (parts) log.p = { d: parts.done, t: parts.of };
     out[l.habitId][fromDbDate(l.date)] = log;
   }
   return out;

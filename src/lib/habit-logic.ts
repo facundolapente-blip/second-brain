@@ -45,8 +45,34 @@ export type HabitRule = {
 /** Clave para atar un hábito al Plan: los ids de los hábitos que aparecen solo con su bloque. */
 export const HABITS_PLAN_LINKED_KEY = "habitos_ligados_plan";
 
-/** `none` = el día solo tiene una nota, sin marca. */
-export type DayLog = { s: LogStatus | "none"; v: number; n?: string };
+/**
+ * `none` = el día solo tiene una nota, sin marca (o, en un hábito por partes, algunas
+ * partes hechas: "a medias"). `p` (solo en hábitos por partes) = qué partes se hicieron
+ * ese día (`d`, sus ids) y cuántas había (`t`).
+ */
+export type DayLog = { s: LogStatus | "none"; v: number; n?: string; p?: { d: string[]; t: number } };
+
+/**
+ * Hábitos por partes (ver lib/habit-parts.ts). Un día con todas las partes hechas se
+ * guarda como `done` (es un hecho como cualquier otro); con algunas, como `none` con
+ * `v` = cuántas y `p` = cuáles: "a medias". Las reglas de un día a medias:
+ *  - se ve "partial" (ni hecho ni fallado; pasado el día no pasa a "sin marcar")
+ *  - la racha: no la corta, pero tampoco la suma (como un salteado)
+ *  - el puntaje: cuenta la parte hecha (2 de 3 = 0,67 de un día)
+ *  - "Logrado / incompletos": no es ninguno de los dos
+ *  - el avance del día (`dayProgress`, `habitDayMark`): no está hecho; hoy sigue abierto
+ * Los hábitos sin partes no cambian en nada: estas reglas solo miran logs con `p`.
+ */
+export function isPartsPartial(log: DayLog | undefined): boolean {
+  return !!log?.p && log.s === "none" && log.p.d.length > 0;
+}
+
+/** Cuánto vale un día para el puntaje: 1 hecho; a medias (por partes), la parte hecha; si no, 0. */
+function dayCredit(h: Pick<HabitRule, "target">, log: DayLog | undefined): number {
+  if (isDone(h, log)) return 1;
+  if (isPartsPartial(log)) return Math.min(1, log!.p!.d.length / Math.max(1, log!.p!.t));
+  return 0;
+}
 /** Logs de un hábito por día ISO. */
 export type LogMap = Record<string, DayLog>;
 
@@ -252,7 +278,8 @@ export function currentStreak(h: HabitRule, logs: LogMap, today: string): number
     if (!isScheduled(h, iso)) continue;
     const log = logs[iso];
     if (isDone(h, log)) n++;
-    else if (log?.s === "skipped") continue;
+    // Salteado o a medias (por partes): no corta ni suma.
+    else if (log?.s === "skipped" || isPartsPartial(log)) continue;
     else if (!(iso === today && log?.s !== "failed")) break;
   }
   return n;
@@ -273,7 +300,7 @@ export function bestStreak(h: HabitRule, logs: LogMap, today: string): number {
     if (!isScheduled(h, iso)) continue;
     const log = logs[iso];
     if (isDone(h, log)) run++;
-    else if (log?.s === "skipped") continue;
+    else if (log?.s === "skipped" || isPartsPartial(log)) continue;
     else if (iso !== today || log?.s === "failed") run = 0;
     best = Math.max(best, run);
   }
@@ -309,9 +336,12 @@ function scoreParts(h: HabitRule, logs: LogMap, today: string) {
     for (const w of weeks(h, today)) {
       const need = weekNeed(h, w.first);
       if (need === 0) continue;
-      const ratio = Math.min(1, weekDoneCount(h, logs, w.first) / need);
-      if (w.current && ratio < 1) continue;
-      num += ratio;
+      // La semana en curso entra solo si ya se cumplió (con días hechos).
+      if (w.current && weekDoneCount(h, logs, w.first) < need) continue;
+      // Los días a medias (por partes) suman su parte; sin partes, es lo hecho sobre la meta.
+      let credit = 0;
+      for (let i = 0; i < 7; i++) credit += dayCredit(h, logs[addDays(w.first, i)]);
+      num += Math.min(1, credit / need);
       den++;
     }
   } else {
@@ -319,7 +349,7 @@ function scoreParts(h: HabitRule, logs: LogMap, today: string) {
       if (!isScheduled(h, iso)) continue;
       const done = isDone(h, logs[iso]);
       if (iso === today && !done) continue;
-      if (done) num++;
+      num += dayCredit(h, logs[iso]);
       den++;
     }
   }
@@ -364,7 +394,8 @@ export function periodSummary(h: HabitRule, logs: LogMap, today: string) {
     for (let iso = h.startDate; iso <= today; iso = addDays(iso, 1)) {
       if (!isScheduled(h, iso)) continue;
       if (isDone(h, logs[iso])) achieved++;
-      else if (iso !== today) missed++;
+      // A medias (por partes): ni logrado ni incompleto.
+      else if (iso !== today && !isPartsPartial(logs[iso])) missed++;
     }
   }
   return { achieved, missed };
@@ -511,7 +542,7 @@ export function trackStats(
  * que no son 1 y las notas. Pasa de ~50 bytes por marca a ~1: Hábitos carga
  * mucho más rápido en el celular.
  */
-export type PackedLogs = { from: string; s: string; v?: Record<number, number>; n?: Record<number, string> };
+export type PackedLogs = { from: string; s: string; v?: Record<number, number>; n?: Record<number, string>; p?: Record<number, string> };
 export type PackedLogMap = Record<string, PackedLogs | null>;
 
 const CODE: Record<string, string> = { done: "d", failed: "f", skipped: "s", none: "o" };
@@ -525,16 +556,20 @@ export function packLogs(m: LogMap): PackedLogs | null {
   const chars = Array<string>(len).fill(".");
   const v: Record<number, number> = {};
   const n: Record<number, string> = {};
+  // Partes hechas (hábitos por partes): "id1,id2/3".
+  const p: Record<number, string> = {};
   for (const d of dates) {
     const i = diffDaysUtc(d, from);
     const log = m[d];
     chars[i] = CODE[log.s] ?? ".";
     if (log.v !== 1) v[i] = log.v;
     if (log.n) n[i] = log.n;
+    if (log.p) p[i] = `${log.p.d.join(",")}/${log.p.t}`;
   }
   const out: PackedLogs = { from, s: chars.join("") };
   if (Object.keys(v).length) out.v = v;
   if (Object.keys(n).length) out.n = n;
+  if (Object.keys(p).length) out.p = p;
   return out;
 }
 
@@ -546,6 +581,12 @@ export function unpackLogs(p: PackedLogs | null | undefined): LogMap {
     if (c === ".") continue;
     const log: DayLog = { s: DECODE[c] ?? "done", v: p.v?.[i] ?? 1 };
     if (p.n?.[i]) log.n = p.n[i];
+    const parts = p.p?.[i];
+    if (parts) {
+      const cut = parts.lastIndexOf("/");
+      const ids = parts.slice(0, cut);
+      log.p = { d: ids ? ids.split(",") : [], t: Number(parts.slice(cut + 1)) || 0 };
+    }
     out[addDays(p.from, i)] = log;
   }
   return out;

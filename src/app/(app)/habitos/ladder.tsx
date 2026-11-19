@@ -44,6 +44,7 @@ import { haptic } from "@/components/haptics";
 import { Button, cx, Sheet, type SheetHandle } from "@/components/ui";
 import { TintedCard } from "@/components/tinted-card";
 import { CheckButton, tapHabit } from "./day-rows";
+import { partsCircle } from "./parts";
 import type { MarkFn } from "./habit-ui";
 import "./habits.css";
 
@@ -339,7 +340,9 @@ function LadderItem({
   const alert = !!nt?.failedYesterday && day === today;
   const goalMet = reachedGoal(prog);
   const log = logs[day];
-  const state = log?.s === "skipped" ? "skipped" : dayState(h, logs, day, today);
+  const baseState = log?.s === "skipped" ? "skipped" : dayState(h, logs, day, today);
+  const pc = h.parts?.length ? partsCircle(h.parts, log, baseState) : null;
+  const state = pc?.state ?? baseState;
   const [confirmBack, setConfirmBack] = useState(false);
   const labels = stepLabels(ladder);
   const sub = subLine(prog, ladder);
@@ -376,7 +379,7 @@ function LadderItem({
             <span className="lad-sub">{sub}</span>
           </span>
         </button>
-        <CheckButton state={state} disabled={day > today} onTap={() => tapHabit(h, log, day, mark, onOpenDay)} />
+        <CheckButton state={state} fill={pc?.fill} label={pc?.label} disabled={day > today} onTap={() => tapHabit(h, log, day, mark, onOpenDay)} />
       </div>
 
       {goalMet ? (
@@ -794,14 +797,15 @@ function WeekChart({ weeks, labels }: { weeks: (LadderWeek & { step: number })[]
 
 const weeksUnit = (n: number) => (n === 1 ? "semana cumplida" : "semanas seguidas cumplidas");
 
-/** Un número con − y +: los selectores del plan. */
-function PlanStepper({
+/** Un número con − y +: los selectores del plan (`step`: de a cuánto, 1 si no se dice). */
+export function PlanStepper({
   label,
   unit,
   value,
   min,
   max,
   onChange,
+  step = 1,
 }: {
   label: string;
   unit: string;
@@ -809,6 +813,7 @@ function PlanStepper({
   min: number;
   max: number;
   onChange: (v: number) => void;
+  step?: number;
 }) {
   return (
     <div role="group" aria-label={label} className="flex items-center justify-between gap-3 py-1.5">
@@ -821,19 +826,19 @@ function PlanStepper({
           type="button"
           aria-label={`${label}: menos`}
           disabled={value <= min}
-          onClick={() => onChange(Math.max(min, value - 1))}
+          onClick={() => onChange(Math.max(min, value - step))}
           className="lad-icon-btn border border-line-strong"
         >
           <Minus size={15} aria-hidden />
         </button>
-        <span aria-live="polite" className="figure w-8 text-center text-[22px] font-[750]">
+        <span aria-live="polite" className="figure min-w-8 text-center text-[22px] font-[750]">
           {value}
         </span>
         <button
           type="button"
           aria-label={`${label}: más`}
           disabled={value >= max}
-          onClick={() => onChange(Math.min(max, value + 1))}
+          onClick={() => onChange(Math.min(max, value + step))}
           className="lad-icon-btn border border-line-strong"
         >
           <Plus size={15} aria-hidden />

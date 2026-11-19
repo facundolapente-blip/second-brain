@@ -53,6 +53,7 @@ import {
 } from "../habit-ui";
 import { fromHabit, HabitFormBody, hasMarks } from "../habit-form";
 import { LadderSettings, useLadders } from "../ladder";
+import { PartsStatsCard } from "../parts";
 
 export type DetailTab = "calendario" | "estadisticas" | "editar";
 
@@ -475,6 +476,8 @@ function StatsTab({
           <AchievedBar achieved={periods.achieved} missed={periods.missed} labels={periodWords} />
         </StatTile>
       </div>
+
+      {habit.parts?.length ? <PartsStatsCard habit={habit} logs={logs} today={today} className="lg:col-span-2 xl:col-span-2" /> : null}
 
       <Panel icon={CheckCircle} title="Veces logrado" bodyClassName="py-2!">
         <dl className="divide-y divide-line">

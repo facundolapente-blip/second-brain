@@ -362,3 +362,28 @@
 .lad-switch[data-on] { background: var(--lad-strong); }
 .lad-switch[data-on] > span { translate: 18px 0; }
 :root[data-theme="oscuro"] .lad-switch[data-on] > span { background: #141413; }
+
+/* ─── Hábitos por partes ─────────────────────────────────────────────────────
+   A medias: el círculo se llena desde abajo hasta la parte hecha (2 de 3 = dos
+   tercios), con el borde verde entero (la cantidad a medias va punteada). */
+.habit-check[data-state="parts"] {
+  overflow: hidden;
+  border-color: var(--hc-done);
+  background: var(--st-done-bg);
+}
+.habit-check[data-state="parts"] > .parts-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: var(--hc-done);
+  pointer-events: none;
+}
+.habit-check[data-state="parts"][data-pressed]:not(:disabled) {
+  border-color: var(--hc-done-press);
+}
+/* En chico (calendario y tira de días): el relleno más claro, así se lee el número. */
+.day-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: color-mix(in oklab, var(--st-done-line) 34%, var(--st-done-bg));
+  pointer-events: none;
+}

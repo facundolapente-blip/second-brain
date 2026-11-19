@@ -500,11 +500,11 @@ export async function restoreSnapshot(kind: TrashKind, data: Snap, db: Db = pris
       await db.savingsGoal.create({ data: { ...row, accountId: await orNull(exists.account, row.accountId) } });
       return null;
     case "habit": {
-      // `ladder` (Json opcional) vacío vuelve como DbNull: Prisma no acepta null en un Json.
-      await db.habit.create({ data: { ...row, ladder: row.ladder ?? Prisma.DbNull, categoryId: await orNull(exists.habitCategory, row.categoryId) } });
+      // `ladder` y `parts` (Json opcionales) vacíos vuelven como DbNull: Prisma no acepta null en un Json.
+      await db.habit.create({ data: { ...row, ladder: row.ladder ?? Prisma.DbNull, parts: row.parts ?? Prisma.DbNull, categoryId: await orNull(exists.habitCategory, row.categoryId) } });
       const tracks = (data.tracks as never[]) ?? [];
       if (tracks.length) await db.habitTrack.createMany({ data: tracks });
-      const logs = (data.logs as never[]) ?? [];
+      const logs = ((data.logs as Record<string, unknown>[]) ?? []).map((l) => ({ ...l, parts: l.parts ?? Prisma.DbNull })) as never[];
       for (let i = 0; i < logs.length; i += 1000) await db.habitLog.createMany({ data: logs.slice(i, i + 1000), skipDuplicates: true });
       return null;
     }

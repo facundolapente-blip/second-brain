@@ -11,6 +11,7 @@ import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
 import { daysText, LADDER_DEFAULT_WEEKS, ladderPlan, planSteps, planTarget, stepTitle, type Ladder } from "@/lib/habit-ladder";
 import { LadderEditSection, LadderPlanner } from "./ladder";
+import { draftsOf, newPartDraft, PartsEditor, partsPayload, type PartDraft } from "./parts";
 
 /** `hasHistory`: si el hábito ya tiene marcas (cambiar la meta ofrece empezar una pista nueva). */
 export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO, hasHistory?: boolean) => void };
@@ -27,7 +28,7 @@ export type Draft = {
   weekdays: number[];
   timesPerWeek: number;
   weekStart: number;
-  kind: "check" | "count";
+  kind: "check" | "count" | "parts";
   target: number;
   unit: string;
   priority: number;
@@ -35,6 +36,8 @@ export type Draft = {
   /** Ya está en construcción: en vez de "¿Lo querés construir de a poco?" va su plan. */
   inLadder?: boolean;
   ladder?: Ladder | null;
+  /** Por partes: las partes como se editan. */
+  parts?: PartDraft[];
 };
 
 function emptyDraft(today: string): Draft {
@@ -71,13 +74,14 @@ export function fromHabit(h: HabitDTO): Draft {
     weekdays: h.weekdays,
     timesPerWeek: h.timesPerWeek,
     weekStart: h.weekStart,
-    kind: h.target > 1 || h.unit ? "count" : "check",
+    kind: h.parts?.length ? "parts" : h.target > 1 || h.unit ? "count" : "check",
     target: h.target,
     unit: h.unit ?? "",
     priority: h.priority,
     startDate: h.startDate,
     inLadder: !!h.ladder,
     ladder: h.ladder,
+    parts: draftsOf(h.parts),
   };
 }
 
@@ -168,6 +172,7 @@ export function HabitFormBody({
   return (
     <form action={action} className="grid gap-5">
       {draft.id && <input type="hidden" name="id" value={draft.id} />}
+      {draft.kind === "parts" && <input type="hidden" name="parts" value={partsPayload(draft.parts ?? [])} />}
       {ladderMode && <input type="hidden" name="ladder" value={JSON.stringify({ goal: stepTitle(planTo), steps: planSteps(planFrom, planTo, planWeeks) })} />}
       {(isNew || ladderMode) && <input type="hidden" name="neverTwice" value={ladderMode && neverTwice ? "1" : "0"} />}
 
@@ -282,10 +287,15 @@ export function HabitFormBody({
         <Segmented
           name="kind"
           value={draft.kind}
-          onChange={(v) => set("kind", v)}
+          onChange={(v) => {
+            set("kind", v);
+            // Al pasar a "Por partes" sin ninguna, arranca con una vacía.
+            if (v === "parts" && !draft.parts?.length) set("parts", [newPartDraft()]);
+          }}
           options={[
             { value: "check", label: "Sí o no" },
             { value: "count", label: "Cantidad" },
+            { value: "parts", label: "Por partes" },
           ]}
         />
         {draft.kind === "count" && (
@@ -299,6 +309,11 @@ export function HabitFormBody({
               aria-label="Unidad"
               maxLength={30}
             />
+          </div>
+        )}
+        {draft.kind === "parts" && (
+          <div className="pt-1">
+            <PartsEditor drafts={draft.parts ?? []} onChange={(d) => set("parts", d)} />
           </div>
         )}
       </div>

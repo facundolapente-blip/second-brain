@@ -18,6 +18,8 @@ type Op = {
   status: LogStatus | null;
   value: number;
   note?: string | null;
+  /** Hábito por partes: las partes hechas ese día (`d`, ids) y cuántas hay (`t`). */
+  parts?: { d: string[]; t: number } | null;
   /** Intentos fallidos con señal (a los 3 se descarta). */
   tries?: number;
 };
@@ -119,7 +121,7 @@ export async function flushQueue(): Promise<number> {
       // Lo que está en la cola ahora (otra marca pudo reemplazarla mientras subía).
       if (!read().some((o) => o.id === op.id)) continue;
       try {
-        await setHabitLog(op.habitId, op.date, op.status, op.value, op.note);
+        await setHabitLog(op.habitId, op.date, op.status, op.value, op.note, op.parts ? op.parts.d : undefined);
         sent++;
         done.add(op.id!);
         sentOps.push(op);

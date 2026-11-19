@@ -167,7 +167,7 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
 
   const trackToHabit = new Map<string, { habitId: string; kind: string; target: number }>();
   const known = new Map(
-    (await prisma.habit.findMany({ select: { id: true, name: true, order: true } })).map((h) => [
+    (await prisma.habit.findMany({ select: { id: true, name: true, order: true, parts: true } })).map((h) => [
       h.name.trim().toLowerCase(),
       h,
     ]),
@@ -227,7 +227,8 @@ export async function importHabitNow(prisma: PrismaClient, raw: string, mode: Ha
     const habit = prev
       ? await prisma.habit.update({
           where: { id: prev.id },
-          data: lockedIds.has(prev.id) ? keepConfig : { ...fromHabitNow, tracks: { deleteMany: {}, create: pastTracks } },
+          // Un hábito por partes (de la app) no toma la unidad de HabitNow: pasaría a ser de cantidad.
+          data: lockedIds.has(prev.id) ? (prev.parts ? { ...keepConfig, unit: null } : keepConfig) : { ...fromHabitNow, tracks: { deleteMany: {}, create: pastTracks } },
         })
       : await prisma.habit.create({
           data: {

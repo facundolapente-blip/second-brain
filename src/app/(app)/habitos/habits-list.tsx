@@ -31,7 +31,7 @@ import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { PageHeader } from "@/components/page-header";
 import { Button, cx, IconButton } from "@/components/ui";
 import { Menu } from "@/components/menu";
-import { DayCircle, DaySheet, HabitBadge, useDayTap, useHabitLogs, useHabitOrder, type DaySheetHandle, type MarkFn } from "./habit-ui";
+import { DayCircle, DaySheet, HabitBadge, partsFill, useDayTap, useHabitLogs, useHabitOrder, type DaySheetHandle, type MarkFn } from "./habit-ui";
 import { Sortable, SortableItem } from "@/components/sortable";
 import { HabitForm, hasMarks, type HabitFormHandle } from "./habit-form";
 import { HabitsTabs } from "./habits-nav";
@@ -282,7 +282,7 @@ function HabitCard({
             <span className={cx("font-mono text-[10.5px] tracking-[0.08em] uppercase", d === today ? "font-semibold text-fg" : "text-muted")}>
               {WEEKDAY_SHORT[weekday(d)]}
             </span>
-            <DayCircle date={d} state={dayState(habit, logs, d, today)} onTap={() => tap(d)} />
+            <DayCircle date={d} state={dayState(habit, logs, d, today)} fill={partsFill(logs[d])} onTap={() => tap(d)} />
           </div>
         ))}
       </div>

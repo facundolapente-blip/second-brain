@@ -85,6 +85,10 @@ model Habit {
   ladder       Json?
   /// "Nunca dos seguidos": destaca el día después de fallar y cuenta recuperaciones.
   neverTwice   Boolean        @default(false)
+  /// Hábito "por partes": la lista ordenada de partes (`HabitPart[]` en
+  /// lib/habit-parts.ts: id, nombre, momento, desde cuándo y su escalera opcional).
+  /// null = se mide por sí o no, o por cantidad.
+  parts        Json?
   /// Inicio de la pista actual: la tarjeta, la racha y el puntaje cuentan desde acá.
   /// Las pistas anteriores están en HabitTrack.
   startDate    DateTime       @db.Date
@@ -127,6 +131,9 @@ model HabitLog {
   /// De dónde vino la marca: "app" (marcada acá) o null/"habitnow" (importada).
   /// Reimportar HabitNow nunca pisa una marca de la app.
   source  String?
+  /// En hábitos por partes: qué partes se hicieron ese día y cuántas había
+  /// (`{ done: string[], of: number }`). null en los demás.
+  parts   Json?
 
   @@unique([habitId, date])
   @@index([date])

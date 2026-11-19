@@ -25,6 +25,22 @@ import {
   type Ladder,
   type LadderStep,
 } from "./habit-ladder";
+import {
+  newPartId,
+  newPartLadder,
+  PART_NAME_MAX,
+  PART_UNIT_MAX,
+  partPlanError,
+  partsMark,
+  parseParts,
+  parsePartsDay,
+  PARTS_MAX,
+  replanPart,
+  orderParts,
+  type HabitPart,
+  type PartMoment,
+  type PartPlan,
+} from "./habit-parts";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false, error: string };
 
@@ -39,6 +55,10 @@ const STATUSES: LogStatus[] = ["done", "failed", "skipped"];
  * Marca un día. `status` null borra la marca. En hábitos de cantidad `value` es
  * lo hecho ese día; en los de sí/no queda en 1. `note` undefined deja la nota
  * como estaba; un día sin marca pero con nota queda con status "none".
+ *
+ * En un hábito por partes, `parts` = los ids de las partes hechas ese día (con
+ * `status` null o "done"): la marca sale de ahí (`partsMark`: todas = hecho, algunas =
+ * a medias). Salteado o fallado borran el detalle de las partes.
  */
 export async function setHabitLog(
   habitId: string,
@@ -46,12 +66,27 @@ export async function setHabitLog(
   status: LogStatus | null,
   value = 1,
   note?: string | null,
+  parts?: string[] | null,
 ) {
   await exigirSesion();
   if (!isISODate(date)) throw new Error("Fecha inválida");
   if (status !== null && !STATUSES.includes(status)) throw new Error("Estado inválido");
 
   const key = { habitId, date: toDbDate(date) };
+  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { target: true, parts: true } });
+  const habitParts = parseParts(habit?.parts);
+  let partsDay: { done: string[]; of: number } | null = null;
+  let partsHalf = false;
+  if (habitParts && status !== "failed" && status !== "skipped") {
+    // Sin el detalle (un "hecho" que llegó de otro lado): todas o ninguna.
+    const ids = habitParts.map((p) => p.id);
+    const doneIds = Array.isArray(parts) ? parts.filter((x) => typeof x === "string") : status === "done" ? ids : [];
+    const m = partsMark(ids, doneIds);
+    partsDay = m.parts;
+    partsHalf = m.status === "none";
+    status = m.status === "done" ? "done" : null;
+    value = m.value;
+  }
   let finalNote: string | null;
   if (note === undefined) {
     const existing = await prisma.habitLog.findUnique({ where: { habitId_date: key }, select: { note: true } });
@@ -63,7 +98,10 @@ export async function setHabitLog(
   let s: string | null = status;
   let v = Math.max(0, Math.min(100_000, Math.round(value)));
   if (s === "done" && v <= 0) s = null;
-  if (s === null) {
+  if (partsHalf) {
+    // A medias: algunas partes hechas.
+    s = "none";
+  } else if (s === null) {
     if (!finalNote) {
       await prisma.habitLog.deleteMany({ where: key });
       await syncLinkedBlocks(habitId, key.date, false);
@@ -73,13 +111,13 @@ export async function setHabitLog(
     s = "none";
     v = 0;
   }
+  const partsJson = partsDay ? (partsDay as unknown as Prisma.InputJsonValue) : Prisma.DbNull;
   await prisma.habitLog.upsert({
     where: { habitId_date: key },
-    create: { ...key, status: s, value: v, note: finalNote, source: "app" },
-    update: { status: s, value: v, note: finalNote, source: "app" },
+    create: { ...key, status: s, value: v, note: finalNote, source: "app", parts: partsJson },
+    update: { status: s, value: v, note: finalNote, source: "app", parts: partsJson },
   });
   // Gym: marcar el hábito tilda su bloque del Plan ese día (y sacarle el hecho lo destilda).
-  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { target: true } });
   await syncLinkedBlocks(habitId, key.date, s === "done" && v >= Math.max(1, habit?.target ?? 1));
   refrescar();
 }
@@ -177,6 +215,10 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
   }
 
   const kind = texto(fd, "kind");
+  // Por partes: la lista viene como JSON (se valida acá, antes de escribir nada).
+  const partsIn = kind === "parts" ? partsFromForm(texto(fd, "parts", 40_000), parseParts(before?.parts), todayISO()) : null;
+  if (partsIn && !partsIn.ok) return partsIn;
+  const newParts = partsIn?.ok ? partsIn.parts : null;
   const target = kind === "count" ? entero(fd, "target", 1, 100_000, 1) : 1;
   const unit = kind === "count" ? texto(fd, "unit", 30) || null : null;
   const startRaw = texto(fd, "startDate", 10);
@@ -197,6 +239,7 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     priority: entero(fd, "priority", 1, 5, 1),
     isQuit: fd.get("isQuit") === "on",
     startDate: toDbDate(startDate),
+    parts: newParts ? (newParts as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
   };
 
   if (id && before) {
@@ -248,6 +291,15 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     ) {
       await lockHabitConfig(id);
     }
+    // Partes que cambiaron: el día de hoy (si ya estaba marcado) se vuelve a leer con
+    // las partes nuevas; los anteriores quedan como estaban (guardan cuántas había).
+    const partsBefore = parseParts(before.parts);
+    if (JSON.stringify(partsBefore) !== JSON.stringify(newParts)) {
+      await refreshPartsDay(id, today, newParts);
+      // Por partes es de la app: la importación de HabitNow no le pisa la configuración.
+      if (newParts) await lockHabitConfig(id);
+      await logActivity("updated", "habit", id, `${name}: partes cambiadas`);
+    }
     if (endLadderNow) {
       // Como endLadder: queda como hábito común con la configuración de ahora.
       await prisma.habit.update({ where: { id }, data: { ladder: Prisma.DbNull } });
@@ -293,10 +345,10 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
       neverTwice: fd.get("neverTwice") === "1" || (ladder !== null && fd.get("neverTwice") === null),
     },
   });
-  if (ladder) {
+  if (ladder || newParts) {
     // La configuración es de la app: la importación de HabitNow no la pisa.
     await lockHabitConfig(created.id);
-    await logActivity("created", "habit", created.id, `${created.name} (en construcción)`);
+    if (ladder) await logActivity("created", "habit", created.id, `${created.name} (en construcción)`);
   }
   refrescar();
   return { ok: true, id: created.id };
@@ -569,4 +621,118 @@ export async function setNeverTwice(habitId: string, on: boolean): Promise<Ladde
   if (!res.count) return { ok: false, error: "No existe ese hábito." };
   refrescar();
   return { ok: true };
+}
+
+// ─── Hábitos por partes ─────────────────────────────────────────────────────
+
+type PartInput = { id?: unknown; name?: unknown; moment?: unknown; build?: unknown };
+
+/**
+ * Las partes que manda el formulario (JSON: `[{ id?, name, moment, build: null |
+ * { from, to, by, unit, weeks } }]`), validadas. Una parte que ya existía conserva su
+ * id, desde cuándo existe y lo avanzado de su escalera (`replanPart`).
+ */
+function partsFromForm(raw: string, before: HabitPart[] | null, today: string): { ok: true; parts: HabitPart[] } | { ok: false; error: string } {
+  let v: unknown;
+  try {
+    v = JSON.parse(raw || "[]");
+  } catch {
+    return { ok: false, error: "No se pudieron leer las partes." };
+  }
+  if (!Array.isArray(v) || v.length === 0) return { ok: false, error: "Agregá al menos una parte." };
+  if (v.length > PARTS_MAX) return { ok: false, error: `Como mucho ${PARTS_MAX} partes.` };
+  const old = new Map((before ?? []).map((p) => [p.id, p]));
+  const used = new Set<string>();
+  const out: HabitPart[] = [];
+  for (const [i, x] of (v as PartInput[]).entries()) {
+    const name = typeof x?.name === "string" ? x.name.trim() : "";
+    if (!name) return { ok: false, error: `Ponele un nombre a la parte ${i + 1}.` };
+    if (name.length > PART_NAME_MAX) return { ok: false, error: `La parte ${i + 1} es muy larga (hasta ${PART_NAME_MAX} letras).` };
+    const moment: PartMoment = x.moment === "night" ? "night" : "morning";
+    const prev = typeof x.id === "string" ? old.get(x.id) : undefined;
+    let id = prev?.id ?? newPartId();
+    while (used.has(id)) id = newPartId();
+    used.add(id);
+    let ladder = null;
+    if (x.build && typeof x.build === "object") {
+      const b = x.build as Record<string, unknown>;
+      const num = (k: string) => (typeof b[k] === "number" && Number.isFinite(b[k]) ? Math.round(b[k] as number) : NaN);
+      const plan: PartPlan = {
+        from: num("from"),
+        to: num("to"),
+        by: num("by"),
+        weeks: Math.max(1, Math.min(8, num("weeks") || 2)),
+        unit: typeof b.unit === "string" ? b.unit.trim().slice(0, PART_UNIT_MAX) : "",
+      };
+      const err = partPlanError(plan);
+      if (err) return { ok: false, error: `Parte ${i + 1}: ${err}` };
+      if (plan.to > 100_000) return { ok: false, error: `Parte ${i + 1}: el número es muy grande.` };
+      ladder = prev?.ladder ? replanPart(prev.ladder, plan, today) : newPartLadder(plan, today);
+    }
+    out.push({ id, name, moment, since: prev?.since ?? today, ladder });
+  }
+  return { ok: true, parts: orderParts(out) };
+}
+
+/** Vuelve a leer la marca de hoy con las partes de ahora (si tenía el detalle de partes). */
+async function refreshPartsDay(habitId: string, today: string, parts: HabitPart[] | null) {
+  const key = { habitId, date: toDbDate(today) };
+  const log = await prisma.habitLog.findUnique({ where: { habitId_date: key } });
+  if (!log) return;
+  const prev = parsePartsDay(log.parts);
+  if (!parts) {
+    // Dejó de ser por partes: el detalle se va; un día a medias queda solo con su nota (o sin marca).
+    if (!prev) return;
+    if (log.status === "done") await prisma.habitLog.update({ where: { id: log.id }, data: { parts: Prisma.DbNull } });
+    else if (log.note) await prisma.habitLog.update({ where: { id: log.id }, data: { parts: Prisma.DbNull, value: 0 } });
+    else await prisma.habitLog.delete({ where: { id: log.id } });
+    return;
+  }
+  if (log.status === "failed" || log.status === "skipped") return;
+  if (!prev && log.status !== "done") return;
+  const ids = parts.map((p) => p.id);
+  const m = partsMark(ids, prev ? prev.done : ids);
+  if (!m.status) {
+    if (log.note) await prisma.habitLog.update({ where: { id: log.id }, data: { status: "none", value: 0, parts: Prisma.DbNull } });
+    else await prisma.habitLog.delete({ where: { id: log.id } });
+    return;
+  }
+  await prisma.habitLog.update({ where: { id: log.id }, data: { status: m.status, value: m.value, parts: m.parts as unknown as Prisma.InputJsonValue } });
+}
+
+async function movePart(habitId: string, partId: string, fn: (p: HabitPart, today: string) => HabitPart | null, label: (p: HabitPart) => string): Promise<LadderResult> {
+  await exigirSesion();
+  const habit = await prisma.habit.findUnique({ where: { id: habitId }, select: { name: true, parts: true } });
+  if (!habit) return { ok: false, error: "No existe ese hábito." };
+  const parts = parseParts(habit.parts);
+  const part = parts?.find((p) => p.id === partId);
+  if (!parts || !part?.ladder) return { ok: false, error: "Esa parte no se está construyendo." };
+  const next = fn(part, todayISO());
+  if (!next) return { ok: true };
+  await prisma.habit.update({
+    where: { id: habitId },
+    data: { parts: parts.map((p) => (p.id === partId ? next : p)) as unknown as Prisma.InputJsonValue },
+  });
+  await logActivity("updated", "habit", habitId, `${habit.name}: ${label(next)}`);
+  refrescar();
+  return { ok: true };
+}
+
+/** Sube la escalera de una parte un paso (no pasa de la meta). */
+export async function advancePart(habitId: string, partId: string): Promise<LadderResult> {
+  return movePart(
+    habitId,
+    partId,
+    (p, today) => {
+      const l = p.ladder!;
+      if (l.current >= l.steps.length - 1) return null;
+      return { ...p, ladder: { ...advance(l, today), unit: l.unit } };
+    },
+    (p) => `${p.name} subió a ${p.ladder!.steps[p.ladder!.current].title}`,
+  );
+}
+
+/** "Todavía no": la parte no ofrece subir por 7 días. */
+export async function stayPart(habitId: string, partId: string): Promise<LadderResult> {
+  return movePart(habitId, partId, (p, today) => ({ ...p, ladder: { ...snoozeWeek(p.ladder!, today), unit: p.ladder!.unit } }), (p) => `${p.name}: todavía no sube`);
 }

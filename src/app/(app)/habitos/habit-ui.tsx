@@ -23,7 +23,9 @@ import {
   type PackedLogMap,
   type PackedLogs,
 } from "@/lib/habit-logic";
-import { addDays, formatLong, monthBounds, shiftMonth, weekday } from "@/lib/dates";
+import { addDays, formatLong, monthBounds, shiftMonth, todayISO, weekday } from "@/lib/dates";
+import { doneParts } from "@/lib/habit-parts";
+import { PartsDayBody } from "./parts";
 import { tone } from "@/lib/palette";
 import type { HabitDTO } from "@/lib/habits";
 import { Button, cx, inputClass, Sheet, type SheetHandle } from "@/components/ui";
@@ -39,15 +41,29 @@ export type MarkFn = (
   status: LogStatus | null,
   value?: number,
   note?: string | null,
+  /** Hábito por partes: las partes hechas (`d`) y cuántas hay (`t`). */
+  parts?: PartsMark | null,
 ) => void;
 
-type Mark = { habitId: string; date: string; status: LogStatus | null; value: number; note?: string | null };
+export type PartsMark = { d: string[]; t: number };
+
+type Mark = { habitId: string; date: string; status: LogStatus | null; value: number; note?: string | null; parts?: PartsMark | null };
 
 /** Aplica una marca a un log, con las mismas reglas que la server action. */
 function applyMark(prev: DayLog | undefined, m: Mark): DayLog | null {
   const n = m.note === undefined ? prev?.n : m.note?.trim() || undefined;
   let s: DayLog["s"] | null = m.status;
   let v = m.value;
+  // Por partes: todas = hecho; algunas = a medias ("none" con cuántas); ninguna = sin marca.
+  if (m.parts && s !== "failed" && s !== "skipped") {
+    const done = m.parts.d.length;
+    if (done > 0) {
+      const log: DayLog = { s: done >= m.parts.t ? "done" : "none", v: done, p: m.parts };
+      if (n) log.n = n;
+      return log;
+    }
+    s = null;
+  }
   if (s === "done" && v <= 0) s = null;
   if (s === null) {
     if (!n) return null;
@@ -73,7 +89,7 @@ function withMark(state: Record<string, LogMap>, m: Mark): Record<string, LogMap
 function queuedMarks(): Mark[] {
   return pendingOps()
     .filter((o) => o.type === "habit")
-    .map((o) => ({ habitId: o.habitId, date: o.date, status: o.status, value: o.value, note: o.note }));
+    .map((o) => ({ habitId: o.habitId, date: o.date, status: o.status, value: o.value, note: o.note, parts: o.parts }));
 }
 
 /**
@@ -84,7 +100,7 @@ function queuedMarks(): Mark[] {
  */
 const unpacked = new Map<string, { sig: string; logs: LogMap }>();
 function packedSig(p: PackedLogs | null | undefined): string {
-  return p ? `${p.from}|${p.s}|${p.v ? JSON.stringify(p.v) : ""}|${p.n ? JSON.stringify(p.n) : ""}` : "";
+  return p ? `${p.from}|${p.s}|${p.v ? JSON.stringify(p.v) : ""}|${p.n ? JSON.stringify(p.n) : ""}|${p.p ? JSON.stringify(p.p) : ""}` : "";
 }
 function unpackStable(packed: PackedLogMap): Record<string, LogMap> {
   const out: Record<string, LogMap> = {};
@@ -137,16 +153,16 @@ export function useHabitLogs(packed: PackedLogMap) {
   const [, startTransition] = useSafeTransition();
 
   // Estable entre renders: las filas memorizadas (day-rows) no se vuelven a dibujar por esto.
-  const mark: MarkFn = useCallback((habitId, date, status, value = 1, note) => {
+  const mark: MarkFn = useCallback((habitId, date, status, value = 1, note, parts) => {
     // Una marca nueva reemplaza a las que seguían en la cola para ese día (si no, al
     // subir después pisarían a esta); se queda con la nota que traían.
     const keptNote = dropPending(habitId, date);
-    const m: Mark = { habitId, date, status, value, note: note === undefined ? keptNote : note };
+    const m: Mark = { habitId, date, status, value, note: note === undefined ? keptNote : note, ...(parts ? { parts } : {}) };
     if (!navigator.onLine) return enqueue({ type: "habit", ...m });
     startTransition(async () => {
       apply(m);
       try {
-        await setHabitLog(habitId, date, status, value, m.note);
+        await setHabitLog(habitId, date, status, value, m.note, parts ? parts.d : undefined);
       } catch (e) {
         // Se cortó la señal en el medio: queda en la cola (y se sigue viendo).
         if (isNetworkError(e)) return enqueue({ type: "habit", ...m });
@@ -176,6 +192,11 @@ export function isCountHabit(h: Pick<HabitDTO, "target" | "unit">) {
   return h.target > 1 || !!h.unit;
 }
 
+/** Al tocar el círculo se abre la hoja del día (cantidad o por partes) en vez de rotar el estado. */
+export function opensSheet(h: Pick<HabitDTO, "target" | "unit" | "parts">) {
+  return isCountHabit(h) || !!h.parts?.length;
+}
+
 /** Lo que pasa al tocar un día: en sí/no rota el estado, en cantidad abre la hoja. */
 export function useDayTap(
   habit: HabitDTO,
@@ -184,7 +205,7 @@ export function useDayTap(
   openDetail: (habit: HabitDTO, date: string) => void,
 ) {
   return (date: string) => {
-    if (isCountHabit(habit)) {
+    if (opensSheet(habit)) {
       openDetail(habit, date);
       return;
     }
@@ -206,6 +227,14 @@ const STATE_CLASS: Record<DayState, string> = {
   before: "bg-transparent border-transparent text-faint",
 };
 
+/** Día a medias de un hábito por partes: borde verde lleno (no punteado como la cantidad a medias). */
+const PARTS_PARTIAL_CLASS = "overflow-hidden bg-transparent border-[var(--st-done-line)] text-[var(--st-done-fg)]";
+
+/** Lo que se llena del círculo de un día a medias (por partes), o undefined. */
+export function partsFill(log: DayLog | undefined): number | undefined {
+  return log?.p && log.s === "none" && log.p.t > 0 && log.p.d.length > 0 ? log.p.d.length / log.p.t : undefined;
+}
+
 const STATE_LABEL: Record<DayState, string> = {
   done: "hecho",
   partial: "a medias",
@@ -225,6 +254,7 @@ export function DayCircle({
   size = "md",
   future,
   hasNote,
+  fill,
 }: {
   date: string;
   state: DayState;
@@ -232,23 +262,29 @@ export function DayCircle({
   size?: "sm" | "md";
   future?: boolean;
   hasNote?: boolean;
+  /** Día a medias de un hábito por partes: qué parte se hizo (0 a 1), se llena desde abajo. */
+  fill?: number;
 }) {
   const day = Number(date.slice(8));
+  const parts = !future && state === "partial" && fill !== undefined;
   return (
     <button
       type="button"
       onClick={onTap}
       disabled={future || state === "before"}
       aria-label={`${formatLong(date)}${STATE_LABEL[state] ? `, ${STATE_LABEL[state]}` : ""}${hasNote ? ", con nota" : ""}`}
+      data-parts={parts || undefined}
       className={cx(
         "tabular relative inline-flex items-center justify-center rounded-full border-[1.5px] font-medium transition-[transform,background-color,border-color] duration-200 active:scale-90 disabled:active:scale-100 motion-reduce:transition-none motion-reduce:active:scale-100",
         size === "md"
           ? "size-9 text-[14px] sm:size-11 sm:text-[15px]"
           : "size-9 text-sm sm:size-10",
-        future ? "border-line border-dotted bg-transparent text-fg/70" : STATE_CLASS[state],
+        future ? "border-line border-dotted bg-transparent text-fg/70" : parts ? PARTS_PARTIAL_CLASS : STATE_CLASS[state],
       )}
     >
-      {day}
+      {/* A medias por partes: el mismo círculo medio lleno de Hoy, en chico (relleno más claro para que se lea el número). */}
+      {parts && <span aria-hidden className="day-fill" style={{ height: `${Math.round(Math.max(0, Math.min(1, fill!)) * 100)}%` }} />}
+      <span className="relative">{day}</span>
       {hasNote && <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-bg bg-accent" />}
     </button>
   );
@@ -385,6 +421,7 @@ export function CalendarMonth({
               state={stateOf ? stateOf(date) : dayState(habit, logs, date, today)}
               future={date > today}
               hasNote={!!logs[date]?.n}
+              fill={partsFill(logs[date])}
               onTap={() => onTap(date)}
             />
           ) : (
@@ -455,7 +492,8 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
     }));
 
     const habit = target?.habit;
-    const isCount = !!habit && isCountHabit(habit);
+    const isParts = !!habit?.parts?.length;
+    const isCount = !!habit && !isParts && isCountHabit(habit);
     const current = habit && target ? logs[habit.id]?.[target.date] : undefined;
     const marked = current && current.s !== "none" ? (current.s as LogStatus) : null;
     const noteChanged = note.trim() !== (current?.n ?? "");
@@ -477,11 +515,39 @@ export const DaySheet = forwardRef<DaySheetHandle, { logs: Record<string, LogMap
         onClose={() => {
           if (handled.current || !habit || !target || (!noteChanged && !valueChanged)) return;
           handled.current = true;
+          if (isParts) {
+            // Por partes: la nota se guarda con las partes como están.
+            if (current?.s === "skipped" || current?.s === "failed") mark(habit.id, target.date, current.s, 1, note);
+            else {
+              const ids = doneParts(current, habit.parts);
+              mark(habit.id, target.date, null, ids.length, note, { d: ids, t: habit.parts!.length });
+            }
+            return;
+          }
           if (valueChanged) mark(habit.id, target.date, value > 0 ? "done" : null, value, note);
           else mark(habit.id, target.date, marked, current?.v ?? 1, note);
         }}
       >
-        {habit && target && (
+        {habit && target && isParts && (
+          <div className="grid gap-2">
+            <p className="kicker">{formatLong(target.date)}</p>
+            <PartsDayBody
+              key={`${habit.id}|${target.date}`}
+              habit={habit}
+              date={target.date}
+              today={todayISO()}
+              logs={logs[habit.id] ?? {}}
+              mark={mark}
+              note={note}
+              onNote={setNote}
+              onDone={() => {
+                handled.current = true;
+                sheet.current?.close();
+              }}
+            />
+          </div>
+        )}
+        {habit && target && !isParts && (
           <div className="grid gap-5">
             <p className="kicker">{formatLong(target.date)}</p>
 

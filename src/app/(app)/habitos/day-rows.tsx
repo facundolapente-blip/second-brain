@@ -10,6 +10,7 @@ import { cx } from "@/components/ui";
 import { haptic } from "@/components/haptics";
 import { HabitBadge, type MarkFn } from "./habit-ui";
 import { NeverTwiceLine } from "./ladder";
+import { PartIcons, partsCircle } from "./parts";
 import "./habits.css";
 
 /**
@@ -110,7 +111,8 @@ const NO_LOGS: LogMap = {};
  * los de cantidad abren la hoja del día; los demás rotan tilde → cruz → blanco.
  */
 export function tapHabit(h: HabitDTO, log: DayLog | undefined, day: string, mark: MarkFn, onOpen: (h: HabitDTO) => void) {
-  if (h.target > 1 || !!h.unit) return onOpen(h);
+  // Cantidad y por partes: la hoja del día.
+  if (h.target > 1 || !!h.unit || !!h.parts?.length) return onOpen(h);
   // Un toque: tilde verde; dos: cruz roja; tres: vuelve a blanco.
   mark(h.id, day, nextStatus(log), 1);
 }
@@ -139,9 +141,12 @@ const HabitRow = memo(function HabitRow({
   const log = hLogs[day];
   // El círculo muestra la marca que hay: un salteado de hoy (que el
   // estado del día deja en blanco) se ve salteado, así el toque se entiende.
-  const state = log?.s === "skipped" ? "skipped" : dayState(h, hLogs, day, today);
+  const baseState = log?.s === "skipped" ? "skipped" : dayState(h, hLogs, day, today);
   const isCount = h.target > 1 || !!h.unit;
   const value = log?.s === "done" ? log.v : 0;
+  // Por partes: "2 de 3", sol y luna por parte y el círculo medio lleno a medias.
+  const pc = h.parts?.length ? partsCircle(h.parts, log, baseState) : null;
+  const state = pc?.state ?? baseState;
   return (
     <SortableItem id={h.id} className={cx("flex items-center gap-3 lg:gap-4", className)}>
       <button
@@ -160,16 +165,22 @@ const HabitRow = memo(function HabitRow({
                 {h.target > 1 ? `/${h.target}` : ""} {unitLabel(h.target > 1 ? h.target : value, h.unit)}
               </span>
             )}
+            {pc && (
+              <span className={cx("tabular shrink-0 text-sm", pc.partial ? "font-medium text-[var(--st-done-fg)]" : "text-muted")}>
+                {pc.done} de {pc.total}
+              </span>
+            )}
           </span>
           <span className="flex min-w-0 items-center gap-2">
             <HabitBadge habit={h} compact />
             <WeekCount habit={h} logs={hLogs} day={day} today={today} />
+            {pc && <PartIcons parts={h.parts!} done={pc.doneIds} />}
           </span>
           {/* "Nunca dos seguidos": el día después de fallar, una línea amarilla. */}
           {h.neverTwice && day === today && <NeverTwiceLine habit={h} logs={hLogs} today={today} />}
         </span>
       </button>
-      <CheckButton state={state} disabled={isFuture} burst={burst} onTap={() => onTap(h, log)} />
+      <CheckButton state={state} fill={pc?.fill} label={pc?.label} disabled={isFuture} burst={burst} onTap={() => onTap(h, log)} />
     </SortableItem>
   );
 });
@@ -223,6 +234,8 @@ const CHECK_STATES: Record<string, { cls: string; icon: React.ReactNode; label: 
     icon: null,
     label: "A medias",
   },
+  // Por partes a medias: medio lleno desde abajo (colores en habits.css).
+  parts: { cls: "", icon: null, label: "A medias" },
 };
 const CHECK_DEFAULT = { cls: "border-line-strong hover:border-fg/50", icon: null, label: "Marcar como hecho" };
 
@@ -230,7 +243,22 @@ function unpress(e: React.PointerEvent<HTMLElement>) {
   delete e.currentTarget.dataset.pressed;
 }
 
-export function CheckButton({ state, onTap, disabled, burst }: { state: string; onTap: () => void; disabled?: boolean; burst?: boolean }) {
+export function CheckButton({
+  state,
+  onTap,
+  disabled,
+  burst,
+  fill,
+  label,
+}: {
+  state: string;
+  onTap: () => void;
+  disabled?: boolean;
+  burst?: boolean;
+  /** Con `state = "parts"`: cuánto se llena desde abajo (0 a 1). */
+  fill?: number;
+  label?: string;
+}) {
   const [tapped, setTapped] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const prev = useRef(state);
@@ -279,12 +307,13 @@ export function CheckButton({ state, onTap, disabled, burst }: { state: string; 
         onTap();
       }}
       disabled={disabled}
-      aria-label={s.label}
+      aria-label={label ?? s.label}
       className={cx(
         "habit-check relative inline-flex size-9 shrink-0 items-center justify-center rounded-full border-[1.5px] lg:size-11 disabled:opacity-40",
         s.cls,
       )}
     >
+      {state === "parts" && <span aria-hidden className="parts-fill" style={{ height: `${Math.round(Math.max(0, Math.min(1, fill ?? 0)) * 100)}%` }} />}
       {s.icon && (
         <span key={state} className={cx("inline-flex", tapped && (state === "done" ? "check-draw" : "mark-pop"))}>
           {s.icon}
