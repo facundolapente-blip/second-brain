@@ -9,8 +9,8 @@ import { HabitAvatar } from "@/lib/habit-icons";
 import { tone } from "@/lib/palette";
 import type { CategoryDTO, HabitDTO } from "@/lib/habits";
 import { Button, cx, Field, Input, inputClass, Segmented, Sheet, type SheetHandle } from "@/components/ui";
-import { daysText, LADDER_DEFAULT_WEEKS, planSteps, planTarget, stepTitle } from "@/lib/habit-ladder";
-import { LadderPlanner } from "./ladder";
+import { daysText, LADDER_DEFAULT_WEEKS, ladderPlan, planSteps, planTarget, stepTitle, type Ladder } from "@/lib/habit-ladder";
+import { LadderEditSection, LadderPlanner } from "./ladder";
 
 /** `hasHistory`: si el hábito ya tiene marcas (cambiar la meta ofrece empezar una pista nueva). */
 export type HabitFormHandle = { create: () => void; edit: (h: HabitDTO, hasHistory?: boolean) => void };
@@ -32,8 +32,9 @@ export type Draft = {
   unit: string;
   priority: number;
   startDate: string;
-  /** Ya está en construcción (la escalera se cambia desde su camino). */
+  /** Ya está en construcción: en vez de "¿Lo querés construir de a poco?" va su plan. */
   inLadder?: boolean;
+  ladder?: Ladder | null;
 };
 
 function emptyDraft(today: string): Draft {
@@ -76,6 +77,7 @@ export function fromHabit(h: HabitDTO): Draft {
     priority: h.priority,
     startDate: h.startDate,
     inLadder: !!h.ladder,
+    ladder: h.ladder,
   };
 }
 
@@ -153,6 +155,12 @@ export function HabitFormBody({
   const planFrom = Math.min(pickedFrom, planTo - 1);
   const canLadder = isNew || !draft.inLadder;
   const ladderMode = canLadder && mode === "ladder";
+  // Ya en construcción: cambiar hasta dónde llegar y cada cuántas semanas subir, o sacarla.
+  const editLadder = !isNew && draft.inLadder && draft.ladder ? draft.ladder : null;
+  const editPlan = editLadder ? ladderPlan(editLadder) : null;
+  const [editTo, setEditTo] = useState(editPlan?.to ?? 7);
+  const [editWeeks, setEditWeeks] = useState(editPlan?.weeks ?? LADDER_DEFAULT_WEEKS);
+  const [endingLadder, setEndingLadder] = useState(false);
   // Cambiar cuándo toca o la meta reescribiría cómo se leen los días ya marcados
   // (un "hecho" pasaría a "a medias"): antes de guardar se elige desde cuándo vale.
   const askTrack = !!draft.id && hasHistory && initial.startDate < today && rulesDiffer(initial, draft);
@@ -379,6 +387,18 @@ export function HabitFormBody({
         </div>
       )}
 
+      {editLadder && (
+        <LadderEditSection
+          ladder={editLadder}
+          to={editTo}
+          weeks={editWeeks}
+          onTo={setEditTo}
+          onWeeks={setEditWeeks}
+          ending={endingLadder}
+          onEnding={setEndingLadder}
+        />
+      )}
+
       {state && !state.ok && <p className="reveal text-sm text-danger">{state.error}</p>}
 
       {askTrack ? (
@@ -402,7 +422,7 @@ export function HabitFormBody({
         </div>
       ) : (
         <Button type="submit" variant="accent" disabled={pending} className="w-full">
-          {pending ? "Guardando..." : ladderMode ? `${draft.id ? "Guardar y empezar" : "Empezar"} con ${daysText(planFrom)}` : draft.id ? "Guardar cambios" : "Crear hábito"}
+          {pending ? "Guardando..." : ladderMode ? `${draft.id ? "Guardar y empezar" : "Empezar"} con ${daysText(planFrom)}` : endingLadder ? "Guardar y sacar la construcción" : draft.id ? "Guardar cambios" : "Crear hábito"}
         </Button>
       )}
     </form>

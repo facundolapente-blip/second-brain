@@ -980,3 +980,77 @@ export function LadderSettings({
     </div>
   );
 }
+
+/**
+ * En "Editar hábito", si ya está en construcción: el paso en el que está, la escalera
+ * con el plan nuevo y los selectores de destino y semanas (si la escalera tiene plan),
+ * y "Sacar la construcción". Todo se manda con el formulario (campos ocultos
+ * `ladderPlan` y `ladderEnd`, ver `saveHabit`).
+ */
+export function LadderEditSection({
+  ladder,
+  to,
+  weeks,
+  onTo,
+  onWeeks,
+  ending,
+  onEnding,
+}: {
+  ladder: Ladder;
+  to: number;
+  weeks: number;
+  onTo: (v: number) => void;
+  onWeeks: (v: number) => void;
+  ending: boolean;
+  onEnding: (v: boolean) => void;
+}) {
+  const plan = ladderPlan(ladder);
+  const cur = Math.min(ladder.current, ladder.steps.length - 1);
+  const min = ladder.steps[cur].perWeek ?? 1;
+  const changed = !!plan && (to !== plan.to || weeks !== plan.weeks);
+  const shown = plan && !ending ? { ...ladder, steps: replanSteps(ladder, to, weeks) } : ladder;
+  const total = shown.steps.length;
+  const stepText = plan ? stepTitle(ladder.steps[cur].perWeek as number) : ladder.steps[cur].title;
+  return (
+    <div data-tone="habitos">
+      {changed && !ending && <input type="hidden" name="ladderPlan" value={JSON.stringify({ to, weeks })} />}
+      {ending && <input type="hidden" name="ladderEnd" value="1" />}
+      <TintedCard as="div" tone="habitos" icon={Stairs} title="En construcción">
+        <div className="grid gap-3">
+          <p className="grid gap-0.5 text-[14px] leading-snug">
+            <span className="font-medium">
+              Paso {cur + 1} de {total} · {stepText}
+            </span>
+            {!ending && <span className="text-[13px] text-muted">{cur === total - 1 ? "Es la meta" : `${weeksText(shown.steps[cur].weeks)} para subir`}</span>}
+          </p>
+          <div className={cx("lad-propose", ending && "opacity-50")}>
+            <p className="lad-kicker">{changed && !ending ? "Tu camino con el cambio" : "Tu camino"}</p>
+            <LadderBars labels={stepLabels(shown)} current={cur} />
+          </div>
+          {plan && !ending && (
+            <div className="grid divide-y divide-line">
+              <PlanStepper label="Querés llegar a" unit={to === 1 ? "día por semana" : "días por semana"} value={to} min={min} max={7} onChange={onTo} />
+              <PlanStepper label="Subís después de" unit={weeksUnit(weeks)} value={weeks} min={1} max={LADDER_WEEKS_MAX} onChange={onWeeks} />
+            </div>
+          )}
+          {ending ? (
+            <div className="reveal grid gap-2 rounded-[12px] bg-surface-2 p-3">
+              <p className="text-[13.5px] leading-snug">
+                Al guardar, vuelve a ser un hábito común, con la meta y la frecuencia que tiene hoy. Las marcas no cambian.
+              </p>
+              <div>
+                <Button type="button" variant="outline" size="sm" onClick={() => onEnding(false)}>
+                  Mantener la construcción
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button type="button" variant="ghost" onClick={() => onEnding(true)}>
+              Sacar la construcción
+            </Button>
+          )}
+        </div>
+      </TintedCard>
+    </div>
+  );
+}

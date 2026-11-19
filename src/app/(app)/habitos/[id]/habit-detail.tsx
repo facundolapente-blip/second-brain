@@ -810,7 +810,8 @@ function EditTab({
         <div className="flex items-center gap-3">
           <HabitBadge habit={habit} />
         </div>
-        <HabitFormBody initial={fromHabit(habit)} categories={categories} today={today} hasHistory={hasHistory} onSaved={onSaved} />
+        {/* Con otra escalera (cambiada desde "De a poco") el formulario arranca de nuevo. */}
+        <HabitFormBody key={JSON.stringify(habit.ladder ?? null)} initial={fromHabit(habit)} categories={categories} today={today} hasHistory={hasHistory} onSaved={onSaved} />
       </Panel>
       <div className="grid content-start gap-3.5 lg:gap-5 xl:grid-rows-[auto_auto_1fr] xl:content-stretch">
         {!habit.archived && ladder}

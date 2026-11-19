@@ -17,6 +17,8 @@ import {
   LADDER_MAX_STEPS,
   LADDER_TITLE_MAX,
   parseLadder,
+  parseReplan,
+  replanSteps,
   snoozeWeek,
   stepBack,
   stepConfig,
@@ -199,6 +201,12 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
 
   if (id && before) {
     const today = todayISO();
+    // Si ya está en construcción: cambiar el plan o sacarla, desde el mismo formulario.
+    // Se valida antes de escribir nada.
+    const ladderBefore = parseLadder(before.ladder);
+    const endLadderNow = !!ladderBefore && fd.get("ladderEnd") === "1";
+    const replan = ladderBefore && !endLadderNow ? parseReplan(texto(fd, "ladderPlan", 200), ladderBefore) : null;
+    if (replan && !replan.ok) return replan;
     // Al editar, la escalera se cambia con sus acciones; "Nunca dos seguidos" sí viene del formulario.
     const nt = fd.get("neverTwice");
     if (nt === "1" || nt === "0") await prisma.habit.update({ where: { id }, data: { neverTwice: nt === "1" } });
@@ -240,8 +248,20 @@ export async function saveHabit(_prev: ActionResult | null, fd: FormData): Promi
     ) {
       await lockHabitConfig(id);
     }
+    if (endLadderNow) {
+      // Como endLadder: queda como hábito común con la configuración de ahora.
+      await prisma.habit.update({ where: { id }, data: { ladder: Prisma.DbNull } });
+      await logActivity("updated", "habit", id, `${name}: terminó la construcción`);
+    } else if (ladderBefore && replan?.ok && replan.plan) {
+      // Lo ya subido y el paso actual no cambian (replanSteps).
+      const fresh = await prisma.habit.findUnique({ where: { id } });
+      if (fresh) {
+        await writeLadder(fresh, { ...ladderBefore, steps: replanSteps(ladderBefore, replan.plan.to, replan.plan.weeks) });
+        await logActivity("updated", "habit", id, `${fresh.name}: plan cambiado`);
+      }
+    }
     // Pasar a "en construcción" un hábito que ya existe (desde el mismo formulario).
-    if (!parseLadder(before.ladder)) {
+    if (!ladderBefore) {
       const fromForm = ladderFromForm(fd, today);
       if (!fromForm.ok) return fromForm;
       if (fromForm.ladder) {

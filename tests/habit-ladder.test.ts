@@ -10,6 +10,7 @@ import {
   parseLadder,
   planSteps,
   planTarget,
+  parseReplan,
   replanSteps,
   snoozeWeek,
   spanWeeks,
@@ -80,6 +81,23 @@ describe("el plan de días por semana", () => {
     const steps = [2, 4, 7].map((n) => ({ title: String(n), perWeek: n, weeks: 2 }));
     const s = replanSteps({ goal: "x", steps, current: 1, stepStart: "2026-11-02" }, 6, 2);
     expect(s.map((x) => x.perWeek)).toEqual([2, 4, 5, 6]);
+  });
+  it("parseReplan: el plan que manda Editar hábito", () => {
+    const steps = [1, 2, 3, 4].map((n) => ({ title: String(n), perWeek: n, weeks: 2 }));
+    const l: Ladder = { goal: "x", steps, current: 2, stepStart: "2026-11-02" };
+    expect(parseReplan("", l)).toEqual({ ok: true, plan: null });
+    expect(parseReplan(JSON.stringify({ to: 6, weeks: 3 }), l)).toEqual({ ok: true, plan: { to: 6, weeks: 3 } });
+    expect(parseReplan(JSON.stringify({ to: 3, weeks: 1 }), l)).toEqual({ ok: true, plan: { to: 3, weeks: 1 } });
+    // Nunca menos que el paso actual, ni más de 7 días o de las semanas máximas.
+    expect(parseReplan(JSON.stringify({ to: 2, weeks: 2 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ to: 8, weeks: 2 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ to: 5, weeks: 0 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ to: 5, weeks: 9 }), l).ok).toBe(false);
+    expect(parseReplan(JSON.stringify({ to: 5.5, weeks: 2 }), l).ok).toBe(false);
+    expect(parseReplan("{roto", l).ok).toBe(false);
+    // Las escaleras viejas (sin plan) no se replanifican.
+    const old: Ladder = { goal: "x", steps: [{ title: "a", target: 2, weeks: 1 }, { title: "b", target: 4, weeks: 1 }], current: 0, stepStart: "2026-11-02" };
+    expect(parseReplan(JSON.stringify({ to: 5, weeks: 2 }), old).ok).toBe(false);
   });
   it("textos por semana", () => {
     expect(stepRuleText({ title: "x", perWeek: 3, weeks: 2 }, plain, false)).toBe("3 días por semana · 2 semanas seguidas para subir");

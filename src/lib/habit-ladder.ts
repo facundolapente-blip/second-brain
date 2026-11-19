@@ -227,6 +227,29 @@ export function replanSteps(ladder: Ladder, to: number, weeks: number): LadderSt
   return [...ladder.steps.slice(0, cur), ...planSteps(days, Math.max(days, to), weeks)];
 }
 
+/**
+ * Lo que manda el formulario "Editar hábito" para cambiar el plan (JSON `{ to, weeks }`),
+ * controlado contra la escalera: hace falta que tenga plan, `to` entre los días del paso
+ * actual y 7, `weeks` de 1 a `LADDER_WEEKS_MAX`. Vacío = sin cambios (plan null).
+ */
+export function parseReplan(raw: string | null | undefined, ladder: Ladder): { ok: true; plan: { to: number; weeks: number } | null } | { ok: false; error: string } {
+  if (!raw || !raw.trim()) return { ok: true, plan: null };
+  if (!ladderPlan(ladder)) return { ok: false, error: "Esta construcción no tiene plan de días por semana." };
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "No se pudo leer el plan." };
+  }
+  const r = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const to = typeof r.to === "number" && Number.isInteger(r.to) ? r.to : null;
+  const weeks = typeof r.weeks === "number" && Number.isInteger(r.weeks) ? r.weeks : null;
+  const min = ladder.steps[clamp(ladder.current, 0, ladder.steps.length - 1)].perWeek ?? 1;
+  if (to === null || to < min || to > 7) return { ok: false, error: `Podés llegar a entre ${min} y 7 días por semana.` };
+  if (weeks === null || weeks < 1 || weeks > LADDER_WEEKS_MAX) return { ok: false, error: `Las semanas para subir van de 1 a ${LADDER_WEEKS_MAX}.` };
+  return { ok: true, plan: { to, weeks } };
+}
+
 // ─── Progreso del escalón, por semanas ─────────────────────────────────────
 
 export type LadderWeek = {
