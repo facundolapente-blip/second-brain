@@ -185,6 +185,8 @@ export const TxSheet = forwardRef<
   // Categoría sugerida a partir del título (lo que ya clasificaste antes).
   const [suggested, setSuggested] = useState<string | null>(null);
   const [byHand, setByHand] = useState(false);
+  // Las categorías del otro grupo (personales en una cuenta de trabajo, o al revés), plegadas.
+  const [otherCats, setOtherCats] = useState(false);
   const suggestTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Foco al monto al abrir: se reintenta (la hoja tarda en abrir apenas carga la
   // página), pero nunca después de que la persona tocó o escribió en la hoja.
@@ -301,6 +303,8 @@ export const TxSheet = forwardRef<
     suggestTimer.current = setTimeout(async () => {
       const id = await suggestCategory(title, kind);
       if (!id) return;
+      // Solo se sugiere una del grupo de la cuenta (del negocio en una cuenta de trabajo).
+      if (offGroup.current.has(id)) return;
       setD((prev) => (prev.kind === kind && !prev.byHand ? { ...prev, categoryId: id } : prev));
       setSuggested(id);
     }, 350);
@@ -315,6 +319,17 @@ export const TxSheet = forwardRef<
   const to = accounts.find((a) => a.id === d.toAccountId);
   const crossCurrency = d.kind === "transfer" && !!from && !!to && from.currency !== to.currency;
   const kindCats = categories.filter((c) => c.kind === (d.kind === "income" ? "income" : "expense") && !c.adjustment);
+  // Una cuenta de trabajo muestra las categorías del negocio; una personal, las personales.
+  // Las del otro grupo quedan plegadas debajo (se abren solas si el movimiento ya usa una).
+  const businessAccount = !!from?.business;
+  const mainCats = kindCats.filter((c) => !!c.business === businessAccount);
+  const restCats = kindCats.filter((c) => !!c.business !== businessAccount);
+  const showRest = otherCats || restCats.some((c) => c.id === d.categoryId);
+  const offGroup = useRef(new Set<string>());
+  const restIds = restCats.map((c) => c.id).join(",");
+  useEffect(() => {
+    offGroup.current = new Set(restIds ? restIds.split(",") : []);
+  }, [restIds]);
   // Las cuentas archivadas solo aparecen si el movimiento que se edita ya las usa.
   const pickable = (selected: string) => accounts.filter((a) => !a.archived || a.id === selected);
 
@@ -663,12 +678,33 @@ export const TxSheet = forwardRef<
               >
                 <CategoryAvatar size={34} />
               </CategoryChip>
-              {kindCats.map((c) => (
+              {mainCats.map((c) => (
                 <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => pickCategory(c.id)}>
                   <CategoryAvatar category={c} size={34} />
                 </CategoryChip>
               ))}
             </div>
+            {restCats.length > 0 &&
+              (showRest ? (
+                <div className="grid gap-2 pt-1">
+                  <span className="kicker">{businessAccount ? "Personales" : "Del negocio"}</span>
+                  <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                    {restCats.map((c) => (
+                      <CategoryChip key={c.id} label={c.name} selected={d.categoryId === c.id} onClick={() => pickCategory(c.id)}>
+                        <CategoryAvatar category={c} size={34} />
+                      </CategoryChip>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setOtherCats(true)}
+                  className="inline-flex min-h-11 w-fit items-center text-[13px] text-accent-fg hover:underline"
+                >
+                  {businessAccount ? `Ver las personales (${restCats.length})` : `Ver las del negocio (${restCats.length})`}
+                </button>
+              ))}
           </div>
         )}
 

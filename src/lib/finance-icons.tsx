@@ -6,6 +6,7 @@ import {
   GasPump, Gift, GraduationCap, HandCoins, Hamburger, Heartbeat, House, Laptop, Lightning, Money,
   MusicNotes, PawPrint, PiggyBank, Pill, Pizza, Question, Receipt, Repeat, Scales, Scissors, ShoppingBag,
   ShoppingCart, Sparkle, Storefront, Suitcase, Tag, Taxi, Television, TShirt, Wallet, WifiHigh, Wine, Wrench,
+  VinylRecord, Megaphone, Globe, Percent, Package, SpeakerHifi,
   type Icon,
 } from "@phosphor-icons/react";
 
@@ -20,6 +21,7 @@ export const FINANCE_ICONS: Record<string, Icon> = {
   GraduationCap, BookOpen, Baby, PawPrint,
   Briefcase, Money, Coins, HandCoins, PiggyBank, ChartLineUp, Bank, CreditCard, Wallet,
   Scales, Tag,
+  VinylRecord, Megaphone, Globe, Percent, Package, SpeakerHifi,
 };
 
 export function FinanceIcon({ name, ...props }: { name: string } & React.ComponentProps<Icon>) {
