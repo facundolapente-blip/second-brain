@@ -386,7 +386,7 @@ export const Sheet = forwardRef<
         </IconButton>
       </div>
       </div>
-      <div ref={body} className="max-h-[calc(92dvh-60px)] overflow-y-auto overscroll-contain px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div ref={body} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {children}
       </div>
     </dialog>

@@ -349,6 +349,14 @@ dialog.sheet {
   padding: 0;
   box-shadow: 0 -12px 40px -20px rgba(var(--shadow-tint), 0.25);
 }
+/* Abierta, la hoja es una columna: la cabecera fija y el cuerpo con su propio scroll.
+   Antes el cuerpo tenía un alto calculado (92dvh − 60px) y la cabecera medía un poco
+   más, así que la hoja entera también se desplazaba: dos barras. */
+dialog.sheet[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 /* El scroll de una hoja no arrastra la página de atrás. */
 dialog.sheet,
 dialog.sheet * {
