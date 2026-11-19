@@ -17,8 +17,10 @@ const WANTED = [
   { kind: "expense", name: "Web y herramientas", icon: "Globe", color: "blue" },
   { kind: "expense", name: "Comisiones", icon: "Percent", color: "orange" },
   { kind: "expense", name: "Envíos y empaque", icon: "Package", color: "brown" },
+  { kind: "expense", name: "Merch", icon: "TShirt", color: "purple" },
   { kind: "expense", name: "Otros del negocio", icon: "Briefcase", color: "stone" },
   { kind: "income", name: "Venta de discos", icon: "VinylRecord", color: "teal" },
+  { kind: "income", name: "Venta de merch", icon: "TShirt", color: "purple" },
   { kind: "income", name: "Otros ingresos del negocio", icon: "Briefcase", color: "stone" },
 ];
 const RENAME: Record<string, string> = { expense: "Otros del negocio", income: "Venta de discos" };
