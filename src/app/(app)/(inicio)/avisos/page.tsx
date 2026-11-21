@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { pushConfigured, vapidPublicKey } from "@/lib/push";
-import { getReminderPrefs, previewReminders } from "@/lib/reminders";
+import { buildHabitReminders, getReminderPrefs, previewReminders } from "@/lib/reminders";
+import { getHabitsWithLogs } from "@/lib/habits";
+import { todayISO } from "@/lib/dates";
 import { deviceLabel } from "@/lib/reminder-logic";
 import { RemindersView, type Device } from "./reminders-view";
 
@@ -10,6 +12,8 @@ export const metadata = { title: "Avisos" };
 export default async function AvisosPage() {
   const prefs = await getReminderPrefs();
   const preview = await previewReminders();
+  const { habits } = await getHabitsWithLogs();
+  const habitPreview = await buildHabitReminders(Object.keys(prefs.habits)).catch(() => ({}));
   let devices: Device[] = [];
   let tableReady = true;
   try {
@@ -30,6 +34,9 @@ export default async function AvisosPage() {
       <RemindersView
         prefs={prefs}
         preview={preview}
+        habits={habits.map((h) => ({ id: h.id, name: h.name, icon: h.icon, color: h.color }))}
+        habitPreview={habitPreview}
+        today={todayISO()}
         devices={devices}
         tableReady={tableReady}
         publicKey={pushConfigured() ? vapidPublicKey() : null}

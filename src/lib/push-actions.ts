@@ -54,13 +54,21 @@ export async function saveReminderPrefs(prefs: ReminderPrefs) {
   return { ok: true as const };
 }
 
-/** Un aviso de prueba a este aparato (o a todos, sin endpoint). */
-export async function sendTestPush(endpoint?: string): Promise<{ ok: boolean; message: string }> {
+/**
+ * Un aviso de prueba a este aparato (por `endpoint`), a uno de la lista (por `id`, el botón
+ * "Probar" de cada aparato) o a todos.
+ */
+export async function sendTestPush(endpoint?: string, id?: string): Promise<{ ok: boolean; message: string }> {
   await exigirSesion();
   if (!pushConfigured()) return { ok: false, message: "Faltan las claves de avisos (VAPID) en el servidor." };
   const r = await sendPush(
-    { title: "Aviso de prueba", body: "Si ves esto, los avisos andan en este aparato.", url: "/avisos", tag: "aviso-prueba" },
-    { endpoint: typeof endpoint === "string" ? endpoint : undefined },
+    {
+      title: "Aviso de prueba",
+      body: "Si ves esto, los avisos andan en este aparato (y en el reloj, si está conectado).",
+      url: "/avisos",
+      tag: "aviso-prueba",
+    },
+    typeof id === "string" ? { ids: [id] } : { endpoint: typeof endpoint === "string" ? endpoint : undefined },
   );
   revalidatePath("/avisos");
   if (r.sent) return { ok: true, message: "Mandado. Tendría que llegar en unos segundos." };

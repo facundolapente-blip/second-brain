@@ -30,12 +30,12 @@ function setup() {
 export type PushResult = { sent: number; removed: number; failed: number; errors: string[] };
 
 /**
- * Manda el aviso a todos los aparatos (o a uno, por `endpoint`). Los que el servicio
+ * Manda el aviso a todos los aparatos (o a uno, por `endpoint`, o a los elegidos, por `ids`). Los que el servicio
  * da por muertos (404/410: se desinstaló la app, se borraron los datos o venció) se borran.
  */
-export async function sendPush(payload: PushPayload, opts: { endpoint?: string } = {}): Promise<PushResult> {
+export async function sendPush(payload: PushPayload, opts: { endpoint?: string; ids?: string[] } = {}): Promise<PushResult> {
   setup();
-  const subs = await prisma.pushSubscription.findMany({ where: opts.endpoint ? { endpoint: opts.endpoint } : undefined });
+  const subs = await prisma.pushSubscription.findMany({ where: opts.endpoint ? { endpoint: opts.endpoint } : opts.ids ? { id: { in: opts.ids } } : undefined });
   const result: PushResult = { sent: 0, removed: 0, failed: 0, errors: [] };
   const body = JSON.stringify(payload);
   // De a uno: en la compu la base admite una sola conexión, y son pocos aparatos.

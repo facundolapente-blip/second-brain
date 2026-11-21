@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { Bell, BellSlash, CheckCircle, DeviceMobile, PaperPlaneTilt, WarningCircle } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { TintedCard } from "@/components/tinted-card";
-import { Button, cx, inputClass } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
+import { ReminderGroups, type HabitChoice } from "./reminder-rows";
+import { CustomReminders } from "./custom-reminders";
 import { actionErrorText, useSafeTransition } from "@/components/safe-action";
 import { removePushSubscription, savePushSubscription, saveReminderPrefs, sendTestPush } from "@/lib/offline/push";
-import { REMINDER_HOURS, REMINDER_INFO, REMINDER_KINDS, type PushPayload, type ReminderKind, type ReminderPrefs } from "@/lib/reminder-logic";
+import { type PushPayload, type ReminderKind, type ReminderPrefs } from "@/lib/reminder-logic";
 
 export type Device = { id: string; endpoint: string; label: string; createdAt: string; lastUsedAt: string | null };
 
@@ -39,12 +41,18 @@ function sameKey(a: ArrayBuffer | null | undefined, b: Uint8Array): boolean {
 export function RemindersView({
   prefs: initialPrefs,
   preview,
+  habitPreview,
+  habits,
   devices,
+  today,
   tableReady,
   publicKey,
 }: {
+  today: string;
   prefs: ReminderPrefs;
   preview: Record<ReminderKind, PushPayload | null>;
+  habitPreview: Record<string, PushPayload | null>;
+  habits: HabitChoice[];
   devices: Device[];
   tableReady: boolean;
   publicKey: string | null;
@@ -53,6 +61,9 @@ export function RemindersView({
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [busy, setBusy] = useState<"activar" | "desactivar" | "prueba" | null>(null);
+  // Prueba de un aparato de la lista: cuál se está mandando y lo que contestó.
+  const [testing, setTesting] = useState<string | null>(null);
+  const [tested, setTested] = useState<{ id: string; ok: boolean; text: string } | null>(null);
   const [note, setNote] = useState<Note>(null);
   const [prefs, setPrefs] = useState(initialPrefs);
   const [, run] = useSafeTransition();
@@ -162,11 +173,23 @@ export function RemindersView({
     }
   }
 
-  function change(kind: ReminderKind, patch: Partial<ReminderPrefs[ReminderKind]>) {
+  function change(next: ReminderPrefs) {
     const before = prefs;
-    const next = { ...prefs, [kind]: { ...prefs[kind], ...patch } };
     setPrefs(next);
     run(() => saveReminderPrefs(next), { onError: () => setPrefs(before) });
+  }
+
+  async function testDevice(d: Device) {
+    setTesting(d.id);
+    setTested(null);
+    try {
+      const r = await sendTestPush(undefined, d.id);
+      setTested({ id: d.id, ok: r.ok, text: r.message });
+    } catch (e) {
+      setTested({ id: d.id, ok: false, text: actionErrorText(e) });
+    } finally {
+      setTesting(null);
+    }
   }
 
   function remove(d: Device) {
@@ -187,7 +210,6 @@ export function RemindersView({
   else if (here) status = "Activados en este aparato.";
   else status = "Este aparato todavía no recibe avisos.";
 
-  const on = REMINDER_KINDS.filter((k) => prefs[k].on).length;
   const canActivate = tableReady && !!publicKey && support === "ok" && permission !== "denied";
 
   return (
@@ -198,7 +220,7 @@ export function RemindersView({
           icon={DeviceMobile}
           title="Este aparato"
           meta={here ? "Recibe avisos" : support === "checking" ? "Revisando…" : "Sin avisos"}
-          className="lg:col-span-5"
+          className="lg:col-span-5 lg:self-start"
         >
           <p className="text-[13.5px] leading-relaxed text-muted">{status}</p>
 
@@ -242,9 +264,13 @@ export function RemindersView({
           {devices.length > 0 && (
             <div className="grid gap-2">
               <h3 className="font-mono text-[11px] tracking-[0.1em] text-muted uppercase">Aparatos con avisos · {devices.length}</h3>
+              <p className="text-[12.5px] leading-relaxed text-muted">
+                “Probar” manda un aviso de prueba a ese aparato. El reloj no aparece aparte: recibe lo que le llega al celular.
+              </p>
               <ul className="grid divide-y divide-line overflow-hidden rounded-xl border border-line">
                 {devices.map((d) => (
-                  <li key={d.id} className="flex min-h-12 items-center gap-3 px-3 py-2">
+                  <li key={d.id} className="grid gap-2 px-3 py-2">
+                    <div className="flex min-h-10 items-center gap-2">
                     <div className="grid min-w-0 flex-1">
                       <span className="flex items-center gap-2 text-[14px]">
                         <span className="truncate">{d.label}</span>
@@ -255,9 +281,19 @@ export function RemindersView({
                         {d.lastUsedAt ? ` · último aviso ${when.format(new Date(d.lastUsedAt))}` : ""}
                       </span>
                     </div>
+                    <Button size="sm" onClick={() => testDevice(d)} disabled={testing !== null}>
+                      <PaperPlaneTilt size={15} aria-hidden />
+                      {testing === d.id ? "Mandando…" : "Probar"}
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => remove(d)}>
                       Quitar
                     </Button>
+                    </div>
+                    {tested?.id === d.id && (
+                      <p role="status" className={cx("reveal text-[12.5px]", tested.ok ? "text-[var(--st-done-fg)]" : "text-[var(--st-fail-fg)]")}>
+                        {tested.text}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -265,94 +301,32 @@ export function RemindersView({
           )}
         </TintedCard>
 
-        <TintedCard
-          icon={Bell}
-          title="Qué avisos y a qué hora"
-          meta={`${on} de ${REMINDER_KINDS.length} ${on === 1 ? "activo" : "activos"} · ${devices.length} ${devices.length === 1 ? "aparato" : "aparatos"}`}
-          className="lg:col-span-7"
-          bodyClassName="gap-0! p-0!"
-        >
-          <p className="max-w-[62ch] px-[18px] pt-4 pb-3 text-[13.5px] leading-relaxed text-muted lg:px-5">
-            Van a todos los aparatos activados, una vez por día cada uno, y solo si hay algo para avisar. Salen dentro de la hora
-            elegida (con 21:00, entre las 21:00 y las 21:59).
+        <div className="grid content-start gap-4 lg:col-span-7 lg:gap-5">
+          <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-muted">
+            Prendé los que quieras y elegí la hora, los días y a qué aparato llegan. Salen una vez por día, dentro de la hora
+            elegida (con 21:00, entre las 21:00 y las 21:59), y solo si hay algo para avisar. Lo que llega al celular también
+            llega al reloj.
           </p>
-          <ul className="grid divide-y divide-line border-y border-line">
-            {REMINDER_KINDS.map((k) => {
-              const p = preview[k];
-              const id = `aviso-${k}`;
-              return (
-                <li key={k} className="grid gap-3 p-4 lg:p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="grid min-w-0 flex-1 gap-0.5">
-                      <label htmlFor={id} className="text-[15px] font-medium">
-                        {REMINDER_INFO[k].label}
-                      </label>
-                      <p className="text-[13px] leading-relaxed text-muted">{REMINDER_INFO[k].hint}</p>
-                    </div>
-                    <Switch id={id} checked={prefs[k].on} onChange={(on) => change(k, { on })} />
-                  </div>
-                  <div className={cx("flex flex-wrap items-center gap-x-4 gap-y-2", !prefs[k].on && "opacity-60")}>
-                    <label className="flex items-center gap-2 text-[13.5px] whitespace-nowrap text-muted">
-                      A las
-                      <select
-                        value={prefs[k].hour}
-                        onChange={(e) => change(k, { hour: Number(e.target.value) })}
-                        disabled={!prefs[k].on}
-                        className={cx(inputClass, "h-10 w-auto font-mono text-[14px]")}
-                      >
-                        {REMINDER_HOURS.map((h) => (
-                          <option key={h} value={h}>
-                            {String(h).padStart(2, "0")}:00
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="rounded-xl bg-surface-2 p-3 text-[13px] leading-relaxed">
-                    <p className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">Si fuera ahora</p>
-                    {p ? (
-                      <>
-                        <p className="mt-1 font-medium text-fg">{p.title}</p>
-                        <p className="text-muted">{p.body}</p>
-                      </>
-                    ) : (
-                      <p className="mt-1 text-muted">No habría nada para avisar.</p>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="max-w-[62ch] px-[18px] pt-3 pb-4 text-[12.5px] leading-relaxed text-muted lg:px-5">
+          <CustomReminders
+            items={prefs.custom}
+            onChange={(custom) => change({ ...prefs, custom })}
+            devices={devices.map((d) => ({ id: d.id, label: d.label, here: d.endpoint === endpoint }))}
+            today={today}
+          />
+          <ReminderGroups
+            prefs={prefs}
+            onChange={change}
+            preview={preview}
+            habitPreview={habitPreview}
+            habits={habits}
+            devices={devices.map((d) => ({ id: d.id, label: d.label, here: d.endpoint === endpoint }))}
+          />
+          <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-muted">
             ¿Y un aviso justo antes de cada bloque? El plan gratis de Vercel solo corre tareas programadas una vez por día y sin
             minuto exacto, así que no se puede avisar “empieza en 15 minutos”. En su lugar está el Plan del día a la mañana.
           </p>
-        </TintedCard>
+        </div>
       </main>
     </>
-  );
-}
-
-function Switch({ id, checked, onChange }: { id: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cx(
-        "relative mt-0.5 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors before:absolute before:-inset-2 before:content-['']",
-        checked ? "bg-accent" : "bg-faint",
-      )}
-    >
-      <span
-        aria-hidden
-        className={cx(
-          "inline-block size-5 rounded-full bg-surface shadow-sm transition-transform duration-150 motion-reduce:transition-none",
-          checked ? "translate-x-6" : "translate-x-1",
-        )}
-      />
-    </button>
   );
 }
