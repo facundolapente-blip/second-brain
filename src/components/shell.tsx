@@ -573,7 +573,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
             className={cx(
               // Entra con la curva de las hojas y se va más rápido; se cierra también deslizándolo
               // hacia la izquierda. Con menos movimiento, solo un fundido en su lugar.
-              "absolute inset-y-0 left-0 flex w-[17.5rem] touch-pan-y flex-col gap-8 bg-side px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
+              "absolute inset-y-0 left-0 w-[17.5rem] touch-pan-y bg-side transition-[translate,opacity] motion-reduce:translate-x-0 motion-reduce:duration-[120ms]",
               drawer ? "duration-[var(--dur-sheet)] ease-[var(--ease-sheet)]" : "duration-[var(--dur-exit)] ease-[var(--ease-in)] motion-reduce:opacity-0",
               drawer ? "translate-x-0" : "-translate-x-full",
             )}
@@ -587,11 +587,15 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
                 drawer ? "opacity-100 duration-[var(--dur-sheet)] ease-[var(--ease-out)]" : "opacity-0 duration-[var(--dur-exit)] ease-[var(--ease-in)]",
               )}
             />
-            <Brand />
-            <Nav onNavigate={() => setDrawer(false)} />
-            <div className="mt-auto grid gap-3">
-              <ThemePicker initial={theme} />
-              <SignOutButton />
+            {/* Con todas las herramientas ya no entra en la pantalla: se desplaza adentro
+                (sin mover la página de atrás); la sombra queda afuera, en el cajón. */}
+            <div className="relative flex h-full flex-col gap-8 overflow-y-auto overscroll-contain px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] [scrollbar-width:thin]">
+              <Brand />
+              <Nav onNavigate={() => setDrawer(false)} />
+              <div className="mt-auto grid gap-3">
+                <ThemePicker initial={theme} />
+                <SignOutButton />
+              </div>
             </div>
           </aside>
         </div>
