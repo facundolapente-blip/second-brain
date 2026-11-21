@@ -28,6 +28,12 @@ export type ContextMenuItem =
       icon?: React.ReactNode;
       /** Solo el día, ahí mismo, con atajos Anteayer / Ayer / Hoy (entradas del journal). */
       day: { date: string; today: string; onSave: (date: string) => void };
+    }
+  | {
+      label: string;
+      icon?: React.ReactNode;
+      /** "Notificar": día y hora de un aviso al celular (y al reloj), ahí mismo. */
+      notify: { date: string; hour: number; today: string; onSave: (date: string, hour: number) => void };
     };
 type FormItem = Exclude<ContextMenuItem, { onSelect: () => void }>;
 
@@ -153,6 +159,8 @@ export function ContextMenuHost() {
         <ScheduleForm item={renaming} onDone={() => dismiss()} />
       ) : renaming && "day" in renaming ? (
         <DayForm item={renaming} onDone={() => dismiss()} />
+      ) : renaming && "notify" in renaming ? (
+        <NotifyForm item={renaming} onDone={() => dismiss()} />
       ) : renaming && "rename" in renaming ? (
         <form
           className="reveal grid gap-2 p-2"
@@ -189,7 +197,7 @@ export function ContextMenuHost() {
               type="button"
               role="menuitem"
               onClick={() => {
-                if ("rename" in it || "schedule" in it || "day" in it) setRenaming(it);
+                if ("rename" in it || "schedule" in it || "day" in it || "notify" in it) setRenaming(it);
                 else {
                   dismiss();
                   it.onSelect();
@@ -325,6 +333,62 @@ function DayForm({ item, onDone }: { item: Extract<ContextMenuItem, { day: unkno
       </div>
       <button type="submit" className="h-10 rounded-full bg-[var(--text)] text-[14px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">
         Guardar
+      </button>
+    </form>
+  );
+}
+
+/**
+ * "Notificar": un aviso al celular (y al reloj) ese día a esa hora. Las horas van de 6 a 23
+ * y salen dentro de la hora elegida (los avisos corren una vez por hora).
+ */
+function NotifyForm({ item, onDone }: { item: Extract<ContextMenuItem, { notify: unknown }>; onDone: () => void }) {
+  const n = item.notify;
+  const [date, setDate] = useState(n.date);
+  const [hour, setHour] = useState(n.hour);
+  const chip = "h-9 flex-1 rounded-full border border-line-strong text-[12.5px] hover:bg-surface-2";
+  const field = "h-10 rounded-lg border border-line-strong bg-surface px-2.5 text-[16px] outline-none focus:border-accent pointer-fine:text-[14px]";
+  const hours = Array.from({ length: 18 }, (_, i) => i + 6);
+  return (
+    <form
+      className="reveal grid w-[19rem] max-w-[86vw] gap-2.5 p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!date) return;
+        n.onSave(date, hour);
+        onDone();
+      }}
+    >
+      <span className="px-0.5 text-[12px] font-medium text-muted">{item.label}</span>
+      <div className="flex gap-1.5">
+        {[
+          ["Hoy", n.today],
+          ["Mañana", shiftIso(n.today, 1)],
+        ].map(([label, v]) => (
+          <button key={label} type="button" onClick={() => setDate(v)} className={cx(chip, v === date ? "border-[var(--text)] font-semibold text-fg" : "text-fg")}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <label className="grid gap-1 text-[12px] text-muted">
+          Día
+          <input type="date" required min={n.today} value={date} onChange={(e) => setDate(e.target.value)} className={field} />
+        </label>
+        <label className="grid gap-1 text-[12px] text-muted">
+          A las
+          <select value={hour} onChange={(e) => setHour(Number(e.target.value))} className={cx(field, "font-mono")}>
+            {hours.map((h) => (
+              <option key={h} value={h}>
+                {String(h).padStart(2, "0")}:00
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <span className="px-0.5 text-[11.5px] leading-relaxed text-muted">Te llega al celular (y al reloj) dentro de esa hora. Lo ves y lo cambiás en Avisos.</span>
+      <button type="submit" className="h-10 rounded-full bg-[var(--text)] text-[14px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">
+        Avisarme
       </button>
     </form>
   );

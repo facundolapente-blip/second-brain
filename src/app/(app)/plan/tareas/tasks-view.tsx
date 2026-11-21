@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyTaskItem } from "@/components/notify-menu";
 import { leaveThen, useNewIds, useTick } from "@/components/motion";
 import { notifyDeleted, notifyError, notifyInfo } from "@/components/undo-toast";
 import { haptic } from "@/components/haptics";
@@ -298,6 +299,7 @@ export function TasksBoard({
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => sheet.current?.open(t) },
         ...(t.status !== "done" ? [{ label: "Agendar en la semana", icon: <CalendarPlus size={15} />, onSelect: () => schedule(t) }] : []),
         // Arranca el temporizador de Enfoque con esta tarea.
+        ...(t.status !== "done" ? [notifyTaskItem(t)] : []),
         ...(t.status !== "done" ? [{ label: "Enfocarme", icon: <Timer size={15} />, onSelect: () => router.push(`/enfoque?tarea=${encodeURIComponent(t.id)}`) }] : []),
         {
           label: "Borrar",

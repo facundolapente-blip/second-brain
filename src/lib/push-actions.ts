@@ -5,7 +5,8 @@ import { prisma } from "./prisma";
 import { exigirSesion } from "./session";
 import { pushConfigured, sendPush } from "./push";
 import { REMINDERS_KEY } from "./reminders";
-import { normalizePrefs, type ReminderPrefs } from "./reminder-logic";
+import { CUSTOM_MAX, normalizeCustom, normalizePrefs, type ReminderPrefs } from "./reminder-logic";
+import { getReminderPrefs } from "./reminders";
 
 /** Pantalla de Avisos (Herramientas). Sin señal no tienen sentido: van tal cual (`offline/push.ts`). */
 
@@ -49,6 +50,23 @@ export async function removePushSubscription(where: { id?: string; endpoint?: st
 export async function saveReminderPrefs(prefs: ReminderPrefs) {
   await exigirSesion();
   const value = JSON.stringify(normalizePrefs(prefs));
+  await prisma.appSetting.upsert({ where: { key: REMINDERS_KEY }, create: { key: REMINDERS_KEY, value }, update: { value } });
+  revalidatePath("/avisos");
+  return { ok: true as const };
+}
+
+/**
+ * Un recordatorio propio desde otra pantalla ("Notificar" en el clic derecho de un bloque o
+ * una tarea). El id lo pone el aparato: si llega dos veces (la cola), reemplaza al mismo.
+ */
+export async function addCustomReminder(input: unknown) {
+  await exigirSesion();
+  const c = normalizeCustom(input);
+  if (!c) throw new Error("Recordatorio inválido");
+  const prefs = await getReminderPrefs();
+  const others = prefs.custom.filter((x) => x.id !== c.id);
+  if (others.length >= CUSTOM_MAX) throw new Error(`Ya tenés ${CUSTOM_MAX} recordatorios: borrá alguno en Avisos.`);
+  const value = JSON.stringify(normalizePrefs({ ...prefs, custom: [...others, c] }));
   await prisma.appSetting.upsert({ where: { key: REMINDERS_KEY }, create: { key: REMINDERS_KEY, value }, update: { value } });
   revalidatePath("/avisos");
   return { ok: true as const };

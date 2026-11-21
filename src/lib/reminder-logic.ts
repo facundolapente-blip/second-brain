@@ -36,7 +36,14 @@ export type ReminderPrefs = Record<ReminderKind, ReminderPref> & {
  * Un recordatorio propio: título, texto opcional y, como los demás, hora, días y aparatos.
  * Con `date` sale una sola vez ese día (los días no cuentan); sin `date`, los días elegidos.
  */
-export type CustomReminder = ReminderPref & { id: string; title: string; body: string; date: string | null };
+export type CustomReminder = ReminderPref & {
+  id: string;
+  title: string;
+  body: string;
+  date: string | null;
+  /** Adónde lleva al tocarlo (los de "Notificar" de un bloque o una tarea van al Plan). */
+  url?: string | null;
+};
 export const CUSTOM_MAX = 50;
 export const CUSTOM_TITLE_MAX = 80;
 export const CUSTOM_BODY_MAX = 300;
@@ -152,7 +159,8 @@ export function normalizeCustom(raw: unknown): CustomReminder | null {
   if (!id || !title) return null;
   const body = typeof v.body === "string" ? v.body.trim().slice(0, CUSTOM_BODY_MAX) : "";
   const date = typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : null;
-  return { ...normalizeOne(v, DEFAULT_CUSTOM_PREF), id, title, body, date };
+  const url = typeof v.url === "string" && /^\/(?![/\\])/.test(v.url) && v.url.length <= 200 ? v.url : null;
+  return { ...normalizeOne(v, DEFAULT_CUSTOM_PREF), id, title, body, date, url };
 }
 export const DEFAULT_CUSTOM_PREF: ReminderPref = { on: true, hour: 9, days: [0, 1, 2, 3, 4, 5, 6], devices: null };
 
@@ -168,7 +176,7 @@ export function customPast(c: CustomReminder, today: string): boolean {
 }
 
 export function customMessage(c: CustomReminder): PushPayload {
-  return { title: c.title, body: c.body || "Recordatorio", url: "/avisos", tag: `aviso-propio-${c.id}`.slice(0, 32) };
+  return { title: c.title, body: c.body || "Recordatorio", url: c.url || "/avisos", tag: `aviso-propio-${c.id}`.slice(0, 32) };
 }
 
 /** Si un aviso toca a esta hora y este día de la semana (con margen por si un cron falló). */

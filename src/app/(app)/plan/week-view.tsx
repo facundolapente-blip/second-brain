@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyBlockItem } from "@/components/notify-menu";
 import { applyPendingBlocks } from "@/lib/offline/plan-pending";
 import { usePendingActions } from "@/lib/offline/queue";
 import { notifyDeleted, notifyError, notifyInfo } from "@/components/undo-toast";
@@ -310,6 +311,7 @@ export function WeekView({
         { label: "Duplicar", icon: <CopySimple size={15} />, onSelect: () => sheetActions.duplicate(b.id) },
         // Arranca el temporizador de Enfoque con este bloque (un bloque creado sin señal todavía no tiene id del servidor).
         ...(!b.id.startsWith("pendiente-") && !isFreeBlock(b) ? [{ label: "Enfocarme", icon: <Timer size={15} />, onSelect: () => router.push(`/enfoque?bloque=${encodeURIComponent(b.id)}`) }] : []),
+        ...(!isFreeBlock(b) && !b.done ? [notifyBlockItem(b)] : []),
         { label: "Editar", icon: <NotePencil size={15} />, onSelect: () => openEdit(b) },
         {
           label: "Borrar",

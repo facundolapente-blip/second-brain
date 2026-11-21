@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyBlockItem } from "@/components/notify-menu";
 import { useSafeTransition } from "@/components/safe-action";
 import { QuoteCard } from "./quote-card";
 import { MementoCard } from "./memento-card";
@@ -760,6 +761,7 @@ function PlanToday({ d }: { d: Dashboard }) {
           icon: <CalendarBlank size={15} />,
           schedule: { date: b.date, start: b.startTime, end: b.endTime, onSave: (date, s, en) => moveTo(b, date, s, en) },
         },
+        ...(!b.done ? [notifyBlockItem(b)] : []),
         { label: "Ver en el Plan", icon: <CalendarCheck size={15} />, onSelect: () => router.push(`/plan?semana=${b.date}`) },
         {
           label: "Borrar",
