@@ -162,7 +162,8 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </ul>
       <p className="mt-6 mb-1.5 lg:[@media(max-height:980px)]:mt-3 lg:[@media(max-height:980px)]:mb-1 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
-      <ul className="grid gap-1 lg:[@media(max-height:980px)]:gap-0.5">
+      {/* Herramientas juntas en un bloque blanco, con el ícono en un círculo (opción 2 de Facu, 2026-11-22). */}
+      <ul className="grid gap-0 rounded-[18px] bg-surface p-1.5 shadow-[0_1px_2px_rgba(30,40,30,0.05),0_14px_30px_-18px_rgba(30,40,60,0.35)]">
         {TOOLS.map((t) => {
           const active = isActive(t.href);
           const Ico = t.icon;
@@ -176,9 +177,14 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   onNavigate?.();
                 }}
                 aria-current={active ? "page" : undefined}
-                className={cx("h-10 text-[15px] lg:[@media(max-height:980px)]:h-[34px] lg:[@media(max-height:800px)]:h-7! lg:[@media(max-height:800px)]:text-[14px]!", linkCls(active))}
+                className={cx("h-10 gap-2.5 text-[14.5px] whitespace-nowrap lg:[@media(max-height:980px)]:h-[34px] lg:[@media(max-height:800px)]:h-7! lg:[@media(max-height:800px)]:text-[14px]!", linkCls(active))}
               >
-                <Ico size={19} weight={active ? "fill" : "regular"} aria-hidden />
+                <span
+                  aria-hidden
+                  className="inline-flex size-[26px] shrink-0 items-center justify-center side-tool-ico rounded-full bg-surface-2 lg:[@media(max-height:800px)]:size-6"
+                >
+                  <Ico size={16} weight={active ? "fill" : "regular"} />
+                </span>
                 {t.label}
                 <NavHint />
               </Link>

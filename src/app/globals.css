@@ -1273,3 +1273,7 @@ dialog.sheet.closing-drag::backdrop {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Menú lateral: el ícono de cada herramienta (en su círculo) va en el azul de Inicio; en oscuro, más claro. */
+.side-tool-ico { color: var(--mod-inicio); }
+:root[data-theme="oscuro"] .side-tool-ico { color: #a9bedc; }
