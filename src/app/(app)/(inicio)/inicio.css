@@ -124,3 +124,40 @@
 /* Selectores dentro de la cabecera (Hoy/Ayer del check-in): la marca de lo elegido va del color lleno, con letra blanca. */
 .ini-bento .tcard-head .bg-\[var\(--head-bg\)\] { background: color-mix(in oklab, var(--mod) 74%, black); }
 :root[data-theme="oscuro"] .ini-bento .tcard-head .bg-\[var\(--head-bg\)\] { background: color-mix(in oklab, var(--mod) 52%, #1d1d1b); }
+
+/* Saludo con el cielo del momento (opción 3, elegida por Facu el 2026-11-22: "estaba muy apagada esa
+   zona"): el fondo cambia con la hora (data-momento de RitualRow: amanecer a la mañana, cielo celeste
+   a la tarde, noche con estrellas desde las 19) con un sol o una luna dibujados con CSS. */
+.ini-bento .ini-greeting { position: relative; isolation: isolate; }
+.ini-bento .ini-greeting { padding: 22px 24px; border-radius: 24px; overflow: hidden; }
+.ini-bento .ini-greeting::after { content: ""; position: absolute; z-index: -1; right: 28px; top: 22px; width: 64px; height: 64px; border-radius: 50%; }
+.ini-bento .ini-greeting[data-momento="noche"] {
+  color: #fff; box-shadow: 0 18px 40px -20px rgba(15, 27, 61, 0.8);
+  background:
+    radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 40% 70%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 60% 25%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 75% 55%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 85%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 30% 88%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 52% 48%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 10% 75%, #fff 50%, transparent 51%),
+    linear-gradient(160deg, #0f1b3d 0%, #1e2a5e 55%, #3b2f6b 100%);
+}
+.ini-bento .ini-greeting[data-momento="noche"]::after { box-shadow: inset -14px -6px 0 0 #f3e9c6; transform: rotate(-20deg); }
+.ini-bento .ini-greeting[data-momento="manana"] {
+  color: #3a1d12; background: linear-gradient(160deg, #ffd6a5 0%, #ffb3a7 55%, #f7a8c8 100%); box-shadow: 0 18px 40px -20px rgba(240, 130, 110, 0.7);
+}
+.ini-bento .ini-greeting[data-momento="manana"]::after { background: radial-gradient(circle, #fff3c4 0 45%, #ffd36b 46% 100%); box-shadow: 0 0 40px 10px rgba(255, 211, 107, 0.6); }
+.ini-bento .ini-greeting[data-momento="tarde"] {
+  color: #08324f; background: linear-gradient(160deg, #a8dcff 0%, #79c2f2 60%, #b9e6ff 100%); box-shadow: 0 18px 40px -20px rgba(60, 140, 200, 0.7);
+}
+.ini-bento .ini-greeting[data-momento="tarde"]::after { background: radial-gradient(circle, #fffbe0 0 45%, #ffe27a 46% 100%); box-shadow: 0 0 36px 8px rgba(255, 226, 122, 0.7); }
+.ini-bento .ini-greeting[data-momento="noche"] .kicker, .ini-bento .ini-greeting[data-momento="noche"] p { color: rgba(255,255,255,0.82) !important; }
+.ini-bento .ini-greeting[data-momento="noche"] b { color: #fff !important; }
+.ini-bento .ini-greeting[data-momento="noche"] a { background: rgba(255,255,255,0.14) !important; color: #fff !important; border-color: transparent !important; }
+.ini-bento .ini-greeting:not([data-momento="noche"]) .kicker, .ini-bento .ini-greeting:not([data-momento="noche"]) p { color: inherit !important; opacity: 0.85; }
+.ini-bento .ini-greeting:not([data-momento="noche"]) a { background: rgba(255,255,255,0.55) !important; color: inherit !important; border-color: transparent !important; }
+.ini-bento .ini-greeting button { color: inherit; }
+/* En el celular el sol o la luna van más chicos, en la esquina (a la altura de la fecha, no del título). */
+@media (max-width: 1023px) {
+  .ini-bento .ini-greeting { padding: 16px 18px 18px; }
+  .ini-bento .ini-greeting::after { width: 34px; height: 34px; right: 16px; top: 14px; }
+  .ini-bento .ini-greeting[data-momento="noche"]::after { box-shadow: inset -8px -3px 0 0 #f3e9c6; }
+}
