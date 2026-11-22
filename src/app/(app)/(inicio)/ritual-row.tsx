@@ -160,7 +160,10 @@ export function RitualRow({
           con su `order`: saludo, ¿Cómo estás?, tarea prioritaria y Plan de hoy arriba (order 1);
           Notas en su lugar de siempre (order 9). */}
       <div className="min-w-0 max-lg:contents lg:col-span-7 lg:flex lg:flex-col lg:gap-5">
-        <div className="flex min-w-0 flex-col gap-1.5 max-lg:order-1 lg:gap-2 lg:px-1 lg:pt-1.5">
+        <div
+          className="ini-greeting flex min-w-0 flex-col gap-1.5 max-lg:order-1 lg:gap-2 lg:px-1 lg:pt-1.5"
+          data-momento={d.hour < 12 ? "manana" : d.hour < NIGHT_HOUR ? "tarde" : "noche"}
+        >
           <div className="flex items-center gap-2 max-lg:-ml-0.5">
             <MenuButton />
             <p className="kicker truncate">{formatLong(d.today)}</p>

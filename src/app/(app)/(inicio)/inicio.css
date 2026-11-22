@@ -102,3 +102,25 @@
   .ini-gastos-body > div + div { padding-top: 20px; }
   .ini-gastos-body > div + div + div { border-left: 1px solid var(--border); }
 }
+
+/* Cabeceras llenas (opción A, elegida por Facu el 2026-11-22: "le falta color al Inicio").
+   Solo en Inicio (.ini-bento): la banda de cada tarjeta va llena del color de su módulo con
+   letra blanca, y las cifras de las tarjetas chicas en ese color. Lo de adentro no cambia:
+   el blanco va solo en la cabecera (--head-fg se sigue usando en botones del cuerpo). */
+.ini-bento .tcard-head {
+  --head-fg: #ffffff;
+  background: color-mix(in oklab, var(--mod) 74%, black);
+  color: #ffffff;
+  border-bottom-color: transparent;
+}
+.ini-bento .tcard-ico { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+.ini-bento .tcard-pill { background: rgba(0, 0, 0, 0.16); color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
+.ini-bento .tcard-pill:hover { background: rgba(0, 0, 0, 0.26); }
+.ini-bento .tcard-bar { background: rgba(255, 255, 255, 0.22); }
+.ini-bento .tcard-bar > span { background: #ffffff; }
+.ini-bento .tstat-fig { color: color-mix(in oklab, var(--mod) 78%, var(--text)); }
+:root[data-theme="oscuro"] .ini-bento .tcard-head { background: color-mix(in oklab, var(--mod) 52%, #1d1d1b); }
+:root[data-theme="oscuro"] .ini-bento .tstat-fig { color: color-mix(in oklab, var(--mod) 45%, white); }
+/* Selectores dentro de la cabecera (Hoy/Ayer del check-in): la marca de lo elegido va del color lleno, con letra blanca. */
+.ini-bento .tcard-head .bg-\[var\(--head-bg\)\] { background: color-mix(in oklab, var(--mod) 74%, black); }
+:root[data-theme="oscuro"] .ini-bento .tcard-head .bg-\[var\(--head-bg\)\] { background: color-mix(in oklab, var(--mod) 52%, #1d1d1b); }
