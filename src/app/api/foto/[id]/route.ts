@@ -12,6 +12,8 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/foto/[id]">) {
   return new Response(r.stream, {
     headers: {
       "Content-Type": r.attachment.contentType,
+      // Un documento se abre en el navegador con su nombre (y se baja con ese nombre).
+      ...(r.attachment.name ? { "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(r.attachment.name)}` } : {}),
       // Poco rato en la caché del navegador: al cerrar sesión no tiene que quedar
       // una copia que dure un año en el aparato.
       "Cache-Control": "private, max-age=300",

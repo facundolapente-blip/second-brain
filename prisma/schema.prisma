@@ -721,6 +721,8 @@ model Attachment {
   pathname       String        @unique
   contentType    String
   size           Int
+  /// Nombre original del archivo (documentos de Notas; las fotos no lo usan).
+  name           String?
   width          Int?
   height         Int?
   journalEntryId String?

@@ -41,7 +41,7 @@ const SELECT = {
   done: true,
   source: true,
   createdAt: true,
-  attachments: { select: { id: true, width: true, height: true }, orderBy: { createdAt: "asc" } },
+  attachments: { select: { id: true, width: true, height: true, contentType: true, name: true, size: true }, orderBy: { createdAt: "asc" } },
 } satisfies Prisma.NoteSelect;
 
 type Row = Prisma.NoteGetPayload<{ select: typeof SELECT }>;
@@ -51,7 +51,12 @@ const ORDER: Prisma.NoteOrderByWithRelationInput[] = [{ pinned: "desc" }, { sort
 
 function toDTO(r: Row): NoteDTO {
   const { attachments, createdAt, ...rest } = r;
-  return { ...rest, createdAt: createdAt.toISOString(), photos: attachments.map(toPhotoDTO) };
+  // Las imágenes sin nombre son fotos de la nota; lo demás (PDF, Word, videos…), archivos para abrir.
+  const photos = attachments.filter((a) => a.contentType.startsWith("image/") && !a.name);
+  const files = attachments
+    .filter((a) => !photos.includes(a))
+    .map((a) => ({ id: a.id, name: a.name ?? "Archivo", contentType: a.contentType, size: a.size }));
+  return { ...rest, createdAt: createdAt.toISOString(), photos: photos.map(toPhotoDTO), files };
 }
 
 export type NoteFilters = {

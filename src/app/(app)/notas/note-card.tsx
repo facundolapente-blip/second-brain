@@ -24,6 +24,7 @@ import {
 import { cx } from "@/components/ui";
 import { StarsShow } from "./stars";
 import { photoUrl } from "@/components/photos";
+import { NoteFiles } from "./note-files";
 import { tone } from "@/lib/palette";
 import {
   bodyWithoutUrl,
@@ -460,6 +461,7 @@ export function NoteCard({
             {rest}
           </p>
         )}
+        {n.files?.length ? <NoteFiles files={n.files} /> : null}
         {meta}
       </div>,
     );
@@ -486,6 +488,7 @@ export function NoteCard({
           <Folded text={n.body} done={n.done} strong onOpen={handlers.onOpen} />
         </>
       )}
+      {n.files?.length ? <NoteFiles files={n.files} /> : null}
       {meta}
     </div>,
   );

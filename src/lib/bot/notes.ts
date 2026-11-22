@@ -5,7 +5,7 @@ import { prisma } from "../prisma";
 import { logActivity } from "../trash";
 import { fetchLinkMeta } from "../notes";
 import { storeThumbnail } from "../thumbs";
-import { photosEnabled, storePhoto } from "../photos";
+import { photosEnabled, storeFile, storePhoto } from "../photos";
 import {
   bodyWithoutUrl,
   classifyNote,
@@ -99,15 +99,15 @@ export type IncomingMedia = {
   kind: "image" | "document" | "video" | "audio";
   caption: string | null;
   filename: string | null;
-  /** La imagen ya bajada de WhatsApp (solo imágenes; lo demás queda anotado). */
+  /** El archivo ya bajado de WhatsApp (foto, documento, video o audio; null si no se pudo). */
   file: File | null;
 };
 
-/** Foto → nota en Archivos con la foto; documento, video o audio → nota con el nombre. */
+/** Foto, documento, video o audio → nota en Archivos con el archivo guardado. */
 export async function saveMediaNote(m: IncomingMedia, msgId: string | null): Promise<string> {
   const what = { image: "Foto", document: "Documento", video: "Video", audio: "Audio" }[m.kind];
   const caption = (m.caption ?? "").trim();
-  const parts = [caption, m.kind !== "image" ? `${what}${m.filename ? `: ${m.filename}` : ""} (el archivo queda en WhatsApp)` : ""].filter(Boolean);
+  const parts = [caption];
   const created = await createOnce({
     section: "archivos",
     title: m.filename ?? (caption ? null : what),
@@ -120,14 +120,20 @@ export async function saveMediaNote(m: IncomingMedia, msgId: string | null): Pro
   let stored = false;
   if (m.file && photosEnabled()) {
     try {
-      await storePhoto(m.file, { noteId: created.id });
+      if (m.kind === "image") await storePhoto(m.file, { noteId: created.id });
+      else await storeFile(m.file, { noteId: created.id }, m.filename ?? m.file.name);
       stored = true;
     } catch (e) {
-      console.error("[whatsapp] no se pudo guardar la foto:", e instanceof Error ? e.message : e);
+      console.error("[whatsapp] no se pudo guardar el archivo:", e instanceof Error ? e.message : e);
     }
+  }
+  // Sin el archivo (muy pesado o falló la descarga), la nota lo dice.
+  if (!stored && m.kind !== "image") {
+    const note = `${what}${m.filename ? `: ${m.filename}` : ""} (no se pudo guardar el archivo; quedó en WhatsApp)`;
+    await prisma.note.update({ where: { id: created.id }, data: { body: [caption, note].filter(Boolean).join("\n\n").slice(0, NOTE_BODY_MAX) } });
   }
   await logActivity("created", "note", created.id, `${what} (WhatsApp)`);
   refresh();
   if (m.kind === "image") return stored ? "Foto guardada en Notas · Archivos" : "Guardé la nota en Archivos, pero la foto no se pudo subir.";
-  return `Guardado en Notas · Archivos (${what.toLowerCase()}; el archivo en sí queda en WhatsApp)`;
+  return stored ? `${what} guardado en Notas · Archivos` : `Guardé la nota en Archivos, pero el ${what.toLowerCase()} no se pudo subir (¿pesa más de 25 MB?).`;
 }

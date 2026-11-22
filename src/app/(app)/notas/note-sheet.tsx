@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { ArrowSquareOut, Camera, Trash, X } from "@phosphor-icons/react";
 import { Button, cx, Field, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { PhotoStrip } from "@/components/photos";
+import { NoteFiles } from "./note-files";
 import { useSaveOnDismiss } from "@/components/save-on-dismiss";
 import { haptic } from "@/components/haptics";
 import { tone } from "@/lib/palette";
@@ -345,9 +346,12 @@ function NoteForm({
       </div>
 
       <div className="grid gap-2">
-        <span className="kicker">Fotos</span>
+        <span className="kicker">{note?.files?.length ? "Archivos y fotos" : "Fotos"}</span>
         {note ? (
-          <PhotoStrip photos={note.photos} owner={{ noteId: note.id }} onCountChange={setPhotoCount} />
+          <>
+            {note.files?.length ? <NoteFiles files={note.files} /> : null}
+            <PhotoStrip photos={note.photos} owner={{ noteId: note.id }} onCountChange={setPhotoCount} />
+          </>
         ) : (
           <>
             {files.length > 0 && (

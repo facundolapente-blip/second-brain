@@ -5,6 +5,7 @@ import { handleBotMessage, handleReplyCommand } from "@/lib/bot/bot";
 import { isSkipMessage, SKIP_REPLY } from "@/lib/bot/parse";
 import { saveMediaNote, saveTextNote, type IncomingMedia } from "@/lib/bot/notes";
 import { AUDIO_MAX, transcribe, transcriptionReady } from "@/lib/transcribe";
+import { FILE_MAX_BYTES } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 // Un audio largo se baja y se transcribe antes de contestar.
@@ -93,10 +94,10 @@ const IMAGE_MAX = 8 * 1024 * 1024;
  * Baja un archivo de WhatsApp (dos pasos: la URL del archivo y después el archivo, los dos
  * con el token). Fotos hasta 8 MB; audios hasta lo que acepta la transcripción.
  */
-async function downloadMedia(mediaId: string, mime: string, kind: "image" | "audio"): Promise<File | null> {
+async function downloadMedia(mediaId: string, mime: string, kind: "image" | "audio" | "file", name = "archivo"): Promise<File | null> {
   const token = process.env.WHATSAPP_TOKEN!;
   if (isTestToken(token)) return null;
-  const max = kind === "image" ? IMAGE_MAX : AUDIO_MAX;
+  const max = kind === "image" ? IMAGE_MAX : kind === "file" ? FILE_MAX_BYTES : AUDIO_MAX;
   try {
     const info = await fetch(`${GRAPH}/${encodeURIComponent(mediaId)}`, {
       headers: { authorization: `Bearer ${token}` },
@@ -107,7 +108,8 @@ async function downloadMedia(mediaId: string, mime: string, kind: "image" | "aud
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     if (buf.byteLength > max) return null;
-    const type = (info.mime_type || mime || (kind === "image" ? "image/jpeg" : "audio/ogg")).split(";")[0].trim();
+    const type = (info.mime_type || mime || (kind === "image" ? "image/jpeg" : kind === "file" ? "application/octet-stream" : "audio/ogg")).split(";")[0].trim();
+    if (kind === "file") return new File([buf], name, { type });
     const ext =
       kind === "image"
         ? type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"
@@ -117,6 +119,13 @@ async function downloadMedia(mediaId: string, mime: string, kind: "image" | "aud
     console.error(`[whatsapp] no se pudo bajar ${kind === "image" ? "la foto" : "el audio"}:`, e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+/** Nombre para un archivo que llega sin nombre (los videos y audios no lo traen). */
+function fallbackName(kind: string, mime: string | null): string {
+  const ext = (mime ?? "").split("/")[1]?.split(";")[0]?.replace("quicktime", "mov").replace("mpeg", "mp3") || "bin";
+  const what = kind === "video" ? "Video" : kind === "audio" ? "Audio" : "Archivo";
+  return `${what} de WhatsApp.${ext}`;
 }
 
 /** Un audio → su texto en Notas (como si lo hubiera escrito). Null si no se pudo transcribir. */
@@ -188,14 +197,18 @@ export async function POST(req: Request) {
     else if (heard) answer = heard;
     else if (mediaKind && isSkipMessage(typeof caption === "string" ? caption : null)) answer = SKIP_REPLY;
     else if (mediaKind) {
-      // Fotos y documentos van a Notas → Archivos (la foto se guarda; lo demás queda anotado).
+      // Fotos, documentos, videos y audios sin transcribir van a Notas → Archivos con el archivo.
       const part = msg[mediaKind] ?? {};
       const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
       const media: IncomingMedia = {
         kind: mediaKind,
         caption: str(part.caption),
         filename: str(part.filename),
-        file: mediaKind === "image" && str(part.id) ? await downloadMedia(str(part.id)!, str(part.mime_type) ?? "image/jpeg", "image") : null,
+        file: !str(part.id)
+          ? null
+          : mediaKind === "image"
+            ? await downloadMedia(str(part.id)!, str(part.mime_type) ?? "image/jpeg", "image")
+            : await downloadMedia(str(part.id)!, str(part.mime_type) ?? "", "file", str(part.filename) ?? fallbackName(mediaKind, str(part.mime_type))),
       };
       answer = await saveMediaNote(media, msgId);
     } else answer = await handleBotMessage(text, msgId);

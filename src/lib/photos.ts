@@ -41,6 +41,25 @@ export async function storePhoto(file: File, owner: PhotoOwner, size?: { width?:
   return { id: a.id, width: a.width, height: a.height };
 }
 
+/** Tope para un documento que llega por WhatsApp (PDF, Word, video…). */
+export const FILE_MAX_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Un documento cualquiera (de una nota): va dentro de la carpeta de las fotos, así la
+ * papelera lo borra igual al vaciarse. Guarda el nombre original para mostrarlo y bajarlo.
+ */
+export async function storeFile(file: File, owner: PhotoOwner, name: string): Promise<{ id: string }> {
+  if (file.size > FILE_MAX_BYTES) throw new Error("El archivo es demasiado pesado.");
+  const ext = (name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "bin";
+  const id = crypto.randomUUID();
+  const type = file.type || "application/octet-stream";
+  const res = await put(`${folder()}archivos/${id}.${ext}`, file, { access: "private", contentType: type, addRandomSuffix: false });
+  const a = await prisma.attachment.create({
+    data: { pathname: res.pathname, contentType: type, size: file.size, name: name.slice(0, 200), ...owner },
+  });
+  return { id: a.id };
+}
+
 export async function openPhoto(id: string) {
   const a = await prisma.attachment.findUnique({ where: { id } });
   if (!a) return null;

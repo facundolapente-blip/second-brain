@@ -362,6 +362,8 @@ export type NoteDTO = {
   /** Lugar en la lista (más alto = más arriba); arranca en la fecha de creación en ms y cambia al arrastrar. */
   sortKey: number;
   photos: { id: string; width: number | null; height: number | null }[];
+  /** Documentos guardados (PDF, Word, videos…): se abren desde la tarjeta. */
+  files?: NoteFile[];
 };
 
 export const NOTE_TITLE_MAX = 200;
@@ -590,4 +592,28 @@ export function relativeDay(day: string, today: string): string {
     .format(new Date(a))
     .replace(".", "")
     .replace(" de ", " ");
+}
+
+export type NoteFile = { id: string; name: string; contentType: string; size: number };
+
+/** "1,2 MB", "340 KB". */
+export function fileSizeText(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+export type FileKind = "pdf" | "doc" | "sheet" | "slides" | "video" | "audio" | "image" | "zip" | "other";
+
+/** Qué tipo de archivo es, para el ícono y el rótulo. */
+export function fileKind(name: string, contentType: string): FileKind {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  if (contentType === "application/pdf" || ext === "pdf") return "pdf";
+  if (contentType.startsWith("video/")) return "video";
+  if (contentType.startsWith("audio/")) return "audio";
+  if (contentType.startsWith("image/")) return "image";
+  if (["doc", "docx", "odt", "rtf", "txt"].includes(ext)) return "doc";
+  if (["xls", "xlsx", "ods", "csv"].includes(ext)) return "sheet";
+  if (["ppt", "pptx", "odp", "key"].includes(ext)) return "slides";
+  if (["zip", "rar", "7z"].includes(ext)) return "zip";
+  return "other";
 }
