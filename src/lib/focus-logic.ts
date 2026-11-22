@@ -167,3 +167,47 @@ export function cleanNote(v: unknown): string | null {
   const s = typeof v === "string" ? v.trim().slice(0, 2000) : "";
   return s ? s : null;
 }
+
+export type FocusStats = {
+  todayMin: number;
+  todayCount: number;
+  weekMin: number;
+  /** La semana anterior hasta el mismo día de la semana (para comparar a esta altura). */
+  prevWeekMin: number;
+  /** Días seguidos con enfoque, contando hoy (o desde ayer si hoy todavía no hubo). */
+  streak: number;
+  /** La racha llega al borde de lo cargado: puede ser más larga. */
+  streakOpen: boolean;
+  /** Promedio por día con enfoque en los últimos `window` días. */
+  avgMin: number;
+  activeDays: number;
+};
+
+/** Las cifras de arriba de Enfoque, con las sesiones cargadas (las de los últimos `window` días). */
+export function focusStats(sessions: SessionLike[], today: string, monday: string, window: number): FocusStats {
+  const byDay = new Map<string, number>();
+  for (const s of sessions) byDay.set(s.day, (byDay.get(s.day) ?? 0) + s.minutes);
+  const todays = sessions.filter((s) => s.day === today);
+  const sum = (from: string, to: string) => [...byDay].reduce((a, [d, m]) => (d >= from && d <= to ? a + m : a), 0);
+  const prevMonday = addDays(monday, -7);
+  const offset = Math.round((Date.parse(today) - Date.parse(monday)) / 86_400_000);
+  const first = addDays(today, -(window - 1));
+  let day = byDay.has(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (byDay.has(day) && day >= first) {
+    streak++;
+    day = addDays(day, -1);
+  }
+  const recent = [...byDay].filter(([d]) => d >= first && d <= today);
+  const total = recent.reduce((a, [, m]) => a + m, 0);
+  return {
+    todayMin: todays.reduce((a, s) => a + s.minutes, 0),
+    todayCount: todays.length,
+    weekMin: sum(monday, today),
+    prevWeekMin: sum(prevMonday, addDays(prevMonday, offset)),
+    streak,
+    streakOpen: streak > 0 && addDays(day, 1) === first,
+    avgMin: recent.length ? Math.round(total / recent.length) : 0,
+    activeDays: recent.length,
+  };
+}

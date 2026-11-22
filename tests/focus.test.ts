@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  focusStats,
   breakAfter,
   cleanNote,
   clockText,
@@ -94,5 +95,31 @@ describe("totales", () => {
     expect(g.map((x) => x.day)).toEqual(["2026-11-15", "2026-11-12", "2026-11-09", "2026-11-08"]);
     expect(g[2].minutes).toBe(75);
     expect(g[2].sessions.map((x) => x.minutes)).toEqual([50, 25]);
+  });
+});
+
+describe("cifras de Enfoque", () => {
+  const s = (day: string, minutes: number) => ({ day, minutes });
+  // Hoy es jueves 2026-11-19; la semana empieza el lunes 16.
+  const list = [s("2026-11-19", 25), s("2026-11-19", 25), s("2026-11-18", 50), s("2026-11-17", 30), s("2026-11-12", 40), s("2026-11-10", 20), s("2026-11-13", 60)];
+  const st = focusStats(list, "2026-11-19", "2026-11-16", 14);
+
+  it("hoy, la semana y la anterior hasta el mismo día", () => {
+    expect(st.todayMin).toBe(50);
+    expect(st.todayCount).toBe(2);
+    expect(st.weekMin).toBe(130);
+    expect(st.prevWeekMin).toBe(60); // lunes 9 a jueves 12: 20 + 40 (el viernes 13 no)
+  });
+
+  it("racha y promedio por día con enfoque", () => {
+    expect(st.streak).toBe(3);
+    expect(st.streakOpen).toBe(false);
+    expect(st.activeDays).toBe(6);
+    expect(st.avgMin).toBe(Math.round(250 / 6));
+  });
+
+  it("si hoy todavía no hubo, la racha cuenta desde ayer", () => {
+    expect(focusStats([s("2026-11-18", 10), s("2026-11-17", 10)], "2026-11-19", "2026-11-16", 14).streak).toBe(2);
+    expect(focusStats([s("2026-11-17", 10)], "2026-11-19", "2026-11-16", 14).streak).toBe(0);
   });
 });

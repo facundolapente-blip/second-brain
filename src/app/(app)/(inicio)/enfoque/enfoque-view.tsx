@@ -8,6 +8,11 @@ import {
   CaretDown,
   Check,
   CheckCircle,
+  Circle,
+  CalendarBlank,
+  Fire,
+  Lightning,
+  Target,
   ClockCounterClockwise,
   GearSix,
   MagnifyingGlass,
@@ -20,7 +25,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
-import { TintedCard } from "@/components/tinted-card";
+import { StatTile, TintedCard } from "@/components/tinted-card";
 import { PillSwitch } from "@/components/pill-switch";
 import { Button, cx, Field, IconButton, Input, inputClass, Sheet, type SheetHandle } from "@/components/ui";
 import { quiet, useSafeTransition } from "@/components/safe-action";
@@ -46,6 +51,7 @@ import {
   totalsOf,
   weekMinutes,
   breakAfter,
+  focusStats,
   type FocusMode,
   type FocusSettings,
 } from "@/lib/focus-logic";
@@ -79,6 +85,9 @@ function reduce(list: FocusSessionDTO[], op: Op): FocusSessionDTO[] {
   if (op.type === "remove") return list.filter((s) => s.id !== op.id);
   return list.map((s) => (s.id === op.id ? { ...s, note: op.note } : s));
 }
+
+/** Redondeo para el SVG: el servidor y el navegador no dan los mismos decimales de seno y coseno. */
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -120,6 +129,7 @@ export function EnfoqueView({ data, link }: { data: FocusPageData; link: FocusLi
   const today = data.today;
   const todayTotals = totalsOf(sessions.filter((s) => s.day === today));
   const weekTotals = totalsOf(sessions.filter((s) => s.day >= data.monday && s.day <= addDays(data.monday, 6)));
+  const stats = focusStats(sessions, today, data.monday, data.days);
 
   function saveEnded(note: string, then: "break" | "focus") {
     const e = t.ended;
@@ -149,14 +159,14 @@ export function EnfoqueView({ data, link }: { data: FocusPageData; link: FocusLi
   return (
     <>
       <PageHeader title="Enfoque" kicker="Una cosa a la vez" wide />
-      <main className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-4 px-4 pt-2 pb-16 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
+      <main className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-4 px-4 pt-2 pb-16 lg:gap-5 lg:px-10 lg:pt-4">
         <TimerCard
           t={t}
           targets={data.targets}
           meta={todayTotals.count ? `Hoy ${minutesText(todayTotals.minutes)} · ${sessionsText(todayTotals.count)}` : "Hoy todavía nada"}
           onOpenEnded={() => endSheet.current?.open()}
-          className="xl:col-span-5"
         />
+        <FocusTiles stats={stats} />
         <HistoryCard
           sessions={sessions}
           data={data}
@@ -174,7 +184,6 @@ export function EnfoqueView({ data, link }: { data: FocusPageData; link: FocusLi
             });
             notifyDeleted("Sesión borrada");
           }}
-          className="xl:col-span-7"
         />
       </main>
       <Sheet ref={endSheet} title="Enfoque">
@@ -212,8 +221,15 @@ function TimerCard({
   const fraction = t.status === "ended" ? 0 : t.durationMs ? left / t.durationMs : 1;
   const isBreak = t.mode !== "focus";
 
-  const R = 108;
+  const R = 96;
   const C = 2 * Math.PI * R;
+  const pos = cyclePosition(done, every);
+  const clamped = Math.max(0, Math.min(1, fraction));
+  // Los pasos de la tarea ligada (de la tarea o del bloque que la tiene), para tildar mientras corre.
+  const taskId = t.link?.taskId ?? null;
+  const steps = useMemo(() => (taskId ? (targets.find((x) => x.taskId === taskId)?.steps ?? []) : []), [targets, taskId]);
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const stepsDone = steps.filter((s) => ticked[s.id] ?? s.done).length;
 
   function changeMode(m: FocusMode) {
     if (m === t.mode) return;
@@ -222,18 +238,15 @@ function TimerCard({
     setMode(m);
   }
 
-  const sub =
-    t.status === "ended"
-      ? "Terminó"
-      : isBreak
-        ? `${MODE_LABEL[t.mode]}${t.status === "paused" ? " · en pausa" : ""}`
-        : `Sesión ${cyclePosition(done, every)} de ${every}${t.status === "paused" ? " · en pausa" : ""}`;
+  const label = t.status === "ended" ? "Terminó" : t.status === "paused" ? `${MODE_LABEL[t.mode]} · en pausa` : MODE_LABEL[t.mode];
+  const headMeta =
+    t.status === "running" && t.endsAt ? `${isBreak ? MODE_LABEL[t.mode] : `Sesión ${pos} de ${every}`} · termina ${hourText(t.endsAt)}` : meta;
 
   return (
     <TintedCard
       icon={Timer}
       title="Enfoque"
-      meta={meta}
+      meta={headMeta}
       action={
         <button
           type="button"
@@ -247,103 +260,184 @@ function TimerCard({
         </button>
       }
       className={className}
-      bodyClassName="justify-items-center gap-5! pt-5! pb-6!"
+      bodyClassName="gap-6! pt-5! pb-6! lg:grid! lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-10! lg:p-8!"
     >
-      <PillSwitch
-        label="Parte"
-        value={t.mode}
-        options={FOCUS_MODES}
-        onChange={changeMode}
-        className="w-full max-w-sm"
-        item="h-8 px-1 text-[12px] min-[400px]:text-[12.5px] sm:px-3 sm:text-[13px]"
-      />
+      <div className="grid justify-items-center gap-5">
+        <PillSwitch
+          label="Parte"
+          value={t.mode}
+          options={FOCUS_MODES}
+          onChange={changeMode}
+          className="w-full max-w-sm"
+          item="h-8 px-1 text-[12px] min-[400px]:text-[12.5px] sm:px-3 sm:text-[13px]"
+        />
 
-      <div className="relative grid size-[min(68vw,248px)] place-items-center" role="timer" aria-label={`${clockText(left)} restantes`}>
-        <svg viewBox="0 0 240 240" className="absolute inset-0 size-full -rotate-90" aria-hidden>
-          <circle cx="120" cy="120" r={R} fill="none" strokeWidth="12" className="stroke-[var(--surface-2)]" />
-          <circle
-            cx="120"
-            cy="120"
-            r={R}
-            fill="none"
-            strokeWidth="12"
-            strokeLinecap="round"
-            strokeDasharray={C}
-            strokeDashoffset={C * (1 - Math.max(0, Math.min(1, fraction)))}
-            style={{ stroke: isBreak ? "var(--c-habitos)" : "var(--accent)" }}
-            className={cx(t.status === "running" && "transition-[stroke-dashoffset] duration-300 ease-linear motion-reduce:transition-none")}
-          />
-        </svg>
-        <div className="relative grid justify-items-center gap-1.5">
-          {t.status === "ended" ? (
-            <CheckCircle size={44} weight="fill" className="text-[var(--accent)]" aria-hidden />
-          ) : (
-            <span className="figure tabular text-[clamp(44px,14vw,58px)] text-fg">{clockText(left)}</span>
-          )}
-          <span className="text-[13.5px] text-muted">{sub}</span>
+        <div className="relative grid size-[min(78vw,312px)] place-items-center" role="timer" aria-label={`${clockText(left)} restantes`}>
+          <svg viewBox="0 0 240 240" className="absolute inset-0 size-full -rotate-90" aria-hidden>
+            {/* Marcas de reloj: una por minuto de la vuelta; cada cinco, más largas. Lo que ya pasó, más tenue. */}
+            {Array.from({ length: 60 }, (_, i) => {
+              const a = (i / 60) * 2 * Math.PI;
+              const long = i % 5 === 0;
+              const r2 = long ? 108 : 112;
+              return (
+                <line
+                  key={i}
+                  x1={r3(120 + 118 * Math.cos(a))}
+                  y1={r3(120 + 118 * Math.sin(a))}
+                  x2={r3(120 + r2 * Math.cos(a))}
+                  y2={r3(120 + r2 * Math.sin(a))}
+                  strokeWidth={long ? 2 : 1.2}
+                  strokeLinecap="round"
+                  className="stroke-[var(--faint)]"
+                  opacity={i / 60 < 1 - clamped ? 0.25 : 0.7}
+                />
+              );
+            })}
+            <circle cx="120" cy="120" r={R} fill="none" strokeWidth="10" className="stroke-[var(--surface-2)]" />
+            <circle
+              cx="120"
+              cy="120"
+              r={R}
+              fill="none"
+              strokeWidth="10"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - clamped)}
+              style={{ stroke: isBreak ? "var(--c-habitos)" : "var(--accent)" }}
+              className={cx(t.status === "running" && "transition-[stroke-dashoffset] duration-300 ease-linear motion-reduce:transition-none")}
+            />
+          </svg>
+          <div className="relative grid justify-items-center gap-2">
+            <span className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">{label}</span>
+            {t.status === "ended" ? (
+              <CheckCircle size={52} weight="fill" className="text-[var(--accent)]" aria-hidden />
+            ) : (
+              <span className="figure tabular text-[clamp(50px,15vw,68px)] leading-none text-fg">{clockText(left)}</span>
+            )}
+            {/* En qué sesión del ciclo vas: las hechas llenas, la de ahora más larga. */}
+            <div className="flex items-center gap-1.5" role="img" aria-label={`Sesión ${pos} de ${every}`}>
+              {Array.from({ length: every }, (_, i) => (
+                <span
+                  key={i}
+                  className={cx(
+                    "h-1.5 rounded-full",
+                    i === pos - 1 ? "w-9" : "w-5",
+                    i < pos - 1 ? "bg-[var(--accent)]" : i === pos - 1 ? "bg-[color-mix(in_oklab,var(--accent)_55%,transparent)]" : "bg-surface-2",
+                  )}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex max-w-full items-center gap-2 text-[14px]">
-        <span className="shrink-0 text-muted">Trabajando en</span>
-        <button
-          type="button"
-          onClick={() => targetSheet.current?.open()}
-          className="press inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 font-medium text-fg hover:bg-surface-2"
-        >
-          <span className="truncate">{t.link?.title ?? "Elegir"}</span>
-          <CaretDown size={13} className="shrink-0 text-muted" aria-hidden />
-        </button>
-      </div>
+      <div className="grid w-full content-center gap-4">
+        {/* Trabajando en: la tarea con sus pasos para tildar ahí mismo. */}
+        <div className="grid gap-2 rounded-2xl border border-line bg-[color-mix(in_oklab,var(--surface-2)_60%,transparent)] p-3.5">
+          <div className="flex items-center gap-2">
+            <Target size={15} className="text-muted" aria-hidden />
+            <span className="font-mono text-[11px] tracking-[0.1em] text-muted uppercase">Trabajando en</span>
+            <button
+              type="button"
+              onClick={() => targetSheet.current?.open()}
+              className="press ml-auto inline-flex min-h-9 items-center gap-1 rounded-full px-2.5 text-[12.5px] text-muted hover:bg-surface hover:text-fg"
+            >
+              {t.link ? "Cambiar" : "Elegir"} <CaretDown size={12} aria-hidden />
+            </button>
+          </div>
+          {t.link ? (
+            <p className="text-[17px] leading-snug font-semibold text-fg">{t.link.title}</p>
+          ) : (
+            <button type="button" onClick={() => targetSheet.current?.open()} className="text-left text-[15px] text-muted hover:text-fg">
+              Elegí una tarea o un bloque de hoy, o escribí otra cosa.
+            </button>
+          )}
+          {steps.length > 0 && (
+            <ul className="grid gap-0.5">
+              {steps.map((s) => {
+                const on = ticked[s.id] ?? s.done;
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        haptic("select");
+                        setTicked((m) => ({ ...m, [s.id]: !on }));
+                        quiet(toggleSubtask(s.id, !on));
+                      }}
+                      className="tap-tint flex min-h-9 w-full items-center gap-2 rounded-lg px-1 text-left text-[14px]"
+                    >
+                      {on ? (
+                        <CheckCircle size={18} weight="fill" className="shrink-0 text-[var(--c-habitos)]" aria-hidden />
+                      ) : (
+                        <Circle size={18} className="shrink-0 text-faint" aria-hidden />
+                      )}
+                      <span className={cx("min-w-0 truncate", on ? "text-muted line-through" : "text-fg")}>{s.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+              <li className="px-1 pt-0.5 font-mono text-[11.5px] text-muted">
+                {stepsDone} de {steps.length} pasos
+              </li>
+            </ul>
+          )}
+        </div>
 
-      <div className="flex w-full max-w-sm items-center gap-2 sm:gap-3">
-        <IconButton label="Reiniciar" onClick={() => reset()} disabled={t.status === "idle" || t.status === "ended"} className="size-11 shrink-0 border border-line disabled:opacity-40">
-          <ArrowCounterClockwise size={18} />
-        </IconButton>
-        {t.status === "ended" ? (
-          <Button onClick={onOpenEnded} className="h-12 min-w-0 flex-1 px-4 text-[15px]">
-            <NotePencil size={17} weight="bold" aria-hidden /> Anotar sesión
-          </Button>
-        ) : (
-          <Button
-            onClick={() => {
-              haptic("tap");
-              toggle();
+        <div className="flex w-full items-center gap-2 sm:gap-3">
+          <IconButton label="Reiniciar" onClick={() => reset()} disabled={t.status === "idle" || t.status === "ended"} className="size-11 shrink-0 border border-line disabled:opacity-40">
+            <ArrowCounterClockwise size={18} />
+          </IconButton>
+          {t.status === "ended" ? (
+            <Button onClick={onOpenEnded} className="h-13 min-w-0 flex-1 px-4 text-[15.5px]">
+              <NotePencil size={17} weight="bold" aria-hidden /> Anotar sesión
+            </Button>
+          ) : (
+            <Button
+              onClick={() => {
+                haptic("tap");
+                toggle();
+              }}
+              className="h-13 min-w-0 flex-1 px-4 text-[15.5px]"
+            >
+              {t.status === "running" ? <Pause size={17} weight="fill" aria-hidden /> : <Play size={17} weight="fill" aria-hidden />}
+              {t.status === "running" ? "Pausar" : t.status === "paused" ? "Seguir" : "Empezar"}
+            </Button>
+          )}
+          {t.status === "ended" ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                discardEnded();
+                notifyInfo("Sesión descartada");
+              }}
+              className="h-11 shrink-0 px-3.5"
+            >
+              <X size={15} aria-hidden /> Descartar
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => finish()} disabled={t.status === "idle"} className="h-11 shrink-0 px-3.5">
+              <Stop size={15} weight="fill" aria-hidden /> Terminar
+            </Button>
+          )}
+        </div>
+
+        <div className="flex w-full items-center gap-3 border-t border-line pt-4">
+          <label htmlFor="enfoque-aviso" className="grid min-w-0 flex-1 gap-0.5">
+            <span className="text-[14px] font-medium text-fg">Avisar al celular y al reloj</span>
+            <span className="text-[12.5px] leading-snug text-muted">Cuando termina la sesión o el descanso, a los aparatos de Avisos.</span>
+          </label>
+          <Switch
+            id="enfoque-aviso"
+            checked={!!t.push}
+            onChange={(on) => {
+              haptic("select");
+              setPush(on);
+              quiet(saveFocusPush(on));
             }}
-            className="h-12 min-w-0 flex-1 px-4 text-[15px]"
-          >
-            {t.status === "running" ? <Pause size={17} weight="fill" aria-hidden /> : <Play size={17} weight="fill" aria-hidden />}
-            {t.status === "running" ? "Pausar" : t.status === "paused" ? "Seguir" : "Empezar"}
-          </Button>
-        )}
-        {t.status === "ended" ? (
-          <Button variant="outline" onClick={() => {
-              discardEnded();
-              notifyInfo("Sesión descartada");
-            }} className="h-11 shrink-0 px-3.5">
-            <X size={15} aria-hidden /> Descartar
-          </Button>
-        ) : (
-          <Button variant="outline" onClick={() => finish()} disabled={t.status === "idle"} className="h-11 shrink-0 px-3.5">
-            <Stop size={15} weight="fill" aria-hidden /> Terminar
-          </Button>
-        )}
-      </div>
-
-      <div className="flex w-full max-w-sm items-center gap-3 border-t border-line pt-4">
-        <label htmlFor="enfoque-aviso" className="grid min-w-0 flex-1 gap-0.5">
-          <span className="text-[14px] font-medium text-fg">Avisar al celular y al reloj</span>
-          <span className="text-[12.5px] leading-snug text-muted">Cuando termina la sesión o el descanso, a los aparatos de Avisos.</span>
-        </label>
-        <Switch
-          id="enfoque-aviso"
-          checked={!!t.push}
-          onChange={(on) => {
-            haptic("select");
-            setPush(on);
-            quiet(saveFocusPush(on));
-          }}
-        />
+          />
+        </div>
       </div>
 
       <Sheet ref={settingsSheet} title="Tiempos">
@@ -468,6 +562,27 @@ function TargetPicker({ targets, current, onPick }: { targets: FocusTarget[]; cu
         </section>
       )}
       {shown.length === 0 && <p className="px-3 text-[14px] text-muted">{q.trim() ? "No hay tareas con ese nombre." : "No tenés tareas abiertas en el Plan."}</p>}
+    </div>
+  );
+}
+
+// ─── Cifras ───────────────────────────────────────────────────────────────
+
+/** Hoy, la semana (contra la anterior a esta altura), la racha y el promedio por día con enfoque. */
+function FocusTiles({ stats }: { stats: ReturnType<typeof focusStats> }) {
+  const diff = stats.weekMin - stats.prevWeekMin;
+  const vs =
+    stats.prevWeekMin === 0 && stats.weekMin === 0
+      ? "Todavía nada"
+      : Math.abs(diff) < 5
+        ? "Igual que la anterior"
+        : `${diff > 0 ? "+" : "−"}${minutesText(Math.abs(diff))} contra la anterior`;
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <StatTile icon={Timer} label="Hoy" figure={minutesText(stats.todayMin)} sub={stats.todayCount ? sessionsText(stats.todayCount) : "Todavía nada"} />
+      <StatTile icon={CalendarBlank} label="Esta semana" figure={minutesText(stats.weekMin)} sub={vs} />
+      <StatTile icon={Fire} label="Racha" figure={`${stats.streak}${stats.streakOpen ? "+" : ""}`} unit={stats.streak === 1 ? "día" : "días"} sub="seguidos con enfoque" />
+      <StatTile icon={Lightning} label="Promedio" figure={minutesText(stats.avgMin)} sub={stats.activeDays ? "por día con enfoque" : "Sin sesiones todavía"} />
     </div>
   );
 }
@@ -607,8 +722,11 @@ function HistoryCard({
 
   return (
     <TintedCard icon={ClockCounterClockwise} title="Historial" meta={meta} className={className} bodyClassName="gap-5!">
+      {week.every((m) => m === 0) ? (
+        <p className="text-[13.5px] text-muted">Esta semana todavía no hubo sesiones.</p>
+      ) : (
       <div className="grid gap-1.5">
-        <div className="grid h-32 items-end gap-2" style={cols} role="img" aria-label={`Minutos por día esta semana: ${week.map((m, i) => `${weekdayInitial(addDays(monday, i))} ${minutesText(m)}`).join(", ")}`}>
+        <div className="grid h-24 items-end gap-2" style={cols} role="img" aria-label={`Minutos por día esta semana: ${week.map((m, i) => `${weekdayInitial(addDays(monday, i))} ${minutesText(m)}`).join(", ")}`}>
           {week.map((m, i) => {
             const d = addDays(monday, i);
             return (
@@ -633,6 +751,7 @@ function HistoryCard({
           })}
         </div>
       </div>
+      )}
 
       {groups.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line-strong px-5 py-6 text-[15px] text-muted">Todavía no hay sesiones. Empezá una y, al terminar, anotá qué hiciste.</p>
