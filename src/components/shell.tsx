@@ -143,12 +143,19 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                 aria-current={active ? "page" : undefined}
                 // En la compu con poca altura (1024×768) el menú entra entero sin desplazarse (con las
                 // 12 herramientas de nov-2026 hubo que achicar renglones y huecos).
-                className={cx("h-11 text-[15px] lg:[@media(max-height:980px)]:h-9", linkCls(active))}
+                className={cx("h-[46px] text-[16px] lg:[@media(max-height:980px)]:h-10 lg:[@media(max-height:800px)]:h-9! lg:[@media(max-height:800px)]:text-[15px]!", linkCls(active))}
               >
                 <span className="font-mono text-[11px] tabular opacity-60">{String(i).padStart(2, "0")}</span>
-                <Ico size={18} weight={active ? "fill" : "regular"} aria-hidden />
+                {/* Cada módulo con su ícono en un cuadrado lleno de su color (opción 1 de Facu, 2026-11-22). */}
+                <span
+                  aria-hidden
+                  className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-[9px] text-white lg:[@media(max-height:980px)]:size-7"
+                  style={{ background: m.color }}
+                >
+                  <Ico size={17} weight="fill" />
+                </span>
                 {m.label}
-                <NavHint color={m.color} />
+                <NavHint />
               </Link>
             </li>
           );
@@ -169,9 +176,9 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   onNavigate?.();
                 }}
                 aria-current={active ? "page" : undefined}
-                className={cx("h-10 text-[14px] lg:[@media(max-height:980px)]:h-7 lg:[@media(max-height:980px)]:text-[13.5px]", linkCls(active))}
+                className={cx("h-10 text-[15px] lg:[@media(max-height:980px)]:h-[34px] lg:[@media(max-height:800px)]:h-7! lg:[@media(max-height:800px)]:text-[14px]!", linkCls(active))}
               >
-                <Ico size={17} weight={active ? "fill" : "regular"} aria-hidden />
+                <Ico size={19} weight={active ? "fill" : "regular"} aria-hidden />
                 {t.label}
                 <NavHint />
               </Link>
