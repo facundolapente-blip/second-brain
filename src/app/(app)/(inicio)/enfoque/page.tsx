@@ -12,7 +12,7 @@ export default async function EnfoquePage({ searchParams }: { searchParams: Para
   const dias = Math.min(365, Math.max(14, Number(one(sp.dias)) || 14));
   const [data, link] = await Promise.all([getFocusPage(dias), getFocusLink({ tarea: one(sp.tarea), bloque: one(sp.bloque) })]);
   return (
-    <div data-module="inicio" className="min-h-dvh">
+    <div data-module="enfoque" className="min-h-dvh">
       <EnfoqueView data={data} link={link} />
     </div>
   );

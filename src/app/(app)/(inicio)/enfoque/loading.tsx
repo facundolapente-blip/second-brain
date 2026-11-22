@@ -3,7 +3,7 @@ import { Bone, CardSkeleton, HeaderSkeleton, LoadingRegion } from "@/components/
 
 export default function Loading() {
   return (
-    <div data-module="inicio" className="min-h-dvh">
+    <div data-module="enfoque" className="min-h-dvh">
       <HeaderSkeleton title="Enfoque" tabs={0} wide />
       <LoadingRegion label="Cargando enfoque" className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pt-2 xl:grid-cols-12 lg:gap-5 lg:px-10 lg:pt-4">
         <CardSkeleton icon={Timer} title="Enfoque" pill="w-24" className="xl:col-span-5" bodyClassName="justify-items-center gap-5! py-6!">

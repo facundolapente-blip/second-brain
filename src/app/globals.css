@@ -57,6 +57,8 @@
   --mod-gastos: #2f7f8f;
   --mod-plan: #c27a35;
   --mod-inicio: #3f5b7d;
+  /* Enfoque (2026-11-22, opción A de Facu): el azul de Inicio pero vivo. */
+  --mod-enfoque: #1f5fc4;
   /* Frambuesa: lejos del ámbar del Plan y del lavanda del Journal; 5,8:1 con blanco. */
   --mod-notas: #a8406a;
   /* Color de cada módulo para marcas chicas (puntos, barras) en Inicio. */
@@ -142,6 +144,7 @@
 [data-module="gastos"] { --mod: var(--mod-gastos); }
 [data-module="plan"] { --mod: var(--mod-plan); }
 [data-module="inicio"] { --mod: var(--mod-inicio); }
+[data-module="enfoque"] { --mod: var(--mod-enfoque); }
 [data-module="notas"] { --mod: var(--mod-notas); }
 /* Plan en claro: el ámbar del módulo no da contraste como acento (2,8:1 sobre el fondo y
    3,4:1 con el blanco de las casillas tildadas). El acento es un ámbar tostado (5,6:1 con

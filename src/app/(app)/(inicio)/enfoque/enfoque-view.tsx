@@ -288,8 +288,8 @@ function TimerCard({
                   y2={r3(120 + r2 * Math.sin(a))}
                   strokeWidth={long ? 2 : 1.2}
                   strokeLinecap="round"
-                  className="stroke-[var(--faint)]"
-                  opacity={i / 60 < 1 - clamped ? 0.25 : 0.7}
+                  className={i / 60 < 1 - clamped ? "stroke-[var(--faint)]" : "stroke-[var(--accent)]"}
+                  opacity={i / 60 < 1 - clamped ? 0.25 : 0.6}
                 />
               );
             })}
@@ -333,7 +333,7 @@ function TimerCard({
 
       <div className="grid w-full content-center gap-4">
         {/* Trabajando en: la tarea con sus pasos para tildar ahí mismo. */}
-        <div className="grid gap-2 rounded-2xl border border-line bg-[color-mix(in_oklab,var(--surface-2)_60%,transparent)] p-3.5">
+        <div className="grid gap-2 rounded-2xl border border-[color-mix(in_oklab,var(--accent)_22%,transparent)] bg-[var(--accent-soft)] p-3.5">
           <div className="flex items-center gap-2">
             <Target size={15} className="text-muted" aria-hidden />
             <span className="font-mono text-[11px] tracking-[0.1em] text-muted uppercase">Trabajando en</span>
@@ -390,7 +390,7 @@ function TimerCard({
             <ArrowCounterClockwise size={18} />
           </IconButton>
           {t.status === "ended" ? (
-            <Button onClick={onOpenEnded} className="h-13 min-w-0 flex-1 px-4 text-[15.5px]">
+            <Button onClick={onOpenEnded} className="h-13 min-w-0 flex-1 bg-accent! px-4 text-[15.5px] text-on-accent!">
               <NotePencil size={17} weight="bold" aria-hidden /> Anotar sesión
             </Button>
           ) : (
@@ -399,7 +399,7 @@ function TimerCard({
                 haptic("tap");
                 toggle();
               }}
-              className="h-13 min-w-0 flex-1 px-4 text-[15.5px]"
+              className="h-13 min-w-0 flex-1 bg-accent! px-4 text-[15.5px] text-on-accent!"
             >
               {t.status === "running" ? <Pause size={17} weight="fill" aria-hidden /> : <Play size={17} weight="fill" aria-hidden />}
               {t.status === "running" ? "Pausar" : t.status === "paused" ? "Seguir" : "Empezar"}
@@ -578,7 +578,7 @@ function FocusTiles({ stats }: { stats: ReturnType<typeof focusStats> }) {
         ? "Igual que la anterior"
         : `${diff > 0 ? "+" : "−"}${minutesText(Math.abs(diff))} contra la anterior`;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4 [&_.tstat-fig]:text-[var(--accent-fg)]">
       <StatTile icon={Timer} label="Hoy" figure={minutesText(stats.todayMin)} sub={stats.todayCount ? sessionsText(stats.todayCount) : "Todavía nada"} />
       <StatTile icon={CalendarBlank} label="Esta semana" figure={minutesText(stats.weekMin)} sub={vs} />
       <StatTile icon={Fire} label="Racha" figure={`${stats.streak}${stats.streakOpen ? "+" : ""}`} unit={stats.streak === 1 ? "día" : "días"} sub="seguidos con enfoque" />
