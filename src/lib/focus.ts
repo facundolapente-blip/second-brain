@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { addDays, fromDbDate, startOfWeek, todayISO, toDbDate } from "./dates";
-import { FOCUS_SETTINGS_KEY, parseFocusSettings, type FocusSettings } from "./focus-logic";
+import { FOCUS_SETTINGS_KEY, parseFocusSettings, type FocusSettings, FOCUS_PUSH_KEY } from "./focus-logic";
 import { isFreeBlock } from "./plan-logic";
 
 export type FocusSessionDTO = {
@@ -30,8 +30,9 @@ export async function getFocusPage(days = 14) {
   const today = todayISO();
   const monday = startOfWeek(today);
   const from = [addDays(today, -(days - 1)), monday].sort()[0];
-  const [settings, rows, older, tasks, blocks] = await Promise.all([
+  const [settings, pushRow, rows, older, tasks, blocks] = await Promise.all([
     getFocusSettings(),
+    prisma.appSetting.findUnique({ where: { key: FOCUS_PUSH_KEY } }),
     prisma.focusSession.findMany({ where: { day: { gte: toDbDate(from) } }, orderBy: [{ startedAt: "desc" }, { id: "desc" }] }),
     prisma.focusSession.count({ where: { day: { lt: toDbDate(from) } } }),
     prisma.planTask.findMany({
@@ -64,7 +65,7 @@ export async function getFocusPage(days = 14) {
     ...blocks.filter((b) => !isFreeBlock(b)).map((b) => ({ kind: "block" as const, id: b.id, title: b.title, taskId: b.taskId, steps: (b.taskId && taskSteps.get(b.taskId)) || [] })),
     ...[...tasks].sort((a, b) => (rank[a.status] ?? 3) - (rank[b.status] ?? 3)).map((t) => ({ kind: "task" as const, id: t.id, title: t.title, taskId: t.id, steps: t.subtasks })),
   ];
-  return { today, monday, days, settings, sessions, hasOlder: older > 0, targets };
+  return { today, monday, days, settings, push: pushRow?.value === "1", sessions, hasOlder: older > 0, targets };
 }
 
 export type FocusPageData = Awaited<ReturnType<typeof getFocusPage>>;

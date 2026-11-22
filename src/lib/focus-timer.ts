@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { haptic } from "@/components/haptics";
 import { todayISO } from "./dates";
+import { sendFocusPush } from "./offline/focus";
 import { breakAfter, DEFAULT_FOCUS_SETTINGS, focusedMinutes, MIN_SAVE_MS, modeMs, type FocusMode, type FocusSettings } from "./focus-logic";
 
 /**
@@ -35,6 +36,8 @@ export type FocusTimerState = {
   link: FocusLink | null;
   ended: FocusEnded | null;
   settings: FocusSettings;
+  /** Avisar al celular y al reloj al terminar (lo guardado en el servidor manda: `syncPush`). */
+  push?: boolean;
 };
 
 const KEY = "sb_enfoque";
@@ -150,6 +153,13 @@ function alarm(title: string, body: string) {
   if (document.visibilityState !== "visible") notify(title, body);
 }
 
+/** El aviso al celular y al reloj (por el servidor: Web Push a los aparatos activados en Avisos). */
+function pushEnd(endsAt: number, kind: "focus" | "break", title?: string | null) {
+  sendFocusPush(endsAt, kind, title ?? null).catch(() => {
+    // Sin señal o sin aparatos: queda el aviso de este aparato.
+  });
+}
+
 /** Si el tiempo de lo que corre se acabó, lo da por terminado. */
 function check() {
   const s = load();
@@ -158,10 +168,12 @@ function check() {
     const startedAt = s.startedAt ?? s.endsAt - s.durationMs;
     set({ ...s, status: "ended", endsAt: null, remainingMs: 0, ended: { startedAt, endedAt: s.endsAt, minutes: focusedMinutes(s.durationMs), link: s.link } });
     alarm("Sesión terminada", "Anotá qué hiciste.");
+    if (s.push) pushEnd(s.endsAt, "focus", s.link?.title);
   } else {
     const durationMs = modeMs("focus", s.settings);
     set({ ...s, mode: "focus", status: "idle", durationMs, endsAt: null, remainingMs: durationMs, startedAt: null });
     alarm("Se terminó el descanso", "¿Otra sesión de enfoque?");
+    if (s.push) pushEnd(s.endsAt, "break");
   }
 }
 
@@ -232,6 +244,16 @@ export function syncSettings(settings: FocusSettings) {
     const durationMs = modeMs(s.mode, settings);
     set({ ...s, settings, durationMs, remainingMs: durationMs });
   } else set({ ...s, settings });
+}
+
+/** El interruptor guardado en el servidor manda sobre el del aparato. */
+export function syncPush(on: boolean) {
+  const s = load();
+  if (!!s.push !== on) set({ ...s, push: on });
+}
+
+export function setPush(on: boolean) {
+  set({ ...load(), push: on });
 }
 
 export function setMode(mode: FocusMode) {

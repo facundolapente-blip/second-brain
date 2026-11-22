@@ -59,13 +59,16 @@ import {
   setMode,
   startLinked,
   syncSettings,
+  syncPush,
+  setPush,
   toggle,
   useFocusTimer,
   useRemaining,
   type FocusLink,
   type FocusTimerState,
 } from "@/lib/focus-timer";
-import { deleteFocusSession, saveFocusSession, saveFocusSettings, updateFocusNote } from "@/lib/offline/focus";
+import { deleteFocusSession, saveFocusPush, saveFocusSession, saveFocusSettings, updateFocusNote } from "@/lib/offline/focus";
+import { Switch } from "../avisos/reminder-rows";
 import { toggleSubtask } from "@/lib/offline/plan";
 import type { FocusPageData, FocusSessionDTO, FocusTarget } from "@/lib/focus";
 
@@ -89,6 +92,9 @@ export function EnfoqueView({ data, link }: { data: FocusPageData; link: FocusLi
   useEffect(() => {
     syncSettings(data.settings);
   }, [data.settings]);
+  useEffect(() => {
+    syncPush(data.push);
+  }, [data.push]);
 
   // Desde el Plan (`?tarea=` o `?bloque=`): liga y arranca, y saca el parámetro (si no, recargar volvería a arrancar).
   const linked = useRef(false);
@@ -322,6 +328,22 @@ function TimerCard({
             <Stop size={15} weight="fill" aria-hidden /> Terminar
           </Button>
         )}
+      </div>
+
+      <div className="flex w-full max-w-sm items-center gap-3 border-t border-line pt-4">
+        <label htmlFor="enfoque-aviso" className="grid min-w-0 flex-1 gap-0.5">
+          <span className="text-[14px] font-medium text-fg">Avisar al celular y al reloj</span>
+          <span className="text-[12.5px] leading-snug text-muted">Cuando termina la sesión o el descanso, a los aparatos de Avisos.</span>
+        </label>
+        <Switch
+          id="enfoque-aviso"
+          checked={!!t.push}
+          onChange={(on) => {
+            haptic("select");
+            setPush(on);
+            quiet(saveFocusPush(on));
+          }}
+        />
       </div>
 
       <Sheet ref={settingsSheet} title="Tiempos">

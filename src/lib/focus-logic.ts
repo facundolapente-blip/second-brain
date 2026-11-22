@@ -18,6 +18,8 @@ export const MODE_LABEL: Record<FocusMode, string> = { focus: "Enfoque", short: 
 export type FocusSettings = { focus: number; short: number; long: number; every: number };
 
 export const FOCUS_SETTINGS_KEY = "enfoque";
+/** Avisar al celular (y al reloj) cuando termina una sesión o un descanso: "1" prendido. */
+export const FOCUS_PUSH_KEY = "enfoque_aviso";
 export const DEFAULT_FOCUS_SETTINGS: FocusSettings = { focus: 25, short: 5, long: 15, every: 4 };
 
 /** Topes de cada campo (minutos; `every` en sesiones). */
