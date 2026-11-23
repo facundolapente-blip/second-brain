@@ -17,6 +17,9 @@ import { flushQueue, pendingCount } from "@/lib/offline-queue";
 import { flushActions, pendingActions, subscribePending } from "@/lib/offline/registry";
 import { cx } from "./ui";
 import { useTick } from "./motion";
+import { Sortable, SortableItem } from "./sortable";
+import { normalizeToolOrder } from "@/lib/tool-order";
+import { saveToolOrder } from "@/lib/offline/shell";
 
 type Module = { href: string; label: string; icon: Icon; color: string };
 
@@ -74,7 +77,10 @@ function NavHint({ color }: { color?: string }) {
   );
 }
 
-function Nav({ onNavigate }: { onNavigate?: () => void }) {
+/** Las direcciones de las Herramientas en su orden de siempre. */
+const TOOL_HREFS = TOOLS.map((t) => t.href);
+
+function Nav({ onNavigate, toolOrder, onToolOrder }: { onNavigate?: () => void; toolOrder: string[]; onToolOrder: (order: string[]) => void }) {
   const pathname = usePathname();
   // La marca pasa al enlace tocado enseguida, sin esperar a que llegue la pantalla.
   const [clicked, setClicked] = useState<string | null>(null);
@@ -163,12 +169,15 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
       </ul>
       <p className="mt-6 mb-1.5 lg:[@media(max-height:980px)]:mt-3 lg:[@media(max-height:980px)]:mb-1 px-3 font-mono text-[10.5px] tracking-[0.12em] text-side-fg uppercase">Herramientas</p>
       {/* Herramientas juntas en un bloque blanco, con el ícono en un círculo (opción 2 de Facu, 2026-11-22). */}
+      {/* Se ordenan arrastrando (en la compu clic y arrastrar; en el celular mantener apretado). */}
+      <Sortable ids={toolOrder} onReorder={onToolOrder}>
       <ul className="grid gap-0 rounded-[18px] bg-surface p-1.5 shadow-[0_1px_2px_rgba(30,40,30,0.05),0_14px_30px_-18px_rgba(30,40,60,0.35)]">
-        {TOOLS.map((t) => {
+        {toolOrder.map((href) => {
+          const t = TOOLS.find((x) => x.href === href)!;
           const active = isActive(t.href);
           const Ico = t.icon;
           return (
-            <li key={t.href}>
+            <SortableItem key={t.href} id={t.href} draggingClass="rounded-xl bg-surface shadow-[0_12px_32px_-12px_rgba(0,0,0,0.35)]">
               <Link
                 href={t.href}
                 data-href={t.href}
@@ -188,10 +197,11 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                 {t.label}
                 <NavHint />
               </Link>
-            </li>
+            </SortableItem>
           );
         })}
       </ul>
+      </Sortable>
     </nav>
   );
 }
@@ -497,8 +507,14 @@ function useSwipeToClose(close: () => void) {
   };
 }
 
-export function Shell({ children, theme }: { children: React.ReactNode; theme: Theme }) {
+export function Shell({ children, theme, toolOrder: savedToolOrder }: { children: React.ReactNode; theme: Theme; toolOrder?: string | null }) {
   const [drawer, setDrawer] = useState(false);
+  // Orden propio de las Herramientas (el mismo en la compu y en el cajón del celular).
+  const [toolOrder, setToolOrder] = useState(() => normalizeToolOrder(savedToolOrder ?? null, TOOL_HREFS));
+  const reorderTools = (order: string[]) => {
+    setToolOrder(order);
+    saveToolOrder(order).catch(() => {});
+  };
   const drawerRef = useRef<HTMLElement>(null);
   const swipe = useSwipeToClose(() => setDrawer(false));
   // Cajón abierto: Escape lo cierra, el foco entra al menú y al cerrar vuelve a
@@ -556,7 +572,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
       <div className="lg:grid lg:grid-cols-[256px_1fr] print:block">
         <aside className="sticky top-0 hidden h-dvh flex-col gap-8 overflow-y-auto overscroll-contain border-r border-side-line bg-side px-4 pt-7 pb-5 [scrollbar-width:thin] lg:flex print:hidden lg:[@media(max-height:980px)]:gap-3 lg:[@media(max-height:980px)]:pt-4 lg:[@media(max-height:980px)]:pb-3">
           <Brand />
-          <Nav />
+          <Nav toolOrder={toolOrder} onToolOrder={reorderTools} />
           <div className="mt-auto grid gap-3">
             <ThemePicker initial={theme} />
             <SignOutButton />
@@ -604,7 +620,7 @@ export function Shell({ children, theme }: { children: React.ReactNode; theme: T
                 (sin mover la página de atrás); la sombra queda afuera, en el cajón. */}
             <div className="relative flex h-full flex-col gap-8 overflow-y-auto overscroll-contain px-4 pt-[max(1.75rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] [scrollbar-width:thin]">
               <Brand />
-              <Nav onNavigate={() => setDrawer(false)} />
+              <Nav onNavigate={() => setDrawer(false)} toolOrder={toolOrder} onToolOrder={reorderTools} />
               <div className="mt-auto grid gap-3">
                 <ThemePicker initial={theme} />
                 <SignOutButton />
