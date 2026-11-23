@@ -4,6 +4,7 @@ import {
   cleanRitualPatch,
   emptyRitual,
   frogCandidates,
+  dayFrogCandidates,
   isRitualDay,
   isRitualDone,
   ritualStage,
@@ -81,10 +82,10 @@ describe("ritual: estados", () => {
 
 describe("ritual: datos", () => {
   it("limpia lo que llega del cliente", () => {
-    expect(cleanRitualPatch({ frogTaskId: "abc", frogTitle: "  Llamar   al contador " })).toEqual({ frogTaskId: "abc", frogTitle: "Llamar al contador" });
+    expect(cleanRitualPatch({ frogTaskId: "abc", frogTitle: "  Llamar   al contador " })).toEqual({ frogTaskId: "abc", frogBlockId: null, frogTitle: "Llamar al contador" });
     // La misión ya no existe: si quedó algo en la cola sin conexión, se ignora.
     expect(cleanRitualPatch({ mission: "termino la tienda", missionResult: "yes" })).toEqual({});
-    expect(cleanRitualPatch({ frogTaskId: "abc", frogTitle: "" })).toEqual({ frogTaskId: null, frogTitle: null });
+    expect(cleanRitualPatch({ frogTaskId: "abc", frogTitle: "" })).toEqual({ frogTaskId: null, frogBlockId: null, frogTitle: null });
     expect(cleanRitualPatch({ frogDoneAt: "no" })).toEqual({ frogDoneAt: null });
     expect(cleanRitualPatch({ skipped: "si", completed: true })).toEqual({ skipped: false, completed: true });
     expect(cleanRitualPatch(null)).toEqual({});
@@ -123,5 +124,29 @@ describe("ritual: racha y semana", () => {
         r({ completedAt: "2026-11-16T11:00:00Z" }),
       ]),
     ).toEqual({ frogs: 2, eaten: 1 });
+  });
+});
+
+describe("ritual: candidatas del día (bloques de hoy primero)", () => {
+  const block = (id: string, extra: Partial<{ startTime: string | null; priority: number; taskId: string | null }> = {}) => ({
+    id,
+    title: id,
+    startTime: null,
+    priority: 0,
+    taskId: null,
+    category: null,
+    ...extra,
+  });
+  it("los bloques de hoy van antes que las tareas; lo urgente primero y, a igualdad, por hora", () => {
+    const tasks = [task({ id: "t1", priority: 4 }), task({ id: "suelta", deadline: "2026-11-10" }), task({ id: "tranqui" })];
+    const list = dayFrogCandidates([block("b-tarde", { startTime: "18:00" }), block("b-maniana", { startTime: "09:00" }), block("b-urgente", { taskId: "t1" })], tasks, today);
+    expect(list.map((c) => c.blockId ?? c.id)).toEqual(["b-urgente", "b-maniana", "b-tarde", "suelta"]);
+    expect(list[1].reasons[0].text).toBe("Hoy a las 09:00");
+    // La tarea del bloque: no se repite como tarea suelta; la tranquila sin agendar no aparece.
+    expect(list.some((c) => !c.blockId && c.id === "t1")).toBe(false);
+    expect(list.some((c) => c.id === "tranqui")).toBe(false);
+  });
+  it("sin bloques hoy, las tareas de siempre", () => {
+    expect(dayFrogCandidates([], [task({ id: "a" })], today).map((c) => c.id)).toEqual(["a"]);
   });
 });

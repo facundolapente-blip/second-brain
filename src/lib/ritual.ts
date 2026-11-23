@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { addDays, fromDbDate, toDbDate } from "./dates";
-import { frogCandidates, isRitualDone, ritualStreak, ritualWeek, type RitualDTO } from "./ritual-logic";
+import { isFreeBlock } from "./plan-logic";
+import { dayFrogCandidates, isRitualDone, ritualStreak, ritualWeek, type RitualDTO } from "./ritual-logic";
 
 type RitualRow = NonNullable<Awaited<ReturnType<typeof prisma.dailyRitual.findFirst>>>;
 
@@ -9,6 +10,7 @@ export function ritualDTO(r: RitualRow): RitualDTO {
   return {
     day: fromDbDate(r.day),
     frogTaskId: r.frogTaskId,
+    frogBlockId: r.frogBlockId,
     frogTitle: r.frogTitle,
     frogDoneAt: r.frogDoneAt?.toISOString() ?? null,
     skipped: r.skipped,
@@ -21,12 +23,18 @@ export function ritualDTO(r: RitualRow): RitualDTO {
  * racha de rituales (lo demás sale de `getDashboard`).
  */
 export async function getRitualData(today: string) {
-  const [row, recent, tasks] = await Promise.all([
+  const [row, recent, tasks, todayBlocks] = await Promise.all([
     prisma.dailyRitual.findUnique({ where: { day: toDbDate(today) } }),
     prisma.dailyRitual.findMany({ where: { day: { gte: toDbDate(addDays(today, -400)), lte: toDbDate(today) } } }),
     prisma.planTask.findMany({
       where: { status: { not: "done" } },
       select: { id: true, title: true, status: true, priority: true, deadline: true, category: { select: { id: true, name: true, color: true } } },
+    }),
+    // Lo que ya está en el Plan de hoy y falta (sin los "Libre"): de ahí sale primero la tarea prioritaria.
+    prisma.planBlock.findMany({
+      where: { date: toDbDate(today), done: false },
+      orderBy: [{ startTime: { sort: "asc", nulls: "last" } }, { sortKey: "asc" }],
+      select: { id: true, title: true, startTime: true, priority: true, taskId: true, category: { select: { id: true, name: true, color: true } } },
     }),
   ]);
 
@@ -42,7 +50,8 @@ export async function getRitualData(today: string) {
   const passes = new Map<string, number>();
   for (const b of blocks) if (b.taskId) passes.set(b.taskId, (passes.get(b.taskId) ?? 0) + (perBlock.get(b.id) ?? 0));
 
-  const candidates = frogCandidates(
+  const candidates = dayFrogCandidates(
+    todayBlocks.filter((b) => !isFreeBlock(b)),
     tasks.map((t) => ({
       id: t.id,
       title: t.title,
@@ -53,7 +62,7 @@ export async function getRitualData(today: string) {
       category: t.category,
     })),
     today,
-    3,
+    4,
   );
 
   return {

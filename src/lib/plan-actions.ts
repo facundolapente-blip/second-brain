@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { QUARTER_REVIEW_TAG } from "./review-logic";
 import { prisma } from "./prisma";
 import { syncLinkedHabit } from "./plan-habit-link";
+import { markBlockDone } from "./block-done";
 import { exigirSesion } from "./session";
 import { logActivity, trashAndDelete } from "./trash";
 import { addDays, fromDbDate, isISODate, startOfWeek, toDbDate, todayISO } from "./dates";
@@ -165,11 +166,8 @@ export async function saveBlock(_prev: ActionResult | null, fd: FormData): Promi
 export async function setBlockDone(id: string, done: boolean) {
   await exigirSesion();
   const real = await blockId(id);
-  await prisma.planBlock.updateMany({ where: { id: real }, data: { done: !!done } });
-  // La tarea de un objetivo agendada en este bloque se tilda igual.
-  await prisma.planStep.updateMany({ where: { blockId: real }, data: { done: !!done, doneAt: done ? new Date() : null } });
-  // Gym: tildar su bloque marca el hábito (el único atado al Plan).
-  await syncLinkedHabit(real, !!done);
+  // Con la tarea de un objetivo agendada en él, Gym y la tarea prioritaria del día (block-done.ts).
+  await markBlockDone(real, !!done);
   refrescar();
 }
 

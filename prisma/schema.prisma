@@ -930,6 +930,8 @@ model DailyRitual {
   mission       String?
   /// Tarea del Plan elegida como sapo (sin relación: si se borra la tarea, queda el nombre).
   frogTaskId    String?
+  /// Bloque de hoy elegido como tarea prioritaria (tildarlo en uno tilda el otro; 2026-11-23).
+  frogBlockId   String?
   frogTitle     String?
   frogDoneAt    DateTime?
   /// Sin uso desde 2026-11-14 (era yes | partial | no, la pregunta de la noche de la misión).

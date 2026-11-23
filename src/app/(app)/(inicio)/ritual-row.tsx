@@ -93,9 +93,9 @@ export function RitualRow({
   }
 
   // La tarea que se ve: la elegida o, si no hay, la primera candidata (propuesta).
-  const chosen = ritual.frogTitle ? { id: ritual.frogTaskId, title: ritual.frogTitle } : null;
-  const proposal = data.candidates[0] ?? null;
-  const frogPatch = (c: { id: string | null; title: string }): RitualPatch => ({ frogTaskId: c.id, frogTitle: c.title });
+  const chosen: Frog | null = ritual.frogTitle ? { id: ritual.frogTaskId, blockId: ritual.frogBlockId, title: ritual.frogTitle } : null;
+  const proposal = data.candidates[0] ? asFrog(data.candidates[0]) : null;
+  const frogPatch = (c: Frog): RitualPatch => ({ frogTaskId: c.id, frogBlockId: c.blockId, frogTitle: c.title });
 
   // Desde las 19 h ya es "Buenas noches" (la pregunta de la noche arranca ahí).
   const title = `${d.hour >= NIGHT_HOUR ? "Buenas noches" : greeting(d.hour)}, Facu`;
@@ -194,6 +194,11 @@ function nextBlock(d: Dashboard) {
 
 // ─── La tarea prioritaria (el "sapo" en el código) ───────────────────────────
 
+/** Lo elegido: una tarea del Plan, un bloque de hoy (con su tarea si tiene) o algo escrito a mano. */
+type Frog = { id: string | null; blockId: string | null; title: string };
+const asFrog = (c: FrogCandidate): Frog => ({ id: c.id || null, blockId: c.blockId ?? null, title: c.title });
+const sameFrog = (a: Frog, b: Frog) => (a.blockId || b.blockId ? a.blockId === b.blockId : a.id === b.id && a.title === b.title);
+
 function Reasons({ c }: { c: Pick<FrogCandidate, "reasons" | "category"> }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -217,8 +222,8 @@ function FrogCard({
 }: {
   d: Dashboard;
   candidates: FrogCandidate[];
-  chosen: { id: string | null; title: string } | null;
-  onChoose: (c: { id: string | null; title: string }) => void;
+  chosen: Frog | null;
+  onChoose: (c: Frog) => void;
   /** "Listo": queda armado (con la propuesta si no se eligió otra). */
   onDone: () => void;
   onSkip: () => void;
@@ -227,15 +232,17 @@ function FrogCard({
   const [draft, setDraft] = useState("");
   const [scheduled, setScheduled] = useState<string[]>([]);
   const [, start] = useSafeTransition();
-  const shownCand = chosen ? candidates.find((c) => c.id === chosen.id) : candidates[0];
-  const frog = chosen ?? (shownCand ? { id: shownCand.id, title: shownCand.title } : null);
-  const others = candidates.filter((c) => c.id !== frog?.id).slice(0, 2);
-  const inPlan = !!frog?.id && (scheduled.includes(frog.id) || d.plan.today.some((b) => b.taskId === frog.id));
+  const shownCand = chosen ? candidates.find((c) => sameFrog(asFrog(c), chosen)) : candidates[0];
+  const frog = chosen ?? (shownCand ? asFrog(shownCand) : null);
+  const others = candidates.filter((c) => !frog || !sameFrog(asFrog(c), frog)).slice(0, 3);
+  // Un bloque de hoy ya está en el Plan; una tarea, si se agendó recién o tiene un bloque hoy.
+  const inPlan = !!frog?.blockId || (!!frog?.id && (scheduled.includes(frog.id) || d.plan.today.some((b) => b.taskId === frog.id)));
+  const blockTime = frog?.blockId ? d.plan.today.find((b) => b.id === frog.blockId)?.startTime : null;
 
   function writeFrog() {
     const t = draft.trim();
     if (!t) return setWriting(false);
-    onChoose({ id: null, title: t });
+    onChoose({ id: null, blockId: null, title: t });
     setDraft("");
     setWriting(false);
   }
@@ -253,10 +260,10 @@ function FrogCard({
         <>
           <div className="grid gap-2">
             <p className="text-[21px] leading-[1.2] font-bold tracking-[-0.025em] text-pretty">{frog.title}</p>
-            {shownCand && shownCand.id === frog.id ? <Reasons c={shownCand} /> : !frog.id && <p className="text-[12.5px] text-muted">Escrito a mano</p>}
+            {shownCand && sameFrog(asFrog(shownCand), frog) ? <Reasons c={shownCand} /> : !frog.id && !frog.blockId && <p className="text-[12.5px] text-muted">Escrito a mano</p>}
           </div>
-          <div className={cx("grid gap-2", frog.id && "grid-cols-2")}>
-            {frog.id && (
+          <div className={cx("grid gap-2", (frog.id || frog.blockId) && "grid-cols-2")}>
+            {(frog.id || frog.blockId) && (
               <button
                 type="button"
                 disabled={inPlan}
@@ -275,11 +282,11 @@ function FrogCard({
                 className="press inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-[var(--head-fg)] px-3 text-[13.5px] font-semibold text-[var(--head-chip-fg)] hover:opacity-90 disabled:bg-surface-2 disabled:text-muted disabled:opacity-100"
               >
                 {inPlan ? <CalendarCheck size={16} aria-hidden /> : <CalendarPlus size={16} aria-hidden />}
-                {inPlan ? "Ya está hoy" : "Agendar hoy"}
+                {inPlan ? (blockTime ? `Hoy a las ${blockTime}` : "Ya está hoy") : "Agendar hoy"}
               </button>
             )}
             <Link
-              href={frog.id ? `/enfoque?tarea=${frog.id}` : "/enfoque"}
+              href={frog.blockId ? `/enfoque?bloque=${frog.blockId}` : frog.id ? `/enfoque?tarea=${frog.id}` : "/enfoque"}
               onClick={() => !chosen && onChoose(frog)}
               className="press inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-line-strong bg-surface px-3 text-[13.5px] font-semibold text-fg hover:bg-surface-2"
             >
@@ -293,13 +300,13 @@ function FrogCard({
       <div className="grid gap-0.5 border-t border-line pt-2.5">
         <span className="kicker mb-1">{frog ? "Otras candidatas" : "Tu tarea prioritaria"}</span>
         {others.map((c) => (
-          <div key={c.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-0.5 text-[13.5px]">
+          <div key={c.blockId ?? c.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-0.5 text-[13.5px]">
             <span className="min-w-0 truncate">
               <b className="font-semibold">{c.title}</b> <span className="text-[12.5px] text-muted">· {c.reasons[0]?.text.toLowerCase()}</span>
             </span>
             <button
               type="button"
-              onClick={() => onChoose({ id: c.id, title: c.title })}
+              onClick={() => onChoose(asFrog(c))}
               className="press inline-flex min-h-11 items-center rounded-full px-3 text-[12.5px] font-semibold text-[var(--head-fg)] hover:bg-surface-2"
             >
               Elegir
@@ -441,7 +448,7 @@ function SmallFrog({
           type="button"
           aria-pressed={eaten}
           onClick={eat}
-          className="press inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface py-1 pr-3 pl-1.5 text-[12.5px] font-semibold whitespace-nowrap text-[var(--head-fg)] shadow-[0_0_0_1px_var(--head-line)]"
+          className="press inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface py-1 pr-3 pl-1.5 text-[12.5px] font-semibold whitespace-nowrap text-fg shadow-[0_0_0_1px_var(--head-line)]"
         >
           <span
             className={cx(
@@ -464,8 +471,8 @@ function SmallFrog({
         )
       ) : (
         <div className="-mb-1.5 flex flex-wrap items-center gap-x-4">
-          {ritual.frogTaskId && (
-            <Link href={`/enfoque?tarea=${ritual.frogTaskId}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted hover:text-fg">
+          {(ritual.frogBlockId || ritual.frogTaskId) && (
+            <Link href={ritual.frogBlockId ? `/enfoque?bloque=${ritual.frogBlockId}` : `/enfoque?tarea=${ritual.frogTaskId}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted hover:text-fg">
               <Timer size={15} aria-hidden /> Enfocarme
             </Link>
           )}

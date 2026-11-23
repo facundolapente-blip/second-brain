@@ -13,6 +13,8 @@ export const FROG_MAX = 120;
 export type RitualDTO = {
   day: string;
   frogTaskId: string | null;
+  /** El bloque de hoy elegido (si la tarea prioritaria salió del Plan de hoy). */
+  frogBlockId: string | null;
   frogTitle: string | null;
   /** Instante (ISO) en que se tildó "La hice". */
   frogDoneAt: string | null;
@@ -21,12 +23,13 @@ export type RitualDTO = {
 };
 
 export function emptyRitual(day: string): RitualDTO {
-  return { day, frogTaskId: null, frogTitle: null, frogDoneAt: null, skipped: false, completedAt: null };
+  return { day, frogTaskId: null, frogBlockId: null, frogTitle: null, frogDoneAt: null, skipped: false, completedAt: null };
 }
 
 /** Lo que se puede cambiar de un ritual (cada campo, opcional). `completed` y `frogDone` ponen o sacan la hora. */
 export type RitualPatch = {
   frogTaskId?: string | null;
+  frogBlockId?: string | null;
   frogTitle?: string | null;
   frogDoneAt?: string | null;
   skipped?: boolean;
@@ -47,6 +50,7 @@ export function cleanRitualPatch(raw: unknown): RitualPatch {
   if ("frogTitle" in p || "frogTaskId" in p) {
     out.frogTitle = typeof p.frogTitle === "string" ? oneLine(p.frogTitle, FROG_MAX) || null : null;
     out.frogTaskId = typeof p.frogTaskId === "string" && p.frogTaskId.length <= 40 && out.frogTitle ? p.frogTaskId : null;
+    out.frogBlockId = typeof p.frogBlockId === "string" && p.frogBlockId.length <= 60 && out.frogTitle ? p.frogBlockId : null;
   }
   if ("frogDoneAt" in p) {
     const t = typeof p.frogDoneAt === "string" ? Date.parse(p.frogDoneAt) : NaN;
@@ -62,9 +66,10 @@ export function applyRitualPatch(r: RitualDTO, p: RitualPatch, now: Date = new D
   const next = { ...r };
   if ("frogTitle" in p) {
     // Otro sapo: lo comido era del anterior.
-    if ((p.frogTitle ?? null) !== r.frogTitle || (p.frogTaskId ?? null) !== r.frogTaskId) next.frogDoneAt = null;
+    if ((p.frogTitle ?? null) !== r.frogTitle || (p.frogTaskId ?? null) !== r.frogTaskId || (p.frogBlockId ?? null) !== r.frogBlockId) next.frogDoneAt = null;
     next.frogTitle = p.frogTitle ?? null;
     next.frogTaskId = p.frogTaskId ?? null;
+    next.frogBlockId = p.frogBlockId ?? null;
   }
   if ("frogDoneAt" in p) next.frogDoneAt = p.frogDoneAt ?? null;
   if ("skipped" in p) next.skipped = !!p.skipped;
@@ -108,7 +113,11 @@ export function ritualStreak(doneDays: Iterable<string>, today: string): number 
 // ─── El sapo ────────────────────────────────────────────────────────────────
 
 export type FrogTaskInput = {
+  /** La tarea del Plan ("" si es un bloque sin tarea). */
   id: string;
+  /** Si sale de un bloque de hoy: su id y su hora (null = sin hora). */
+  blockId?: string | null;
+  time?: string | null;
   title: string;
   /** backlog | todo | doing */
   status: string;
@@ -134,6 +143,8 @@ function dueReason(left: number): FrogReason {
 export function frogReasons(t: FrogTaskInput, today: string): FrogReason[] {
   const left = t.deadline ? diffDays(t.deadline, today) : null;
   const out: FrogReason[] = [];
+  // Lo que ya está en el Plan de hoy lo dice primero.
+  if (t.blockId) out.push({ text: t.time ? `Hoy a las ${t.time}` : "Hoy en el plan", tone: "blue" });
   if (left !== null && left < 0) out.push(dueReason(left));
   if (t.priority >= 4) out.push({ text: "Urgente", tone: "red" });
   else if (t.priority === 3) out.push({ text: "Prioridad alta", tone: "orange" });
@@ -166,6 +177,51 @@ export function frogCandidates(tasks: FrogTaskInput[], today: string, n = 3): Fr
     )
     .slice(0, n)
     .map((t) => ({ ...t, reasons: frogReasons(t, today) }));
+}
+
+export type FrogBlockInput = {
+  id: string;
+  title: string;
+  startTime: string | null;
+  priority: number;
+  taskId: string | null;
+  category: { id: string; name: string; color: string } | null;
+};
+
+/**
+ * Las candidatas del día (pedido de Facu, 2026-11-23: "es muy probable que la tarea ya esté
+ * agendada en los bloques"): primero los bloques de hoy que faltan (sin los "Libre"), con la
+ * prioridad, el deadline y las veces pasada de su tarea si tienen; después, las tareas que no
+ * están hoy en el Plan y piden atención (vencidas, prioridad 3 o 4, pasadas 2 veces o más),
+ * para agendarlas. Sin bloques hoy, las tareas de siempre.
+ */
+export function dayFrogCandidates(blocks: FrogBlockInput[], tasks: FrogTaskInput[], today: string, n = 4): FrogCandidate[] {
+  const byTask = new Map(tasks.map((t) => [t.id, t]));
+  const fromBlocks: FrogTaskInput[] = blocks.map((b) => {
+    const t = b.taskId ? byTask.get(b.taskId) : undefined;
+    return {
+      id: t?.id ?? "",
+      blockId: b.id,
+      time: b.startTime,
+      title: b.title,
+      status: t?.status ?? "todo",
+      priority: Math.max(b.priority, t?.priority ?? 0),
+      deadline: t?.deadline ?? null,
+      passes: t?.passes ?? 0,
+      category: b.category ?? t?.category ?? null,
+    };
+  });
+  const inToday = new Set(blocks.map((b) => b.taskId).filter(Boolean));
+  const rest = tasks.filter((t) => !inToday.has(t.id));
+  if (!fromBlocks.length) return frogCandidates(rest, today, n);
+  const pressing = rest.filter((t) => (t.deadline && diffDays(t.deadline, today) < 0) || t.priority >= 3 || t.passes >= 2);
+  // Los bloques se ordenan con las mismas reglas (lo vencido y urgente, primero); a igualdad, por hora.
+  const rankedBlocks = frogCandidates(
+    [...fromBlocks].sort((a, b) => (a.time ?? "99").localeCompare(b.time ?? "99")).map((b) => ({ ...b, status: b.status === "backlog" ? "todo" : b.status })),
+    today,
+    fromBlocks.length,
+  );
+  return [...rankedBlocks, ...frogCandidates(pressing, today, n)].slice(0, n);
 }
 
 // ─── Revisión semanal ───────────────────────────────────────────────────────
