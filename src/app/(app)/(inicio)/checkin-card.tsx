@@ -46,9 +46,9 @@ export function CheckinCard({
   today: CheckinDTO;
   yesterday: CheckinDTO;
   lastWeightG: number | null;
-  /** Lo que mandó el reloj (solo para leer); no cuenta en "N de 5". */
+  /** Lo que mandó el reloj (solo para leer); no cuenta en "N de 4". */
   watch: { today: WatchDay | null; yesterday: WatchDay | null };
-  /** El ánimo que quedó en el journal (solo para leer); tampoco cuenta en "N de 5". */
+  /** El ánimo que quedó en el journal (solo para leer); tampoco cuenta en "N de 4". */
   night: { today: NightMood; yesterday: NightMood };
   className?: string;
 }) {
@@ -73,12 +73,12 @@ export function CheckinCard({
   const cur = data[day];
   const filled = countFilled(cur);
   // Con el de hoy completo arranca plegado: una línea con lo cargado.
-  const [open, setOpen] = useState(() => countFilled(today) < 5);
+  const [open, setOpen] = useState(() => countFilled(today) < CHECKIN_FIELDS);
   // Hoy ↔ Ayer: fundido de los valores (solo tras tocar).
   const [daySwap, setDaySwap] = useState(false);
   // El ánimo elegido aparece con un golpe corto, solo tras tocarlo (al cargar, quieto).
   const [tappedMood, setTappedMood] = useState<number | null>(null);
-  // "N de 5" → "Guardando…" → "Guardado": los tres ocupan el mismo lugar (el ancho del
+  // "N de 4" → "Guardando…" → "Guardado": los tres ocupan el mismo lugar (el ancho del
   // más largo) y se cruzan con un fundido, así nada se corre (antes el selector Hoy/Ayer
   // bajaba de renglón y la tarjeta saltaba ~45 px).
   const statusKey = pending ? "saving" : saved ? "saved" : "count";
@@ -147,7 +147,7 @@ export function CheckinCard({
         <span key={filledTick.key} className={filledTick.className}>
           {filled}
         </span>{" "}
-        de 5<span className="hidden sm:inline"> · cada toque se guarda solo</span>
+        de {CHECKIN_FIELDS}<span className="hidden sm:inline"> · cada toque se guarda solo</span>
       </StatusLine>
       <StatusLine on={statusKey === "saving"}>Guardando…</StatusLine>
       <StatusLine on={statusKey === "saved"}>
@@ -398,8 +398,11 @@ function StatusLine({ on, children }: { on: boolean; children: React.ReactNode }
   );
 }
 
+/** Lo que cuenta en "N de 4": el peso no (se carga solo algunos días). */
+const CHECKIN_FIELDS = 4;
+
 function countFilled(c: CheckinDTO) {
-  return (["mood", "energy", "stress", "sleepMin", "weightG"] as const).filter((k) => c[k] !== null).length;
+  return (["mood", "energy", "stress", "sleepMin"] as const).filter((k) => c[k] !== null).length;
 }
 
 function Row({ icon, label, hint, children, className }: { icon: React.ReactNode; label: string; hint?: string; children: React.ReactNode; className?: string }) {
